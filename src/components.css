@@ -1,0 +1,397 @@
+/* Component styles for all Finca Manager screens */
+
+/* ---- Shared Utility Components ---- */
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.section-title h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.section-subtitle {
+  font-size: 13px;
+  color: #888;
+  margin-top: -8px;
+  margin-bottom: 20px;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 4px 12px rgba(46,125,50,0.25);
+}
+.btn-primary:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(46,125,50,0.3);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.badge-green {
+  background: rgba(67,160,71,0.15);
+  color: #43a047;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- Stats Grid ---- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+.stat-icon {
+  font-size: 28px !important;
+  color: var(--primary);
+  background: rgba(46,125,50,0.1);
+  padding: 10px;
+  border-radius: 14px;
+}
+.stat-label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+
+/* ---- Info & Alert Banners ---- */
+.info-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-top: 24px;
+  font-size: 14px;
+}
+.alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff8e1;
+  color: #e65100;
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  border-left: 4px solid #fb8c00;
+}
+.tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(135deg, #43a04715, #66bb6a15);
+  border: 1px solid rgba(67,160,71,0.2);
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 24px;
+  color: #388e3c;
+  font-size: 14px;
+}
+
+/* ---- Search Box ---- */
+.screen-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid #eee;
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: var(--shadow);
+}
+.search-box input {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  flex: 1;
+  background: transparent;
+  color: var(--on-surface);
+}
+.search-box .material-icons {
+  color: #aaa;
+}
+
+/* ---- Dashboard Specific ---- */
+.screen-hero {
+  background: linear-gradient(135deg, #2e7d32, #60ad5e);
+  border-radius: var(--border-radius);
+  padding: 32px;
+  margin-bottom: 24px;
+  color: white;
+}
+.hero-content h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.hero-content p {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+.hero-content .badge-green {
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+.lot-card {
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+  cursor: pointer;
+}
+.lot-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.1);
+}
+.lot-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.lot-icon { font-size: 28px; }
+.lot-header h4 { font-size: 15px; font-weight: 600; }
+.lot-header p { font-size: 13px; color: #666; }
+
+.activity-list { display: flex; flex-direction: column; gap: 12px; }
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.activity-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.activity-content h4 { font-size: 14px; font-weight: 600; }
+.activity-content p { font-size: 12px; color: #888; }
+
+/* ---- Herramientas Specific ---- */
+.tool-list { display: flex; flex-direction: column; gap: 12px; }
+.tool-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 20px;
+  transition: var(--transition);
+}
+.tool-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+.tool-main { display: flex; align-items: center; gap: 16px; flex: 1; }
+.tool-emoji { font-size: 28px; }
+.tool-info h4 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.tool-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tool-location { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #666; }
+.tool-arrow { color: #aaa; }
+
+/* ---- Motores Specific ---- */
+.motor-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+.motor-card { transition: var(--transition); }
+.motor-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+.motor-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.motor-icon { font-size: 32px; }
+.motor-info { flex: 1; }
+.motor-info h4 { font-size: 15px; font-weight: 600; }
+.motor-sn { font-size: 12px; color: #888; }
+.hours-bar { display: flex; align-items: center; gap: 12px; }
+.hours-track {
+  flex: 1;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.hours-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+.hours-label { font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* ---- Potreros Specific ---- */
+.potrero-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.potrero-card { transition: var(--transition); }
+.potrero-card:hover { transform: translateY(-2px); }
+.potrero-header { display: flex; align-items: center; gap: 16px; }
+.potrero-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.potrero-info { flex: 1; }
+.potrero-info h4 { font-size: 15px; font-weight: 600; }
+.potrero-meta { display: flex; gap: 12px; font-size: 12px; color: #666; align-items: center; flex-wrap: wrap; }
+.potrero-meta span { display: flex; align-items: center; gap: 4px; }
+
+/* ---- Ganado Specific ---- */
+.animal-list { display: flex; flex-direction: column; gap: 12px; }
+.animal-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  transition: var(--transition);
+}
+.animal-card:hover { transform: translateY(-2px); }
+.animal-tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 11px;
+  color: #aaa;
+  font-weight: 600;
+}
+.animal-avatar { font-size: 36px; }
+.animal-info { flex: 1; }
+.animal-info h4 { font-size: 15px; font-weight: 600; }
+.animal-info > p { font-size: 13px; color: #666; margin-bottom: 8px; }
+.animal-stats { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12px; color: #666; }
+.animal-stats span { display: flex; align-items: center; gap: 4px; }
+.vacuna-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.vacuna-badge.ok { background: #e8f5e9; color: #43a047; }
+.vacuna-badge.pending { background: #fce4ec; color: #e53935; }
+
+/* ---- Mobile Navigation Bottom Bar ---- */
+@media (max-width: 1024px) {
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    padding: 8px 0;
+    border-top: 1px solid #eee;
+    border-right: none;
+    z-index: 200;
+    justify-content: space-around;
+    top: unset;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+  }
+  .sidebar-header { display: none; }
+  .sidebar-footer { display: none; border: none; padding: 0; }
+  .nav-links {
+    display: flex;
+    flex-direction: row;
+    flex-grow: 0;
+    width: 100%;
+    justify-content: space-around;
+  }
+  .nav-links li { flex: 1; }
+  .nav-link {
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 4px;
+    font-size: 10px;
+    text-align: center;
+    justify-content: center;
+    border-radius: 12px;
+    margin: 0 4px;
+  }
+  .nav-link span.material-icons { font-size: 22px !important; }
+  .main-content {
+    padding-bottom: 80px;
+  }
+  .sidebar.open { left: 0; top: 0; height: 100%; flex-direction: column; }
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#2e7d32"/>
+  <!-- Leaf shape -->
+  <path d="M256 120 C180 120 120 200 120 290 C120 370 190 400 256 400 C322 400 392 370 392 290 C392 200 332 120 256 120Z" fill="#81c784" opacity="0.3"/>
+  <path d="M256 140 C200 160 160 220 160 295 C160 360 200 390 256 390 C256 390 256 250 380 200 C360 160 310 140 256 140Z" fill="#a5d6a7"/>
+  <path d="M256 150 C256 150 256 350 256 390" stroke="white" stroke-width="12" stroke-linecap="round"/>
+  <path d="M256 250 C256 250 210 230 186 200" stroke="white" stroke-width="8" stroke-linecap="round"/>
+  <path d="M256 300 C256 300 300 285 320 265" stroke="white" stroke-width="8" stroke-linecap="round"/>
+  <!-- Gear icon small -->
+  <circle cx="370" cy="160" r="48" fill="#1b5e20"/>
+  <circle cx="370" cy="160" r="22" fill="#a5d6a7"/>
+  <rect x="366" y="108" width="8" height="20" rx="4" fill="#a5d6a7"/>
+  <rect x="366" y="192" width="8" height="20" rx="4" fill="#a5d6a7"/>
+  <rect x="318" y="156" width="20" height="8" rx="4" fill="#a5d6a7"/>
+  <rect x="402" y="156" width="20" height="8" rx="4" fill="#a5d6a7"/>
+</svg>
