@@ -3,6 +3,11 @@ import './components.css';
 import './pickers.css';
 import './detalle_motor.css';
 import './snackbar.js';
+import { registerSW } from 'virtual:pwa-register';
+
+// Register Service Worker for PWA
+registerSW({ immediate: true });
+
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores } from './screens/motores.js';
 import { renderHerramientas } from './screens/herramientas.js';
@@ -167,19 +172,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Handle Nav Clicks
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            const screenId = link.getAttribute('data-screen');
-            if (screenId) {
-                e.preventDefault();
-                navigate(screenId);
-
-                // Close sidebar on mobile
-                if (window.innerWidth <= 1024) {
-                    closeSidebar();
-                }
-            }
         });
+    });
+
+    // PWA Install Logic
+    let deferredPrompt;
+    const installBtn = document.getElementById('pwa-install');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        // Update UI notify the user they can install the PWA
+        if (installBtn) installBtn.style.display = 'flex';
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            // Show the install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond to the prompt
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                console.log('User accepted the install prompt');
+                installBtn.style.display = 'none';
+            } else {
+                console.log('User dismissed the install prompt');
+            }
+            deferredPrompt = null;
+        });
+    }
+
+    window.addEventListener('appinstalled', (evt) => {
+        console.log('Finca Manager was installed.');
+        if (installBtn) installBtn.style.display = 'none';
     });
 });
