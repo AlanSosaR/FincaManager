@@ -37,9 +37,6 @@ export async function renderDetallePotrero(potreroId) {
 
   return `
     <div class="screen-detalle">
-      <button class="btn-back" onclick="navigateTo('potreros')">
-        <span class="material-icons">arrow_back</span> Volver a Potreros
-      </button>
 
       <!-- Hero Section -->
       <div class="detail-hero card">

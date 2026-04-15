@@ -28,5 +28,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,ico}']
       }
     })
-  ]
+  ],
+  server: {
+    host: true
+  }
 })

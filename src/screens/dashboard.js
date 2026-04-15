@@ -3,7 +3,21 @@ import { supabase } from '../supabase.js';
 export async function renderDashboard() {
   const { count: potrerosCount } = await supabase.from('potreros').select('*', { count: 'exact', head: true });
   const { count: ganadoCount } = await supabase.from('ganado').select('*', { count: 'exact', head: true });
-  const { count: motoresCount } = await supabase.from('motores').select('*', { count: 'exact', head: true });
+  const { data: motores, error: motoresError } = await supabase.from('motores').select('*');
+
+  const motoresUrgentes = (motores || []).filter(eq => (eq.horas || 0) >= (eq.max_horas || 100));
+  const motoresCount = (motores || []).length;
+
+  if (motoresUrgentes.length > 0) {
+    setTimeout(() => {
+      window.Snackbar.confirm(
+        `<strong>Mantenimiento pendiente:</strong> ${motoresUrgentes.length} motores requieren cambio de aceite.`,
+        () => window.navigateTo('detalle_motor', motoresUrgentes[0].id),
+        null,
+        { confirmText: 'REVISAR', type: 'error', persist: true }
+      );
+    }, 800);
+  }
 
   return `
     <div class="screen-dashboard">

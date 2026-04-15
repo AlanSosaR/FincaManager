@@ -3,13 +3,23 @@
   --primary-light: #60ad5e;
   --primary-dark: #005005;
   --secondary: #fb8c00;
-  --background: #f5f5f5;
+  --background: #fdf9f3;
   --surface: #ffffff;
   --on-surface: #333333;
   --border-radius: 24px;
-  --sidebar-width: 280px;
+  --sidebar-width: 300px;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 1024px) {
+  .mobile-only {
+    display: flex !important;
+  }
 }
 
 * {
@@ -25,6 +35,7 @@ body {
   line-height: 1.5;
   font-size: 16px;
   overflow: hidden;
+  scroll-behavior: smooth;
 }
 
 #app {
@@ -36,13 +47,22 @@ body {
 /* Sidebar Styling */
 .sidebar {
   width: var(--sidebar-width);
-  background: var(--surface);
+  background-color: #ffffff !important;
+  background: #ffffff !important;
   border-right: 1px solid rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
   padding: 32px 24px;
-  z-index: 100;
+  z-index: 1000;
   transition: var(--transition);
+  opacity: 1 !important;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 40px;
 }
 
 .sidebar-header h1 {
@@ -54,7 +74,6 @@ body {
 .sidebar-header p {
   font-size: 14px;
   color: #666;
-  margin-bottom: 40px;
 }
 
 .nav-links {
@@ -86,8 +105,13 @@ body {
 
 .nav-link.active {
   background: var(--primary);
-  color: white;
-  box-shadow: 0 8px 16px rgba(46, 125, 50, 0.2);
+  color: #fff !important;
+  box-shadow: 0 12px 24px rgba(46, 125, 50, 0.25);
+  transform: translateX(4px);
+}
+
+.nav-link.active span {
+  color: #fff !important;
 }
 
 .sidebar-footer {
@@ -107,6 +131,7 @@ body {
   height: 100vh;
   overflow-y: auto;
   position: relative;
+  background: var(--background);
 }
 
 .top-bar {
@@ -117,7 +142,7 @@ body {
   background: var(--surface);
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 2000;
   border-bottom: 1px solid rgba(0,0,0,0.03);
 }
 
@@ -127,6 +152,8 @@ body {
   border: none;
   cursor: pointer;
   padding: 8px;
+  z-index: 5000;
+  position: relative;
 }
 
 #current-screen-title {
@@ -167,6 +194,23 @@ body {
 
   .preview-container {
     padding: 24px;
+  }
+
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.5);
+    z-index: 1200;
+    display: none;
+    backdrop-filter: blur(4px);
+    transition: var(--transition);
+  }
+
+  .sidebar-overlay.active {
+    display: block;
   }
 }
 

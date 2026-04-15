@@ -33,9 +33,6 @@ export async function renderDetalleHerramienta(toolId) {
 
   return `
     <div class="screen-detalle">
-      <button class="btn-back" onclick="navigateTo('herramientas')">
-        <span class="material-icons">arrow_back</span> Volver a Herramientas
-      </button>
 
       <!-- Hero Section -->
       <div class="detail-hero card" style="background: ${toolData.color};">

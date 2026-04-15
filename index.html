@@ -20,12 +20,17 @@
         <!-- Sidebar/Navigation -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h1>Finca Manager</h1>
-                <p>Gestión Agrícola</p>
+                <div class="header-main">
+                    <h1>Finca Manager</h1>
+                    <p>Gestión Agrícola</p>
+                </div>
+                <button id="sidebar-close" class="btn-close mobile-only">
+                    <span class="material-icons">close</span>
+                </button>
             </div>
             <ul class="nav-links">
-                <li><a href="#dashboard" class="nav-link active" data-screen="dashboard"><span class="material-icons">psychology_alt</span> Cafetal</a></li>
-                <li><a href="#motores" class="nav-link" data-screen="motores"><span class="material-icons">settings_input_component</span> Motores</a></li>
+                <li><a href="#motores" class="nav-link active" data-screen="motores"><span class="material-icons">settings_input_component</span> Motores</a></li>
+                <li><a href="#dashboard" class="nav-link" data-screen="dashboard"><span class="material-icons">psychology_alt</span> Cafetal</a></li>
                 <li><a href="#herramientas" class="nav-link" data-screen="herramientas"><span class="material-icons">construction</span> Herramientas</a></li>
                 <li><a href="#ganado" class="nav-link" data-screen="ganado"><span class="material-icons">pets</span> Ganado</a></li>
                 <li><a href="#potreros" class="nav-link" data-screen="potreros"><span class="material-icons">landscape</span> Potreros</a></li>
@@ -42,7 +47,7 @@
                 <button id="menu-toggle" class="menu-toggle">
                     <span class="material-icons">menu</span>
                 </button>
-                <h2 id="current-screen-title">Dashboard Cafetal</h2>
+                <h2 id="current-screen-title">Lista de Motores</h2>
                 <div class="user-actions">
                     <span class="material-icons">notifications</span>
                 </div>
@@ -53,12 +58,16 @@
             </div>
         </main>
     </div>
+    <!-- Snackbar System Container -->
+    <div id="snackbar-container"></div>
+
     <!-- Modal System -->
     <div id="modal-container" class="modal-overlay">
         <div class="modal-content" id="modal-body">
             <!-- Form content will be injected here -->
         </div>
     </div>
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
     <script type="module" src="/src/main.js"></script>
 </body>
 </html>

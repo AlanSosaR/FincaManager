@@ -101,7 +101,7 @@ export function showModal(type, onSave) {
     const { error } = await supabase.from(table).insert([data]);
     
     if (error) {
-      alert('Error al guardar: ' + error.message);
+      window.Snackbar.show('Error al guardar: ' + error.message, { type: 'error' });
     } else {
       closeModal();
       if (onSave) onSave();

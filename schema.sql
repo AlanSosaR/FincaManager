@@ -33,6 +33,7 @@ CREATE TABLE motor_mantenimientos (
   fecha TIMESTAMP WITH TIME ZONE,
   icon TEXT,
   color TEXT,
+  total_horas NUMERIC,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

@@ -1,5 +1,8 @@
 import './style.css';
 import './components.css';
+import './pickers.css';
+import './detalle_motor.css';
+import './snackbar.js';
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores } from './screens/motores.js';
 import { renderHerramientas } from './screens/herramientas.js';
@@ -17,15 +20,15 @@ const screens = {
     herramientas: { title: 'Inventario de Herramientas', render: renderHerramientas },
     ganado: { title: 'Gestión de Ganado', render: renderGanado },
     potreros: { title: 'Control de Potreros', render: renderPotreros },
-    detalle_motor: { title: 'Detalle de Motor', render: renderDetalleMotor },
-    detalle_potrero: { title: 'Detalle de Potrero', render: renderDetallePotrero },
-    detalle_animal: { title: 'Detalle de Animal', render: renderDetalleAnimal },
-    detalle_herramienta: { title: 'Detalle de Herramienta', render: renderDetalleHerramienta }
+    detalle_motor: { title: 'Detalle de Motor', backTo: 'motores', render: renderDetalleMotor },
+    detalle_potrero: { title: 'Detalle de Potrero', backTo: 'potreros', render: renderDetallePotrero },
+    detalle_animal: { title: 'Detalle de Animal', backTo: 'ganado', render: renderDetalleAnimal },
+    detalle_herramienta: { title: 'Detalle de Herramienta', backTo: 'herramientas', render: renderDetalleHerramienta }
 };
 
 // Global navigate function for use inside screen HTML
-window.navigateTo = function(screenId) {
-    const event = new CustomEvent('navigate', { detail: { screenId } });
+window.navigateTo = function(screenId, ...args) {
+    const event = new CustomEvent('navigate', { detail: { screenId, args } });
     document.dispatchEvent(event);
 };
 
@@ -34,26 +37,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleElement = document.getElementById('current-screen-title');
 
     async function navigate(screenId, ...args) {
-        const screen = screens[screenId] || screens.dashboard;
-        titleElement.textContent = screen.title;
+        const screen = screens[screenId] || screens.motores;
+        
+        if (screen.backTo) {
+            titleElement.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button onclick="window.navigateTo('${screen.backTo}')" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; color: #333; margin-left: -8px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
+                        <span class="material-icons">arrow_back</span>
+                    </button>
+                    <span>${screen.title}</span>
+                </div>
+            `;
+        } else {
+            titleElement.textContent = screen.title;
+        }
         container.innerHTML = '<div style="padding: 24px;">Cargando...</div>';
         
         try {
             const html = await screen.render(...args);
             container.innerHTML = html;
+
+            // Highlight active link in sidebar
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            const activeLink = document.querySelector(`.nav-link[data-screen="${screenId}"]`);
+            if (activeLink) activeLink.classList.add('active');
+
+            // Initialize screen-specific logic
+            if (screenId === 'detalle_motor') {
+              const { initDetalleMotor } = await import('./screens/detalle_motor.js');
+              initDetalleMotor(...args);
+            }
         } catch (error) {
             console.error(error);
             container.innerHTML = `<div style="padding: 24px; color: red;">Error: ${error.message}</div>`;
         }
-        window.location.hash = screenId;
+        
+        // Build the new hash including any arguments
+        let newHash = screenId;
+        if (args && args.length > 0) {
+            newHash += '/' + args.join('/');
+        }
+        if (window.location.hash !== '#' + newHash) {
+            window.location.hash = newHash;
+        }
     }
 
-    // Listen to global navigate events (from screen HTML buttons)
+    // Handle browser back/forward buttons
+    window.addEventListener('hashchange', () => {
+        const hashParams = window.location.hash.replace('#', '').split('/');
+        const screenId = hashParams[0];
+        const args = hashParams.slice(1);
+        if (screenId && screens[screenId]) {
+            navigate(screenId, ...args);
+        }
+    });
+
     document.addEventListener('navigate', (e) => {
-        navigate(e.detail.screenId);
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        const matching = document.querySelector(`[data-screen="${e.detail.screenId}"]`);
-        if (matching) matching.classList.add('active');
+        navigate(e.detail.screenId, ...(e.detail.args || []));
     });
 
     // Wire motor card clicks to detalle_motor
@@ -88,16 +128,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Initial load based on hash
-    const initialScreen = window.location.hash.replace('#', '') || 'dashboard';
-    navigate(initialScreen);
+    const hashParams = window.location.hash.replace('#', '').split('/');
+    const initialScreen = hashParams[0] || 'motores';
+    const initArgs = hashParams.slice(1);
+    navigate(initialScreen, ...initArgs);
 
     // Sidebar Toggle
     const menuToggle = document.getElementById('menu-toggle');
+    const sidebarClose = document.getElementById('sidebar-close');
     const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
     
-    menuToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('open');
-    });
+    function toggleSidebar() {
+        const isOpen = sidebar.classList.toggle('open');
+        if (overlay) overlay.classList.toggle('active', isOpen);
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('active');
+    }
+
+    if (menuToggle) {
+        menuToggle.addEventListener('click', () => {
+            toggleSidebar();
+        });
+    }
+
+    if (sidebarClose) {
+        sidebarClose.addEventListener('click', () => {
+            closeSidebar();
+        });
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', () => {
+            closeSidebar();
+        });
+    }
 
     // Handle Nav Clicks
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -106,14 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (screenId) {
                 e.preventDefault();
                 navigate(screenId);
-                
-                // Active class
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
 
                 // Close sidebar on mobile
                 if (window.innerWidth <= 1024) {
-                    sidebar.classList.remove('open');
+                    closeSidebar();
                 }
             }
         });

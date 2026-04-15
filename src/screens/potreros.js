@@ -21,54 +21,62 @@ export async function renderPotreros() {
 
   return `
     <div class="screen-potreros">
-      <div class="stats-grid">
-        <div class="stat-card" style="border-left: 4px solid #43a047">
-          <span class="material-icons stat-icon" style="color:#43a047">check_circle</span>
-          <div><p class="stat-label">Libres</p><h3 class="stat-value">3</h3></div>
-        </div>
-        <div class="stat-card" style="border-left: 4px solid #e53935">
-          <span class="material-icons stat-icon" style="color:#e53935">groups</span>
-          <div><p class="stat-label">Ocupados</p><h3 class="stat-value">1</h3></div>
-        </div>
-        <div class="stat-card" style="border-left: 4px solid #fb8c00">
-          <span class="material-icons stat-icon" style="color:#fb8c00">autorenew</span>
-          <div><p class="stat-label">Recuperando</p><h3 class="stat-value">2</h3></div>
-        </div>
-      </div>
-
       <div class="section-title">
-        <h3>Mapa de Potreros</h3>
-        <button class="btn-primary" id="btn-add-potrero">+ Agregar</button>
+        <h3>Control de Potreros</h3>
       </div>
+      <p class="section-subtitle">Gestión de áreas de pastoreo, rotación y capacidad de carga.</p>
 
-      <div class="potrero-list">
+      <div class="card-grid">
         ${potreros.map(p => {
-          const s = statusColors[p.status] || statusColors['libre'];
+          const statusVal = p.status || 'libre';
+          let label = statusVal.toUpperCase();
+          let statusClass = 'ok';
+          
+          if (statusVal === 'ocupado' || statusVal === 'pastoreo') {
+            statusClass = 'urgent';
+            label = 'OCUPADO';
+          } else if (statusVal === 'recuperando') {
+            statusClass = 'warning';
+            label = 'RECUPERANDO';
+          }
+
           return `
-            <div class="potrero-card card" data-id="${p.id}" style="cursor: pointer;">
-              <div class="potrero-header">
-                <div class="potrero-icon" style="background: ${s.bg}; color: ${s.color}">
-                  ${p.icon || '🌿'}
+            <div class="item-card potrero-card" data-id="${p.id}">
+              <div class="item-card-header">
+                <div class="item-card-icon">${p.icon || '🌿'}</div>
+                <span class="item-status ${statusClass}">${label}</span>
+              </div>
+              
+              <div class="item-card-content">
+                <h4>${p.nombre}</h4>
+                <p class="item-sn">Capacidad: ${p.capacidad || '--'}</p>
+                
+                <div class="item-stats-label">
+                  <span>Carga animal</span>
+                  <span style="color: var(--primary)">${p.animales_actuales} Cabezas</span>
                 </div>
-                <div class="potrero-info">
-                  <h4>${p.nombre}</h4>
-                  <div class="potrero-meta">
-                    <span><span class="material-icons" style="font-size:14px">square_foot</span> ${p.capacidad || '--'}</span>
-                    <span><span class="material-icons" style="font-size:14px">groups</span> ${p.animales_actuales} Cabezas</span>
-                  </div>
+                <div class="progress-container">
+                  <div class="progress-bar" style="width: 45%; background: var(--primary)"></div>
                 </div>
-                <span class="status-badge" style="background: ${s.bg}; color: ${s.color}">${s.label}</span>
+
+                <div class="item-footer-info">
+                  <span class="material-icons" style="font-size:16px;">history</span>
+                  Última rotación: hace 4 días
+                </div>
+              </div>
+
+              <div class="item-card-actions">
+                <button class="btn-primary" onclick="window.navigateTo('detalle_potrero', '${p.id}')">Ver detalles</button>
+                <button class="btn-outline" onclick="window.navigateTo('detalle_potrero', '${p.id}')">Rotar</button>
               </div>
             </div>
           `;
         }).join('')}
       </div>
 
-      <div class="add-card card" id="add-potrero-card" style="cursor:pointer; border: 2px dashed #ccc; text-align:center; padding:32px; color:#999">
-        <span class="material-icons" style="font-size:48px">add_location</span>
-        <h4 style="margin-top:8px">Agregar Potrero</h4>
-        <p>Definir nuevas áreas de pastoreo</p>
-      </div>
+      <button id="btn-add-potrero" class="fab">
+        <span class="material-icons">add_location</span> Nuevo potrero
+      </button>
     </div>
   `;
 }

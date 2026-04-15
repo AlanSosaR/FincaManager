@@ -13,59 +13,53 @@ export async function renderGanado() {
 
   return `
     <div class="screen-ganado">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span class="material-icons stat-icon">pets</span>
-          <div><p class="stat-label">Total Animales</p><h3 class="stat-value">342</h3></div>
-        </div>
-        <div class="stat-card">
-          <span class="material-icons stat-icon" style="color:#e91e63">female</span>
-          <div><p class="stat-label">Hembras</p><h3 class="stat-value">218</h3></div>
-        </div>
-        <div class="stat-card">
-          <span class="material-icons stat-icon" style="color:#1e88e5">male</span>
-          <div><p class="stat-label">Machos</p><h3 class="stat-value">124</h3></div>
-        </div>
-        <div class="stat-card">
-          <span class="material-icons stat-icon" style="color:#fb8c00">scale</span>
-          <div><p class="stat-label">Pesaje Pendiente</p><h3 class="stat-value">18</h3></div>
-        </div>
-      </div>
-
       <div class="section-title">
         <h3>Inventario de Hato</h3>
-        <button class="btn-primary" id="btn-add-animal">+ Registrar</button>
       </div>
-      <p class="section-subtitle">Listado actualizado hoy a las 06:00 AM</p>
+      <p class="section-subtitle">Gestión integral de ganado, pesaje y plan sanitario.</p>
 
-      <div class="animal-list">
+      <div class="card-grid">
         ${animales.map(a => {
-          const sexo = a.sexo || 'N/A';
-          const statusVacunas = a.total_vacunas > 0 ? 'Al día' : 'Pendiente';
+          const statusVacunas = a.total_vacunas > 0 ? 'AL DÍA' : 'PENDIENTE';
+          let statusClass = statusVacunas === 'AL DÍA' ? 'ok' : 'warning';
+
           return `
-          <div class="animal-card card" data-id="${a.id}" style="cursor: pointer;">
-            <div class="animal-tag">${a.id}</div>
-            <div class="animal-avatar">${a.icon || '🐮'}</div>
-            <div class="animal-info">
-              <h4>${a.nombre}</h4>
-              <p>${a.raza} • ${sexo}</p>
-              <div class="animal-stats">
-                <span><span class="material-icons" style="font-size:14px">scale</span> ${a.peso_actual || 0} kg</span>
-                <span class="vacuna-badge ${statusVacunas === 'Al día' ? 'ok' : 'pending'}">
-                  <span class="material-icons" style="font-size:14px">vaccines</span> ${statusVacunas}
-                </span>
+            <div class="item-card animal-card" data-id="${a.id}">
+              <div class="item-card-header">
+                <div class="item-card-icon">${a.icon || '🐮'}</div>
+                <span class="item-status ${statusClass}">${statusVacunas}</span>
+              </div>
+              
+              <div class="item-card-content">
+                <h4>${a.nombre}</h4>
+                <p class="item-sn">ID: ${a.id.substring(0,8)}... • ${a.raza}</p>
+                
+                <div class="item-stats-label">
+                  <span>Peso actual</span>
+                  <span style="color: var(--primary)">${a.peso_actual || 0} kg</span>
+                </div>
+                <div class="progress-container">
+                  <div class="progress-bar" style="width: 70%; background: var(--primary)"></div>
+                </div>
+
+                <div class="item-footer-info">
+                  <span class="material-icons" style="font-size:16px;">transgender</span>
+                  Sexo: ${a.sexo || 'N/A'}
+                </div>
+              </div>
+
+              <div class="item-card-actions">
+                <button class="btn-primary" onclick="window.navigateTo('detalle_animal', '${a.id}')">Ver ficha</button>
+                <button class="btn-outline" onclick="window.navigateTo('detalle_animal', '${a.id}')">Pesar</button>
               </div>
             </div>
-            <span class="material-icons" style="color:#ccc">chevron_right</span>
-          </div>
           `;
         }).join('')}
       </div>
 
-      <div class="info-banner">
-        <span class="material-icons">info</span>
-        <p>Mostrando 4 de 342 animales</p>
-      </div>
+      <button id="btn-add-animal" class="fab">
+        <span class="material-icons">add</span> Registrar animal
+      </button>
     </div>
   `;
 }

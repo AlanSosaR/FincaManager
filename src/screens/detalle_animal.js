@@ -37,9 +37,6 @@ export async function renderDetalleAnimal(animalId) {
 
   return `
     <div class="screen-detalle">
-      <button class="btn-back" onclick="navigateTo('ganado')">
-        <span class="material-icons">arrow_back</span> Volver a Ganado
-      </button>
 
       <!-- Hero Section -->
       <div class="detail-hero card">
