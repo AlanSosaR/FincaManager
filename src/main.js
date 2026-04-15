@@ -172,6 +172,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Handle Nav Clicks
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            const screenId = link.getAttribute('data-screen');
+            if (screenId) {
+                e.preventDefault();
+                navigate(screenId);
+
+                // Close sidebar on mobile
+                if (window.innerWidth <= 1024) {
+                    closeSidebar();
+                }
+            }
         });
     });
 
