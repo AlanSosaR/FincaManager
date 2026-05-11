@@ -39,35 +39,6 @@ export function showModal(type, onSave) {
         </div>
       </form>
     `;
-  } else if (type === 'ganado') {
-    content = `
-      <div class="modal-header">
-        <h3>Añadir Animal</h3>
-        <button class="btn-close" id="close-modal"><span class="material-icons">close</span></button>
-      </div>
-      <form id="form-add-ganado">
-        <div class="form-group">
-          <label>Nombre / ID Visible</label>
-          <input type="text" name="nombre" placeholder="Ej: Esperanza" required>
-        </div>
-        <div class="form-group">
-          <label>Raza</label>
-          <input type="text" name="raza" placeholder="Ej: Jersey" required>
-        </div>
-        <div class="form-group">
-          <label>Peso Inicial (kg)</label>
-          <input type="number" step="0.1" name="peso_actual" placeholder="0.0">
-        </div>
-        <div class="form-group">
-          <label>Icono (Emoji)</label>
-          <input type="text" name="icon" value="🐄">
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-outline" id="cancel-modal">Cancelar</button>
-          <button type="submit" class="btn-primary">Registrar Animal</button>
-        </div>
-      </form>
-    `;
   }
 
   modalBody.innerHTML = content;

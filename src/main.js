@@ -18,6 +18,7 @@ import { renderDetallePotrero } from './screens/detalle_potrero.js';
 import { renderDetalleAnimal } from './screens/detalle_animal.js';
 import { renderDetalleHerramienta } from './screens/detalle_herramienta.js';
 import { renderNuevoMotor, initNuevoMotor } from './screens/nuevo_motor.js';
+import { renderNuevoAnimal, initNuevoAnimal } from './screens/nuevo_animal.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -30,7 +31,8 @@ const screens = {
     detalle_potrero: { title: 'Detalle de Potrero', backTo: 'potreros', render: renderDetallePotrero },
     detalle_animal: { title: 'Detalle de Animal', backTo: 'ganado', render: renderDetalleAnimal },
     detalle_herramienta: { title: 'Detalle de Tool', backTo: 'herramientas', render: renderDetalleHerramienta },
-    nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor }
+    nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor },
+    nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal }
 };
 
 // Global navigate function for use inside screen HTML
@@ -76,6 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (screenId === 'nuevo_motor') {
               initNuevoMotor();
+            }
+            if (screenId === 'nuevo_animal') {
+              initNuevoAnimal();
             }
         } catch (error) {
             console.error(error);
@@ -133,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
             navigate('nuevo_motor');
         }
         if (e.target.closest('#btn-add-animal')) {
-            showModal('ganado', () => navigate('ganado'));
+            navigate('nuevo_animal');
         }
     });
 
