@@ -78,7 +78,7 @@ export async function renderGanado() {
         <div class="xl:col-span-2 space-y-6">
           <div class="flex justify-between items-end mb-4 px-2">
             <h4 class="text-xl font-bold font-headline text-on-surface">Entradas Recientes</h4>
-            <button class="text-sm font-bold text-emerald-700 flex items-center gap-1 hover:bg-emerald-50 px-3 py-1.5 rounded-full transition-colors">
+            <button class="text-sm font-bold text-emerald-700 flex items-center gap-1 hover:bg-emerald-50 px-3 py-1.5 rounded-full transition-colors border-none outline-none bg-transparent">
               Ver Filtrados <span class="material-symbols-outlined text-[18px]">filter_list</span>
             </button>
           </div>
@@ -125,7 +125,7 @@ export async function renderGanado() {
                     </div>
                     
                     <div class="text-right hidden sm:flex justify-end">
-                      <button class="p-2 text-on-surface-variant hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-colors flex items-center justify-center" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}')">
+                      <button class="p-2 text-on-surface-variant hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-colors flex items-center justify-center border-none outline-none bg-transparent" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}')">
                         <span class="material-symbols-outlined">more_vert</span>
                       </button>
                     </div>
@@ -151,7 +151,7 @@ export async function renderGanado() {
       </div>
 
       <!-- Floating Action Button -->
-      <button id="btn-add-animal" class="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-8 py-5 bg-gradient-to-br from-primary to-primary-dim text-white rounded-xl shadow-[0px_20px_40px_-10px_rgba(62,111,57,0.4)] glass-effect hover:scale-105 active:scale-95 transition-all duration-300">
+      <button id="btn-add-animal" class="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-6 py-4 bg-[#345e37] text-white rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all duration-300 border-none outline-none">
         <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
         <span class="font-headline font-bold text-sm">Registrar animal</span>
       </button>
