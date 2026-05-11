@@ -142,8 +142,8 @@ export async function renderGanado() {
             ` : ''}
           </div>
 
-          ${animales.length > 5 ? `
-          <button class="w-full mt-2 py-3.5 text-sm font-bold text-emerald-700 border-2 border-dashed border-emerald-700/30 rounded-full hover:bg-emerald-50 hover:border-emerald-700/50 transition-all">
+          ${animales.length > 0 ? `
+          <button class="w-full mt-6 py-4 text-sm font-bold text-emerald-800 border border-dashed border-outline-variant/50 rounded-full hover:bg-surface-container hover:border-emerald-700/30 transition-all flex items-center justify-center">
               Cargar más registros
           </button>
           ` : ''}
