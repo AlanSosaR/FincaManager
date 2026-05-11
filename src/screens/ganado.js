@@ -76,10 +76,10 @@ export async function renderGanado() {
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-12">
         <!-- Animal List (Bento-inspired cards) -->
         <div class="xl:col-span-2 space-y-6">
-          <div class="flex justify-between items-end mb-4">
+          <div class="flex justify-between items-end mb-4 px-2">
             <h4 class="text-xl font-bold font-headline text-on-surface">Entradas Recientes</h4>
-            <button class="text-sm font-bold text-emerald-700 flex items-center gap-1">
-              Ver Filtrados <span class="material-symbols-outlined text-sm">filter_list</span>
+            <button class="text-sm font-bold text-emerald-700 flex items-center gap-1 hover:bg-emerald-50 px-3 py-1.5 rounded-full transition-colors">
+              Ver Filtrados <span class="material-symbols-outlined text-[18px]">filter_list</span>
             </button>
           </div>
           
@@ -97,7 +97,7 @@ export async function renderGanado() {
               const imageUrl = `https://api.dicebear.com/7.x/shapes/svg?seed=${randomImageSeed}&backgroundColor=f1ede6`;
 
               return `
-                <div class="group bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-6" onclick="window.navigateTo('detalle_animal', '${a.id}')">
+                <div class="group bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all p-3 pr-6 rounded-[2rem] flex flex-col sm:flex-row items-start sm:items-center gap-6" onclick="window.navigateTo('detalle_animal', '${a.id}')">
                   <div class="relative flex-shrink-0">
                     <img class="w-16 h-16 rounded-2xl object-cover bg-surface-variant" src="${imageUrl}" alt="${a.nombre}" />
                     <div class="absolute -bottom-1 -right-1 w-6 h-6 ${statusIconColorBg} rounded-full border-4 border-surface-container-low flex items-center justify-center">
@@ -124,9 +124,9 @@ export async function renderGanado() {
                       </div>
                     </div>
                     
-                    <div class="text-right hidden sm:block">
-                      <button class="p-2 text-on-surface-variant hover:text-emerald-700 transition-colors" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}')">
-                        <span class="material-symbols-outlined">chevron_right</span>
+                    <div class="text-right hidden sm:flex justify-end">
+                      <button class="p-2 text-on-surface-variant hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-colors flex items-center justify-center" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}')">
+                        <span class="material-symbols-outlined">more_vert</span>
                       </button>
                     </div>
                   </div>
@@ -143,7 +143,7 @@ export async function renderGanado() {
           </div>
 
           ${animales.length > 5 ? `
-          <button class="w-full py-4 text-sm font-bold text-emerald-800 border-2 border-dashed border-outline-variant/30 rounded-lg hover:border-emerald-300 transition-all">
+          <button class="w-full mt-2 py-3.5 text-sm font-bold text-emerald-700 border-2 border-dashed border-emerald-700/30 rounded-full hover:bg-emerald-50 hover:border-emerald-700/50 transition-all">
               Cargar más registros
           </button>
           ` : ''}
