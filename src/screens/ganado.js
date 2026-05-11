@@ -94,59 +94,59 @@ export async function renderGanado() {
               const statusIconColorBg = isAlDia ? 'bg-emerald-500' : 'bg-tertiary';
               
               const randomImageSeed = a.id || a.nombre;
-              const imageUrl = \`https://api.dicebear.com/7.x/shapes/svg?seed=\${randomImageSeed}&backgroundColor=f1ede6\`;
+              const imageUrl = `https://api.dicebear.com/7.x/shapes/svg?seed=${randomImageSeed}&backgroundColor=f1ede6`;
 
-              return \`
-                <div class="group bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-6" onclick="window.navigateTo('detalle_animal', '\${a.id}')">
+              return `
+                <div class="group bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-6" onclick="window.navigateTo('detalle_animal', '${a.id}')">
                   <div class="relative flex-shrink-0">
-                    <img class="w-16 h-16 rounded-2xl object-cover bg-surface-variant" src="\${imageUrl}" alt="\${a.nombre}" />
-                    <div class="absolute -bottom-1 -right-1 w-6 h-6 \${statusIconColorBg} rounded-full border-4 border-surface-container-low flex items-center justify-center">
-                      <span class="material-symbols-outlined text-[10px] text-white" style="font-variation-settings: 'FILL' 1;">\${statusIcon}</span>
+                    <img class="w-16 h-16 rounded-2xl object-cover bg-surface-variant" src="${imageUrl}" alt="${a.nombre}" />
+                    <div class="absolute -bottom-1 -right-1 w-6 h-6 ${statusIconColorBg} rounded-full border-4 border-surface-container-low flex items-center justify-center">
+                      <span class="material-symbols-outlined text-[10px] text-white" style="font-variation-settings: 'FILL' 1;">${statusIcon}</span>
                     </div>
                   </div>
                   
                   <div class="flex-1 w-full grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
                     <div>
-                      <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider">#\${a.id.substring(0,4)} — \${a.nombre}</p>
-                      <p class="text-sm font-bold text-on-surface">\${a.raza || 'Bovino'}</p>
+                      <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider">#${a.id.substring(0,4)} — ${a.nombre}</p>
+                      <p class="text-sm font-bold text-on-surface">${a.raza || 'Bovino'}</p>
                     </div>
                     
                     <div>
                       <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Peso</p>
-                      <p class="text-sm font-bold text-on-surface">\${a.peso_actual || '0'} kg</p>
+                      <p class="text-sm font-bold text-on-surface">${a.peso_actual || '0'} kg</p>
                     </div>
                     
                     <div class="hidden md:block">
                       <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">Estado</p>
-                      <div class="flex items-center gap-1.5 px-3 py-1 \${statusBg} \${statusText} rounded-full w-fit">
-                        <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">\${statusIcon}</span>
-                        <span class="text-[10px] font-bold uppercase">\${statusVacunas}</span>
+                      <div class="flex items-center gap-1.5 px-3 py-1 ${statusBg} ${statusText} rounded-full w-fit">
+                        <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">${statusIcon}</span>
+                        <span class="text-[10px] font-bold uppercase">${statusVacunas}</span>
                       </div>
                     </div>
                     
                     <div class="text-right hidden sm:block">
-                      <button class="p-2 text-on-surface-variant hover:text-emerald-700 transition-colors" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '\${a.id}')">
+                      <button class="p-2 text-on-surface-variant hover:text-emerald-700 transition-colors" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}')">
                         <span class="material-symbols-outlined">chevron_right</span>
                       </button>
                     </div>
                   </div>
                 </div>
-              \`;
+              `;
             }).join('')}
             
-            \${animales.length === 0 ? \`
+            ${animales.length === 0 ? `
               <div class="p-8 text-center bg-surface-container-low rounded-lg">
                 <span class="material-symbols-outlined text-4xl text-on-surface-variant opacity-50 mb-2">pets</span>
                 <p class="text-on-surface-variant font-medium">No hay animales registrados en el inventario.</p>
               </div>
-            \` : ''}
+            ` : ''}
           </div>
 
-          \${animales.length > 5 ? \`
+          ${animales.length > 5 ? `
           <button class="w-full py-4 text-sm font-bold text-emerald-800 border-2 border-dashed border-outline-variant/30 rounded-lg hover:border-emerald-300 transition-all">
               Cargar más registros
           </button>
-          \` : ''}
+          ` : ''}
         </div>
       </div>
 
@@ -156,5 +156,5 @@ export async function renderGanado() {
         <span class="font-headline font-bold text-sm">Registrar animal</span>
       </button>
     </div>
-  \`;
+  `;
 }

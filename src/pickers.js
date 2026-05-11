@@ -106,9 +106,19 @@ export const m3Pickers = {
    * @param {function} onSelect - Callback with (timeString)
    */
   showTimePicker(initialValue, onSelect) {
-    let [h, m] = initialValue ? initialValue.split(':').map(Number) : [12, 0];
-    let isPM = h >= 12;
-    let h12 = h % 12 || 12;
+    let h12, m, isPM;
+    if (initialValue && initialValue.includes(' ')) {
+      const [timePart, suffix] = initialValue.split(' ');
+      const [parsedH, parsedM] = timePart.split(':').map(Number);
+      h12 = parsedH;
+      m = parsedM;
+      isPM = suffix.toUpperCase() === 'PM';
+    } else {
+      let [h, parsedM] = initialValue ? initialValue.split(':').map(Number) : [12, 0];
+      h12 = h % 12 || 12;
+      m = parsedM;
+      isPM = h >= 12;
+    }
     
     const overlay = document.createElement('div');
     overlay.className = 'm3-picker-overlay';
@@ -169,8 +179,10 @@ export const m3Pickers = {
       
       overlay.querySelector('#m3-time-cancel').onclick = () => overlay.remove();
       overlay.querySelector('#m3-time-ok').onclick = () => {
-        let finalH = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
-        onSelect(`${finalH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+        let displayH = h12.toString().padStart(2, '0');
+        let displayM = m.toString().padStart(2, '0');
+        let suffix = isPM ? 'PM' : 'AM';
+        onSelect(`${displayH}:${displayM} ${suffix}`);
         overlay.remove();
       };
     };

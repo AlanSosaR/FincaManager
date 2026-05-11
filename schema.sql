@@ -10,6 +10,8 @@ CREATE TABLE motores (
   horas INT DEFAULT 0,
   max_horas INT DEFAULT 100,
   icon TEXT,
+  fecha_adquisicion DATE,
+  notas TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

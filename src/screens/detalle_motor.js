@@ -81,25 +81,25 @@ export async function renderDetalleMotor(motorId) {
             <div class="grid grid-cols-1 gap-4">
               <div class="m3-field">
                 <label style="font-size: 10px;">FECHA</label>
-                <div class="m3-input-container">
+                <div class="m3-input-container" style="cursor: pointer;">
                   <span class="material-icons" style="font-size: 20px;">calendar_today</span>
-                  <input type="date" id="input-manual-date" value="${today}" style="cursor: pointer;">
+                  <input type="text" id="input-manual-date" value="${today}" readonly inputmode="none" style="pointer-events: none;">
                 </div>
               </div>
               
               <div class="manual-inputs-row">
                 <div class="m3-field flex-col flex-1" style="flex: 1;">
                   <label style="font-size: 10px;">HORA INICIO</label>
-                  <div class="m3-input-container">
+                  <div class="m3-input-container" style="cursor: pointer;">
                     <span class="material-icons" style="font-size: 18px;">login</span>
-                    <input type="time" id="input-manual-start" value="00:00" style="cursor: pointer;">
+                    <input type="text" id="input-manual-start" value="08:00 AM" readonly inputmode="none" style="pointer-events: none;">
                   </div>
                 </div>
                 <div class="m3-field flex-col flex-1" style="flex: 1;">
                   <label style="font-size: 10px;">HORA FIN</label>
-                  <div class="m3-input-container">
+                  <div class="m3-input-container" style="cursor: pointer;">
                     <span class="material-icons" style="font-size: 18px;">logout</span>
-                    <input type="time" id="input-manual-end" value="00:00" style="cursor: pointer;">
+                    <input type="text" id="input-manual-end" value="05:00 PM" readonly inputmode="none" style="pointer-events: none;">
                   </div>
                 </div>
               </div>
@@ -127,11 +127,11 @@ export async function renderDetalleMotor(motorId) {
         <!-- Operation Card (Timer) -->
         <div class="operation-card" id="timer-card" style="background: #fdfaf6; padding: 0; position: relative;">
           <!-- Header image area -->
-          <div style="position: relative; height: 260px; width: 100%;">
-            <!-- Ensure tracking tractor background image -->
-            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('tractor_bg.png'); background-size: cover; background-position: center;"></div>
+          <div style="position: relative; height: 260px; width: 100%; overflow: hidden; border-radius: 24px 24px 0 0;">
+            <!-- Dynamic motor image -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: ${motor.image_url ? `url('${motor.image_url}')` : 'var(--m3-surface-variant)'}; background-size: cover; background-position: center;"></div>
             <!-- Fade gradient -->
-            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to bottom, transparent 0%, #dcf0d5 100%);"></div>
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to bottom, transparent 0%, rgba(220, 240, 213, 0.8) 100%);"></div>
             
             <!-- Operacion lista badge -->
             <div style="position: absolute; top: 24px; left: 24px; background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); padding: 6px 16px; border-radius: 100px; display: flex; align-items: center; gap: 8px;">
@@ -213,7 +213,7 @@ export async function renderDetalleMotor(motorId) {
                     </div>
                     <div>
                       <p style="font-size: 14px; font-weight: 700; color: #444; margin: 0;">${date}</p>
-                      <p style="font-size: 11px; color: #888; font-weight: 500; margin: 0;">Operador: ${s.operador || 'Admin'}</p>
+                      <p style="font-size: 11px; color: #888; font-weight: 500; margin: 0;">Operador: ${s.operador || 'Admin'} • ${s.hora_inicio || '---'} - ${s.hora_fin || '---'}</p>
                     </div>
                   </div>
                   <div style="text-align: right;">
@@ -262,20 +262,25 @@ export async function renderDetalleMotor(motorId) {
                   const mb = ((index % 3) + 1.2).toFixed(1);
                   return `
                   <!-- Maintenance Item -->
-                  <label class="maint-export-item" style="display: flex; align-items: center; gap: 16px; padding: 16px 24px; background: #faf9f6; border-radius: 16px; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f4f2ec'" onmouseout="this.style.background='#faf9f6'">
+                  <div class="maint-export-item" style="display: flex; align-items: center; gap: 16px; padding: 16px 24px; background: #faf9f6; border-radius: 16px; transition: background 0.2s; position: relative;">
                     
-                    <input type="checkbox" class="maint-export-cb" data-mantenimiento-id="${m.id}" data-fecha="${m.fecha}" style="accent-color: #386a3e; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
-                    
-                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #eef3ef; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                      <span class="material-icons" style="color: #386a3e; font-size: 20px;">picture_as_pdf</span>
-                    </div>
+                    <label style="display: flex; align-items: center; gap: 16px; flex: 1; cursor: pointer;">
+                      <input type="checkbox" class="maint-export-cb" data-mantenimiento-id="${m.id}" data-fecha="${m.fecha}" style="accent-color: #386a3e; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
+                      
+                      <div style="width: 40px; height: 40px; border-radius: 50%; background: #eef3ef; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <span class="material-icons" style="color: #386a3e; font-size: 20px;">picture_as_pdf</span>
+                      </div>
 
-                    <div style="display: flex; flex-direction: column; flex: 1;">
-                      <span style="font-size: 13px; font-weight: 800; color: #444; margin-bottom: 2px;">${m.titulo || m.tipo || 'Mantenimiento Preventivo'} - ${d}.pdf</span>
-                      <span style="font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase; margin-top: 2px;">${mb} MB • REGISTRO TÉCNICO</span>
-                    </div>
+                      <div style="display: flex; flex-direction: column; flex: 1;">
+                        <span style="font-size: 13px; font-weight: 800; color: #444; margin-bottom: 2px;">${m.titulo || m.tipo || 'Mantenimiento Preventivo'} - ${d}.pdf</span>
+                        <span style="font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase; margin-top: 2px;">${mb} MB • REGISTRO TÉCNICO</span>
+                      </div>
+                    </label>
 
-                  </label>
+                    <button class="btn-delete-maintenance" data-id="${m.id}" style="background: none; border: none; color: #e57373; cursor: pointer; padding: 8px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background 0.2s;" onmouseover="this.style.background='rgba(229,115,115,0.1)'" onmouseout="this.style.background='none'">
+                      <span class="material-icons" style="font-size: 18px;">delete_outline</span>
+                    </button>
+                  </div>
                   `;
                 }).join('')
               : `
@@ -471,8 +476,17 @@ export function initDetalleMotor(motorId) {
     // Calcular hora_inicio y hora_fin
     const dInicio = new Date(Date.now() - finalElapsed);
     const dFin = new Date();
-    const strInicio = `${dInicio.getHours().toString().padStart(2, '0')}:${dInicio.getMinutes().toString().padStart(2, '0')}`;
-    const strFin = `${dFin.getHours().toString().padStart(2, '0')}:${dFin.getMinutes().toString().padStart(2, '0')}`;
+    
+    const format12 = (date) => {
+      let h = date.getHours();
+      const m = date.getMinutes().toString().padStart(2, '0');
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h.toString().padStart(2, '0')}:${m} ${suffix}`;
+    };
+
+    const strInicio = format12(dInicio);
+    const strFin = format12(dFin);
 
     const elapsedMins = Math.round(finalElapsed / (1000 * 60));
     
@@ -497,11 +511,23 @@ export function initDetalleMotor(motorId) {
   }
 
   // --- Manual Logic ---
+  const to24 = (time12) => {
+    if (!time12 || !time12.includes(' ')) return time12;
+    const [time, suffix] = time12.split(' ');
+    let [h, m] = time.split(':').map(Number);
+    if (suffix === 'PM' && h !== 12) h += 12;
+    if (suffix === 'AM' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
   function calculateManual() {
     if (!manualStart || !manualEnd) return;
-    const start = manualStart.value; // HH:MM
-    const end = manualEnd.value;
-    if (!start || !end) return;
+    const startRaw = manualStart.value;
+    const endRaw = manualEnd.value;
+    if (!startRaw || !endRaw) return;
+
+    const start = to24(startRaw);
+    const end = to24(endRaw);
 
     const [h1, m1] = start.split(':').map(Number);
     const [h2, m2] = end.split(':').map(Number);
@@ -515,8 +541,6 @@ export function initDetalleMotor(motorId) {
     return totalMins;
   }
 
-  if (manualStart) manualStart.oninput = calculateManual;
-  if (manualEnd) manualEnd.oninput = calculateManual;
   calculateManual(); // Initial calc
 
   if (btnManualSave) {
@@ -577,6 +601,24 @@ export function initDetalleMotor(motorId) {
       }
     });
   }
+
+  // Initialize delete maintenance logic
+  document.querySelectorAll('.btn-delete-maintenance').forEach(btn => {
+    btn.onclick = async () => {
+      const maintId = btn.dataset.id;
+      window.Snackbar.confirm('¿Deseas eliminar este registro de mantenimiento?', async () => {
+        try {
+          const { error } = await supabase.from('motor_mantenimientos').delete().eq('id', maintId);
+          if (error) throw error;
+          window.Snackbar.show('Registro eliminado', { type: 'success' });
+          await reloadDetalleSinParpadeo(motorId);
+        } catch (err) {
+          console.error(err);
+          window.Snackbar.show('Error al eliminar: ' + err.message, { type: 'error' });
+        }
+      });
+    };
+  });
 
   // Initialize export logic
   const selectAllCb = document.getElementById('cb-select-all-mantenimientos');

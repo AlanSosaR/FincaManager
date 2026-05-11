@@ -17,6 +17,7 @@ import { renderDetalleMotor } from './screens/detalle_motor.js';
 import { renderDetallePotrero } from './screens/detalle_potrero.js';
 import { renderDetalleAnimal } from './screens/detalle_animal.js';
 import { renderDetalleHerramienta } from './screens/detalle_herramienta.js';
+import { renderNuevoMotor, initNuevoMotor } from './screens/nuevo_motor.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -28,7 +29,8 @@ const screens = {
     detalle_motor: { title: 'Detalle de Motor', backTo: 'motores', render: renderDetalleMotor },
     detalle_potrero: { title: 'Detalle de Potrero', backTo: 'potreros', render: renderDetallePotrero },
     detalle_animal: { title: 'Detalle de Animal', backTo: 'ganado', render: renderDetalleAnimal },
-    detalle_herramienta: { title: 'Detalle de Herramienta', backTo: 'herramientas', render: renderDetalleHerramienta }
+    detalle_herramienta: { title: 'Detalle de Tool', backTo: 'herramientas', render: renderDetalleHerramienta },
+    nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor }
 };
 
 // Global navigate function for use inside screen HTML
@@ -71,6 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (screenId === 'detalle_motor') {
               const { initDetalleMotor } = await import('./screens/detalle_motor.js');
               initDetalleMotor(...args);
+            }
+            if (screenId === 'nuevo_motor') {
+              initNuevoMotor();
             }
         } catch (error) {
             console.error(error);
@@ -125,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add Record Buttons
         if (e.target.closest('#btn-add-motor')) {
-            showModal('motor', () => navigate('motores'));
+            navigate('nuevo_motor');
         }
         if (e.target.closest('#btn-add-animal')) {
             showModal('ganado', () => navigate('ganado'));
@@ -172,10 +177,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Handle Nav Clicks
+    // Handle Nav Clicks with double-tap to reload
     document.querySelectorAll('.nav-link').forEach(link => {
+        let lastClick = 0;
         link.addEventListener('click', (e) => {
             const screenId = link.getAttribute('data-screen');
+            const now = Date.now();
+            
+            // Check for double click/tap (within 350ms)
+            if (now - lastClick < 350) {
+                window.location.reload();
+                return;
+            }
+            lastClick = now;
+
             if (screenId) {
                 e.preventDefault();
                 navigate(screenId);
@@ -187,6 +202,61 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Pull-to-refresh logic for mobile (Improved visibility)
+    const mainContent = document.querySelector('.main-content');
+    let touchStartY = 0;
+    let pullThresholdReached = false;
+    
+    // Create the visual indicator if it doesn't exist
+    if (mainContent && !document.querySelector('.ptr-indicator')) {
+        const indicator = document.createElement('div');
+        indicator.className = 'ptr-indicator';
+        indicator.innerHTML = '<div class="spinner"></div>';
+        mainContent.appendChild(indicator);
+    }
+
+    if (mainContent) {
+        const indicator = document.querySelector('.ptr-indicator');
+
+        mainContent.addEventListener('touchstart', (e) => {
+            if (mainContent.scrollTop <= 0) {
+                touchStartY = e.touches[0].pageY;
+                pullThresholdReached = false;
+            } else {
+                touchStartY = 0;
+            }
+        }, { passive: true });
+
+        mainContent.addEventListener('touchmove', (e) => {
+            if (touchStartY > 0) {
+                const touchMoveY = e.touches[0].pageY;
+                const delta = touchMoveY - touchStartY;
+                
+                if (delta > 100 && delta < 280) {
+                  // Show partially? but we'll stick to a clean look
+                }
+
+                if (delta > 280) {
+                    pullThresholdReached = true;
+                    if (indicator) indicator.classList.add('active');
+                } else if (delta < 250) {
+                    pullThresholdReached = false;
+                    if (indicator) indicator.classList.remove('active');
+                }
+            }
+        }, { passive: true });
+
+        mainContent.addEventListener('touchend', () => {
+            if (pullThresholdReached) {
+                setTimeout(() => window.location.reload(), 200);
+            } else {
+              if (indicator) indicator.classList.remove('active');
+            }
+            touchStartY = 0;
+            pullThresholdReached = false;
+        });
+    }
 
     // PWA Install Logic
     let deferredPrompt;

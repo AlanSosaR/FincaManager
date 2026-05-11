@@ -52,38 +52,47 @@ export async function renderMotores() {
           }
 
           return `
-            <div class="item-card motor-card premium-card" data-id="${eq.id}">
-              <div class="item-card-header">
-                <div class="item-card-icon" style="background: ${barColor}22; color: ${barColor}">${eq.icon || 'settings'}</div>
-                <span class="item-status ${statusClass}" style="background: ${barColor}22; color: ${barColor}; border: 1px solid ${barColor}44">
-                  ${statusLabel}
-                </span>
-              </div>
-              
-              <div class="item-card-content">
-                <div class="card-title-row">
-                  <h4>${eq.nombre}</h4>
-                  <span class="card-remaining-tag">${Math.max(0, maxHours - hours)}h finales</span>
+            <div class="motor-card-premium" data-id="${eq.id}">
+              <!-- Status Badge: Only show if not OK -->
+              ${statusClass !== 'ok' ? `
+                <div class="m3-premium-badge ${statusClass}">
+                   ${statusLabel}
                 </div>
-                <p class="item-sn">Serie: ${eq.sn || 'No reg.'}</p>
-                
-                <div class="item-progress-section">
-                  <div class="progress-labels">
-                    <span class="label">Uso acumulado</span>
-                    <span class="value"><b>${hours}</b> / ${maxHours}h</span>
-                  </div>
-                  <div class="premium-progress-track">
-                    <div class="premium-progress-fill" style="width: ${pct}%; background: ${barColor}"></div>
-                  </div>
+              ` : ''}
+
+              <!-- Top Content: Image + Name -->
+              <div class="m3-premium-top">
+                <div class="m3-premium-img-box">
+                  ${eq.image_url ? `<img src="${eq.image_url}" alt="${eq.nombre}">` : `<span class="material-icons">${eq.icon || 'settings'}</span>`}
+                </div>
+                <div class="m3-premium-title-group">
+                  <h4 class="m3-premium-title">${eq.nombre}</h4>
                 </div>
               </div>
 
-              <div class="item-card-footer">
-                <button class="btn-card-primary" onclick="window.navigateTo('detalle_motor', '${eq.id}')">
-                   <span class="material-icons">timer</span> Iniciar
+              <!-- Progress Section -->
+              <div class="m3-premium-body">
+                <div class="m3-premium-stat-row">
+                   <span class="m3-premium-stat-label">HORAS ACUMULADAS</span>
+                   <span class="m3-premium-stat-value"><b>${hours}</b>/${maxHours}h</span>
+                </div>
+                <div class="m3-premium-progress">
+                   <div class="m3-premium-progress-fill" style="width: ${pct}%; background: ${barColor}"></div>
+                </div>
+                
+                <div class="m3-premium-meta">
+                   <span class="material-icons">calendar_today</span>
+                   <span>Último cambio: No reg.</span>
+                </div>
+              </div>
+
+              <!-- Footer Actions -->
+              <div class="m3-premium-actions">
+                <button class="btn-m3-fill" onclick="window.navigateTo('detalle_motor', '${eq.id}')">
+                   Iniciar sesión
                 </button>
-                <button class="btn-card-secondary" onclick="window.navigateTo('detalle_motor', '${eq.id}')">
-                   Detalles
+                <button class="btn-m3-tonal" onclick="window.navigateTo('detalle_motor', '${eq.id}')">
+                   Historial
                 </button>
               </div>
             </div>

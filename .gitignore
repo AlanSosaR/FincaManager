@@ -4,3 +4,5 @@ dist/
 .gemini/
 .DS_Store
 *.log
+
+.vercel
