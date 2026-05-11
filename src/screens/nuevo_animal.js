@@ -108,7 +108,7 @@ export function initNuevoAnimal() {
         selectedFile = file;
         const reader = new FileReader();
         reader.onload = (re) => {
-          preview.innerHTML = \`<img src="\${re.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">\`;
+          preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">`;
         };
         reader.readAsDataURL(file);
       }
@@ -142,8 +142,8 @@ export function initNuevoAnimal() {
       let image_url = null;
       if (selectedFile) {
         const fileExt = selectedFile.name.split('.').pop();
-        const fileName = \`\${Math.random()}.\${fileExt}\`;
-        const filePath = \`animales/\${fileName}\`;
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `animales/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('animales')
@@ -163,7 +163,7 @@ export function initNuevoAnimal() {
 
       // Generate an ID if the user provided something that might not be unique, 
       // but let's use the provided name as part of the ID, or a random string.
-      const uniqueId = \`#\${Math.random().toString(36).substr(2, 5).toUpperCase()}\`;
+      const uniqueId = `#${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
       // Clean empty dates so Supabase doesn't error out on empty strings
       if (!data.fecha_adquisicion) {
