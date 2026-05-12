@@ -249,3 +249,78 @@
 .btn-m3-primary span {
   font-size: 20px;
 }
+
+/* Material 3 Expressive Fields (Floating Labels) */
+.m3-field {
+  position: relative;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.m3-field input, 
+.m3-field select, 
+.m3-field textarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 24px 16px 8px 16px;
+  background: var(--m3-surface-container);
+  border: 1px solid transparent;
+  border-radius: 24px; /* Expressive rounding */
+  font-size: 16px;
+  font-family: 'Work Sans', sans-serif;
+  color: var(--m3-on-surface);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  appearance: none;
+}
+
+.m3-field label {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--m3-on-surface-variant);
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: left top;
+  z-index: 1;
+}
+
+/* Floating logic using :placeholder-shown */
+.m3-field input:focus ~ label,
+.m3-field input:not(:placeholder-shown) ~ label,
+.m3-field textarea:focus ~ label,
+.m3-field textarea:not(:placeholder-shown) ~ label,
+.m3-field select:focus ~ label,
+.m3-field select:not([value=""]) ~ label {
+  transform: translateY(-8px) scale(0.75);
+  color: var(--m3-primary);
+  font-weight: 800;
+}
+
+.m3-field input:focus, 
+.m3-field select:focus, 
+.m3-field textarea:focus {
+  background: white;
+  border-color: var(--m3-primary);
+  box-shadow: 0 0 0 4px rgba(62, 111, 57, 0.1);
+  outline: none;
+}
+
+/* Date input special handling */
+.m3-field input[type="date"] {
+  padding-top: 24px;
+}
+
+.m3-field input[type="date"] ~ label {
+  transform: translateY(-8px) scale(0.75);
+  color: var(--m3-primary);
+  font-weight: 800;
+}
+
+.m3-field .material-icons {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  color: var(--m3-on-surface-variant);
+}

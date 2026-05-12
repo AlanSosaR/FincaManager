@@ -1,6 +1,6 @@
 import { supabase } from '../supabase.js';
 
-export async function renderNuevoMotor(id) {
+export async function renderNuevaHerramienta(id) {
   const isEdit = !!id;
   return `
     <div class="m3-form-screen">
@@ -8,10 +8,10 @@ export async function renderNuevoMotor(id) {
         <!-- Photo and Tips -->
         <div class="m3-asymmetric-section">
           <div class="m3-photo-placeholder" id="photo-dropzone">
-            <input type="file" id="motor-photo" accept="image/*" style="display: none">
+            <input type="file" id="tool-photo" accept="image/*" style="display: none">
             <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
               <span class="material-symbols-outlined">photo_camera</span>
-              <p style="font-weight: 800">Subir foto del equipo</p>
+              <p style="font-weight: 800">Subir foto de la herramienta</p>
               <p style="font-size: 11px; text-align: center; color: var(--m3-on-surface-variant); margin-top: 10px; line-height: 1.4">
                 Formatos JPG, PNG hasta 10MB.
               </p>
@@ -22,37 +22,35 @@ export async function renderNuevoMotor(id) {
              <span class="material-symbols-outlined icon">lightbulb</span>
              <div>
                 <h4>Consejo Pro</h4>
-                <p>Registrar las horas iniciales con precisión garantiza alertas de mantenimiento automáticas.</p>
+                <p>Mantener el inventario actualizado ayuda a prevenir pérdidas y planificar compras.</p>
              </div>
           </div>
         </div>
 
         <!-- Form Details -->
         <div class="m3-form-card">
-          <h3>${isEdit ? 'Editar Equipo' : 'Detalles Técnicos'}</h3>
+          <h3>${isEdit ? 'Editar Herramienta' : 'Detalles de la Herramienta'}</h3>
           
-          <form id="form-nuevo-motor">
+          <form id="form-nueva-herramienta">
             <div class="grid-2">
               <div class="m3-input-group">
-                <label>Nombre del equipo</label>
+                <label>Nombre de la herramienta</label>
                 <div class="m3-input-wrapper">
-                  <input type="text" name="nombre" placeholder="Ej. Generador FUNO FN-12GS">
+                  <input type="text" name="nombre" placeholder="Ej. Motosierra Stihl MS 170">
                 </div>
                 <p class="error-text" id="error-nombre">El nombre es obligatorio</p>
               </div>
 
               <div class="m3-input-group">
-                <label>Tipo de equipo</label>
+                <label>Categoría</label>
                 <div class="m3-input-wrapper">
-                  <select name="icon">
-                    <option value="⚙️">Motor Estacionario</option>
-                    <option value="⚡">Generador Eléctrico</option>
-                    <option value="✂️">Motoguadaña</option>
-                    <option value="💨">Pulverizadora</option>
-                    <option value="🪚">Motosierra</option>
-                    <option value="🚜">Tractor</option>
-                    <option value="🚜">Cosechadora</option>
-                    <option value="⚙️">Motobomba</option>
+                  <select name="categoria">
+                    <option value="Manual">Herramienta Manual</option>
+                    <option value="Eléctrica">Eléctrica</option>
+                    <option value="Combustión">Combustión</option>
+                    <option value="Medición">Medición</option>
+                    <option value="Protección">Protección</option>
+                    <option value="Otro">Otro</option>
                   </select>
                 </div>
               </div>
@@ -60,34 +58,37 @@ export async function renderNuevoMotor(id) {
 
             <div class="grid-2">
               <div class="m3-input-group">
-                <label>Fecha de adquisición</label>
+                <label>Ubicación</label>
                 <div class="m3-input-wrapper">
-                  <input type="date" name="fecha_adquisicion">
+                  <input type="text" name="ubicacion" placeholder="Ej. Bodega Principal">
                 </div>
               </div>
 
               <div class="m3-input-group">
-                <label>Límite mantenimiento</label>
+                <label>Estado</label>
                 <div class="m3-input-wrapper">
-                  <input type="number" name="max_horas" value="250">
-                  <span class="m3-unit">HRS</span>
+                  <select name="estado">
+                    <option value="Disponible">Disponible</option>
+                    <option value="Reparación">En Reparación</option>
+                    <option value="Baja">Dada de Baja</option>
+                  </select>
                 </div>
               </div>
             </div>
 
             <div class="m3-input-group">
-              <label>Notas / Observaciones</label>
+              <label>Icono / Emoji</label>
               <div class="m3-input-wrapper">
-                <textarea name="notas" placeholder="Detalles adicionales..." rows="4"></textarea>
+                <input type="text" name="icon" placeholder="Ej. 🛠️" value="🛠️">
               </div>
             </div>
 
             <!-- Internal Actions -->
             <div class="m3-form-actions">
-              <button type="button" class="btn-m3-text" onclick="window.navigateTo('motores')">Cancelar</button>
-              <button type="button" class="btn-m3-primary" id="btn-save-motor">
+              <button type="button" class="btn-m3-text" onclick="window.navigateTo('herramientas')">Cancelar</button>
+              <button type="button" class="btn-m3-primary" id="btn-save-tool">
                 <span class="material-symbols-outlined">${isEdit ? 'update' : 'save'}</span>
-                ${isEdit ? 'Actualizar equipo' : 'Guardar equipo'}
+                ${isEdit ? 'Actualizar herramienta' : 'Guardar herramienta'}
               </button>
             </div>
           </form>
@@ -97,11 +98,11 @@ export async function renderNuevoMotor(id) {
   `;
 }
 
-export async function initNuevoMotor(id) {
+export async function initNuevaHerramienta(id) {
   const isEdit = !!id;
-  const btnSave = document.getElementById('btn-save-motor');
-  const form = document.getElementById('form-nuevo-motor');
-  const photoInput = document.getElementById('motor-photo');
+  const btnSave = document.getElementById('btn-save-tool');
+  const form = document.getElementById('form-nueva-herramienta');
+  const photoInput = document.getElementById('tool-photo');
   const dropzone = document.getElementById('photo-dropzone');
   const preview = document.getElementById('photo-preview');
 
@@ -110,23 +111,23 @@ export async function initNuevoMotor(id) {
 
   if (isEdit) {
     try {
-      const { data, error } = await supabase.from('motores').select('*').eq('id', id).single();
+      const { data, error } = await supabase.from('herramientas').select('*').eq('id', id).single();
       if (error) throw error;
 
       // Fill form
       form.nombre.value = data.nombre || '';
-      form.icon.value = data.icon || '⚙️';
-      form.fecha_adquisicion.value = data.fecha_adquisicion || '';
-      form.max_horas.value = data.max_horas || 250;
-      form.notas.value = data.notas || '';
+      form.categoria.value = data.categoria || 'Manual';
+      form.ubicacion.value = data.ubicacion || '';
+      form.estado.value = data.estado || 'Disponible';
+      form.icon.value = data.icon || '🛠️';
       
       if (data.image_url) {
         currentImageUrl = data.image_url;
         preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">`;
       }
     } catch (err) {
-      console.error('Error al cargar equipo:', err);
-      window.Snackbar.show('Error al cargar datos del equipo', { type: 'error' });
+      console.error('Error al cargar herramienta:', err);
+      window.Snackbar.show('Error al cargar datos de la herramienta', { type: 'error' });
     }
   }
 
@@ -172,7 +173,7 @@ export async function initNuevoMotor(id) {
       if (selectedFile) {
         const fileExt = selectedFile.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `motores/${fileName}`;
+        const filePath = `herramientas/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('equipos')
@@ -187,36 +188,28 @@ export async function initNuevoMotor(id) {
         image_url = urlData.publicUrl;
       }
 
-      const motorData = {
+      const toolData = {
         ...formDataObj,
-        max_horas: parseInt(formDataObj.max_horas) || 250,
         image_url
       };
 
       if (isEdit) {
-        const { error } = await supabase.from('motores').update(motorData).eq('id', id);
+        const { error } = await supabase.from('herramientas').update(toolData).eq('id', id);
         if (error) throw error;
-        window.Snackbar.show('Equipo actualizado exitosamente');
+        window.Snackbar.show('Herramienta actualizada exitosamente');
       } else {
-        const { error } = await supabase.from('motores').insert([{
-          ...motorData,
-          horas: 0
-        }]);
+        const { error } = await supabase.from('herramientas').insert([toolData]);
         if (error) throw error;
-        window.Snackbar.show('Equipo guardado exitosamente');
+        window.Snackbar.show('Herramienta guardada exitosamente');
       }
 
-      if (isEdit) {
-        window.navigateTo('detalle_motor', id);
-      } else {
-        window.navigateTo('motores');
-      }
+      window.navigateTo('herramientas');
     } catch (err) {
       console.error(err);
       window.Snackbar.show('Error: ' + err.message, { type: 'error' });
     } finally {
       btnSave.disabled = false;
-      btnSave.innerHTML = `<span class="material-symbols-outlined">${isEdit ? 'update' : 'save'}</span> ${isEdit ? 'Actualizar equipo' : 'Guardar equipo'}`;
+      btnSave.innerHTML = `<span class="material-symbols-outlined">${isEdit ? 'update' : 'save'}</span> ${isEdit ? 'Actualizar herramienta' : 'Guardar herramienta'}`;
     }
   });
 }

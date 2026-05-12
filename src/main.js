@@ -9,16 +9,17 @@ import { registerSW } from 'virtual:pwa-register';
 registerSW({ immediate: true });
 
 import { renderDashboard } from './screens/dashboard.js';
-import { renderMotores } from './screens/motores.js';
-import { renderHerramientas } from './screens/herramientas.js';
+import { renderMotores, initMotores } from './screens/motores.js';
+import { renderHerramientas, initHerramientas } from './screens/herramientas.js';
 import { renderGanado, initGanado } from './screens/ganado.js';
 import { renderPotreros } from './screens/potreros.js';
 import { renderDetalleMotor } from './screens/detalle_motor.js';
-import { renderDetallePotrero } from './screens/detalle_potrero.js';
+import { renderDetallePotrero, initDetallePotrero } from './screens/detalle_potrero.js';
 import { renderDetalleAnimal, initDetalleAnimal } from './screens/detalle_animal.js';
 import { renderDetalleHerramienta } from './screens/detalle_herramienta.js';
 import { renderNuevoMotor, initNuevoMotor } from './screens/nuevo_motor.js';
 import { renderNuevoAnimal, initNuevoAnimal } from './screens/nuevo_animal.js';
+import { renderNuevoPotrero, initNuevoPotrero } from './screens/nuevo_potrero.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -32,7 +33,8 @@ const screens = {
     detalle_animal: { title: 'Detalle de Animal', backTo: 'ganado', render: renderDetalleAnimal },
     detalle_herramienta: { title: 'Detalle de Tool', backTo: 'herramientas', render: renderDetalleHerramienta },
     nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor },
-    nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal }
+    nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal },
+    nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero }
 };
 
 // Global navigate function for use inside screen HTML
@@ -77,16 +79,28 @@ document.addEventListener('DOMContentLoaded', () => {
               initDetalleMotor(...args);
             }
             if (screenId === 'nuevo_motor') {
-              initNuevoMotor();
+              initNuevoMotor(...args);
+            }
+            if (screenId === 'motores') {
+              initMotores();
+            }
+            if (screenId === 'herramientas') {
+              initHerramientas();
             }
             if (screenId === 'ganado') {
               initGanado();
             }
             if (screenId === 'nuevo_animal') {
-              initNuevoAnimal();
+              initNuevoAnimal(...args);
             }
             if (screenId === 'detalle_animal') {
               initDetalleAnimal(...args);
+            }
+            if (screenId === 'nuevo_potrero') {
+              initNuevoPotrero(...args);
+            }
+            if (screenId === 'detalle_potrero') {
+              initDetallePotrero(...args);
             }
         } catch (error) {
             console.error(error);

@@ -25,12 +25,12 @@ export async function renderDetallePotrero(potreroId) {
 
   const potreroData = {
     nombre: potrero.nombre || 'Potrero Sin Nombre',
-    area: potrero.capacidad || '--',
-    pasto: 'Kikuyo', // Placeholder if not in schema yet
-    ultimoRiego: 'Hace 2d', // Placeholder
+    area: (potrero.area || '--') + ' ' + (potrero.area_unidad || 'ha'),
+    pasto: potrero.pasto || 'Natural',
+    ultimoRiego: potrero.ultimo_riego ? new Date(potrero.ultimo_riego).toLocaleDateString() : 'No registrado',
     carga: (animales ? animales.length : 0) + ' cabezas',
-    ubicacion: 'Norte • Lote 14',
-    cycle: '12 días para próximo pastoreo',
+    ubicacion: potrero.ubicacion || 'Sin ubicación registrada',
+    cycle: potrero.ciclo_recuperacion ? `${potrero.ciclo_recuperacion} días de ciclo` : 'No configurado',
     icon: potrero.icon || '🌿',
   };
 
@@ -40,12 +40,17 @@ export async function renderDetallePotrero(potreroId) {
 
       <!-- Hero Section -->
       <div class="detail-hero card">
-        <div class="detail-hero-header">
-          <div class="detail-hero-icon">${potreroData.icon}</div>
-          <div>
-            <h2>${potreroData.nombre}</h2>
-            <p class="detail-subtitle">${potreroData.ubicacion}</p>
+        <div class="detail-hero-header" style="justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="detail-hero-icon">${potreroData.icon}</div>
+            <div>
+              <h2>${potreroData.nombre}</h2>
+              <p class="detail-subtitle">${potreroData.ubicacion}</p>
+            </div>
           </div>
+          <button class="btn-m3-text" onclick="window.navigateTo('nuevo_potrero', '${potrero.id}')" style="min-width: 48px; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+            <span class="material-symbols-outlined">edit</span>
+          </button>
         </div>
 
         <div class="detail-stats">
@@ -127,4 +132,13 @@ export async function renderDetallePotrero(potreroId) {
       </div>
     </div>
   `;
+}
+
+export function initDetallePotrero(potreroId) {
+  const btnAddNote = document.querySelector('.section-title .btn-primary');
+  if (btnAddNote) {
+    btnAddNote.addEventListener('click', () => {
+      window.Snackbar.show('Funcionalidad de notas en desarrollo...', { type: 'info' });
+    });
+  }
 }

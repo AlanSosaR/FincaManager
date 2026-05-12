@@ -6,3 +6,12 @@ dist/
 *.log
 
 .vercel
+*.css.backup
+base_components.css
+old_components.css
+previous_components.css
+temp.css
+diff.txt
+diff_history.txt
+build_error.txt
+scratch/
