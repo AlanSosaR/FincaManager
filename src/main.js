@@ -283,34 +283,52 @@ document.addEventListener('DOMContentLoaded', () => {
     let deferredPrompt;
     const installBtn = document.getElementById('pwa-install');
 
+    if (!installBtn) {
+        console.warn('[PWA] Botón #pwa-install no encontrado en el DOM.');
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        console.log('[PWA] beforeinstallprompt disparado — la app es instalable.');
+        // Evitar que Chrome muestre el banner automáticamente
         e.preventDefault();
-        // Stash the event so it can be triggered later.
+        // Guardar el evento para usarlo después
         deferredPrompt = e;
-        // Update UI notify the user they can install the PWA
-        if (installBtn) installBtn.style.display = 'flex';
+        // Mostrar botón de instalación
+        if (installBtn) {
+            installBtn.style.display = 'flex';
+            console.log('[PWA] Botón de instalación visible.');
+        }
     });
 
     if (installBtn) {
         installBtn.addEventListener('click', async () => {
-            if (!deferredPrompt) return;
-            // Show the install prompt
+            console.log('[PWA] Click en botón de instalación.');
+            if (!deferredPrompt) {
+                console.warn('[PWA] deferredPrompt es null — el prompt ya fue usado o el evento no se disparó.');
+                return;
+            }
+            // Mostrar el prompt de instalación
             deferredPrompt.prompt();
-            // Wait for the user to respond to the prompt
+            // Esperar respuesta del usuario
             const { outcome } = await deferredPrompt.userChoice;
+            console.log(`[PWA] Respuesta del usuario: ${outcome}`);
             if (outcome === 'accepted') {
-                console.log('User accepted the install prompt');
+                console.log('[PWA] Usuario aceptó la instalación.');
                 installBtn.style.display = 'none';
             } else {
-                console.log('User dismissed the install prompt');
+                console.log('[PWA] Usuario rechazó la instalación.');
             }
             deferredPrompt = null;
         });
     }
 
     window.addEventListener('appinstalled', (evt) => {
-        console.log('Finca Manager was installed.');
+        console.log('[PWA] Finca Manager fue instalado exitosamente.');
         if (installBtn) installBtn.style.display = 'none';
+    });
+
+    // Capturar errores globales y mostrarlos en consola
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('[ERROR] Promesa rechazada sin manejar:', event.reason);
     });
 });
