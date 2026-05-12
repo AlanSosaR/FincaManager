@@ -7,113 +7,198 @@ export async function renderDetalleAnimal(animalId) {
     .eq('id', animalId)
     .single();
 
-  const { data: vacunas, error: vacunasError } = await supabase
+  if (animalError) {
+    console.error('Error fetching animal:', animalError);
+    return `<div class="screen-detalle-motor"><p>Error cargando animal: ${animalError.message}</p></div>`;
+  }
+
+  const { data: vacunas } = await supabase
     .from('animal_vacunas')
     .select('*')
     .eq('animal_id', animalId)
     .order('fecha', { ascending: false });
 
-  const { data: pesajes, error: pesajesError } = await supabase
+  const { data: pesajes } = await supabase
     .from('animal_pesajes')
     .select('*')
     .eq('animal_id', animalId)
     .order('fecha', { ascending: false });
 
-  if (animalError) {
-    console.error('Error fetching animal:', animalError);
-    return `<div class="screen-detalle"><p>Error cargando animal: ${animalError.message}</p></div>`;
-  }
+  const defaultImg = animal.sexo === 'Macho' 
+    ? 'https://images.unsplash.com/photo-1547407139-3c921a66005c?q=80&w=1000&auto=format&fit=crop' 
+    : 'https://images.unsplash.com/photo-1570042225831-d98fa7577f1e?q=80&w=1000&auto=format&fit=crop';
 
-  const animalData = {
-    id: animal.id,
-    nombre: animal.nombre || 'Sin Nombre',
-    raza: animal.raza || 'N/A',
-    pesoActual: (animal.peso_actual || 0) + ' kg',
-    totalVacunas: animal.total_vacunas || 0,
-    totalPesajes: animal.total_pesajes || 0,
-    icon: animal.icon || '🐄',
-  };
-
+  const photoUrl = animal.image_url || defaultImg;
 
   return `
-    <div class="screen-detalle">
-
-      <!-- Hero Section -->
-      <div class="detail-hero card">
-        <div class="detail-hero-header">
-          <div class="detail-hero-icon">${animalData.icon}</div>
-          <div>
-            <h2>${animalData.nombre}</h2>
-            <p class="detail-subtitle">${animalData.raza} • ID: ${animalData.id.split('-').shift()}</p>
-          </div>
-        </div>
-
-        <div class="detail-stats">
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Peso Actual</span>
-            <span class="detail-stat-value">${animalData.pesoActual}</span>
-          </div>
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Total Vacunas</span>
-            <span class="detail-stat-value">${animalData.totalVacunas}</span>
-          </div>
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Total Pesajes</span>
-            <span class="detail-stat-value">${animalData.totalPesajes}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <!-- Weight Evolution Segment -->
-        <div class="section">
-          <div class="section-title">
-            <h3>Evolución de Peso</h3>
-          </div>
-          <div class="chart-container">
-            <span class="material-icons" style="font-size: 48px; margin-bottom: 8px;">insights</span>
-            <span>Espacio para Gráfico de Tendencia</span>
-          </div>
-          <div class="history-list" style="margin-top: 16px;">
-            ${pesajes && pesajes.length > 0 ? pesajes.map(p => `
-              <div class="activity-item card" style="padding:12px 16px; margin-bottom:8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: default;">
-                <div style="flex: 1;">
-                   <p style="font-size: 13px; font-weight: 600;">${p.evento}</p>
-                   <span class="history-date">${new Date(p.fecha).toLocaleDateString()}</span>
+    <div class="screen-detalle-motor screen-detalle-animal">
+      <div class="grid-top-layout">
+        
+        <!-- Left: Main Bento Column -->
+        <div class="col-left space-y-6">
+          
+          <!-- Main Info Card -->
+          <div class="maint-card safe-mode p-8" style="min-height: 400px; justify-content: flex-end;">
+            <div class="maint-card-image" style="background-image: url('${photoUrl}'); position: absolute; top: 0; left: 0; height: 100%; width: 100%; opacity: 0.9; filter: brightness(0.8);">
+                <div class="badge-status-expressive absolute" style="top: 24px; left: 24px;">
+                    <div class="dot-pulse"></div>
+                    ${animal.sexo || 'Indefinido'}
                 </div>
-                <div style="text-align: right;">
-                  <span style="font-weight: 700; font-size: 16px;">${p.peso}</span>
-                  <div style="display: flex; align-items: center; justify-content: flex-end; color: ${p.color || '#666'}; font-size: 12px;">
-                    <span class="material-icons" style="font-size: 14px;">${p.tendencia || 'horizontal_rule'}</span>
-                    <span>${p.cambio || '0 kg'}</span>
+            </div>
+            
+            <div class="z-10">
+              <h2 style="font-size: 48px; font-weight: 950; color: white; margin-bottom: 4px; line-height: 1;">${animal.nombre}</h2>
+              <p style="font-size: 16px; font-weight: 700; color: rgba(255,255,255,0.8); margin-bottom: 24px;">${animal.raza || 'Raza no especificada'} • ID: ${animal.id.split('-').shift()}</p>
+              
+              <div class="flex gap-4">
+                 <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 12px 20px; border-radius: 20px;">
+                    <span class="label-bold-caps" style="color: white; opacity: 0.7; display: block; margin-bottom: 4px;">Peso Actual</span>
+                    <span style="font-size: 24px; font-weight: 900; color: white;">${animal.peso_actual || 0} <span style="font-size: 14px; opacity: 0.8;">KG</span></span>
+                 </div>
+                 <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 12px 20px; border-radius: 20px;">
+                    <span class="label-bold-caps" style="color: white; opacity: 0.7; display: block; margin-bottom: 4px;">Salud</span>
+                    <span style="font-size: 24px; font-weight: 900; color: white;">Excelente</span>
+                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions Bento Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="m3-result-bubble" style="margin: 0; cursor: pointer; border-style: solid; transition: transform 0.2s;" onclick="window.showAnimalAction('peso', '${animalId}')">
+                <div class="m3-result-info">
+                    <span class="m3-result-label">REGISTRAR NUEVO</span>
+                    <span class="m3-result-value">Pesaje</span>
+                </div>
+                <div class="m3-calc-icon-container">
+                    <span class="material-icons">monitor_weight</span>
+                </div>
+            </div>
+
+            <div class="m3-result-bubble" style="margin: 0; cursor: pointer; border-style: solid; background: #e8f5e9; border-color: #c8e6c9; transition: transform 0.2s;" onclick="window.showAnimalAction('vacuna', '${animalId}')">
+                <div class="m3-result-info">
+                    <span class="m3-result-label" style="color: #2e7d32;">REGISTRAR NUEVA</span>
+                    <span class="m3-result-value" style="color: #1b5e20;">Vacunación</span>
+                </div>
+                <div class="m3-calc-icon-container" style="color: #2e7d32;">
+                    <span class="material-icons">vaccines</span>
+                </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right: Timeline Column -->
+        <div class="col-right">
+          <div class="timeline-panel-premium">
+            <div class="timeline-title">
+              <span class="material-icons">history</span>
+              <h3>Historial de Eventos</h3>
+            </div>
+
+            <div class="timeline-items-container">
+              ${[...(vacunas || []).map(v => ({ ...v, type: 'vacuna' })), ...(pesajes || []).map(p => ({ ...p, type: 'pesaje' }))]
+                .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+                .map((event, idx) => `
+                  <div class="timeline-item-premium ${idx === 0 ? 'is-recent' : ''}">
+                    <div class="tl-dot-container">
+                      <div class="tl-dot"></div>
+                    </div>
+                    <div class="tl-content">
+                      <span class="tl-badge">${event.type === 'vacuna' ? 'VACUNACIÓN' : 'CONTROL DE PESO'}</span>
+                      <h4 class="tl-item-title">${event.nombre || (event.type === 'pesaje' ? `${event.peso} KG` : 'Evento')}</h4>
+                      <p class="tl-item-desc">Registrado por el sistema el ${new Date(event.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+                      <div class="tl-footer-pills">
+                        <span class="tl-pill">${new Date(event.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                        ${event.type === 'pesaje' ? `<span class="tl-pill" style="background: #e3f2fd; color: #1565c0;">${event.cambio || 'Estable'}</span>` : ''}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            `).join('') : '<p style="text-align:center; padding: 24px; color:#999">No hay registros de pesaje.</p>'}
+                `).join('') || '<div class="empty-state-text">No hay eventos registrados aún.</div>'}
+            </div>
           </div>
         </div>
 
-        <!-- Vaccination History Segment -->
-        <div class="section">
-          <div class="section-title">
-            <h3>Historial Sanitário</h3>
-            <button class="btn-primary" style="padding: 6px 12px; font-size: 12px;">+ Vacuna</button>
-          </div>
-          <div class="activity-list" style="margin-top: 16px;">
-            ${vacunas && vacunas.length > 0 ? vacunas.map(v => `
-              <div class="activity-item" style="padding: 12px; gap: 12px;">
-                <div class="activity-icon" style="background: ${v.color || '#1e88e5'}20; color: ${v.color || '#1e88e5'};">
-                  <span class="material-icons" style="font-size: 18px;">${v.icon || 'vaccines'}</span>
-                </div>
-                <div class="activity-content">
-                  <h4 style="font-size: 14px; font-weight: 600;">${v.nombre}</h4>
-                  <span class="history-date">${new Date(v.fecha).toLocaleDateString()}</span>
-                </div>
-              </div>
-            `).join('') : '<p style="text-align:center; padding: 24px; color:#999">No hay registros sanitarios.</p>'}
-          </div>
-        </div>
       </div>
     </div>
   `;
+}
+
+export function initDetalleAnimal(animalId) {
+    console.log('Initializing Detalle Animal for:', animalId);
+
+    window.showAnimalAction = async (type, id) => {
+        const title = type === 'peso' ? 'Registrar Pesaje' : 'Registrar Vacuna';
+        const label = type === 'peso' ? 'Peso (KG)' : 'Nombre de la Vacuna';
+        const inputType = type === 'peso' ? 'number' : 'text';
+
+        const result = await window.showModal({
+            title: title,
+            content: `
+                <div class="m3-field">
+                    <label>${label}</label>
+                    <div class="m3-input-container">
+                        <input type="${inputType}" id="action-value" step="0.1" placeholder="Ej: ${type === 'peso' ? '450.5' : 'Aftosa'}">
+                    </div>
+                </div>
+                <div class="m3-field" style="margin-top: 16px;">
+                    <label>Fecha</label>
+                    <div class="m3-input-container">
+                        <input type="date" id="action-date" value="${new Date().toISOString().split('T')[0]}">
+                    </div>
+                </div>
+            `,
+            confirmText: 'Guardar Registro'
+        });
+
+        if (result) {
+            const value = document.getElementById('action-value').value;
+            const date = document.getElementById('action-date').value;
+
+            if (!value) return;
+
+            try {
+                window.Snackbar.show('Guardando...', { type: 'info' });
+                if (type === 'peso') {
+                    // Get last weight to calculate change
+                    const { data: lastPesajes } = await supabase
+                        .from('animal_pesajes')
+                        .select('peso')
+                        .eq('animal_id', id)
+                        .order('fecha', { ascending: false })
+                        .limit(1);
+                    
+                    const lastWeight = lastPesajes && lastPesajes[0] ? lastPesajes[0].peso : 0;
+                    const change = lastWeight > 0 ? (parseFloat(value) - lastWeight).toFixed(1) : 'Inicial';
+                    const cambioStr = lastWeight > 0 ? (change > 0 ? `+${change} kg` : `${change} kg`) : 'Inicial';
+
+                    await supabase.from('animal_pesajes').insert([{
+                        animal_id: id,
+                        peso: parseFloat(value),
+                        fecha: date,
+                        evento: 'Control Rutinario',
+                        cambio: cambioStr,
+                        tendencia: change >= 0 ? 'trending_up' : 'trending_down'
+                    }]);
+
+                    // Update main table
+                    await supabase.from('ganado').update({ peso_actual: parseFloat(value) }).eq('id', id);
+                } else {
+                    await supabase.from('animal_vacunas').insert([{
+                        animal_id: id,
+                        nombre: value,
+                        fecha: date,
+                        icon: 'vaccines',
+                        color: '#2e7d32'
+                    }]);
+                }
+
+                window.Snackbar.show('Registro guardado exitosamente');
+                window.navigateTo('detalle_animal', id); // Reload
+            } catch (err) {
+                console.error(err);
+                window.Snackbar.show('Error al guardar: ' + err.message, { type: 'error' });
+            }
+        }
+    };
 }

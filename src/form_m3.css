@@ -138,7 +138,6 @@
 .m3-input-wrapper:focus-within {
   background: white;
   border-color: var(--m3-primary);
-  box-shadow: 0 0 0 4px rgba(62, 111, 57, 0.1);
 }
 
 .m3-input-wrapper input, .m3-input-wrapper select, .m3-input-wrapper textarea {
@@ -152,7 +151,9 @@
   font-family: 'Work Sans', sans-serif;
 }
 
-.m3-input-wrapper input:focus {
+.m3-input-wrapper input:focus, 
+.m3-input-wrapper select:focus, 
+.m3-input-wrapper textarea:focus {
   outline: none;
 }
 

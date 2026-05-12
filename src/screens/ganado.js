@@ -14,147 +14,107 @@ export async function renderGanado() {
   const totalAnimales = animales.length;
   const hembras = animales.filter(a => a.sexo && a.sexo.toLowerCase() === 'hembra').length;
   const machos = animales.filter(a => a.sexo && a.sexo.toLowerCase() === 'macho').length;
-  const pesajePendiente = animales.filter(a => !a.peso_actual || a.peso_actual == 0).length;
-
-  const hembrasPercent = totalAnimales > 0 ? (hembras / totalAnimales) * 100 : 0;
-  const machosPercent = totalAnimales > 0 ? (machos / totalAnimales) * 100 : 0;
 
   return `
-    <div class="px-2 lg:px-6 pt-4 pb-24 lg:pb-12 bg-surface font-body text-on-surface min-h-full">
-      <!-- Top Summary Cards (M3 Style) -->
-      <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <div class="p-8 bg-primary-container rounded-xl flex flex-col justify-between h-48 border-none">
-          <div class="flex justify-between items-start">
-            <span class="material-symbols-outlined text-emerald-900/60 text-3xl" style="font-variation-settings: 'FILL' 1;">pets</span>
-            <span class="text-xs font-bold uppercase tracking-widest text-emerald-900/60">Total Animales</span>
-          </div>
+    <div class="screen-ganado">
+      <div class="section-title">
+        <h3>Mi Ganado</h3>
+      </div>
+      <p class="section-subtitle">Gestión de inventario bovino y trazabilidad.</p>
+
+      <!-- Summary Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="material-icons stat-icon">pets</span>
           <div>
-            <h3 class="text-5xl font-extrabold font-headline text-emerald-900 tracking-tighter">${totalAnimales}</h3>
-            <p class="text-sm font-medium text-emerald-900/70 mt-1">Registrados</p>
+            <p class="stat-label">Total Animales</p>
+            <h4 class="stat-value">${totalAnimales}</h4>
           </div>
         </div>
-
-        <div class="p-8 bg-surface-container-high rounded-xl flex flex-col justify-between h-48">
-          <div class="flex justify-between items-start">
-            <span class="material-symbols-outlined text-on-surface text-3xl">female</span>
-            <span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Hembras</span>
-          </div>
+        <div class="stat-card">
+          <span class="material-icons stat-icon" style="color: #e91e63; background: #fce4ec;">female</span>
           <div>
-            <h3 class="text-5xl font-extrabold font-headline text-on-surface tracking-tighter">${hembras}</h3>
-            <div class="w-full h-2 bg-outline-variant/20 rounded-full mt-4">
-              <div class="h-full bg-emerald-600 rounded-full" style="width: ${hembrasPercent}%"></div>
-            </div>
+            <p class="stat-label">Hembras</p>
+            <h4 class="stat-value">${hembras}</h4>
           </div>
         </div>
-
-        <div class="p-8 bg-surface-container-high rounded-xl flex flex-col justify-between h-48">
-          <div class="flex justify-between items-start">
-            <span class="material-symbols-outlined text-on-surface text-3xl">male</span>
-            <span class="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Machos</span>
-          </div>
+        <div class="stat-card">
+          <span class="material-icons stat-icon" style="color: #2196f3; background: #e3f2fd;">male</span>
           <div>
-            <h3 class="text-5xl font-extrabold font-headline text-on-surface tracking-tighter">${machos}</h3>
-            <div class="w-full h-2 bg-outline-variant/20 rounded-full mt-4">
-              <div class="h-full bg-secondary rounded-full" style="width: ${machosPercent}%"></div>
-            </div>
+            <p class="stat-label">Machos</p>
+            <h4 class="stat-value">${machos}</h4>
           </div>
-        </div>
-
-        <div class="p-8 bg-tertiary-container rounded-xl flex flex-col justify-between h-48">
-          <div class="flex justify-between items-start">
-            <span class="material-symbols-outlined text-on-tertiary-container text-3xl">scale</span>
-            <span class="text-xs font-bold uppercase tracking-widest text-on-tertiary-container/60">Pesaje Pendiente</span>
-          </div>
-          <div>
-            <h3 class="text-5xl font-extrabold font-headline text-on-tertiary-container tracking-tighter">${pesajePendiente}</h3>
-            <p class="text-sm font-bold text-on-tertiary-container mt-1 underline">Acción requerida</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Main Content Area: Asymmetric Layout -->
-      <div class="grid grid-cols-1 xl:grid-cols-3 gap-12">
-        <!-- Animal List (Bento-inspired cards) -->
-        <div class="xl:col-span-2 space-y-6">
-          <div class="flex justify-between items-end mb-4 px-2">
-            <h4 class="text-xl font-bold font-headline text-on-surface">Entradas Recientes</h4>
-            <button class="text-sm font-bold text-emerald-700 flex items-center gap-1 hover:bg-emerald-50 px-3 py-1.5 rounded-full transition-colors border-none outline-none bg-transparent">
-              Ver Filtrados <span class="material-symbols-outlined text-[18px]">filter_list</span>
-            </button>
-          </div>
-          
-          <div class="grid gap-4">
-            ${animales.map(a => {
-              const statusVacunas = a.total_vacunas > 0 ? 'AL DÍA' : 'PENDIENTE';
-              const isAlDia = statusVacunas === 'AL DÍA';
-              
-              const statusBg = isAlDia ? 'bg-primary-container' : 'bg-tertiary-container';
-              const statusText = isAlDia ? 'text-on-primary-container' : 'text-on-tertiary-container';
-              const statusIcon = isAlDia ? 'vaccines' : 'priority_high';
-              const statusIconColorBg = isAlDia ? 'bg-emerald-500' : 'bg-tertiary';
-              
-              const randomImageSeed = a.id || a.nombre;
-              const imageUrl = `https://api.dicebear.com/7.x/shapes/svg?seed=${randomImageSeed}&backgroundColor=f1ede6`;
-
-              return `
-                <div class="group bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all p-3 pr-6 rounded-[2rem] flex flex-col sm:flex-row items-start sm:items-center gap-6" onclick="window.navigateTo('detalle_animal', '${a.id}')">
-                  <div class="relative flex-shrink-0">
-                    <img class="w-16 h-16 rounded-2xl object-cover bg-surface-variant" src="${imageUrl}" alt="${a.nombre}" />
-                    <div class="absolute -bottom-1 -right-1 w-6 h-6 ${statusIconColorBg} rounded-full border-4 border-surface-container-low flex items-center justify-center">
-                      <span class="material-symbols-outlined text-[10px] text-white" style="font-variation-settings: 'FILL' 1;">${statusIcon}</span>
-                    </div>
-                  </div>
-                  
-                  <div class="flex-1 w-full grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-                    <div>
-                      <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider">#${a.id.substring(0,4)} — ${a.nombre}</p>
-                      <p class="text-sm font-bold text-on-surface">${a.raza || 'Bovino'}</p>
-                    </div>
-                    
-                    <div>
-                      <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider">Peso</p>
-                      <p class="text-sm font-bold text-on-surface">${a.peso_actual || '0'} kg</p>
-                    </div>
-                    
-                    <div class="hidden md:block">
-                      <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">Estado</p>
-                      <div class="flex items-center gap-1.5 px-3 py-1 ${statusBg} ${statusText} rounded-full w-fit">
-                        <span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">${statusIcon}</span>
-                        <span class="text-[10px] font-bold uppercase">${statusVacunas}</span>
-                      </div>
-                    </div>
-                    
-                    <div class="text-right hidden sm:flex justify-end">
-                      <button class="p-2 text-on-surface-variant hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-colors flex items-center justify-center border-none outline-none bg-transparent" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}')">
-                        <span class="material-symbols-outlined">more_vert</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-            
-            ${animales.length === 0 ? `
-              <div class="p-8 text-center bg-surface-container-low rounded-lg">
-                <span class="material-symbols-outlined text-4xl text-on-surface-variant opacity-50 mb-2">pets</span>
-                <p class="text-on-surface-variant font-medium">No hay animales registrados en el inventario.</p>
-              </div>
-            ` : ''}
-          </div>
-
-          ${animales.length > 0 ? `
-          <button class="w-full mt-6 py-4 text-sm font-bold text-emerald-800 border border-dashed border-outline-variant/50 rounded-full hover:bg-surface-container hover:border-emerald-700/30 transition-all flex items-center justify-center">
-              Cargar más registros
-          </button>
-          ` : ''}
         </div>
       </div>
 
-      <!-- Floating Action Button -->
-      <button id="btn-add-animal" class="fixed bottom-8 right-8 z-50 flex items-center gap-3 px-6 py-4 bg-[#345e37] text-white rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all duration-300 border-none outline-none">
-        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
-        <span class="font-headline font-bold text-sm">Registrar animal</span>
+      <div class="card-grid">
+        ${animales.map(a => {
+          const randomImageSeed = a.id || a.nombre;
+          const imageUrl = a.image_url || `https://api.dicebear.com/7.x/shapes/svg?seed=${randomImageSeed}&backgroundColor=f1ede6`;
+          
+          return `
+            <div class="motor-card-premium" data-id="${a.id}">
+              <!-- Top Content -->
+              <div class="m3-premium-top">
+                <div class="m3-premium-img-box">
+                  <img src="${imageUrl}" alt="${a.nombre}">
+                </div>
+                <div class="m3-premium-title-group">
+                  <h4 class="m3-premium-title">${a.nombre}</h4>
+                  <p style="font-size: 13px; color: #888; margin-top: 4px;">${a.raza || 'Sin raza'}</p>
+                </div>
+              </div>
+
+              <!-- Body Section -->
+              <div class="m3-premium-body">
+                <div class="m3-premium-stat-row">
+                   <span class="m3-premium-stat-label">SEXO</span>
+                   <span class="m3-premium-stat-value">${a.sexo || 'N/A'}</span>
+                </div>
+                <div class="m3-premium-stat-row">
+                   <span class="m3-premium-stat-label">PESO ACTUAL</span>
+                   <span class="m3-premium-stat-value"><b>${a.peso_actual || '0'}</b> KG</span>
+                </div>
+                
+                <div class="m3-premium-meta" style="margin-top: 16px;">
+                   <span class="material-icons">calendar_today</span>
+                   <span>Reg: ${a.fecha_adquisicion ? new Date(a.fecha_adquisicion).toLocaleDateString() : 'No reg.'}</span>
+                </div>
+              </div>
+
+              <!-- Footer Actions -->
+              <div class="m3-premium-actions">
+                <button class="btn-m3-fill" onclick="window.navigateTo('detalle_animal', '${a.id}')">
+                   Ver Ficha
+                </button>
+                <button class="btn-m3-tonal" onclick="window.navigateTo('detalle_animal', '${a.id}')">
+                   Eventos
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+
+        ${animales.length === 0 ? `
+          <div style="grid-column: 1/-1; text-align: center; padding: 60px 0; background: #fdfaf6; border-radius: 40px; border: 2px dashed #eee;">
+            <span class="material-icons" style="font-size: 48px; color: #ccc; margin-bottom: 16px;">pets</span>
+            <p style="color: #888; font-weight: 600;">No hay animales registrados aún.</p>
+          </div>
+        ` : ''}
+      </div>
+
+      <button id="btn-add-animal" class="fab">
+        <span class="material-icons">add</span> Registrar animal
       </button>
     </div>
   `;
+}
+
+export function initGanado() {
+  const btnAdd = document.getElementById('btn-add-animal');
+  if (btnAdd) {
+    btnAdd.addEventListener('click', () => {
+      window.navigateTo('nuevo_animal');
+    });
+  }
 }

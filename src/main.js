@@ -11,11 +11,11 @@ registerSW({ immediate: true });
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores } from './screens/motores.js';
 import { renderHerramientas } from './screens/herramientas.js';
-import { renderGanado } from './screens/ganado.js';
+import { renderGanado, initGanado } from './screens/ganado.js';
 import { renderPotreros } from './screens/potreros.js';
 import { renderDetalleMotor } from './screens/detalle_motor.js';
 import { renderDetallePotrero } from './screens/detalle_potrero.js';
-import { renderDetalleAnimal } from './screens/detalle_animal.js';
+import { renderDetalleAnimal, initDetalleAnimal } from './screens/detalle_animal.js';
 import { renderDetalleHerramienta } from './screens/detalle_herramienta.js';
 import { renderNuevoMotor, initNuevoMotor } from './screens/nuevo_motor.js';
 import { renderNuevoAnimal, initNuevoAnimal } from './screens/nuevo_animal.js';
@@ -79,8 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (screenId === 'nuevo_motor') {
               initNuevoMotor();
             }
+            if (screenId === 'ganado') {
+              initGanado();
+            }
             if (screenId === 'nuevo_animal') {
               initNuevoAnimal();
+            }
+            if (screenId === 'detalle_animal') {
+              initDetalleAnimal(...args);
             }
         } catch (error) {
             console.error(error);
@@ -113,6 +119,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Wire motor card clicks to detalle_motor
     document.addEventListener('click', (e) => {
+        const premiumCard = e.target.closest('.motor-card-premium[data-id]');
+        if (premiumCard) {
+            // Check if we are in the motors screen or ganado screen
+            if (premiumCard.closest('.screen-motores')) {
+                navigate('detalle_motor', premiumCard.dataset.id);
+            } else if (premiumCard.closest('.screen-ganado')) {
+                navigate('detalle_animal', premiumCard.dataset.id);
+            }
+        }
+
         const motorCard = e.target.closest('.motor-card[data-id]');
         if (motorCard) {
             navigate('detalle_motor', motorCard.dataset.id);

@@ -105,6 +105,21 @@ export function initNuevoAnimal() {
     photoInput.onchange = (e) => {
       const file = e.target.files[0];
       if (file) {
+        // Validation: Format
+        const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+          window.Snackbar.show('Formato no válido. Use JPG, PNG o WebP.', { type: 'error' });
+          photoInput.value = '';
+          return;
+        }
+
+        // Validation: Size (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          window.Snackbar.show('La imagen es demasiado grande (Máx 10MB).', { type: 'error' });
+          photoInput.value = '';
+          return;
+        }
+
         selectedFile = file;
         const reader = new FileReader();
         reader.onload = (re) => {
@@ -161,22 +176,17 @@ export function initNuevoAnimal() {
         }
       }
 
-      // Generate an ID if the user provided something that might not be unique, 
-      // but let's use the provided name as part of the ID, or a random string.
-      const uniqueId = `#${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-
       // Clean empty dates so Supabase doesn't error out on empty strings
-      if (!data.fecha_adquisicion) {
-          delete data.fecha_adquisicion;
-      }
+      const fechaFinal = (data.fecha_adquisicion && data.fecha_adquisicion.trim() !== '') 
+        ? data.fecha_adquisicion 
+        : null;
 
       const { error } = await supabase.from('ganado').insert([{
-        id: uniqueId,
         nombre: data.nombre,
         raza: data.raza,
         sexo: data.sexo,
         peso_actual: parseFloat(data.peso_actual) || 0,
-        fecha_adquisicion: data.fecha_adquisicion,
+        fecha_adquisicion: fechaFinal,
         icon: data.sexo === 'Macho' ? '🐂' : '🐄',
         image_url: image_url
       }]);
