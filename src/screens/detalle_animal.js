@@ -747,6 +747,8 @@ function showDayDetails(day, dayEvents) {
                                 </div>
                             </div>
                         </div>
+                        ${v.dosis ? `<div style="margin-top: 4px; font-size: 12px; color: #555;">Dosis: ${v.dosis}</div>` : ''}
+                        ${v.observaciones ? `<div style="margin-top: 4px; font-size: 12px; color: #555; font-style: italic;">Obs: ${v.observaciones}</div>` : ''}
                         ${actionsHtml}
                     </div>
                     `;
@@ -1344,39 +1346,60 @@ async function handleEditVaccine(vaccineId) {
     const v = vaccines.find(x => x.id === vaccineId);
     if (!v) return;
 
-    const { showModal, closeModal } = await import('../modals.js');
-    showModal('Editar Vacuna Programada', `
-        <form id="form-edit-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
-            <div class="m3-field">
-                <input type="text" name="nombre" value="${v.nombre || ''}" placeholder=" " required>
-                <label>Nombre de la Vacuna</label>
-            </div>
-            <div class="m3-field">
-                <input type="date" name="fecha" value="${v.fecha || ''}" placeholder=" " required>
-                <label>Fecha Programada</label>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-                <button type="button" class="btn-m3-tonal" id="delete-edit-vaccine" style="background:#ffebee;color:#c62828;">
-                    <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
-                </button>
-                <div style="display:flex;gap:12px;">
-                    <button type="button" class="btn-m3-text" id="cancel-edit-vaccine">Cancelar</button>
-                    <button type="submit" class="btn-m3-fill">Guardar cambios</button>
-                </div>
-            </div>
-        </form>
-    `);
+    const container = document.getElementById('da-day-details-panel');
+    if (!container) return;
 
-    document.getElementById('cancel-edit-vaccine').onclick = closeModal;
+    // Guardamos el contenido original para el botón Cancelar
+    const originalContent = container.innerHTML;
+
+    container.innerHTML = `
+        <div class="da-inline-form-card" style="margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);">
+            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#386a3e;">Editar Vacuna</h3>
+            <form id="form-edit-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="m3-field">
+                    <input type="text" name="nombre" value="${v.nombre || ''}" placeholder=" " required autocomplete="off">
+                    <label>Nombre de la Vacuna</label>
+                </div>
+                <div class="m3-field">
+                    <input type="date" name="fecha" value="${v.fecha || ''}" placeholder=" " required>
+                    <label>Fecha Programada</label>
+                </div>
+                <div class="m3-field">
+                    <input type="text" name="dosis" value="${v.dosis || ''}" placeholder=" " autocomplete="off">
+                    <label>Dosis (opcional)</label>
+                </div>
+                <div class="m3-field">
+                    <textarea name="observaciones" placeholder=" " rows="2">${v.observaciones || ''}</textarea>
+                    <label>Observaciones (opcional)</label>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-m3-tonal" id="delete-edit-vaccine" style="background:#ffebee; color:#c62828;">
+                        <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
+                    </button>
+                    <div style="display:flex; gap:12px;">
+                        <button type="button" class="btn-m3-text" id="cancel-edit-vaccine">Cancelar</button>
+                        <button type="submit" class="btn-m3-fill">Guardar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.getElementById('cancel-edit-vaccine').onclick = () => {
+        container.innerHTML = originalContent;
+        // Re-vincular eventos si es necesario o simplemente recargar
+        renderDayDetails(v.fecha); 
+    };
+
     document.getElementById('delete-edit-vaccine').onclick = () => {
         window.Snackbar.confirm(
-            '¿Eliminar esta vacuna programada? Esta acción no se puede deshacer.',
+            '¿Eliminar esta vacuna programada?',
             async () => {
                 try {
                     const { error } = await supabase.from('animal_vacunas').delete().eq('id', vaccineId);
                     if (error) throw error;
                     showSnackbar('Vacuna eliminada');
-                    closeModal();
                     await loadAllData(currentAnimal.id, document.getElementById('da-container'));
                 } catch (err) {
                     showSnackbar(err.message, 'error');
@@ -1385,21 +1408,27 @@ async function handleEditVaccine(vaccineId) {
             { confirmLabel: 'Eliminar', cancelLabel: 'Cancelar' }
         );
     };
+
     document.getElementById('form-edit-vaccine').onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const newFecha = fd.get('fecha');
         const today = getLocalToday();
         const newEstado = newFecha >= today ? 'Programada' : 'Aplicada';
+        
         try {
-            const { error } = await supabase.from('animal_vacunas').update({
+            const payload = {
                 nombre: fd.get('nombre'),
                 fecha: newFecha,
+                dosis: fd.get('dosis') || null,
+                observaciones: fd.get('observaciones') || null,
                 estado: newEstado
-            }).eq('id', vaccineId);
+            };
+            
+            const { error } = await supabase.from('animal_vacunas').update(payload).eq('id', vaccineId);
             if (error) throw error;
-            showSnackbar('Vacuna actualizada');
-            closeModal();
+            
+            showSnackbar('Vacuna actualizada ✓');
             await loadAllData(currentAnimal.id, document.getElementById('da-container'));
         } catch (err) {
             showSnackbar(err.message, 'error');
@@ -1413,47 +1442,58 @@ async function handleEditFumigacion(fumigacionId) {
     const f = fumigaciones.find(x => x.id === fumigacionId);
     if (!f) return;
 
-    const { showModal, closeModal } = await import('../modals.js');
-    showModal('Editar Fumigación Programada', `
-        <form id="form-edit-fumigacion" style="display: flex; flex-direction: column; gap: 16px;">
-            <div class="m3-field">
-                <input type="text" name="producto" value="${f.producto || ''}" placeholder=" " required>
-                <label>Producto</label>
-            </div>
-            <div class="m3-field">
-                <input type="date" name="fecha" value="${f.fecha || ''}" placeholder=" " required>
-                <label>Fecha Programada</label>
-            </div>
-            <div class="m3-field">
-                <input type="text" name="dosis" value="${f.dosis || ''}" placeholder=" ">
-                <label>Dosis</label>
-            </div>
-            <div class="m3-field">
-                <textarea name="observaciones" placeholder=" ">${f.observaciones || ''}</textarea>
-                <label>Observaciones</label>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-                <button type="button" class="btn-m3-tonal" id="delete-edit-fumigacion" style="background:#ffebee;color:#c62828;">
-                    <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
-                </button>
-                <div style="display:flex;gap:12px;">
-                    <button type="button" class="btn-m3-text" id="cancel-edit-fumigacion">Cancelar</button>
-                    <button type="submit" class="btn-m3-fill">Guardar cambios</button>
-                </div>
-            </div>
-        </form>
-    `);
+    const container = document.getElementById('da-day-details-panel-fumig');
+    if (!container) return;
 
-    document.getElementById('cancel-edit-fumigacion').onclick = closeModal;
+    const originalContent = container.innerHTML;
+
+    container.innerHTML = `
+        <div class="da-inline-form-card" style="margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);">
+            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#386a3e;">Editar Fumigación</h3>
+            <form id="form-edit-fumigacion" style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="m3-field">
+                    <input type="text" name="producto" value="${f.producto || ''}" placeholder=" " required autocomplete="off">
+                    <label>Producto</label>
+                </div>
+                <div class="m3-field">
+                    <input type="date" name="fecha" value="${f.fecha || ''}" placeholder=" " required>
+                    <label>Fecha Programada</label>
+                </div>
+                <div class="m3-field">
+                    <input type="text" name="dosis" value="${f.dosis || ''}" placeholder=" " autocomplete="off">
+                    <label>Dosis (opcional)</label>
+                </div>
+                <div class="m3-field">
+                    <textarea name="observaciones" placeholder=" " rows="2">${f.observaciones || ''}</textarea>
+                    <label>Observaciones (opcional)</label>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-m3-tonal" id="delete-edit-fumigacion" style="background:#ffebee; color:#c62828;">
+                        <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
+                    </button>
+                    <div style="display:flex; gap:12px;">
+                        <button type="button" class="btn-m3-text" id="cancel-edit-fumigacion">Cancelar</button>
+                        <button type="submit" class="btn-m3-fill">Guardar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.getElementById('cancel-edit-fumigacion').onclick = () => {
+        container.innerHTML = originalContent;
+        renderDayDetailsFumig(f.fecha);
+    };
+
     document.getElementById('delete-edit-fumigacion').onclick = () => {
         window.Snackbar.confirm(
-            '¿Eliminar esta fumigación programada? Esta acción no se puede deshacer.',
+            '¿Eliminar esta fumigación?',
             async () => {
                 try {
                     const { error } = await supabase.from('animal_fumigaciones').delete().eq('id', fumigacionId);
                     if (error) throw error;
                     showSnackbar('Fumigación eliminada');
-                    closeModal();
                     await loadAllData(currentAnimal.id, document.getElementById('da-container'));
                 } catch (err) {
                     showSnackbar(err.message, 'error');
@@ -1462,23 +1502,27 @@ async function handleEditFumigacion(fumigacionId) {
             { confirmLabel: 'Eliminar', cancelLabel: 'Cancelar' }
         );
     };
+
     document.getElementById('form-edit-fumigacion').onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const newFecha = fd.get('fecha');
         const today = getLocalToday();
         const newEstado = newFecha >= today ? 'Programada' : 'Aplicada';
+
         try {
-            const { error } = await supabase.from('animal_fumigaciones').update({
+            const payload = {
                 producto: fd.get('producto'),
                 fecha: newFecha,
                 dosis: fd.get('dosis') || null,
                 observaciones: fd.get('observaciones') || null,
                 estado: newEstado
-            }).eq('id', fumigacionId);
+            };
+
+            const { error } = await supabase.from('animal_fumigaciones').update(payload).eq('id', fumigacionId);
             if (error) throw error;
-            showSnackbar('Fumigación actualizada');
-            closeModal();
+
+            showSnackbar('Fumigación actualizada ✓');
             await loadAllData(currentAnimal.id, document.getElementById('da-container'));
         } catch (err) {
             showSnackbar(err.message, 'error');
