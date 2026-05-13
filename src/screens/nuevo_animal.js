@@ -31,15 +31,7 @@ export async function renderNuevoAnimal(id) {
             </div>
           </div>
 
-          <div class="da-hero-actions" style="margin-top: auto;">
-             <button class="da-action-btn da-action-edit" id="btn-save-animal" style="width: 100%; justify-content: center; padding: 16px;">
-                <span class="material-icons">${isEdit ? 'save' : 'add_circle'}</span>
-                <span id="save-label">${isEdit ? 'Guardar Cambios' : 'Registrar Animal'}</span>
-             </button>
-             <button class="da-action-btn da-action-delete" style="background: #f5f5f5; color: #666;" onclick="window.navigateTo('${isEdit ? 'detalle_animal' : 'ganado'}'${isEdit ? `, '${id}'` : ''})">
-                Cancelar
-             </button>
-          </div>
+
         </div>
       </div>
 
@@ -113,6 +105,16 @@ export async function renderNuevoAnimal(id) {
                 <input type="date" name="fecha_adquisicion" placeholder=" ">
                 <label>Fecha de Ingreso / Nacimiento</label>
               </div>
+            </div>
+            
+            <div class="da-form-actions" style="display: flex; gap: 12px; margin-top: 32px; flex-direction: column;">
+              <button type="button" class="da-action-btn da-action-edit" id="btn-save-animal" style="width: 100%; justify-content: center; padding: 16px;">
+                <span class="material-icons">${isEdit ? 'save' : 'add_circle'}</span>
+                <span id="save-label">${isEdit ? 'Guardar Cambios' : 'Registrar Animal'}</span>
+              </button>
+              <button type="button" class="da-action-btn da-action-delete" style="width: 100%; justify-content: center; padding: 16px; background: #f5f5f5; color: #666; border: 1px solid #e0e0e0;" onclick="window.navigateTo('${isEdit ? 'detalle_animal' : 'ganado'}'${isEdit ? `, '${id}'` : ''})">
+                Cancelar
+              </button>
             </div>
           </form>
         </div>
