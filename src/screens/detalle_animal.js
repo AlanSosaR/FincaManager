@@ -434,7 +434,7 @@ function setupEventListeners(animalId, container) {
     document.getElementById('da-edit-photo')?.addEventListener('click', () => handleEditPhoto(animalId));
 
     // Registration Actions
-    document.getElementById('da-add-vaccine')?.addEventListener('click', () => handleAddVaccine(animalId));
+    document.getElementById('da-add-vaccine')?.addEventListener('click', () => showInlineVaccineForm(animalId, getLocalToday(), []));
     document.getElementById('da-add-weight')?.addEventListener('click', () => showInlineWeightForm(animalId));
     document.getElementById('da-add-fumigacion')?.addEventListener('click', () => showInlineFumigForm(animalId, getLocalToday(), []));
 }
@@ -782,10 +782,6 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
                     <label>Nombre de la Vacuna</label>
                 </div>
                 <div class="m3-field">
-                    <input type="text" name="dosis" id="inline-vaccine-dosis" placeholder=" " autocomplete="off">
-                    <label>Dosis (opcional)</label>
-                </div>
-                <div class="m3-field">
                     <input type="date" name="fecha" id="inline-vaccine-fecha" value="${defaultDate}" placeholder=" " required>
                     <label>Fecha</label>
                 </div>
@@ -823,8 +819,6 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
                 fecha: selectedDate,
                 estado: estadoVal
             };
-            const dosis = formData.get('dosis')?.trim();
-            if (dosis) payload.dosis = dosis;
             const obs = formData.get('observaciones')?.trim();
             if (obs) payload.observaciones = obs;
 
