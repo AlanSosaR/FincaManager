@@ -2405,6 +2405,21 @@ input:focus, textarea:focus, select:focus {
   gap: 20px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.02);
   border: 1px solid rgba(0,0,0,0.01);
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+/* Cards acting as tab selectors */
+.da-stat-tab {
+  user-select: none;
+}
+.da-stat-tab:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+.da-stat-tab.active {
+  border: 2px solid var(--primary, #386a3e);
+  box-shadow: 0 0 0 4px rgba(56,106,62,0.10), 0 4px 20px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
 }
 
 .da-stat-icon {

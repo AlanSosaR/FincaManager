@@ -10,60 +10,64 @@ function getLocalToday() {
 
 Chart.register(...registerables);
 
-window.confirmVaccine = async (vaccineId) => {
-    if (!confirm('¿Confirmar que la vacuna fue aplicada?')) return;
-    try {
-        const { error } = await supabase.from('animal_vacunas').update({ estado: 'Aplicada' }).eq('id', vaccineId);
-        if (error) throw error;
-        showSnackbar('Vacuna confirmada');
-        if (currentAnimal) {
-            initDetalleAnimal(currentAnimal.id);
+window.confirmVaccine = (vaccineId) => {
+    window.Snackbar.confirm('¿Confirmar que la vacuna fue aplicada?', async () => {
+        try {
+            const { error } = await supabase.from('animal_vacunas').update({ estado: 'Aplicada' }).eq('id', vaccineId);
+            if (error) throw error;
+            showSnackbar('Vacuna confirmada');
+            if (currentAnimal) {
+                initDetalleAnimal(currentAnimal.id);
+            }
+        } catch (err) {
+            showSnackbar(err.message, 'error');
         }
-    } catch (err) {
-        showSnackbar(err.message, 'error');
-    }
+    });
 };
 
-window.cancelVaccine = async (vaccineId) => {
-    if (!confirm('¿Confirmar que la vacuna fue cancelada/no aplicada?')) return;
-    try {
-        const { error } = await supabase.from('animal_vacunas').update({ estado: 'Cancelada' }).eq('id', vaccineId);
-        if (error) throw error;
-        showSnackbar('Vacuna cancelada');
-        if (currentAnimal) {
-            initDetalleAnimal(currentAnimal.id);
+window.cancelVaccine = (vaccineId) => {
+    window.Snackbar.confirm('¿Confirmar que la vacuna fue cancelada/no aplicada?', async () => {
+        try {
+            const { error } = await supabase.from('animal_vacunas').update({ estado: 'Cancelada' }).eq('id', vaccineId);
+            if (error) throw error;
+            showSnackbar('Vacuna cancelada');
+            if (currentAnimal) {
+                initDetalleAnimal(currentAnimal.id);
+            }
+        } catch (err) {
+            showSnackbar(err.message, 'error');
         }
-    } catch (err) {
-        showSnackbar(err.message, 'error');
-    }
+    });
 };
 
-window.confirmFumigacion = async (fumigacionId) => {
-    if (!confirm('¿Confirmar que la fumigación fue aplicada?')) return;
-    try {
-        const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Aplicada' }).eq('id', fumigacionId);
-        if (error) throw error;
-        showSnackbar('Fumigación confirmada');
-        if (currentAnimal) {
-            initDetalleAnimal(currentAnimal.id);
+window.confirmFumigacion = (fumigacionId) => {
+    window.Snackbar.confirm('¿Confirmar que la fumigación fue aplicada?', async () => {
+        try {
+            const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Aplicada' }).eq('id', fumigacionId);
+            if (error) throw error;
+            showSnackbar('Fumigación confirmada');
+            if (currentAnimal) {
+                initDetalleAnimal(currentAnimal.id);
+            }
+        } catch (err) {
+            showSnackbar(err.message, 'error');
         }
-    } catch (err) {
-        showSnackbar(err.message, 'error');
-    }
+    });
 };
 
-window.cancelFumigacion = async (fumigacionId) => {
-    if (!confirm('¿Confirmar que la fumigación fue cancelada/no aplicada?')) return;
-    try {
-        const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Cancelada' }).eq('id', fumigacionId);
-        if (error) throw error;
-        showSnackbar('Fumigación cancelada');
-        if (currentAnimal) {
-            initDetalleAnimal(currentAnimal.id);
+window.cancelFumigacion = (fumigacionId) => {
+    window.Snackbar.confirm('¿Confirmar que la fumigación fue cancelada/no aplicada?', async () => {
+        try {
+            const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Cancelada' }).eq('id', fumigacionId);
+            if (error) throw error;
+            showSnackbar('Fumigación cancelada');
+            if (currentAnimal) {
+                initDetalleAnimal(currentAnimal.id);
+            }
+        } catch (err) {
+            showSnackbar(err.message, 'error');
         }
-    } catch (err) {
-        showSnackbar(err.message, 'error');
-    }
+    });
 };
 
 // Local state for the screen
@@ -211,7 +215,7 @@ function renderFullContent(container, animalId) {
         </div>
 
         <div class="da-stat-grid">
-            <div class="da-stat-card">
+            <div class="da-stat-card da-stat-tab active" data-tab="vacunas" style="cursor:pointer;" title="Ver Vacunas y Salud">
                 <div class="da-stat-icon">
                     <span class="material-icons">vaccines</span>
                 </div>
@@ -222,7 +226,7 @@ function renderFullContent(container, animalId) {
                 </div>
             </div>
 
-            <div class="da-stat-card">
+            <div class="da-stat-card da-stat-tab" data-tab="pesajes" style="cursor:pointer;" title="Ver Historial de Pesajes">
                 <div class="da-stat-icon da-stat-icon-secondary">
                     <span class="material-icons">monitor_weight</span>
                 </div>
@@ -238,7 +242,7 @@ function renderFullContent(container, animalId) {
                 </div>
             </div>
 
-            <div class="da-stat-card">
+            <div class="da-stat-card da-stat-tab" data-tab="fumigacion" style="cursor:pointer;" title="Ver Fumigación y Químicos">
                 <div class="da-stat-icon" style="background: #e1f5fe; color: #0288d1;">
                     <span class="material-icons">bug_report</span>
                 </div>
@@ -251,18 +255,6 @@ function renderFullContent(container, animalId) {
         </div>
 
         <div class="da-tabs-section">
-            <div class="da-mobile-tabs">
-                <select id="da-tab-select" class="da-mobile-tab-select">
-                    <option value="vacunas">Vacunas y Salud</option>
-                    <option value="pesajes">Historial de Pesajes</option>
-                    <option value="fumigacion">Fumigación y Químicos</option>
-                </select>
-            </div>
-            <div class="da-tab-bar">
-                <button class="da-tab active" data-tab="vacunas">Vacunas y Salud</button>
-                <button class="da-tab" data-tab="pesajes">Historial de Pesajes</button>
-                <button class="da-tab" data-tab="fumigacion">Fumigación y Químicos</button>
-            </div>
 
             <div class="da-tab-content active" id="da-tab-vacunas">
                 <div class="da-calendar-layout">
@@ -390,45 +382,27 @@ function renderFullContent(container, animalId) {
 }
 
 function setupEventListeners(animalId, container) {
-    // Tab switching
-    const tabs = container.querySelectorAll('.da-tab');
     const contents = container.querySelectorAll('.da-tab-content');
-    const tabSelect = document.getElementById('da-tab-select');
+    const statCards = container.querySelectorAll('.da-stat-tab');
 
-    if (tabSelect) {
-        tabSelect.addEventListener('change', (e) => {
-            const target = e.target.value;
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.remove('active'));
-            
-            const btn = Array.from(tabs).find(t => t.getAttribute('data-tab') === target);
-            if (btn) btn.classList.add('active');
-            
-            document.getElementById(`da-tab-${target}`).classList.add('active');
-            
-            if (target === 'pesajes') {
-                initChart();
-            }
-        });
+    function switchTab(target) {
+        contents.forEach(c => c.classList.remove('active'));
+        statCards.forEach(c => c.classList.remove('active'));
+
+        const card = Array.from(statCards).find(c => c.getAttribute('data-tab') === target);
+        if (card) card.classList.add('active');
+
+        const panel = document.getElementById(`da-tab-${target}`);
+        if (panel) panel.classList.add('active');
+
+        if (target === 'pesajes') initChart();
     }
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.classList.remove('active'));
-            tab.classList.add('active');
-            const target = tab.getAttribute('data-tab');
-            document.getElementById(`da-tab-${target}`).classList.add('active');
-            
-            if (tabSelect) {
-                tabSelect.value = target;
-            }
-            
-            if (target === 'pesajes') {
-                initChart();
-            }
-        });
+    // Stat cards are the tab switchers
+    statCards.forEach(card => {
+        card.addEventListener('click', () => switchTab(card.getAttribute('data-tab')));
     });
+
 
     // Calendar Nav
     document.getElementById('prev-month')?.addEventListener('click', () => { 
@@ -467,18 +441,18 @@ function setupEventListeners(animalId, container) {
 
 
 
-async function handleDeleteAnimal(animalId) {
-    if (!confirm('¿Estás seguro de que deseas eliminar este animal? Esta acción no se puede deshacer.')) return;
-    
-    try {
-        const { error } = await supabase.from('ganado').delete().eq('id', animalId);
-        if (error) throw error;
-        
-        showSnackbar('Animal eliminado del inventario');
-        window.location.hash = '#ganado';
-    } catch (err) {
-        alert('Error al eliminar: ' + err.message);
-    }
+function handleDeleteAnimal(animalId) {
+    window.Snackbar.confirm('¿Estás seguro de que deseas eliminar este animal? Esta acción no se puede deshacer.', async () => {
+        try {
+            const { error } = await supabase.from('ganado').delete().eq('id', animalId);
+            if (error) throw error;
+            
+            showSnackbar('Animal eliminado del inventario');
+            window.location.hash = '#ganado';
+        } catch (err) {
+            showSnackbar('Error al eliminar: ' + err.message, 'error');
+        }
+    });
 }
 
 async function handleEditPhoto(animalId) {
@@ -738,18 +712,22 @@ function showDayDetails(day, dayEvents) {
                         iconColor = '#f57c00';
                         iconName = 'schedule';
                         subtitle = 'Vacunación programada';
-                        if (isPastOrToday) {
-                            actionsHtml = `
-                                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
-                                        <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
-                                    </button>
-                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
-                                        <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
-                                    </button>
-                                </div>
-                            `;
-                        }
+                        // Edit button always shown for scheduled
+                        const applyRow = isPastOrToday ? `
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
+                                <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
+                            </button>
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
+                                <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
+                            </button>` : '';
+                        actionsHtml = `
+                            <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+                                ${applyRow}
+                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0; flex: 1;" onclick="window.editVaccine('${v.id}')">
+                                    <span class="material-icons" style="font-size: 16px;">edit</span> Editar
+                                </button>
+                            </div>
+                        `;
                     } else if (currentEstado === 'Cancelada') {
                         iconColor = '#c62828';
                         iconName = 'cancel';
@@ -811,25 +789,25 @@ function renderVaccinesTable(monthVaccines) {
             let estadoHtml = '';
             
             if (currentEstado === 'Programada') {
-                if (isPastOrToday) {
-                    estadoHtml = `
-                        <div style="display: flex; gap: 8px;">
-                            <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmVaccine('${v.id}')">
-                                <span class="material-icons" style="font-size: 16px;">check</span>
-                            </button>
-                            <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelVaccine('${v.id}')">
-                                <span class="material-icons" style="font-size: 16px;">close</span>
-                            </button>
-                        </div>
-                    `;
-                } else {
-                    estadoHtml = `
-                        <span class="da-variation-pill pending">
-                            <span class="material-icons">schedule</span>
-                            Programada
-                        </span>
-                    `;
-                }
+                const applyBtn = isPastOrToday ? `
+                    <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmVaccine('${v.id}')">
+                        <span class="material-icons" style="font-size: 16px;">check</span>
+                    </button>
+                    <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelVaccine('${v.id}')">
+                        <span class="material-icons" style="font-size: 16px;">close</span>
+                    </button>` : `
+                    <span class="da-variation-pill pending" style="margin-right: 4px;">
+                        <span class="material-icons">schedule</span>
+                        Programada
+                    </span>`;
+                estadoHtml = `
+                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                        ${applyBtn}
+                        <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editVaccine('${v.id}')">
+                            <span class="material-icons" style="font-size: 16px;">edit</span>
+                        </button>
+                    </div>
+                `;
             } else if (currentEstado === 'Cancelada') {
                 estadoHtml = `
                     <span class="da-variation-pill negative">
@@ -924,25 +902,25 @@ function renderFumigacionesTable(monthFumigaciones) {
             let estadoHtml = '';
             
             if (currentEstado === 'Programada') {
-                if (isPastOrToday) {
-                    estadoHtml = `
-                        <div style="display: flex; gap: 8px;">
-                            <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmFumigacion('${f.id}')">
-                                <span class="material-icons" style="font-size: 16px;">check</span>
-                            </button>
-                            <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelFumigacion('${f.id}')">
-                                <span class="material-icons" style="font-size: 16px;">close</span>
-                            </button>
-                        </div>
-                    `;
-                } else {
-                    estadoHtml = `
-                        <span class="da-variation-pill pending">
-                            <span class="material-icons">schedule</span>
-                            Programada
-                        </span>
-                    `;
-                }
+                const applyBtnF = isPastOrToday ? `
+                    <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmFumigacion('${f.id}')">
+                        <span class="material-icons" style="font-size: 16px;">check</span>
+                    </button>
+                    <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelFumigacion('${f.id}')">
+                        <span class="material-icons" style="font-size: 16px;">close</span>
+                    </button>` : `
+                    <span class="da-variation-pill pending" style="margin-right: 4px;">
+                        <span class="material-icons">schedule</span>
+                        Programada
+                    </span>`;
+                estadoHtml = `
+                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                        ${applyBtnF}
+                        <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editFumigacion('${f.id}')">
+                            <span class="material-icons" style="font-size: 16px;">edit</span>
+                        </button>
+                    </div>
+                `;
             } else if (currentEstado === 'Cancelada') {
                 estadoHtml = `
                     <span class="da-variation-pill negative">
@@ -1061,18 +1039,21 @@ function showDayDetailsFumig(day, dayEvents) {
                         iconColor = '#f57c00';
                         iconName = 'schedule';
                         subtitle = 'Fumigación programada';
-                        if (isPastOrToday) {
-                            actionsHtml = `
-                                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
-                                        <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
-                                    </button>
-                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelFumigacion('${f.id}')">
-                                        <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
-                                    </button>
-                                </div>
-                            `;
-                        }
+                        const applyRowF = isPastOrToday ? `
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
+                                <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
+                            </button>
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelFumigacion('${f.id}')">
+                                <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
+                            </button>` : '';
+                        actionsHtml = `
+                            <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+                                ${applyRowF}
+                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0; flex: 1;" onclick="window.editFumigacion('${f.id}')">
+                                    <span class="material-icons" style="font-size: 16px;">edit</span> Editar
+                                </button>
+                            </div>
+                        `;
                     } else if (currentEstado === 'Cancelada') {
                         iconColor = '#c62828';
                         iconName = 'cancel';
@@ -1155,3 +1136,150 @@ function initChart() {
     });
 }
 
+// ─── Edit Vaccine ────────────────────────────────────────────────────────────
+async function handleEditVaccine(vaccineId) {
+    const v = vaccines.find(x => x.id === vaccineId);
+    if (!v) return;
+
+    const { showModal, closeModal } = await import('../modals.js');
+    showModal('Editar Vacuna Programada', `
+        <form id="form-edit-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="m3-field">
+                <input type="text" name="nombre" value="${v.nombre || ''}" placeholder=" " required>
+                <label>Nombre de la Vacuna</label>
+            </div>
+            <div class="m3-field">
+                <input type="date" name="fecha" value="${v.fecha || ''}" placeholder=" " required>
+                <label>Fecha Programada</label>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn-m3-tonal" id="delete-edit-vaccine" style="background:#ffebee;color:#c62828;">
+                    <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
+                </button>
+                <div style="display:flex;gap:12px;">
+                    <button type="button" class="btn-m3-text" id="cancel-edit-vaccine">Cancelar</button>
+                    <button type="submit" class="btn-m3-fill">Guardar cambios</button>
+                </div>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('cancel-edit-vaccine').onclick = closeModal;
+    document.getElementById('delete-edit-vaccine').onclick = () => {
+        window.Snackbar.confirm(
+            '¿Eliminar esta vacuna programada? Esta acción no se puede deshacer.',
+            async () => {
+                try {
+                    const { error } = await supabase.from('animal_vacunas').delete().eq('id', vaccineId);
+                    if (error) throw error;
+                    showSnackbar('Vacuna eliminada');
+                    closeModal();
+                    await loadAllData(currentAnimal.id, document.getElementById('da-container'));
+                } catch (err) {
+                    showSnackbar(err.message, 'error');
+                }
+            },
+            { confirmLabel: 'Eliminar', cancelLabel: 'Cancelar' }
+        );
+    };
+    document.getElementById('form-edit-vaccine').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const newFecha = fd.get('fecha');
+        const today = getLocalToday();
+        const newEstado = newFecha >= today ? 'Programada' : 'Aplicada';
+        try {
+            const { error } = await supabase.from('animal_vacunas').update({
+                nombre: fd.get('nombre'),
+                fecha: newFecha,
+                estado: newEstado
+            }).eq('id', vaccineId);
+            if (error) throw error;
+            showSnackbar('Vacuna actualizada');
+            closeModal();
+            await loadAllData(currentAnimal.id, document.getElementById('da-container'));
+        } catch (err) {
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+window.editVaccine = (id) => handleEditVaccine(id);
+
+// ─── Edit Fumigacion ─────────────────────────────────────────────────────────
+async function handleEditFumigacion(fumigacionId) {
+    const f = fumigaciones.find(x => x.id === fumigacionId);
+    if (!f) return;
+
+    const { showModal, closeModal } = await import('../modals.js');
+    showModal('Editar Fumigación Programada', `
+        <form id="form-edit-fumigacion" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="m3-field">
+                <input type="text" name="producto" value="${f.producto || ''}" placeholder=" " required>
+                <label>Producto</label>
+            </div>
+            <div class="m3-field">
+                <input type="date" name="fecha" value="${f.fecha || ''}" placeholder=" " required>
+                <label>Fecha Programada</label>
+            </div>
+            <div class="m3-field">
+                <input type="text" name="dosis" value="${f.dosis || ''}" placeholder=" ">
+                <label>Dosis</label>
+            </div>
+            <div class="m3-field">
+                <textarea name="observaciones" placeholder=" ">${f.observaciones || ''}</textarea>
+                <label>Observaciones</label>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn-m3-tonal" id="delete-edit-fumigacion" style="background:#ffebee;color:#c62828;">
+                    <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
+                </button>
+                <div style="display:flex;gap:12px;">
+                    <button type="button" class="btn-m3-text" id="cancel-edit-fumigacion">Cancelar</button>
+                    <button type="submit" class="btn-m3-fill">Guardar cambios</button>
+                </div>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('cancel-edit-fumigacion').onclick = closeModal;
+    document.getElementById('delete-edit-fumigacion').onclick = () => {
+        window.Snackbar.confirm(
+            '¿Eliminar esta fumigación programada? Esta acción no se puede deshacer.',
+            async () => {
+                try {
+                    const { error } = await supabase.from('animal_fumigaciones').delete().eq('id', fumigacionId);
+                    if (error) throw error;
+                    showSnackbar('Fumigación eliminada');
+                    closeModal();
+                    await loadAllData(currentAnimal.id, document.getElementById('da-container'));
+                } catch (err) {
+                    showSnackbar(err.message, 'error');
+                }
+            },
+            { confirmLabel: 'Eliminar', cancelLabel: 'Cancelar' }
+        );
+    };
+    document.getElementById('form-edit-fumigacion').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const newFecha = fd.get('fecha');
+        const today = getLocalToday();
+        const newEstado = newFecha >= today ? 'Programada' : 'Aplicada';
+        try {
+            const { error } = await supabase.from('animal_fumigaciones').update({
+                producto: fd.get('producto'),
+                fecha: newFecha,
+                dosis: fd.get('dosis') || null,
+                observaciones: fd.get('observaciones') || null,
+                estado: newEstado
+            }).eq('id', fumigacionId);
+            if (error) throw error;
+            showSnackbar('Fumigación actualizada');
+            closeModal();
+            await loadAllData(currentAnimal.id, document.getElementById('da-container'));
+        } catch (err) {
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+window.editFumigacion = (id) => handleEditFumigacion(id);
