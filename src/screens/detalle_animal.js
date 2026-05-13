@@ -435,8 +435,8 @@ function setupEventListeners(animalId, container) {
 
     // Registration Actions
     document.getElementById('da-add-vaccine')?.addEventListener('click', () => handleAddVaccine(animalId));
-    document.getElementById('da-add-weight')?.addEventListener('click', () => handleAddWeight(animalId));
-    document.getElementById('da-add-fumigacion')?.addEventListener('click', () => handleAddFumigacion(animalId));
+    document.getElementById('da-add-weight')?.addEventListener('click', () => showInlineWeightForm(animalId));
+    document.getElementById('da-add-fumigacion')?.addEventListener('click', () => showInlineFumigForm(animalId, getLocalToday(), []));
 }
 
 
@@ -841,6 +841,135 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
 }
 
 
+// ─── Inline Fumigacion Form ──────────────────────────────────────────────────
+function showInlineFumigForm(animalId, defaultDate, existingEvents = []) {
+    const panel = document.getElementById('da-day-details-panel-fumig');
+    if (!panel) return;
+
+    const dateStr = new Date(defaultDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    panel.innerHTML = `
+        <div class="da-day-details" style="display:flex; flex-direction:column; gap:16px;">
+            <h4>${dateStr}</h4>
+            <form id="form-inline-fumig" style="display: flex; flex-direction: column; gap: 14px;">
+                <div class="m3-field">
+                    <input type="text" name="producto" id="inline-fumig-producto" placeholder=" " required autocomplete="off">
+                    <label>Producto / Químico</label>
+                </div>
+                <div class="m3-field">
+                    <input type="text" name="dosis" id="inline-fumig-dosis" placeholder=" " autocomplete="off">
+                    <label>Dosis (opcional)</label>
+                </div>
+                <div class="m3-field">
+                    <input type="date" name="fecha" id="inline-fumig-fecha" value="${defaultDate}" placeholder=" " required>
+                    <label>Fecha</label>
+                </div>
+                <div class="m3-field">
+                    <textarea name="observaciones" id="inline-fumig-obs" placeholder=" " rows="2"></textarea>
+                    <label>Observaciones</label>
+                </div>
+                <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+                    <button type="button" class="btn-m3-text" id="cancel-inline-fumig">Cancelar</button>
+                    <button type="submit" class="btn-m3-fill">Programar</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.getElementById('cancel-inline-fumig').onclick = () => {
+        const day = parseInt(defaultDate.split('-')[2]);
+        showDayDetailsFumig(day, existingEvents);
+    };
+
+    document.getElementById('form-inline-fumig').onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        try {
+            const selectedDate = formData.get('fecha');
+            const today = getLocalToday();
+            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+
+            const payload = {
+                animal_id: animalId,
+                producto: formData.get('producto'),
+                fecha: selectedDate,
+                estado: estadoVal
+            };
+            const dosis = formData.get('dosis')?.trim();
+            if (dosis) payload.dosis = dosis;
+            const obs = formData.get('observaciones')?.trim();
+            if (obs) payload.observaciones = obs;
+
+            const { error } = await supabase.from('animal_fumigaciones').insert(payload);
+            if (error) throw error;
+
+            showSnackbar('Fumigación programada ✓');
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) {
+            console.error(err);
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+
+// ─── Inline Weight Form ──────────────────────────────────────────────────────
+function showInlineWeightForm(animalId) {
+    // Show form above the weights table
+    const tableCard = document.getElementById('da-weights-table');
+    if (!tableCard) return;
+
+    // Insert a temporary inline form before the table card
+    let formContainer = document.getElementById('da-inline-weight-form');
+    if (formContainer) formContainer.remove();
+
+    formContainer = document.createElement('div');
+    formContainer.id = 'da-inline-weight-form';
+    formContainer.className = 'da-day-details';
+    formContainer.style.cssText = 'margin-bottom: 16px; padding: 20px; display:flex; flex-direction:column; gap:14px;';
+    formContainer.innerHTML = `
+        <h4 style="font-size:16px; font-weight:700; color:var(--primary);">Nuevo Pesaje</h4>
+        <form id="form-inline-weight" style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="m3-field">
+                <input type="number" step="0.1" name="peso" id="inline-weight-peso" placeholder=" " required>
+                <label>Peso (${currentAnimal?.peso_unidad || 'kg'})</label>
+            </div>
+            <div class="m3-field">
+                <input type="date" name="fecha" id="inline-weight-fecha" value="${getLocalToday()}" placeholder=" " required>
+                <label>Fecha</label>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+                <button type="button" class="btn-m3-text" id="cancel-inline-weight">Cancelar</button>
+                <button type="submit" class="btn-m3-fill">Guardar Pesaje</button>
+            </div>
+        </form>
+    `;
+
+    tableCard.parentNode.insertBefore(formContainer, tableCard);
+
+    document.getElementById('cancel-inline-weight').onclick = () => {
+        formContainer.remove();
+    };
+
+    document.getElementById('form-inline-weight').onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        try {
+            const pesoVal = formData.get('peso');
+            const { error } = await supabase.from('animal_pesajes').insert({
+                animal_id: animalId,
+                peso: pesoVal,
+                fecha: formData.get('fecha')
+            });
+            if (error) throw error;
+            await supabase.from('ganado').update({ peso_actual: pesoVal }).eq('id', animalId);
+            showSnackbar('Pesaje registrado ✓');
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) {
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+
 function renderVaccinesTable(monthVaccines) {
     const table = document.getElementById('da-vaccines-table');
     if (!table) return;
@@ -1163,7 +1292,7 @@ function showDayDetailsFumig(day, dayEvents) {
     if (btn) {
         btn.onclick = () => {
             if (currentAnimal && currentAnimal.id) {
-                handleAddFumigacion(currentAnimal.id, formattedDate);
+                showInlineFumigForm(currentAnimal.id, formattedDate, dayEvents);
             }
         };
     }
