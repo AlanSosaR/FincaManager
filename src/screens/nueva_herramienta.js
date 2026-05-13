@@ -32,7 +32,7 @@ export async function renderNuevaHerramienta(id) {
           <h3>${isEdit ? 'Editar Herramienta' : 'Detalles de la Herramienta'}</h3>
           
           <form id="form-nueva-herramienta">
-            <div class="grid-2">
+            <div class="m3-grid-2col">
               <div class="m3-input-group">
                 <label>Nombre de la herramienta</label>
                 <div class="m3-input-wrapper">
@@ -56,7 +56,7 @@ export async function renderNuevaHerramienta(id) {
               </div>
             </div>
 
-            <div class="grid-2">
+            <div class="m3-grid-2col">
               <div class="m3-input-group">
                 <label>Ubicación</label>
                 <div class="m3-input-wrapper">

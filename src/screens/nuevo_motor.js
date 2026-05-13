@@ -32,7 +32,7 @@ export async function renderNuevoMotor(id) {
           <h3>${isEdit ? 'Editar Equipo' : 'Detalles Técnicos'}</h3>
           
           <form id="form-nuevo-motor">
-            <div class="grid-2">
+            <div class="m3-grid-2col">
               <div class="m3-input-group">
                 <label>Nombre del equipo</label>
                 <div class="m3-input-wrapper">
@@ -58,7 +58,7 @@ export async function renderNuevoMotor(id) {
               </div>
             </div>
 
-            <div class="grid-2">
+            <div class="m3-grid-2col">
               <div class="m3-input-group">
                 <label>Fecha de adquisición</label>
                 <div class="m3-input-wrapper">

@@ -1,5 +1,8 @@
 import { supabase } from '../supabase.js';
 import { Chart, registerables } from 'chart.js';
+import { showModal, closeModal } from '../modals.js';
+import { showSnackbar } from '../snackbar.js';
+
 Chart.register(...registerables);
 
 // Local state for the screen
@@ -192,7 +195,7 @@ function renderFullContent(container, animalId) {
             </div>
 
             <div class="da-tab-content active" id="da-tab-vacunas">
-                <div style="display: grid; grid-template-columns: 1fr 400px; gap: 32px;">
+                <div class="da-calendar-layout">
                     <div class="da-calendar-card">
                         <div class="da-calendar-header">
                             <div class="da-cal-nav">
@@ -368,6 +371,7 @@ async function handleEditPhoto(animalId) {
 
 async function handleAddVaccine(animalId) {
     const { showModal, closeModal } = await import('../modals.js');
+    const { showSnackbar } = await import('../snackbar.js');
     showModal('Registrar Vacuna', `
         <form id="form-add-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
             <div class="m3-field">
@@ -378,29 +382,35 @@ async function handleAddVaccine(animalId) {
                 <input type="date" name="fecha" value="${new Date().toISOString().split('T')[0]}" placeholder=" " required>
                 <label>Fecha de Aplicación</label>
             </div>
-            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
-                <button type="button" class="btn-m3-tonal" id="cancel-vaccine">Cancelar</button>
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+                <button type="button" class="btn-m3-text" id="cancel-vaccine">Cancelar</button>
                 <button type="submit" class="btn-m3-fill">Registrar</button>
             </div>
         </form>
     `);
-    
+
     document.getElementById('cancel-vaccine').onclick = closeModal;
+    
     document.getElementById('form-add-vaccine').onsubmit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
+        
         try {
             const { error } = await supabase.from('animal_vacunas').insert({
                 animal_id: animalId,
                 nombre: formData.get('nombre'),
                 fecha: formData.get('fecha')
             });
+
             if (error) throw error;
-            const { showSnackbar } = await import('../snackbar.js');
+
             showSnackbar('Vacunación registrada');
             closeModal();
-            loadAllData(animalId, document.getElementById('da-container'));
-        } catch (err) { alert(err.message); }
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) { 
+            console.error(err);
+            showSnackbar(err.message, 'error');
+        }
     };
 }
 
@@ -503,7 +513,6 @@ function renderCalendar() {
     
     const firstDay = new Date(currentYear, currentMonth, 1).getDay();
     const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
-    // Adjust firstDay for Monday start (0=Sun, 1=Mon... -> 0=Mon, 6=Sun)
     const offset = firstDay === 0 ? 6 : firstDay - 1;
 
     for (let i = 0; i < offset; i++) {
@@ -511,16 +520,15 @@ function renderCalendar() {
     }
 
     const monthVaccines = vaccines.filter(v => {
-        const d = new Date(v.fecha);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        const [y, m, d] = v.fecha.split('-').map(Number);
+        return (m - 1) === currentMonth && y === currentYear;
     });
 
     for (let day = 1; day <= lastDay; day++) {
         const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
         const dayVaccines = monthVaccines.filter(v => {
-            // Using UTC date parts to avoid timezone shift issues with input[type=date]
-            const d = new Date(v.fecha);
-            return d.getUTCDate() === day;
+            const [, , d] = v.fecha.split('-').map(Number);
+            return d === day;
         });
         const hasEvent = dayVaccines.length > 0;
         
@@ -583,9 +591,9 @@ function renderVaccinesTable(monthVaccines) {
         </div>
         ${monthVaccines.map(v => `
             <div class="da-table-row">
-                <div class="da-table-cell da-cell-bold">${v.nombre}</div>
-                <div class="da-table-cell">${new Date(v.fecha).toLocaleDateString()}</div>
-                <div class="da-table-cell">
+                <div class="da-table-cell da-cell-bold" data-label="Vacuna">${v.nombre}</div>
+                <div class="da-table-cell" data-label="Fecha">${new Date(v.fecha).toLocaleDateString()}</div>
+                <div class="da-table-cell" data-label="Estado">
                     <span class="da-variation-pill positive">
                         <span class="material-icons">check_circle</span>
                         Aplicada
@@ -618,9 +626,9 @@ function renderWeightsTable() {
             const trend = diff > 0 ? 'positive' : (diff < 0 ? 'negative' : 'neutral');
             return `
                 <div class="da-table-row">
-                    <div class="da-table-cell">${new Date(w.fecha).toLocaleDateString()}</div>
-                    <div class="da-table-cell da-cell-bold">${w.peso} ${currentAnimal.peso_unidad || 'kg'}</div>
-                    <div class="da-table-cell">
+                    <div class="da-table-cell" data-label="Fecha">${new Date(w.fecha).toLocaleDateString()}</div>
+                    <div class="da-table-cell da-cell-bold" data-label="Peso">${w.peso} ${currentAnimal.peso_unidad || 'kg'}</div>
+                    <div class="da-table-cell" data-label="Variación">
                         <span class="da-variation-pill ${trend}">
                             <span class="material-icons">${trend === 'positive' ? 'arrow_upward' : (trend === 'negative' ? 'arrow_downward' : 'horizontal_rule')}</span>
                             ${diff !== 0 ? Math.abs(diff).toFixed(1) : '0.0'}
@@ -654,9 +662,9 @@ function renderFumigacionesTable() {
         </div>
         ${fumigaciones.map(f => `
             <div class="da-table-row">
-                <div class="da-table-cell da-cell-bold">${f.producto}</div>
-                <div class="da-table-cell">${new Date(f.fecha).toLocaleDateString()}</div>
-                <div class="da-table-cell">${f.dosis || 'N/A'}</div>
+                <div class="da-table-cell da-cell-bold" data-label="Producto">${f.producto}</div>
+                <div class="da-table-cell" data-label="Fecha">${new Date(f.fecha).toLocaleDateString()}</div>
+                <div class="da-table-cell" data-label="Dosis">${f.dosis || 'N/A'}</div>
             </div>
             ${f.observaciones ? `<div style="padding: 8px 24px 16px; font-size: 13px; color: #666; font-style: italic; background: #fafafa; border-bottom: 1px solid #eee;">Obs: ${f.observaciones}</div>` : ''}
         `).join('')}

@@ -43,7 +43,7 @@ export async function renderNuevoPotrero(id) {
               <p class="error-text" id="error-nombre">El nombre es obligatorio</p>
             </div>
 
-            <div class="grid-2">
+            <div class="m3-grid-2col">
               <div class="m3-input-group">
                 <label>Área Total</label>
                 <div class="m3-input-wrapper">
@@ -80,7 +80,7 @@ export async function renderNuevoPotrero(id) {
               </div>
             </div>
 
-            <div class="grid-2">
+            <div class="m3-grid-2col">
               <div class="m3-input-group">
                 <label>Ciclo de Recuperación (Días)</label>
                 <div class="m3-input-wrapper">

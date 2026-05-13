@@ -89,5 +89,10 @@ window.Snackbar = new SnackbarSystem();
 
 // Shorthand for easier replacement of alerts
 window.alert = (msg) => window.Snackbar.show(msg);
-// Note: Window.confirm is synchronous, while snackbar confirm is async.
-// We'll need to manually refactor confirm() calls to callbacks.
+
+/**
+ * Exported shorthand for modules
+ */
+export function showSnackbar(message, type = 'info') {
+  window.Snackbar.show(message, { type });
+}

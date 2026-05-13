@@ -100,6 +100,13 @@
   box-shadow: 0 4px 30px rgba(0,0,0,0.03);
 }
 
+@media (max-width: 600px) {
+  .m3-form-card {
+    padding: 24px 20px;
+    border-radius: 24px;
+  }
+}
+
 .m3-form-card h3 {
   font-family: 'Manrope', sans-serif;
   color: var(--m3-primary);
@@ -186,6 +193,17 @@
   border-top: 1px solid var(--m3-surface-variant);
 }
 
+@media (max-width: 480px) {
+  .m3-form-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .m3-form-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* Action Bar */
 .m3-action-bar {
   position: fixed;
@@ -200,6 +218,21 @@
   justify-content: flex-end;
   gap: 16px;
   z-index: 100;
+}
+
+@media (max-width: 600px) {
+  .m3-action-bar {
+    padding: 12px 20px;
+    gap: 8px;
+  }
+  .btn-m3-primary {
+    padding: 12px 24px;
+    flex: 1;
+    justify-content: center;
+  }
+  .btn-m3-text {
+    padding: 12px 16px;
+  }
 }
 
 @media (max-width: 1024px) {
@@ -324,3 +357,18 @@
   top: 16px;
   color: var(--m3-on-surface-variant);
 }
+
+/* Responsive grid for forms */
+.m3-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 650px) {
+  .m3-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+

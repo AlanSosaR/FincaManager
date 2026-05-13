@@ -50,7 +50,7 @@ export async function renderNuevoAnimal(id) {
 
         <div class="da-tab-content active" style="padding-top: 8px;">
           <form id="form-nuevo-animal">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <div class="m3-grid-2col">
               <div class="m3-field">
                 <input type="text" name="nombre" placeholder=" " required>
                 <label>Nombre / ID del Animal</label>

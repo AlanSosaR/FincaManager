@@ -1157,6 +1157,21 @@ input:focus, textarea:focus, select:focus {
   }
 }
 
+@media (max-width: 480px) {
+  .ganado-top-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .ganado-card {
+    min-height: 140px;
+    padding: 20px;
+  }
+  .ganado-card-value {
+    font-size: 44px;
+  }
+}
+
 .ganado-card {
   padding: 24px;
   border-radius: 24px;
@@ -1451,7 +1466,8 @@ input:focus, textarea:focus, select:focus {
 
 @media (max-width: 700px) {
   .ganado-row-content {
-    grid-template-columns: 1fr 1fr auto;
+    grid-template-columns: 1.5fr 1fr auto;
+    gap: 8px;
   }
   .ganado-row-status {
     display: none;
@@ -1460,20 +1476,30 @@ input:focus, textarea:focus, select:focus {
 
 @media (max-width: 460px) {
   .ganado-row {
-    padding: 12px 14px;
+    padding: 12px;
     gap: 12px;
+    border-radius: 16px;
   }
   .ganado-row-img-container {
-    width: 50px;
-    height: 50px;
+    width: 52px;
+    height: 52px;
   }
   .ganado-row-content {
     grid-template-columns: 1fr auto;
     gap: 8px;
+    min-width: 0;
   }
   .ganado-row-status,
   .ganado-col-group:nth-child(2) {
     display: none;
+  }
+  .ganado-col-group {
+    min-width: 0;
+  }
+  .ganado-col-label, .ganado-col-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -2365,7 +2391,7 @@ input:focus, textarea:focus, select:focus {
 
 .da-stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
   margin-bottom: 32px;
 }
@@ -2439,6 +2465,12 @@ input:focus, textarea:focus, select:focus {
   padding: 6px;
   border-radius: 20px;
   width: fit-content;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+.da-tab-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .da-tab {
@@ -2466,6 +2498,39 @@ input:focus, textarea:focus, select:focus {
   display: block;
   animation: slideUp 0.3s ease-out;
 }
+
+/* ---- Responsive DA Hero ---- */
+@media (max-width: 900px) {
+  .da-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 32px;
+    border-radius: 40px;
+  }
+  .da-hero-img-wrap {
+    aspect-ratio: 16/9;
+  }
+}
+
+@media (max-width: 600px) {
+  .da-screen {
+    padding: 16px;
+    gap: 20px;
+  }
+  .da-hero {
+    padding: 24px;
+    border-radius: 32px;
+    gap: 24px;
+  }
+  .da-hero-title {
+    font-size: 28px;
+  }
+  .da-tabs-section {
+    padding: 24px 20px;
+    border-radius: 32px;
+  }
+}
+
 
 /* Calendar Styling */
 .da-calendar-card {
@@ -2769,15 +2834,20 @@ input:focus, textarea:focus, select:focus {
 }
 
 @media (max-width: 900px) {
+  .da-screen {
+    padding: 16px;
+    gap: 24px;
+  }
   .da-hero {
     grid-template-columns: 1fr;
     gap: 24px;
     padding: 24px;
-    border-radius: 24px;
+    border-radius: 32px;
   }
   .da-hero-img-wrap {
-    max-width: 240px;
+    max-width: 100%;
     margin: 0 auto;
+    aspect-ratio: 16/9;
   }
   .da-hero-title {
     font-size: 28px;
@@ -2789,4 +2859,37 @@ input:focus, textarea:focus, select:focus {
   .da-badge-row, .da-hero-actions {
     justify-content: center;
   }
+  .da-tabs-section {
+    padding: 20px;
+    border-radius: 24px;
+  }
+  .da-calendar-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .da-table-header {
+    display: none;
+  }
+  .da-table-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 16px;
+  }
+  .da-table-cell {
+    display: flex;
+    justify-content: space-between;
+  }
+  .da-table-cell::before {
+    content: attr(data-label);
+    font-weight: 800;
+    color: #888;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+}
+
+.da-calendar-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 32px;
 }
