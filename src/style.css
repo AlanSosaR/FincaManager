@@ -176,9 +176,9 @@ body {
   justify-content: space-between;
   padding: 24px 40px;
   background: var(--surface);
-  position: sticky;
-  top: 0;
-  z-index: 2000;
+  /* Desktop: integrated in layout, not floating */
+  position: relative;
+  z-index: auto;
   border-bottom: 1px solid rgba(0,0,0,0.03);
 }
 
@@ -227,6 +227,9 @@ body {
 
   .top-bar {
     padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 2000;
   }
 
   .preview-container {
