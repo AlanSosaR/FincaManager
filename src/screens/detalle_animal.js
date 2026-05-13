@@ -756,15 +756,90 @@ function showDayDetails(day, dayEvents) {
         `;
     }
 
+
     const btn = document.getElementById('da-add-vaccine-specific-date');
     if (btn) {
         btn.onclick = () => {
             if (currentAnimal && currentAnimal.id) {
-                handleAddVaccine(currentAnimal.id, formattedDate);
+                showInlineVaccineForm(currentAnimal.id, formattedDate, dayEvents);
             }
         };
     }
 }
+
+function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
+    const panel = document.getElementById('da-day-details-panel');
+    if (!panel) return;
+
+    const dateStr = new Date(defaultDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    panel.innerHTML = `
+        <div class="da-day-details" style="display:flex; flex-direction:column; gap:16px;">
+            <h4>${dateStr}</h4>
+            <form id="form-inline-vaccine" style="display: flex; flex-direction: column; gap: 14px;">
+                <div class="m3-field">
+                    <input type="text" name="nombre" id="inline-vaccine-nombre" placeholder=" " required autocomplete="off">
+                    <label>Nombre de la Vacuna</label>
+                </div>
+                <div class="m3-field">
+                    <input type="text" name="dosis" id="inline-vaccine-dosis" placeholder=" " autocomplete="off">
+                    <label>Dosis (opcional)</label>
+                </div>
+                <div class="m3-field">
+                    <input type="date" name="fecha" id="inline-vaccine-fecha" value="${defaultDate}" placeholder=" " required>
+                    <label>Fecha</label>
+                </div>
+                <div class="m3-field">
+                    <textarea name="observaciones" id="inline-vaccine-obs" placeholder=" " rows="2"></textarea>
+                    <label>Observaciones</label>
+                </div>
+                <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+                    <button type="button" class="btn-m3-text" id="cancel-inline-vaccine">Cancelar</button>
+                    <button type="submit" class="btn-m3-fill">Programar</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.getElementById('cancel-inline-vaccine').onclick = () => {
+        // Restore day details view
+        showDayDetails(
+            parseInt(defaultDate.split('-')[2]),
+            existingEvents
+        );
+    };
+
+    document.getElementById('form-inline-vaccine').onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        try {
+            const selectedDate = formData.get('fecha');
+            const today = getLocalToday();
+            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+
+            const payload = {
+                animal_id: animalId,
+                nombre: formData.get('nombre'),
+                fecha: selectedDate,
+                estado: estadoVal
+            };
+            const dosis = formData.get('dosis')?.trim();
+            if (dosis) payload.dosis = dosis;
+            const obs = formData.get('observaciones')?.trim();
+            if (obs) payload.observaciones = obs;
+
+            const { error } = await supabase.from('animal_vacunas').insert(payload);
+            if (error) throw error;
+
+            showSnackbar('Vacuna programada ✓');
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) {
+            console.error(err);
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+
 
 function renderVaccinesTable(monthVaccines) {
     const table = document.getElementById('da-vaccines-table');
