@@ -111,6 +111,7 @@ CREATE TABLE animal_pesajes (
   cambio TEXT,
   tendencia TEXT,
   color TEXT,
+  estado TEXT DEFAULT 'Aplicada',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -122,6 +123,7 @@ CREATE TABLE animal_vacunas (
   nombre TEXT,
   icon TEXT,
   color TEXT,
+  estado TEXT DEFAULT 'Aplicada',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -134,6 +136,18 @@ CREATE TABLE herramienta_mantenimientos (
   descripcion TEXT,
   icon TEXT,
   color TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 11. FUMIGACIONES DE ANIMAL
+CREATE TABLE animal_fumigaciones (
+  id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  animal_id UUID REFERENCES ganado(id) ON DELETE CASCADE,
+  fecha DATE DEFAULT CURRENT_DATE,
+  producto TEXT,
+  dosis TEXT,
+  observaciones TEXT,
+  estado TEXT DEFAULT 'Aplicada',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -152,6 +166,7 @@ ALTER TABLE potrero_eventos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_pesajes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_vacunas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE herramienta_mantenimientos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE animal_fumigaciones ENABLE ROW LEVEL SECURITY;
 
 -- Generic Policies for all tables (Select, Insert, Update, Delete)
 -- Note: Replace [TABLE] with actual table name if needed for granularity

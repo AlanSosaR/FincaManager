@@ -15,11 +15,21 @@ export async function renderGanado() {
   const hembras = animales.filter(a => a.sexo && a.sexo.toLowerCase() === 'hembra').length;
   const machos  = animales.filter(a => a.sexo && a.sexo.toLowerCase() === 'macho').length;
 
-  // Count pending scale weigh-ins: animals with 0 pesajes or marked pendiente
-  const pesajePendiente = animales.filter(a =>
-    (a.total_pesajes !== undefined && a.total_pesajes === 0) ||
-    (a.estado && a.estado.toLowerCase().includes('pesaje'))
-  ).length;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const [
+    { data: vacunasPendientes },
+    { data: pesajesPendientes },
+    { data: fumigacionesPendientes }
+  ] = await Promise.all([
+    supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada'),
+    supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada'),
+    supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada')
+  ]);
+
+  const setVacunas = new Set((vacunasPendientes || []).map(v => v.animal_id));
+  const setPesajes = new Set((pesajesPendientes || []).map(p => p.animal_id));
+  const setFumigaciones = new Set((fumigacionesPendientes || []).map(f => f.animal_id));
 
   // "+X este mes" — count animals added in the current calendar month
   const now = new Date();
@@ -88,19 +98,42 @@ export async function renderGanado() {
             </div>
           </div>
         </div>
-
-        <!-- Pesaje Pendiente -->
-        <div class="ganado-card ganado-card-tertiary ganado-card-filter" data-filter="pesaje" id="ganado-card-pesaje" title="Filtrar pesaje pendiente">
+        <!-- Dynamic Task Cards -->
+        ${setVacunas.size > 0 ? `
+        <div class="ganado-card ganado-card-surface ganado-card-filter" data-filter="vacunas" id="ganado-card-vacunas" title="Filtrar vacunas pendientes" style="border-left: 4px solid #f57c00;">
           <div class="ganado-card-header">
-            <span class="material-icons" style="font-size:28px;">monitor_weight</span>
-            <span class="ganado-card-label" style="opacity:0.75;">Pesaje Pendiente</span>
+            <span class="material-icons" style="font-size:28px; color: #f57c00;">vaccines</span>
+            <span class="ganado-card-label" style="color: #f57c00; font-weight: bold;">Vacunas Pdtes.</span>
           </div>
           <div class="ganado-card-body">
-            <h3 class="ganado-card-value">${pesajePendiente}</h3>
-            <p class="ganado-card-sub ganado-card-action">Acción requerida</p>
+            <h3 class="ganado-card-value">${setVacunas.size}</h3>
           </div>
         </div>
+        ` : ''}
 
+        ${setPesajes.size > 0 ? `
+        <div class="ganado-card ganado-card-surface ganado-card-filter" data-filter="pesajes" id="ganado-card-pesajes" title="Filtrar pesajes pendientes" style="border-left: 4px solid #e65100;">
+          <div class="ganado-card-header">
+            <span class="material-icons" style="font-size:28px; color: #e65100;">monitor_weight</span>
+            <span class="ganado-card-label" style="color: #e65100; font-weight: bold;">Pesajes Pdtes.</span>
+          </div>
+          <div class="ganado-card-body">
+            <h3 class="ganado-card-value">${setPesajes.size}</h3>
+          </div>
+        </div>
+        ` : ''}
+
+        ${setFumigaciones.size > 0 ? `
+        <div class="ganado-card ganado-card-surface ganado-card-filter" data-filter="fumigaciones" id="ganado-card-fumigaciones" title="Filtrar fumigaciones pendientes" style="border-left: 4px solid #01579b;">
+          <div class="ganado-card-header">
+            <span class="material-icons" style="font-size:28px; color: #01579b;">bug_report</span>
+            <span class="ganado-card-label" style="color: #01579b; font-weight: bold;">Fumigación Pdtes.</span>
+          </div>
+          <div class="ganado-card-body">
+            <h3 class="ganado-card-value">${setFumigaciones.size}</h3>
+          </div>
+        </div>
+        ` : ''}
       </section>
 
       <!-- List header -->
@@ -110,7 +143,7 @@ export async function renderGanado() {
       </div>
 
       <div class="ganado-list" id="ganado-animal-list">
-        ${animales.map(a => renderAnimalRow(a)).join('')}
+        ${animales.map(a => renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones)).join('')}
 
         ${animales.length === 0 ? `
           <div class="ganado-empty">
@@ -131,12 +164,26 @@ export async function renderGanado() {
   `;
 }
 
-function renderAnimalRow(a) {
+function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
   const isFemale = a.sexo && a.sexo.toLowerCase() === 'hembra';
 
-  // Determine status deterministically: if total_pesajes === 0 → pending
-  const isPending = (a.total_pesajes !== undefined && a.total_pesajes === 0) ||
-                    (a.estado && a.estado.toLowerCase().includes('pendiente'));
+  const pendingVacuna = setVacunas.has(a.id);
+  const pendingPesaje = setPesajes.has(a.id);
+  const pendingFumigacion = setFumigaciones.has(a.id);
+  const isPending = pendingVacuna || pendingPesaje || pendingFumigacion;
+
+  let pendingIcon = 'check_circle';
+  let badgeClass = 'green';
+  if (pendingVacuna) {
+    pendingIcon = 'vaccines';
+    badgeClass = 'orange';
+  } else if (pendingFumigacion) {
+    pendingIcon = 'bug_report';
+    badgeClass = 'orange';
+  } else if (pendingPesaje) {
+    pendingIcon = 'monitor_weight';
+    badgeClass = 'orange';
+  }
 
   // Use animal-themed dicebear avatar
   const seed = encodeURIComponent(a.id || a.nombre || 'animal');
@@ -156,36 +203,30 @@ function renderAnimalRow(a) {
     : razaLabel;
 
   return `
-    <div class="ganado-row" data-sexo="${(a.sexo || '').toLowerCase()}" data-pending="${isPending ? '1' : '0'}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
+    <div class="ganado-row" data-sexo="${(a.sexo || '').toLowerCase()}" data-vacunas="${pendingVacuna ? '1' : '0'}" data-pesajes="${pendingPesaje ? '1' : '0'}" data-fumigaciones="${pendingFumigacion ? '1' : '0'}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
       <div class="ganado-row-img-container">
         <img src="${imageUrl}" alt="${a.nombre || 'Animal'}" onerror="this.src='https://api.dicebear.com/7.x/shapes/svg?seed=${seed}&backgroundColor=e8f5e9'">
-        <div class="ganado-row-badge ${isPending ? 'orange' : 'green'}">
-          <span class="material-icons">${isPending ? 'priority_high' : 'vaccines'}</span>
+        <div class="ganado-row-badge ${badgeClass}">
+          <span class="material-icons">${pendingIcon}</span>
         </div>
       </div>
 
       <div class="ganado-row-content">
         <div class="ganado-col-group">
-          <p class="ganado-col-label">${shortId} — ${(a.nombre || 'Sin nombre').toUpperCase()}</p>
-          <p class="ganado-col-value">${breedPrefix}</p>
+          <p class="ganado-col-label">${shortId} — ${breedPrefix.toUpperCase()}</p>
+          <p class="ganado-col-value">${a.nombre || 'Sin nombre'}</p>
         </div>
-        <div class="ganado-col-group">
+        <div class="ganado-col-group" style="display: none;">
+          <!-- Ocultamos la columna de peso en mobile si falta espacio, pero la dejamos por si la queremos -->
           <p class="ganado-col-label">Peso</p>
           <p class="ganado-col-value">${a.peso_actual ?? '—'} ${a.peso_unidad || 'kg'}</p>
         </div>
-        <div class="ganado-col-group ganado-row-status">
-          <p class="ganado-col-label">Estado</p>
-          <div class="ganado-pill ${isPending ? 'pending' : 'ok'}">
-            <span class="material-icons">${isPending ? 'scale' : 'vaccines'}</span>
-            <span>${isPending ? 'Pendiente' : 'Al día'}</span>
-          </div>
-        </div>
-        <div class="ganado-col-group" style="text-align:right; min-width:40px;">
+        <div class="ganado-col-group" style="margin-left: auto; display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
           <div class="action-menu-container">
-            <button class="ganado-btn-more action-trigger" onclick="event.stopPropagation(); toggleActionMenu(this)">
+            <button class="ganado-btn-more action-trigger" onclick="event.stopPropagation(); toggleActionMenu(this)" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: -8px;">
               <span class="material-icons">more_vert</span>
             </button>
-            <div class="action-menu">
+            <div class="action-menu" style="right: 0;">
               <button class="action-item" onclick="event.stopPropagation(); editAnimal('${a.id}')">
                 <span class="material-icons">edit</span>
                 <span>Editar</span>
@@ -257,18 +298,25 @@ export function initGanado() {
         show = row.dataset.sexo === 'hembra';
       } else if (filter === 'macho') {
         show = row.dataset.sexo === 'macho';
-      } else if (filter === 'pesaje') {
-        show = row.dataset.pending === '1';
+      } else if (filter === 'vacunas') {
+        show = row.dataset.vacunas === '1';
+      } else if (filter === 'pesajes') {
+        show = row.dataset.pesajes === '1';
+      } else if (filter === 'fumigaciones') {
+        show = row.dataset.fumigaciones === '1';
       }
       row.style.display = show ? '' : 'none';
       if (show) visible++;
     });
 
     if (countLabel) {
-      const label = filter === 'all'    ? 'animales'
-        : filter === 'hembra' ? 'hembras'
-        : filter === 'macho'  ? 'machos'
-        : 'pendientes';
+      let label = 'animales';
+      if (filter === 'hembra') label = 'hembras';
+      else if (filter === 'macho') label = 'machos';
+      else if (filter === 'vacunas') label = 'con vacuna pdte.';
+      else if (filter === 'pesajes') label = 'con pesaje pdte.';
+      else if (filter === 'fumigaciones') label = 'con fumigación pdte.';
+
       countLabel.textContent = `${visible} ${label}`;
     }
   }

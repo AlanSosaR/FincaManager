@@ -3,7 +3,68 @@ import { Chart, registerables } from 'chart.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
 
+function getLocalToday() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 Chart.register(...registerables);
+
+window.confirmVaccine = async (vaccineId) => {
+    if (!confirm('¿Confirmar que la vacuna fue aplicada?')) return;
+    try {
+        const { error } = await supabase.from('animal_vacunas').update({ estado: 'Aplicada' }).eq('id', vaccineId);
+        if (error) throw error;
+        showSnackbar('Vacuna confirmada');
+        if (currentAnimal) {
+            initDetalleAnimal(currentAnimal.id);
+        }
+    } catch (err) {
+        showSnackbar(err.message, 'error');
+    }
+};
+
+window.cancelVaccine = async (vaccineId) => {
+    if (!confirm('¿Confirmar que la vacuna fue cancelada/no aplicada?')) return;
+    try {
+        const { error } = await supabase.from('animal_vacunas').update({ estado: 'Cancelada' }).eq('id', vaccineId);
+        if (error) throw error;
+        showSnackbar('Vacuna cancelada');
+        if (currentAnimal) {
+            initDetalleAnimal(currentAnimal.id);
+        }
+    } catch (err) {
+        showSnackbar(err.message, 'error');
+    }
+};
+
+window.confirmFumigacion = async (fumigacionId) => {
+    if (!confirm('¿Confirmar que la fumigación fue aplicada?')) return;
+    try {
+        const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Aplicada' }).eq('id', fumigacionId);
+        if (error) throw error;
+        showSnackbar('Fumigación confirmada');
+        if (currentAnimal) {
+            initDetalleAnimal(currentAnimal.id);
+        }
+    } catch (err) {
+        showSnackbar(err.message, 'error');
+    }
+};
+
+window.cancelFumigacion = async (fumigacionId) => {
+    if (!confirm('¿Confirmar que la fumigación fue cancelada/no aplicada?')) return;
+    try {
+        const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Cancelada' }).eq('id', fumigacionId);
+        if (error) throw error;
+        showSnackbar('Fumigación cancelada');
+        if (currentAnimal) {
+            initDetalleAnimal(currentAnimal.id);
+        }
+    } catch (err) {
+        showSnackbar(err.message, 'error');
+    }
+};
 
 // Local state for the screen
 let currentAnimal = null;
@@ -15,6 +76,8 @@ let weightChange = 0;
 let weightTrend = 'neutral';
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
+let currentYearFumig = new Date().getFullYear();
+let currentMonthFumig = new Date().getMonth();
 let weightChart = null;
 
 export async function renderDetalleAnimal(animalId) {
@@ -188,6 +251,13 @@ function renderFullContent(container, animalId) {
         </div>
 
         <div class="da-tabs-section">
+            <div class="da-mobile-tabs">
+                <select id="da-tab-select" class="da-mobile-tab-select">
+                    <option value="vacunas">Vacunas y Salud</option>
+                    <option value="pesajes">Historial de Pesajes</option>
+                    <option value="fumigacion">Fumigación y Químicos</option>
+                </select>
+            </div>
             <div class="da-tab-bar">
                 <button class="da-tab active" data-tab="vacunas">Vacunas y Salud</button>
                 <button class="da-tab" data-tab="pesajes">Historial de Pesajes</button>
@@ -262,13 +332,52 @@ function renderFullContent(container, animalId) {
             </div>
 
             <div class="da-tab-content" id="da-tab-fumigacion">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                    <h4 style="font-size: 18px; font-weight: 800;">Historial de Fumigación</h4>
-                    <button class="btn-m3-fill" style="padding: 12px 24px;" id="da-add-fumigacion">
-                        <span class="material-icons">add</span> Registrar Aplicación
-                    </button>
+                <div class="da-calendar-layout">
+                    <div class="da-calendar-card">
+                        <div class="da-calendar-header">
+                            <div class="da-cal-nav">
+                                <button class="da-cal-nav-btn" id="prev-month-fumig">
+                                    <span class="material-icons">chevron_left</span>
+                                </button>
+                                <h3 id="current-month-display-fumig">Mes Año</h3>
+                                <button class="da-cal-nav-btn" id="next-month-fumig">
+                                    <span class="material-icons">chevron_right</span>
+                                </button>
+                            </div>
+                            <button class="btn-m3-tonal" style="padding: 10px 20px;" id="da-add-fumigacion">
+                                <span class="material-icons">add</span> Registrar Aplicación
+                            </button>
+                        </div>
+                        <div class="da-calendar-grid">
+                            <div class="da-cal-day-name">Lun</div>
+                            <div class="da-cal-day-name">Mar</div>
+                            <div class="da-cal-day-name">Mié</div>
+                            <div class="da-cal-day-name">Jue</div>
+                            <div class="da-cal-day-name">Vie</div>
+                            <div class="da-cal-day-name">Sáb</div>
+                            <div class="da-cal-day-name">Dom</div>
+                            <div class="da-cal-days-container" id="calendar-days-fumig"></div>
+                        </div>
+                        <div class="da-cal-legend">
+                            <div class="da-cal-dot" style="background: #0288d1;"></div>
+                            <span>Días con fumigación</span>
+                        </div>
+                    </div>
+
+                    <div id="da-day-details-panel-fumig">
+                        <div class="da-day-details">
+                            <div style="text-align: center; color: #aaa; padding: 20px;">
+                                <span class="material-icons" style="font-size: 40px; margin-bottom: 8px;">touch_app</span>
+                                <p>Selecciona un día en el calendario para ver detalles</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="da-table-card" id="da-fumigaciones-table">
+                
+                <div style="margin-top: 32px;">
+                    <h4 style="font-size: 18px; font-weight: 800; margin-bottom: 16px;">Fumigaciones del Mes</h4>
+                    <div class="da-table-card" id="da-fumigaciones-table">
+                    </div>
                 </div>
             </div>
         </div>
@@ -277,13 +386,32 @@ function renderFullContent(container, animalId) {
     setupEventListeners(animalId, container);
     renderCalendar();
     renderWeightsTable();
-    renderFumigacionesTable();
+    renderCalendarFumig();
 }
 
 function setupEventListeners(animalId, container) {
     // Tab switching
     const tabs = container.querySelectorAll('.da-tab');
     const contents = container.querySelectorAll('.da-tab-content');
+    const tabSelect = document.getElementById('da-tab-select');
+
+    if (tabSelect) {
+        tabSelect.addEventListener('change', (e) => {
+            const target = e.target.value;
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+            
+            const btn = Array.from(tabs).find(t => t.getAttribute('data-tab') === target);
+            if (btn) btn.classList.add('active');
+            
+            document.getElementById(`da-tab-${target}`).classList.add('active');
+            
+            if (target === 'pesajes') {
+                initChart();
+            }
+        });
+    }
+
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             tabs.forEach(t => t.classList.remove('active'));
@@ -291,6 +419,10 @@ function setupEventListeners(animalId, container) {
             tab.classList.add('active');
             const target = tab.getAttribute('data-tab');
             document.getElementById(`da-tab-${target}`).classList.add('active');
+            
+            if (tabSelect) {
+                tabSelect.value = target;
+            }
             
             if (target === 'pesajes') {
                 initChart();
@@ -308,6 +440,18 @@ function setupEventListeners(animalId, container) {
         currentMonth++; 
         if(currentMonth > 11) { currentMonth = 0; currentYear++; } 
         renderCalendar(); 
+    });
+
+    // Calendar Nav Fumigacion
+    document.getElementById('prev-month-fumig')?.addEventListener('click', () => { 
+        currentMonthFumig--; 
+        if(currentMonthFumig < 0) { currentMonthFumig = 11; currentYearFumig--; } 
+        renderCalendarFumig(); 
+    });
+    document.getElementById('next-month-fumig')?.addEventListener('click', () => { 
+        currentMonthFumig++; 
+        if(currentMonthFumig > 11) { currentMonthFumig = 0; currentYearFumig++; } 
+        renderCalendarFumig(); 
     });
 
     // CRUD Actions
@@ -366,7 +510,8 @@ async function handleEditPhoto(animalId) {
     };
 }
 
-async function handleAddVaccine(animalId) {
+async function handleAddVaccine(animalId, defaultDate = null) {
+    const dateVal = defaultDate || getLocalToday();
     showModal('Registrar Vacuna', `
         <form id="form-add-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
             <div class="m3-field">
@@ -374,7 +519,7 @@ async function handleAddVaccine(animalId) {
                 <label>Nombre de la Vacuna</label>
             </div>
             <div class="m3-field">
-                <input type="date" name="fecha" value="${new Date().toISOString().split('T')[0]}" placeholder=" " required>
+                <input type="date" name="fecha" value="${dateVal}" placeholder=" " required>
                 <label>Fecha de Aplicación</label>
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
@@ -391,10 +536,15 @@ async function handleAddVaccine(animalId) {
         const formData = new FormData(e.target);
         
         try {
+            const selectedDate = formData.get('fecha');
+            const today = getLocalToday();
+            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+
             const { error } = await supabase.from('animal_vacunas').insert({
                 animal_id: animalId,
                 nombre: formData.get('nombre'),
-                fecha: formData.get('fecha')
+                fecha: selectedDate,
+                estado: estadoVal
             });
 
             if (error) throw error;
@@ -417,7 +567,7 @@ async function handleAddWeight(animalId) {
                 <label>Peso (${currentAnimal.peso_unidad || 'kg'})</label>
             </div>
             <div class="m3-field">
-                <input type="date" name="fecha" value="${new Date().toISOString().split('T')[0]}" placeholder=" " required>
+                <input type="date" name="fecha" value="${getLocalToday()}" placeholder=" " required>
                 <label>Fecha</label>
             </div>
             <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
@@ -447,7 +597,8 @@ async function handleAddWeight(animalId) {
     };
 }
 
-async function handleAddFumigacion(animalId) {
+async function handleAddFumigacion(animalId, defaultDate = null) {
+    const dateVal = defaultDate || getLocalToday();
     showModal('Registrar Aplicación', `
         <form id="form-add-fumigacion" style="display: flex; flex-direction: column; gap: 16px;">
             <div class="m3-field">
@@ -455,7 +606,7 @@ async function handleAddFumigacion(animalId) {
                 <label>Producto</label>
             </div>
             <div class="m3-field">
-                <input type="date" name="fecha" value="${new Date().toISOString().split('T')[0]}" placeholder=" " required>
+                <input type="date" name="fecha" value="${dateVal}" placeholder=" " required>
                 <label>Fecha</label>
             </div>
             <div class="m3-field">
@@ -478,12 +629,17 @@ async function handleAddFumigacion(animalId) {
         e.preventDefault();
         const formData = new FormData(e.target);
         try {
+            const selectedDate = formData.get('fecha');
+            const today = getLocalToday();
+            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+
             const { error } = await supabase.from('animal_fumigaciones').insert({
                 animal_id: animalId,
                 producto: formData.get('producto'),
-                fecha: formData.get('fecha'),
+                fecha: selectedDate,
                 dosis: formData.get('dosis'),
-                observaciones: formData.get('observaciones')
+                observaciones: formData.get('observaciones'),
+                estado: estadoVal
             });
             if (error) throw error;
             showSnackbar('Fumigación registrada');
@@ -522,10 +678,19 @@ function renderCalendar() {
             return d === day;
         });
         const hasEvent = dayVaccines.length > 0;
+        const hasPending = dayVaccines.some(v => v.estado === 'Programada');
         
         const dayEl = document.createElement('div');
-        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''}`;
-        dayEl.innerHTML = `<span>${day}</span>${hasEvent ? '<div class="da-cal-event-dot"></div>' : ''}`;
+        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''}`;
+        let dotsHtml = '';
+        if (hasEvent) {
+            if (hasPending) {
+                dotsHtml = '<div class="da-cal-pending-dot"></div>';
+            } else {
+                dotsHtml = '<div class="da-cal-event-dot"></div>';
+            }
+        }
+        dayEl.innerHTML = `<span>${day}</span>${dotsHtml}`;
         dayEl.onclick = () => showDayDetails(day, dayVaccines);
         daysContainer.appendChild(dayEl);
     }
@@ -537,6 +702,16 @@ function showDayDetails(day, dayEvents) {
     if (!panel) return;
     const dateStr = `${day} de ${new Date(currentYear, currentMonth, 1).toLocaleDateString('es-ES', { month: 'long' })}, ${currentYear}`;
     
+    const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    const addBtnHtml = `
+        <div style="margin-top: 16px; text-align: center;">
+            <button class="btn-m3-fill" id="da-add-vaccine-specific-date">
+                <span class="material-icons">add</span> Programar Vacuna
+            </button>
+        </div>
+    `;
+
     if (dayEvents.length === 0) {
         panel.innerHTML = `
             <div class="da-day-details">
@@ -544,25 +719,73 @@ function showDayDetails(day, dayEvents) {
                 <div style="text-align: center; color: #aaa; padding: 20px;">
                     <p>No hay eventos registrados para este día.</p>
                 </div>
+                ${addBtnHtml}
             </div>
         `;
-        return;
+    } else {
+        panel.innerHTML = `
+            <div class="da-day-details">
+                <h4>${dateStr}</h4>
+                ${dayEvents.map(v => {
+                    const currentEstado = v.estado || 'Aplicada';
+                    const isPastOrToday = v.fecha <= getLocalToday();
+                    let iconColor = '#386a3e';
+                    let iconName = 'vaccines';
+                    let subtitle = 'Vacunación aplicada';
+                    let actionsHtml = '';
+
+                    if (currentEstado === 'Programada') {
+                        iconColor = '#f57c00';
+                        iconName = 'schedule';
+                        subtitle = 'Vacunación programada';
+                        if (isPastOrToday) {
+                            actionsHtml = `
+                                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
+                                        <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
+                                    </button>
+                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
+                                        <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    } else if (currentEstado === 'Cancelada') {
+                        iconColor = '#c62828';
+                        iconName = 'cancel';
+                        subtitle = 'Vacunación cancelada';
+                    }
+
+                    return `
+                    <div class="da-detail-item" style="display: block;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="material-icons" style="color: ${iconColor}">${iconName}</span>
+                            <div>
+                                <div style="font-weight: 700;">${v.nombre}</div>
+                                <div style="font-size: 12px; color: #666;">
+                                    ${currentEstado === 'Programada' ? '<span class="da-variation-pill pending" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Programada</span>' : ''}
+                                    ${currentEstado === 'Cancelada' ? '<span class="da-variation-pill negative" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Cancelada</span>' : ''}
+                                    ${subtitle}
+                                </div>
+                            </div>
+                        </div>
+                        ${actionsHtml}
+                    </div>
+                    `;
+                }).join('')}
+                ${addBtnHtml}
+            </div>
+        `;
     }
 
-    panel.innerHTML = `
-        <div class="da-day-details">
-            <h4>${dateStr}</h4>
-            ${dayEvents.map(v => `
-                <div class="da-detail-item">
-                    <span class="material-icons" style="color: #386a3e">vaccines</span>
-                    <div>
-                        <div style="font-weight: 700;">${v.nombre}</div>
-                        <div style="font-size: 12px; color: #666;">Vacunación registrada</div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    const btn = document.getElementById('da-add-vaccine-specific-date');
+    if (btn) {
+        btn.onclick = () => {
+            if (currentAnimal && currentAnimal.id) {
+                handleAddVaccine(currentAnimal.id, formattedDate);
+            }
+        };
+    }
 }
 
 function renderVaccinesTable(monthVaccines) {
@@ -574,24 +797,65 @@ function renderVaccinesTable(monthVaccines) {
         return;
     }
 
+    const today = getLocalToday();
+
     table.innerHTML = `
         <div class="da-table-header">
             <div>Vacuna</div>
             <div>Fecha</div>
             <div>Estado</div>
         </div>
-        ${monthVaccines.map(v => `
-            <div class="da-table-row">
-                <div class="da-table-cell da-cell-bold" data-label="Vacuna">${v.nombre}</div>
-                <div class="da-table-cell" data-label="Fecha">${new Date(v.fecha).toLocaleDateString()}</div>
-                <div class="da-table-cell" data-label="Estado">
+        ${monthVaccines.map(v => {
+            const isPastOrToday = v.fecha <= today;
+            const currentEstado = v.estado || 'Aplicada';
+            let estadoHtml = '';
+            
+            if (currentEstado === 'Programada') {
+                if (isPastOrToday) {
+                    estadoHtml = `
+                        <div style="display: flex; gap: 8px;">
+                            <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmVaccine('${v.id}')">
+                                <span class="material-icons" style="font-size: 16px;">check</span>
+                            </button>
+                            <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelVaccine('${v.id}')">
+                                <span class="material-icons" style="font-size: 16px;">close</span>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    estadoHtml = `
+                        <span class="da-variation-pill pending">
+                            <span class="material-icons">schedule</span>
+                            Programada
+                        </span>
+                    `;
+                }
+            } else if (currentEstado === 'Cancelada') {
+                estadoHtml = `
+                    <span class="da-variation-pill negative">
+                        <span class="material-icons">cancel</span>
+                        Cancelada
+                    </span>
+                `;
+            } else {
+                estadoHtml = `
                     <span class="da-variation-pill positive">
                         <span class="material-icons">check_circle</span>
                         Aplicada
                     </span>
+                `;
+            }
+
+            return `
+                <div class="da-table-row">
+                    <div class="da-table-cell da-cell-bold" data-label="Vacuna">${v.nombre}</div>
+                    <div class="da-table-cell" data-label="Fecha">${new Date(v.fecha).toLocaleDateString()}</div>
+                    <div class="da-table-cell" data-label="Estado">
+                        ${estadoHtml}
+                    </div>
                 </div>
-            </div>
-        `).join('')}
+            `;
+        }).join('')}
     `;
 }
 
@@ -631,35 +895,222 @@ function renderWeightsTable() {
     `;
 }
 
-function renderFumigacionesTable() {
+function renderFumigacionesTable(monthFumigaciones) {
     const table = document.getElementById('da-fumigaciones-table');
     if (!table) return;
 
-    if (fumigaciones.length === 0) {
+    if (!monthFumigaciones || monthFumigaciones.length === 0) {
         table.innerHTML = `
             <div class="da-empty-state">
                 <span class="material-icons">bug_report</span>
-                <p>No hay registros de fumigación o químicos.</p>
+                <p>No hay registros de fumigación o químicos en este periodo.</p>
             </div>
         `;
         return;
     }
 
+    const today = getLocalToday();
+
     table.innerHTML = `
-        <div class="da-table-header">
+        <div class="da-table-header" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
             <div>Producto</div>
             <div>Fecha</div>
             <div>Dosis</div>
+            <div>Estado</div>
         </div>
-        ${fumigaciones.map(f => `
-            <div class="da-table-row">
+        ${monthFumigaciones.map(f => {
+            const isPastOrToday = f.fecha <= today;
+            const currentEstado = f.estado || 'Aplicada';
+            let estadoHtml = '';
+            
+            if (currentEstado === 'Programada') {
+                if (isPastOrToday) {
+                    estadoHtml = `
+                        <div style="display: flex; gap: 8px;">
+                            <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmFumigacion('${f.id}')">
+                                <span class="material-icons" style="font-size: 16px;">check</span>
+                            </button>
+                            <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelFumigacion('${f.id}')">
+                                <span class="material-icons" style="font-size: 16px;">close</span>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    estadoHtml = `
+                        <span class="da-variation-pill pending">
+                            <span class="material-icons">schedule</span>
+                            Programada
+                        </span>
+                    `;
+                }
+            } else if (currentEstado === 'Cancelada') {
+                estadoHtml = `
+                    <span class="da-variation-pill negative">
+                        <span class="material-icons">cancel</span>
+                        Cancelada
+                    </span>
+                `;
+            } else {
+                estadoHtml = `
+                    <span class="da-variation-pill positive">
+                        <span class="material-icons">check_circle</span>
+                        Aplicada
+                    </span>
+                `;
+            }
+
+            return `
+            <div class="da-table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
                 <div class="da-table-cell da-cell-bold" data-label="Producto">${f.producto}</div>
                 <div class="da-table-cell" data-label="Fecha">${new Date(f.fecha).toLocaleDateString()}</div>
                 <div class="da-table-cell" data-label="Dosis">${f.dosis || 'N/A'}</div>
+                <div class="da-table-cell" data-label="Estado">${estadoHtml}</div>
             </div>
             ${f.observaciones ? `<div style="padding: 8px 24px 16px; font-size: 13px; color: #666; font-style: italic; background: #fafafa; border-bottom: 1px solid #eee;">Obs: ${f.observaciones}</div>` : ''}
-        `).join('')}
+            `;
+        }).join('')}
     `;
+}
+
+function renderCalendarFumig() {
+    const daysContainer = document.getElementById('calendar-days-fumig');
+    const monthDisplay = document.getElementById('current-month-display-fumig');
+    if (!daysContainer) return;
+
+    const date = new Date(currentYearFumig, currentMonthFumig, 1);
+    monthDisplay.textContent = date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    daysContainer.innerHTML = '';
+    
+    const firstDay = new Date(currentYearFumig, currentMonthFumig, 1).getDay();
+    const lastDay = new Date(currentYearFumig, currentMonthFumig + 1, 0).getDate();
+    const offset = firstDay === 0 ? 6 : firstDay - 1;
+
+    for (let i = 0; i < offset; i++) {
+        daysContainer.innerHTML += `<div class="da-cal-day da-cal-empty"></div>`;
+    }
+
+    const monthFumigaciones = fumigaciones.filter(f => {
+        const [y, m, d] = f.fecha.split('-').map(Number);
+        return (m - 1) === currentMonthFumig && y === currentYearFumig;
+    });
+
+    for (let day = 1; day <= lastDay; day++) {
+        const isToday = day === new Date().getDate() && currentMonthFumig === new Date().getMonth() && currentYearFumig === new Date().getFullYear();
+        const dayFumigaciones = monthFumigaciones.filter(f => {
+            const [, , d] = f.fecha.split('-').map(Number);
+            return d === day;
+        });
+        const hasEvent = dayFumigaciones.length > 0;
+        const hasPending = dayFumigaciones.some(f => f.estado === 'Programada');
+        
+        const dayEl = document.createElement('div');
+        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''}`;
+        let dotsHtml = '';
+        if (hasEvent) {
+            if (hasPending) {
+                dotsHtml = '<div class="da-cal-pending-dot"></div>';
+            } else {
+                dotsHtml = '<div class="da-cal-event-dot" style="background: #0288d1;"></div>';
+            }
+        }
+        dayEl.innerHTML = `<span>${day}</span>${dotsHtml}`;
+        dayEl.onclick = () => showDayDetailsFumig(day, dayFumigaciones);
+        daysContainer.appendChild(dayEl);
+    }
+    renderFumigacionesTable(monthFumigaciones);
+}
+
+function showDayDetailsFumig(day, dayEvents) {
+    const panel = document.getElementById('da-day-details-panel-fumig');
+    if (!panel) return;
+    const dateStr = `${day} de ${new Date(currentYearFumig, currentMonthFumig, 1).toLocaleDateString('es-ES', { month: 'long' })}, ${currentYearFumig}`;
+    
+    const formattedDate = `${currentYearFumig}-${String(currentMonthFumig + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    const addBtnHtml = `
+        <div style="margin-top: 16px; text-align: center;">
+            <button class="btn-m3-fill" id="da-add-fumigacion-specific-date">
+                <span class="material-icons">add</span> Programar Aplicación
+            </button>
+        </div>
+    `;
+
+    if (dayEvents.length === 0) {
+        panel.innerHTML = `
+            <div class="da-day-details">
+                <h4>${dateStr}</h4>
+                <div style="text-align: center; color: #aaa; padding: 20px;">
+                    <p>No hay eventos registrados para este día.</p>
+                </div>
+                ${addBtnHtml}
+            </div>
+        `;
+    } else {
+        panel.innerHTML = `
+            <div class="da-day-details">
+                <h4>${dateStr}</h4>
+                ${dayEvents.map(f => {
+                    const currentEstado = f.estado || 'Aplicada';
+                    const isPastOrToday = f.fecha <= getLocalToday();
+                    let iconColor = '#0288d1';
+                    let iconName = 'bug_report';
+                    let subtitle = 'Fumigación aplicada';
+                    let actionsHtml = '';
+
+                    if (currentEstado === 'Programada') {
+                        iconColor = '#f57c00';
+                        iconName = 'schedule';
+                        subtitle = 'Fumigación programada';
+                        if (isPastOrToday) {
+                            actionsHtml = `
+                                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
+                                        <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
+                                    </button>
+                                    <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelFumigacion('${f.id}')">
+                                        <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    } else if (currentEstado === 'Cancelada') {
+                        iconColor = '#c62828';
+                        iconName = 'cancel';
+                        subtitle = 'Fumigación cancelada';
+                    }
+
+                    return `
+                    <div class="da-detail-item" style="display: block;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="material-icons" style="color: ${iconColor}">${iconName}</span>
+                            <div>
+                                <div style="font-weight: 700;">${f.producto}</div>
+                                <div style="font-size: 12px; color: #666;">
+                                    ${currentEstado === 'Programada' ? '<span class="da-variation-pill pending" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Programada</span>' : ''}
+                                    ${currentEstado === 'Cancelada' ? '<span class="da-variation-pill negative" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Cancelada</span>' : ''}
+                                    ${subtitle}
+                                </div>
+                            </div>
+                        </div>
+                        ${f.dosis ? `<div style="margin-top: 4px; font-size: 12px; color: #555;">Dosis: ${f.dosis}</div>` : ''}
+                        ${f.observaciones ? `<div style="margin-top: 4px; font-size: 12px; color: #555; font-style: italic;">Obs: ${f.observaciones}</div>` : ''}
+                        ${actionsHtml}
+                    </div>
+                    `;
+                }).join('')}
+                ${addBtnHtml}
+            </div>
+        `;
+    }
+
+    const btn = document.getElementById('da-add-fumigacion-specific-date');
+    if (btn) {
+        btn.onclick = () => {
+            if (currentAnimal && currentAnimal.id) {
+                handleAddFumigacion(currentAnimal.id, formattedDate);
+            }
+        };
+    }
 }
 
 function initChart() {
