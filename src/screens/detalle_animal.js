@@ -330,7 +330,6 @@ async function handleDeleteAnimal(animalId) {
         const { error } = await supabase.from('ganado').delete().eq('id', animalId);
         if (error) throw error;
         
-        const { showSnackbar } = await import('../snackbar.js');
         showSnackbar('Animal eliminado del inventario');
         window.location.hash = '#ganado';
     } catch (err) {
@@ -339,7 +338,6 @@ async function handleDeleteAnimal(animalId) {
 }
 
 async function handleEditPhoto(animalId) {
-    const { showModal, closeModal } = await import('../modals.js');
     showModal('Cambiar Foto', `
         <div style="padding: 16px; text-align: center;">
             <p style="margin-bottom: 16px;">Ingresa la URL de la nueva imagen:</p>
@@ -359,7 +357,6 @@ async function handleEditPhoto(animalId) {
         try {
             const { error } = await supabase.from('ganado').update({ image_url: url }).eq('id', animalId);
             if (error) throw error;
-            const { showSnackbar } = await import('../snackbar.js');
             showSnackbar('Foto actualizada');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
@@ -370,8 +367,6 @@ async function handleEditPhoto(animalId) {
 }
 
 async function handleAddVaccine(animalId) {
-    const { showModal, closeModal } = await import('../modals.js');
-    const { showSnackbar } = await import('../snackbar.js');
     showModal('Registrar Vacuna', `
         <form id="form-add-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
             <div class="m3-field">
@@ -415,7 +410,6 @@ async function handleAddVaccine(animalId) {
 }
 
 async function handleAddWeight(animalId) {
-    const { showModal, closeModal } = await import('../modals.js');
     showModal('Registrar Pesaje', `
         <form id="form-add-weight" style="display: flex; flex-direction: column; gap: 16px;">
             <div class="m3-field">
@@ -446,17 +440,15 @@ async function handleAddWeight(animalId) {
             });
             if (error) throw error;
             await supabase.from('ganado').update({ peso_actual: pesoVal }).eq('id', animalId);
-            const { showSnackbar } = await import('../snackbar.js');
             showSnackbar('Pesaje registrado');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
-        } catch (err) { alert(err.message); }
+        } catch (err) { showSnackbar(err.message, 'error'); }
     };
 }
 
 async function handleAddFumigacion(animalId) {
-    const { showModal, closeModal } = await import('../modals.js');
-    showModal('Registrar Fumigación', `
+    showModal('Registrar Aplicación', `
         <form id="form-add-fumigacion" style="display: flex; flex-direction: column; gap: 16px;">
             <div class="m3-field">
                 <input type="text" name="producto" placeholder=" " required>
@@ -494,11 +486,10 @@ async function handleAddFumigacion(animalId) {
                 observaciones: formData.get('observaciones')
             });
             if (error) throw error;
-            const { showSnackbar } = await import('../snackbar.js');
             showSnackbar('Fumigación registrada');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
-        } catch (err) { alert(err.message); }
+        } catch (err) { showSnackbar(err.message, 'error'); }
     };
 }
 
