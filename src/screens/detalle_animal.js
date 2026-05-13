@@ -785,6 +785,14 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
                     <input type="date" name="fecha" id="inline-vaccine-fecha" value="${defaultDate}" placeholder=" " required>
                     <label>Fecha</label>
                 </div>
+                <div class="m3-field">
+                    <input type="text" name="dosis" id="inline-vaccine-dosis" placeholder=" " autocomplete="off">
+                    <label>Dosis (opcional)</label>
+                </div>
+                <div class="m3-field">
+                    <textarea name="observaciones" id="inline-vaccine-obs" placeholder=" " rows="2"></textarea>
+                    <label>Observaciones (opcional)</label>
+                </div>
                 <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
                     <button type="button" class="btn-m3-text" id="cancel-inline-vaccine">Cancelar</button>
                     <button type="submit" class="btn-m3-fill">Programar</button>
@@ -815,6 +823,10 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
                 fecha: selectedDate,
                 estado: estadoVal
             };
+            const dosis = formData.get('dosis')?.trim();
+            if (dosis) payload.dosis = dosis;
+            const obs = formData.get('observaciones')?.trim();
+            if (obs) payload.observaciones = obs;
             const { error } = await supabase.from('animal_vacunas').insert(payload);
             if (error) throw error;
 
