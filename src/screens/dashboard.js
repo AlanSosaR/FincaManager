@@ -43,7 +43,7 @@ export async function renderDashboard() {
     }
 
     return `
-      <div class="screen-dashboard" style="padding: 24px; padding-bottom: 80px;">
+      <div class="screen-dashboard" style="padding: 24px; padding-bottom: 120px;">
         <div class="screen-hero" style="background: linear-gradient(135deg, #2e7d32, #60ad5e); border-radius: 24px; padding: 32px; color: white; margin-bottom: 32px;">
           <h1 style="font-size: 28px; font-weight: 800; margin-bottom: 8px;">🌿 Finca Manager</h1>
           <p style="opacity: 0.9;">Resumen ejecutivo de operaciones.</p>

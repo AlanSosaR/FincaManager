@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js';
 let currentGanadoPage = 1;
 const PAGE_SIZE = 5;
 let currentFilter = 'all';
+let currentSearchQuery = '';
 let totalGanadoCount = 0;
 
 export async function renderGanado(page = 1, filter = 'all') {
@@ -46,6 +47,10 @@ export async function renderGanado(page = 1, filter = 'all') {
     query = query.in('id', Array.from(setFumigaciones));
   }
 
+  if (currentSearchQuery) {
+    query = query.or(`nombre.ilike.%${currentSearchQuery}%,identificador.ilike.%${currentSearchQuery}%`);
+  }
+
   const { data: animales, count: filteredCount, error: fetchErr } = await query
     .order('created_at', { ascending: false })
     .range(from, to);
@@ -62,12 +67,16 @@ export async function renderGanado(page = 1, filter = 'all') {
   const machosRatio  = totalAnimales ? Math.round((machosCount  / totalAnimales) * 100) : 0;
 
   return `
-    <div class="screen-ganado" style="padding-bottom: 100px;">
+    <div class="screen-ganado" style="padding-bottom: 120px;">
       <div class="ganado-page-title">
         <h2>Ganado</h2>
         <div class="ganado-top-actions">
-          <button class="ganado-icon-btn" title="Buscar">
-            <span class="material-icons">search</span>
+          <div class="search-container ${currentSearchQuery ? 'active' : ''}" id="ganado-search-container" style="display: flex; align-items: center; background: #f5f5f5; border-radius: 20px; padding: 4px 12px; transition: all 0.3s;">
+            <span class="material-icons" style="font-size: 20px; color: #888;">search</span>
+            <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: none; padding: 8px; outline: none; font-size: 14px; width: ${currentSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentSearchQuery ? '1' : '0'};">
+          </div>
+          <button class="ganado-icon-btn" id="ganado-search-toggle" title="Buscar">
+            <span class="material-icons">${currentSearchQuery ? 'close' : 'search'}</span>
           </button>
         </div>
       </div>
@@ -230,6 +239,10 @@ window.changeGanadoPage = async function(page) {
   else if (currentFilter === 'pesajes') query = query.in('id', Array.from(setPesajes));
   else if (currentFilter === 'fumigaciones') query = query.in('id', Array.from(setFumigaciones));
 
+  if (currentSearchQuery) {
+    query = query.or(`nombre.ilike.%${currentSearchQuery}%,identificador.ilike.%${currentSearchQuery}%`);
+  }
+
   const { data: animales, count, error } = await query
     .order('created_at', { ascending: false })
     .range(from, to);
@@ -317,6 +330,40 @@ export function initGanado() {
       window.navigateTo('ganado', 1, filter);
     });
   });
+
+  // Search logic
+  const searchToggle = document.getElementById('ganado-search-toggle');
+  const searchContainer = document.getElementById('ganado-search-container');
+  const searchInput = document.getElementById('ganado-search-input');
+
+  if (searchToggle && searchInput) {
+    searchToggle.addEventListener('click', () => {
+      if (searchContainer.classList.contains('active')) {
+        currentSearchQuery = '';
+        searchInput.value = '';
+        searchContainer.classList.remove('active');
+        searchInput.style.width = '0px';
+        searchInput.style.opacity = '0';
+        searchToggle.querySelector('.material-icons').textContent = 'search';
+        window.changeGanadoPage(1);
+      } else {
+        searchContainer.classList.add('active');
+        searchInput.style.width = '180px';
+        searchInput.style.opacity = '1';
+        searchInput.focus();
+        searchToggle.querySelector('.material-icons').textContent = 'close';
+      }
+    });
+
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      currentSearchQuery = e.target.value;
+      searchTimeout = setTimeout(() => {
+        window.changeGanadoPage(1);
+      }, 500);
+    });
+  }
 
 
   // Close menus when clicking outside

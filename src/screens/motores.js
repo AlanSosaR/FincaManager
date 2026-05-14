@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js';
 
 let currentMotorsPage = 1;
 let currentMotorsFilter = 'all';
+let currentMotorsSearchQuery = '';
 let totalFilteredCount = 0;
 const PAGE_SIZE = 5;
 
@@ -86,6 +87,10 @@ function buildQuery(urgentIds) {
   } else if (currentMotorsFilter === 'active') {
     query = query.gt('horas', 0);
   }
+
+  if (currentMotorsSearchQuery) {
+    query = query.ilike('nombre', `%${currentMotorsSearchQuery}%`);
+  }
   return query;
 }
 
@@ -131,11 +136,17 @@ export async function renderMotores(page = 1, filter = 'all') {
   }
 
   return `
-    <div class="screen-motores" style="padding-bottom: 100px;">
+    <div class="screen-motores" style="padding-bottom: 120px;">
       <div class="motores-page-title">
         <h2>Motores &amp; Equipos</h2>
         <div class="ganado-top-actions">
-          <button class="ganado-icon-btn" title="Buscar"><span class="material-icons">search</span></button>
+          <div class="search-container ${currentMotorsSearchQuery ? 'active' : ''}" id="motors-search-container" style="display: flex; align-items: center; background: #f5f5f5; border-radius: 20px; padding: 4px 12px; transition: all 0.3s;">
+            <span class="material-icons" style="font-size: 20px; color: #888;">search</span>
+            <input type="text" id="motors-search-input" placeholder="Buscar equipo..." value="${currentMotorsSearchQuery}" style="border: none; background: none; padding: 8px; outline: none; font-size: 14px; width: ${currentMotorsSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentMotorsSearchQuery ? '1' : '0'};">
+          </div>
+          <button class="ganado-icon-btn" id="motors-search-toggle" title="Buscar">
+            <span class="material-icons">${currentMotorsSearchQuery ? 'close' : 'search'}</span>
+          </button>
         </div>
       </div>
 
@@ -153,6 +164,7 @@ export async function renderMotores(page = 1, filter = 'all') {
             </div>
           </div>
 
+          ${urgentCount > 0 ? `
           <div class="motores-card motores-card-tertiary motores-card-filter ${currentMotorsFilter === 'urgent' ? 'active' : ''}" data-filter="urgent">
             <div class="motores-card-header">
               <span class="material-icons">build</span>
@@ -163,6 +175,7 @@ export async function renderMotores(page = 1, filter = 'all') {
               <p class="ganado-card-sub">Req. Aceite</p>
             </div>
           </div>
+          ` : ''}
 
           <div class="motores-card motores-card-surface motores-card-filter ${currentMotorsFilter === 'active' ? 'active' : ''}" data-filter="active">
             <div class="motores-card-header">
@@ -229,6 +242,40 @@ export function initMotores() {
       window.navigateTo('motores', 1, filter);
     });
   });
+
+  // Search logic
+  const searchToggle = document.getElementById('motors-search-toggle');
+  const searchContainer = document.getElementById('motors-search-container');
+  const searchInput = document.getElementById('motors-search-input');
+
+  if (searchToggle && searchInput) {
+    searchToggle.addEventListener('click', () => {
+      if (searchContainer.classList.contains('active')) {
+        currentMotorsSearchQuery = '';
+        searchInput.value = '';
+        searchContainer.classList.remove('active');
+        searchInput.style.width = '0px';
+        searchInput.style.opacity = '0';
+        searchToggle.querySelector('.material-icons').textContent = 'search';
+        window.changeMotorsPage(1);
+      } else {
+        searchContainer.classList.add('active');
+        searchInput.style.width = '180px';
+        searchInput.style.opacity = '1';
+        searchInput.focus();
+        searchToggle.querySelector('.material-icons').textContent = 'close';
+      }
+    });
+
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      currentMotorsSearchQuery = e.target.value;
+      searchTimeout = setTimeout(() => {
+        window.changeMotorsPage(1);
+      }, 500);
+    });
+  }
 
   const closeMenus = (e) => {
     if (!e.target.closest('.ganado-btn-more')) {

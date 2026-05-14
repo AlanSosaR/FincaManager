@@ -2469,6 +2469,7 @@ input:focus, textarea:focus, select:focus {
 
 .da-screen {
   padding: 40px;
+  padding-bottom: 120px;
   max-width: none;
   margin: 0;
   display: flex;
@@ -3266,6 +3267,7 @@ input:focus, textarea:focus, select:focus {
 @media (max-width: 900px) {
   .da-screen {
     padding: 16px;
+    padding-bottom: 120px;
     gap: 24px;
   }
   .da-hero {
