@@ -456,3 +456,35 @@ async function reloadDetalleSinParpadeo(motorId) {
     window.navigateTo('detalle_motor', motorId);
   }
 }
+
+function registerOilChange(motorId) {
+  window.Snackbar.confirm(
+    '¿Confirmas registrar un cambio de aceite? Esto guardará el historial y reiniciará el contador de horas a 0.',
+    async () => {
+      try {
+        const { data: motor } = await supabase.from('motores').select('horas').eq('id', motorId).single();
+        const { data: sesiones } = await supabase.from('motor_sesiones').select('*').eq('motor_id', motorId);
+        
+        await supabase.from('motor_mantenimientos').insert({
+          motor_id: motorId,
+          titulo: 'Cambio de Aceite',
+          descripcion: 'Mantenimiento preventivo.',
+          fecha: new Date().toISOString(),
+          icon: 'oil_barrel',
+          color: '#c62828',
+          total_horas: motor.horas || 0,
+          historial_sesiones: sesiones || []
+        });
+        
+        await supabase.from('motores').update({ horas: 0 }).eq('id', motorId);
+        await supabase.from('motor_sesiones').delete().eq('motor_id', motorId);
+        
+        window.Snackbar.show('Cambio de aceite registrado');
+        await reloadDetalleSinParpadeo(motorId);
+      } catch (err) {
+        console.error(err);
+        window.Snackbar.show('Error: ' + err.message, { type: 'error' });
+      }
+    }
+  );
+}
