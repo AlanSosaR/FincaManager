@@ -43,74 +43,201 @@ export async function renderDashboard() {
     }
 
     return `
-      <div class="screen-dashboard" style="padding: 24px; padding-bottom: 120px;">
-        <div class="screen-hero" style="background: linear-gradient(135deg, #2e7d32, #60ad5e); border-radius: 24px; padding: 32px; color: white; margin-bottom: 32px;">
-          <h1 style="font-size: 28px; font-weight: 800; margin-bottom: 8px;">🌿 Finca Manager</h1>
-          <p style="opacity: 0.9;">Resumen ejecutivo de operaciones.</p>
+      <div class="pt-6 pb-24 lg:pl-0 pr-6 min-h-screen font-['Work_Sans']">
+        <!-- Header & Summary Card -->
+        <section class="mb-10">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+        <span class="text-primary font-bold tracking-widest text-xs uppercase">Dashboard de Cultivos</span>
+        <h1 class="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight mt-1 font-['Manrope']">Gestión del Cafetal</h1>
         </div>
-
-        <div class="stats-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 32px;">
-          <div class="stat-card" onclick="window.navigateTo('ganado')" style="background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer;">
-             <p style="font-size: 12px; color: #666; margin-bottom: 4px;">GANADO</p>
-             <h3 style="font-size: 24px; font-weight: 700;">${ganadoCount || 0}</h3>
-          </div>
-          <div class="stat-card" onclick="window.navigateTo('motores')" style="background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer;">
-             <p style="font-size: 12px; color: #666; margin-bottom: 4px;">MOTORES</p>
-             <h3 style="font-size: 24px; font-weight: 700;">${motoresCount || 0}</h3>
-          </div>
-          
-          ${vacunasPendientesCount > 0 ? `
-          <div class="stat-card" onclick="window.navigateTo('ganado', 1, 'vacunas')" style="background: #fff3e0; padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; border-left: 4px solid #f57c00;">
-             <p style="font-size: 11px; color: #e65100; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-               <span class="material-icons" style="font-size: 14px;">vaccines</span> VACUNAS PDTES.
-             </p>
-             <h3 style="font-size: 24px; font-weight: 800; color: #e65100;">${vacunasPendientesCount}</h3>
-          </div>
-          ` : ''}
-
-          ${fumigacionesPendientesCount > 0 ? `
-          <div class="stat-card" onclick="window.navigateTo('ganado', 1, 'fumigaciones')" style="background: #e1f5fe; padding: 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; border-left: 4px solid #0288d1;">
-             <p style="font-size: 11px; color: #01579b; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
-               <span class="material-icons" style="font-size: 14px;">bug_report</span> FUMIGACIONES PDTES.
-             </p>
-             <h3 style="font-size: 24px; font-weight: 800; color: #01579b;">${fumigacionesPendientesCount}</h3>
-          </div>
-          ` : ''}
+        <div class="relative group max-w-md w-full">
+        <div class="absolute inset-0 bg-primary opacity-5 rounded-3xl -rotate-1 scale-105 group-hover:rotate-0 transition-transform duration-300"></div>
+        <div class="relative bg-surface-container-lowest p-6 rounded-3xl shadow-sm flex items-center gap-5">
+        <div class="bg-primary-container w-16 h-16 rounded-2xl flex items-center justify-center text-primary">
+        <span class="material-symbols-outlined text-3xl" style="font-variation-settings: &quot;FILL&quot; 1;">eco</span>
         </div>
-
-        ${todasLasTareas.length > 0 ? `
-        <div class="tasks-section" style="margin-bottom: 32px;">
-          <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
-            <span class="material-icons" style="color: var(--primary);">event_note</span>
-            Próximas Tareas
-          </h3>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            ${todasLasTareas.map(t => `
-              <div class="task-card" onclick="window.navigateTo('detalle_animal', '${t.animal_id}')" style="background: white; padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid ${t.tipo === 'Vacuna' ? '#f57c00' : '#0288d1'}; cursor: pointer;">
-                <div style="background: ${t.tipo === 'Vacuna' ? '#fff3e0' : '#e1f5fe'}; color: ${t.tipo === 'Vacuna' ? '#f57c00' : '#0288d1'}; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                  <span class="material-icons">${t.tipo === 'Vacuna' ? 'vaccines' : 'bug_report'}</span>
-                </div>
-                <div style="flex: 1;">
-                  <h4 style="margin: 0; font-size: 14px; font-weight: 800;">${t.animalNombre}</h4>
-                  <p style="margin: 2px 0 0 0; font-size: 12px; color: #666;">${t.tipo}: ${t.nombre || t.producto || 'Pendiente'}</p>
-                </div>
-                <div style="text-align: right;">
-                  <p style="margin: 0; font-size: 11px; font-weight: 800; color: #999;">${new Date(t.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</p>
-                </div>
-              </div>
-            `).join('')}
-          </div>
+        <div>
+        <p class="text-sm text-on-surface-variant font-medium">Estado General</p>
+        <h3 class="text-xl font-bold text-on-surface">Floración Activa</h3>
+        <div class="flex items-center gap-2 mt-1">
+        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+        <span class="text-xs text-primary font-semibold">Salud Óptima - 94%</span>
         </div>
-        ` : ''}
-
-        <div style="display: flex; flex-direction: column; gap: 16px;">
-          <button onclick="window.navigateTo('ganado')" style="padding: 16px; border-radius: 16px; border: none; background: #e8f5e9; color: #2e7d32; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            <span class="material-icons">pets</span> Gestión de Ganado
-          </button>
-          <button onclick="window.navigateTo('motores')" style="padding: 16px; border-radius: 16px; border: none; background: #fff3e0; color: #ef6c00; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            <span class="material-icons">settings_suggest</span> Mantenimiento de Motores
-          </button>
         </div>
+        </div>
+        </div>
+        </div>
+        </section>
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <!-- Left Column: Lotes Grid -->
+        <div class="lg:col-span-3 space-y-8">
+        <div>
+        <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-on-surface">Lotes &amp; Microlotes</h2><span class="ml-4 px-3 py-1 bg-primary-container text-on-primary-container text-xs font-bold rounded-full">Total: 24,850 plantas</span>
+        <button class="text-primary font-semibold text-sm flex items-center gap-1 hover:underline">
+                                    Ver todos los lotes <span class="material-symbols-outlined text-sm">arrow_forward</span>
+        </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Card 1 -->
+        <div class="bg-surface-container-lowest p-6 rounded-lg transition-all hover:bg-surface-bright group">
+        <div class="flex justify-between items-start mb-4">
+        <span class="bg-tertiary-container text-on-tertiary-container px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Premium Geisha</span>
+        <button class="text-outline hover:text-primary transition-colors">
+        <span class="material-symbols-outlined">more_vert</span>
+        </button>
+        </div>
+        <h3 class="text-xl font-bold mb-1 group-hover:text-primary transition-colors">La Cumbre</h3>
+        <div class="flex gap-4 text-xs text-on-surface-variant mb-6">
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">filter_vintage</span> Geisha</span>
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">potted_plant</span> 1,250 plantas</span>
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">square_foot</span> 2.5 ha</span>
+        </div>
+        <div class="space-y-2">
+        <div class="flex justify-between text-xs font-semibold">
+        <span class="">Salud &amp; Nutrición</span>
+        <span class="text-primary">88%</span>
+        </div>
+        <div class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
+        <div class="h-full bg-primary rounded-full shadow-[inset_0px_0px_4px_rgba(255,255,255,0.4)]" style="width: 88%"></div>
+        </div>
+        </div>
+        </div>
+        <!-- Card 2 -->
+        <div class="bg-surface-container-lowest p-6 rounded-lg transition-all hover:bg-surface-bright group">
+        <div class="flex justify-between items-start mb-4">
+        <span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Alta Productividad</span>
+        <button class="text-outline hover:text-primary transition-colors">
+        <span class="material-symbols-outlined">more_vert</span>
+        </button>
+        </div>
+        <h3 class="text-xl font-bold mb-1 group-hover:text-primary transition-colors">El Mirador</h3>
+        <div class="flex gap-4 text-xs text-on-surface-variant mb-6">
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">filter_vintage</span> Caturra Rojo</span>
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">potted_plant</span> 3,400 plantas</span>
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">square_foot</span> 5.2 ha</span>
+        </div>
+        <div class="space-y-2">
+        <div class="flex justify-between text-xs font-semibold">
+        <span class="">Salud &amp; Nutrición</span>
+        <span class="text-primary">72%</span>
+        </div>
+        <div class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
+        <div class="h-full bg-primary rounded-full shadow-[inset_0px_0px_4px_rgba(255,255,255,0.4)]" style="width: 72%"></div>
+        </div>
+        </div>
+        </div>
+        <!-- Card 3 -->
+        <div class="bg-surface-container-lowest p-6 rounded-lg transition-all hover:bg-surface-bright group">
+        <div class="flex justify-between items-start mb-4">
+        <span class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Resistente</span>
+        <button class="text-outline hover:text-primary transition-colors">
+        <span class="material-symbols-outlined">more_vert</span>
+        </button>
+        </div>
+        <h3 class="text-xl font-bold mb-1 group-hover:text-primary transition-colors">Valle Central</h3>
+        <div class="flex gap-4 text-xs text-on-surface-variant mb-6">
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">filter_vintage</span> Castillo</span>
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">potted_plant</span> 2,100 plantas</span>
+        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">square_foot</span> 4.0 ha</span>
+        </div>
+        <div class="space-y-2">
+        <div class="flex justify-between text-xs font-semibold">
+        <span class="">Salud &amp; Nutrición</span>
+        <span class="text-primary">95%</span>
+        </div>
+        <div class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
+        <div class="h-full bg-primary rounded-full shadow-[inset_0px_0px_4px_rgba(255,255,255,0.4)]" style="width: 95%"></div>
+        </div>
+        </div>
+        </div>
+        <!-- Card 4: Action Card -->
+        
+        </div>
+        </div>
+        <!-- Aplicaciones Recientes Section -->
+        <div>
+        <h2 class="text-2xl font-bold text-on-surface mb-6">Aplicaciones Recientes</h2>
+        <div class="bg-surface-container-lowest rounded-lg overflow-hidden shadow-sm">
+        <table class="w-full text-left border-collapse">
+        <thead>
+        <tr class="bg-surface-container-high text-on-surface-variant text-xs font-bold uppercase tracking-wider">
+        <th class="px-6 py-4">Tipo &amp; Producto</th>
+        <th class="px-6 py-4">Dosis</th>
+        <th class="px-6 py-4">Lote / Fecha</th>
+        <th class="px-6 py-4 text-right">Operador</th>
+        </tr>
+        </thead>
+        <tbody class="divide-y divide-surface-container">
+        <tr class="hover:bg-surface-container-low transition-colors">
+        <td class="px-6 py-4">
+        <div class="flex items-center gap-3">
+        <div class="bg-secondary-container/30 text-secondary p-2 rounded-xl">
+        <span class="material-symbols-outlined text-sm">science</span>
+        </div>
+        <div>
+        <p class="font-bold text-sm">Fertilizante NPK</p>
+        <p class="text-xs text-on-surface-variant">NutriPlant Max</p>
+        </div>
+        </div>
+        </td>
+        <td class="px-6 py-4 text-sm font-medium">150g / Planta</td>
+        <td class="px-6 py-4">
+        <p class="text-sm font-bold">La Cumbre</p>
+        <p class="text-xs text-on-surface-variant">12 Oct 2023</p>
+        </td>
+        <td class="px-6 py-4 text-right">
+        <div class="flex items-center justify-end gap-2">
+        <span class="text-xs font-semibold">Carlos Ruiz</span>
+        <div class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">CR</div>
+        </div>
+        </td>
+        </tr>
+        <tr class="hover:bg-surface-container-low transition-colors">
+        <td class="px-6 py-4">
+        <div class="flex items-center gap-3">
+        <div class="bg-tertiary-container/30 text-tertiary p-2 rounded-xl">
+        <span class="material-symbols-outlined text-sm">pest_control</span>
+        </div>
+        <div>
+        <p class="font-bold text-sm">Fungicida Orgánico</p>
+        <p class="text-xs text-on-surface-variant">BioShield XL</p>
+        </div>
+        </div>
+        </td>
+        <td class="px-6 py-4 text-sm font-medium">2L / Bomba</td>
+        <td class="px-6 py-4">
+        <p class="text-sm font-bold">El Mirador</p>
+        <p class="text-xs text-on-surface-variant">09 Oct 2023</p>
+        </td>
+        <td class="px-6 py-4 text-right">
+        <div class="flex items-center justify-end gap-2">
+        <span class="text-xs font-semibold">Ana Mendez</span>
+        <div class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">AM</div>
+        </div>
+        </td>
+        </tr>
+        </tbody>
+        </table>
+        </div>
+        </div>
+        </div>
+        <!-- Right Column: Stats & Insights -->
+        <aside class="lg:col-span-1 space-y-8">
+        <!-- Total Plants Card -->
+        
+        <!-- Variety Distribution -->
+        
+        <!-- Inventory Status -->
+        
+        </aside>
+        </div>
+        
+        <button class="fixed bottom-24 right-6 lg:bottom-10 lg:right-10 z-50 flex items-center gap-3 bg-[#3E6F39] text-[#ffffff] px-6 py-4 rounded-3xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 group">
+          <span class="material-symbols-outlined text-2xl" style="font-variation-settings: &quot;FILL&quot; 1;">add_location</span>
+          <span class="font-['Manrope'] font-bold tracking-tight">Agregar Lote</span>
+        </button>
       </div>
     `;
   } catch (err) {
