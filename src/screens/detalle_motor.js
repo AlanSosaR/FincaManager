@@ -33,67 +33,71 @@ export async function renderDetalleMotor(motorId) {
   const today = new Date().toISOString().split('T')[0];
 
   return `
-    <div class="screen-detalle" data-motor-id="${motorId}">
-      
-      <!-- Hero Section -->
-      <div class="detail-hero card" style="background: linear-gradient(135deg, var(--m3-surface-variant) 0%, #fff 100%);">
-        <div class="detail-hero-header">
-          <div style="display: flex; align-items: center; gap: 16px; flex: 1;">
-            <div class="detail-hero-icon" style="background: var(--primary-container); color: var(--on-primary-container); border-radius: 20px; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; font-size: 40px; overflow: hidden;">
-              ${motor.image_url ? `<img src="${motor.image_url}" style="width: 100%; height: 100%; object-fit: cover;">` : '<span class="material-icons" style="font-size: 40px;">engine</span>'}
+      <!-- Main Detail Card (GitHub/Vercel Design) -->
+      <div class="card" style="background: white; border-radius: 32px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); margin-bottom: 32px; position: relative;">
+        
+        <!-- Header: Image + Title + Edit Icon -->
+        <div class="motor-detail-header">
+          <div class="motor-header-info">
+            <div class="motor-header-image">
+              ${motor.image_url 
+                ? `<img src="${motor.image_url}" alt="${motor.nombre}">`
+                : `<div class="motor-header-placeholder"><span class="material-icons">engine</span></div>`
+              }
             </div>
-            <div>
-              <h2 style="margin: 0; font-size: 28px;">${motor.nombre || 'Motor'}</h2>
-              <p class="detail-subtitle" style="margin: 4px 0 0 0; opacity: 0.7;">${motor.marca || 'Sin marca'} • ${motor.modelo || 'S/M'}</p>
+            <div class="motor-header-text">
+              <h2 class="motor-header-title">${motor.nombre || 'Sin Nombre'}</h2>
+              <p class="motor-header-subtitle">
+                ${motor.marca || 'Sin marca'} • ${motor.modelo || 'S/M'}
+              </p>
             </div>
           </div>
-          <button class="btn-m3-text" onclick="window.navigateTo('nuevo_motor', '${motor.id}')" style="min-width: 48px; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
-            <span class="material-symbols-outlined">edit</span>
+          <button class="material-icons motor-edit-btn" onclick="window.navigateTo('nuevo_motor', '${motor.id}')">
+            edit
           </button>
         </div>
 
-        <div class="detail-stats" style="margin-top: 24px;">
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Uso Acumulado</span>
-            <span class="detail-stat-value">${totalHoras.toFixed(1)}h</span>
+        <!-- Stats Grid -->
+        <div class="motor-stats-grid">
+          <div>
+            <span style="font-size: 12px; font-weight: 600; color: #888; display: block; margin-bottom: 8px;">Uso Acumulado</span>
+            <div style="font-size: 20px; font-weight: 800; color: #1a1a1a;">${totalHoras.toFixed(1)}h</div>
           </div>
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Límite Servicio</span>
-            <span class="detail-stat-value">${maxHoras}h</span>
+          <div>
+            <span style="font-size: 12px; font-weight: 600; color: #888; display: block; margin-bottom: 8px;">Límite Servicio</span>
+            <div style="font-size: 20px; font-weight: 800; color: #1a1a1a;">${maxHoras}h</div>
           </div>
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Próximo Cambio</span>
-            <span class="detail-stat-value" style="color: ${requiresAlert ? 'var(--error)' : 'inherit'}">${horasRestantes.toFixed(1)}h</span>
+          <div>
+            <span style="font-size: 12px; font-weight: 600; color: #888; display: block; margin-bottom: 8px;">Próximo Cambio</span>
+            <div style="font-size: 20px; font-weight: 800; color: #1a1a1a;">${horasRestantes.toFixed(1)}h</div>
           </div>
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Estado</span>
+          <div>
+            <span style="font-size: 12px; font-weight: 600; color: #888; display: block; margin-bottom: 8px;">Estado</span>
             <div style="margin-top: 4px;">
-              <span class="tag" style="background: ${requiresAlert ? 'var(--error-container)' : 'var(--primary-container)'}; color: ${requiresAlert ? 'var(--on-error-container)' : 'var(--on-primary-container)'};">
-                ${requiresAlert ? 'Revisión Nec.' : 'Operativo'}
+              <span style="background: ${requiresAlert ? '#ffebee' : '#e8f5e9'}; color: ${requiresAlert ? '#c62828' : '#2e7d32'}; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-block;">
+                ${requiresAlert ? 'Atención' : 'Operativo'}
               </span>
             </div>
           </div>
         </div>
 
-        <div style="margin-top: 20px;">
-           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-             <span style="font-size: 12px; font-weight: 600; color: #666;">Vida útil del aceite</span>
-             <span style="font-size: 12px; font-weight: 700; color: var(--primary);">${pct}%</span>
-           </div>
-           <div class="m3-progress-track" style="height: 12px; background: #e0e0e0; border-radius: 6px; overflow: hidden;">
-             <div id="ui-maint-bar" style="width: ${pct}%; height: 100%; background: ${requiresAlert ? 'var(--error)' : 'var(--primary)'}; transition: width 1s ease;"></div>
-           </div>
+        <!-- Health Progress -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 12px; font-weight: 700; color: #666;">Vida útil del aceite</span>
+            <span style="font-size: 12px; font-weight: 800; color: ${requiresAlert ? '#c62828' : '#2e7d32'};">${pct}%</span>
+          </div>
+          <div style="height: 8px; background: #eee; border-radius: 4px; overflow: hidden; position: relative;">
+            <div style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#c62828' : '#2e7d32'}; border-radius: 4px; transition: width 1s ease-out;"></div>
+          </div>
         </div>
 
+        <!-- Register Oil Button (only if alert) -->
         ${requiresAlert ? `
-          <div class="alert-banner" style="margin-top: 20px; background: var(--error-container); color: var(--on-error-container); border-radius: 16px; padding: 16px; display: flex; align-items: center; gap: 16px;">
-            <span class="material-icons" style="font-size: 32px;">warning</span>
-            <div style="flex: 1;">
-              <p style="margin: 0; font-weight: 800;">MANTENIMIENTO REQUERIDO</p>
-              <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Se ha superado el límite de ${maxHoras} horas de uso.</p>
-            </div>
-            <button class="btn-m3-fill" id="btn-alert-register-oil" style="background: var(--error); color: white;">Registrar</button>
-          </div>
+          <button class="btn-m3-fill" id="btn-alert-register-oil" style="margin-top: 24px; width: 100%; background: #c62828; box-shadow: 0 4px 12px rgba(198, 40, 40, 0.2);">
+            <span class="material-icons" style="font-size: 20px; margin-right: 8px; vertical-align: middle;">oil_barrel</span>
+            Registrar Cambio de Aceite
+          </button>
         ` : ''}
       </div>
 
@@ -103,8 +107,8 @@ export async function renderDetalleMotor(motorId) {
         <div class="section">
           
           <!-- Timer Card -->
-          <div class="card" style="padding: 32px; margin-bottom: 24px; text-align: center; background: var(--surface-variant); border: none;">
-            <div style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; color: var(--on-surface-variant); opacity: 0.8;">
+          <div class="card" style="padding: 32px; margin-bottom: 24px; text-align: center; background: white; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 20px rgba(0,0,0,0.03); border-radius: 32px;">
+            <div style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; color: #888;">
               <span class="material-icons" style="font-size: 18px;">timer</span>
               <span style="font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">Control de Sesión</span>
             </div>
@@ -134,8 +138,8 @@ export async function renderDetalleMotor(motorId) {
               </div>
             </div>
             
-            <div id="ui-current-session-info" style="margin-top: 32px; padding: 12px; background: rgba(255,255,255,0.3); border-radius: 12px; display: inline-block;">
-               <span id="ui-current-session-label" style="font-size: 13px; font-weight: 600; color: var(--on-surface-variant);">Motor en reposo</span>
+            <div id="ui-current-session-info" style="margin-top: 32px; padding: 12px; background: white; border-radius: 12px; display: inline-block; border: 1px solid rgba(0,0,0,0.05);">
+               <span id="ui-current-session-label" style="font-size: 13px; font-weight: 600; color: #666;">Motor en reposo</span>
             </div>
           </div>
 
@@ -150,27 +154,21 @@ export async function renderDetalleMotor(motorId) {
             
             <div style="display: flex; flex-direction: column; gap: 20px;">
               <div class="m3-field">
-                <div class="m3-input-container" style="cursor: pointer;">
-                  <span class="material-icons">calendar_today</span>
-                  <input type="text" id="input-manual-date" value="${today}" readonly>
-                </div>
+                <input type="text" id="input-manual-date" value="${today}" readonly placeholder=" ">
                 <label>Fecha</label>
+                <span class="material-icons" style="cursor: pointer;">calendar_today</span>
               </div>
               
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="m3-field">
-                  <div class="m3-input-container" style="cursor: pointer;">
-                    <span class="material-icons">login</span>
-                    <input type="text" id="input-manual-start" value="08:00 AM" readonly>
-                  </div>
+                  <input type="text" id="input-manual-start" value="08:00 AM" readonly placeholder=" ">
                   <label>Inicio</label>
+                  <span class="material-icons" style="cursor: pointer;">login</span>
                 </div>
                 <div class="m3-field">
-                  <div class="m3-input-container" style="cursor: pointer;">
-                    <span class="material-icons">logout</span>
-                    <input type="text" id="input-manual-end" value="12:00 PM" readonly>
-                  </div>
+                  <input type="text" id="input-manual-end" value="12:00 PM" readonly placeholder=" ">
                   <label>Fin</label>
+                  <span class="material-icons" style="cursor: pointer;">logout</span>
                 </div>
               </div>
 

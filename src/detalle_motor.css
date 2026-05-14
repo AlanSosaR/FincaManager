@@ -172,7 +172,8 @@
 
 /* Operation Card (Green) */
 .operation-card {
-  background-color: var(--color-accent-green);
+  background-color: white;
+  border: 1px solid rgba(0,0,0,0.05);
   border-radius: var(--radius-premium);
   display: flex;
   flex-direction: column;
@@ -244,7 +245,7 @@
 .btn-circle-white {
   width: 56px; height: 56px;
   border-radius: 50%;
-  background: white;
+  background: #f5f5f5;
   border: none;
   display: flex;
   align-items: center;

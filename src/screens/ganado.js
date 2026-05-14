@@ -125,6 +125,16 @@ export async function renderGanado(page = 1, filter = 'all') {
             <div class="ganado-card-body"><h3 class="ganado-card-value">${setPesajes.size}</h3></div>
           </div>
           ` : ''}
+
+          ${setFumigaciones.size > 0 ? `
+          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" data-filter="fumigaciones" style="border-left: 4px solid #0288d1;">
+            <div class="ganado-card-header">
+              <span class="material-icons" style="font-size:28px; color: #0288d1;">bug_report</span>
+              <span class="ganado-card-label" style="color: #0288d1;">Fumigaciones Pdtes.</span>
+            </div>
+            <div class="ganado-card-body"><h3 class="ganado-card-value">${setFumigaciones.size}</h3></div>
+          </div>
+          ` : ''}
         </section>
 
         <div class="ganado-list-header" style="margin-top: 32px;">

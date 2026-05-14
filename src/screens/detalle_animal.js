@@ -184,12 +184,6 @@ function renderFullContent(container, animalId) {
         <div class="da-hero">
             <div class="da-hero-img-wrap">
                 <img src="${currentAnimal.image_url || 'https://images.unsplash.com/photo-1546445317-29f4545e9d53?q=80&w=800'}" alt="${currentAnimal.nombre}">
-                <div class="da-hero-img-overlay">
-                    <button class="da-img-edit-btn" id="da-edit-photo">
-                        <span class="material-icons">photo_camera</span>
-                        Cambiar Foto
-                    </button>
-                </div>
             </div>
             <div class="da-hero-info">
                 <div>
@@ -442,7 +436,7 @@ function setupEventListeners(animalId, container) {
     // CRUD Actions
     document.getElementById('da-edit-animal')?.addEventListener('click', () => window.navigateTo('nuevo_animal', animalId));
     document.getElementById('da-delete-animal')?.addEventListener('click', () => handleDeleteAnimal(animalId));
-    document.getElementById('da-edit-photo')?.addEventListener('click', () => handleEditPhoto(animalId));
+
 
     // Registration Actions
     document.getElementById('da-add-vaccine')?.addEventListener('click', () => showInlineVaccineForm(animalId, getLocalToday(), []));

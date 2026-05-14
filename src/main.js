@@ -46,6 +46,30 @@ window.navigateTo = function(screenId, ...args) {
     document.dispatchEvent(event);
 };
 
+// Helper for M3 Floating Labels
+window.refreshM3Fields = function() {
+  document.querySelectorAll('.m3-field input, .m3-field select, .m3-field textarea').forEach(el => {
+    const parent = el.closest('.m3-field');
+    if (!parent) return;
+    
+    // For selects, check valid/value
+    if (el.tagName === 'SELECT') {
+      if (el.value && el.value !== '') {
+        parent.classList.add('has-value');
+      } else {
+        parent.classList.remove('has-value');
+      }
+    } else {
+      // For inputs/textareas, check if they have content
+      if (el.value && el.value.trim() !== '') {
+        parent.classList.add('has-value');
+      } else {
+        parent.classList.remove('has-value');
+      }
+    }
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('screen-container');
     const titleElement = document.getElementById('current-screen-title');
@@ -65,7 +89,12 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = html;
         // Highlight active link
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        const activeLink = document.querySelector(`.nav-link[data-screen="${screenId}"]`);
+        
+        // Use backTo if available to highlight the parent category in the menu
+        const screenCfg = screens[screenId];
+        const highlightId = (screenCfg && screenCfg.backTo) ? screenCfg.backTo : screenId;
+        
+        const activeLink = document.querySelector(`.nav-link[data-screen="${highlightId}"]`);
         if (activeLink) activeLink.classList.add('active');
         // Init screen
         if (screenId === 'detalle_motor') {

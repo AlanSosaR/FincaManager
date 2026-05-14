@@ -327,7 +327,8 @@
 .m3-field textarea:focus ~ label,
 .m3-field textarea:not(:placeholder-shown) ~ label,
 .m3-field select:focus ~ label,
-.m3-field select:valid ~ label {
+.m3-field select:valid ~ label,
+.m3-field.has-value label {
   transform: translateY(-27px) scale(0.75);
   color: var(--m3-primary);
   font-weight: 800;

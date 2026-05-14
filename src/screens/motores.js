@@ -72,7 +72,7 @@ window.changeMotorsPage = async function(page) {
   totalFilteredCount = count || 0;
   listContainer.innerHTML = equipos.length === 0
     ? `<div class="ganado-empty" style="grid-column: 1 / -1;"><p>No se encontraron equipos.</p></div>`
-    : equipos.map(eq => renderMotorRow(eq)).join('');
+    : equipos.map(eq => renderMotorCard(eq)).join('');
 
   if (footerContainer) footerContainer.innerHTML = getPaginationFooterHtml();
 };
@@ -179,15 +179,15 @@ export async function renderMotores(page = 1, filter = 'all') {
         </section>
 
         <!-- List -->
-        <div class="motores-list-header" style="margin-top: 28px;">
+        <div class="motores-list-header" style="margin-top: 32px; margin-bottom: 16px;">
           <h4>${currentMotorsFilter === 'all' ? 'Maquinaria Registrada' : 'Resultados del Filtro'}</h4>
           <span class="ganado-count-label">${totalFilteredCount} equipos</span>
         </div>
 
-        <div class="ganado-list" id="motors-list-container">
+        <div class="motores-grid" id="motors-list-container">
           ${equipos.length === 0
             ? `<div class="ganado-empty"><p>No se encontraron equipos.</p></div>`
-            : equipos.map(eq => renderMotorRow(eq)).join('')}
+            : equipos.map(eq => renderMotorCard(eq)).join('')}
         </div>
 
         <!-- Pagination Footer -->
@@ -241,49 +241,47 @@ export function initMotores() {
 
 // ─── Row renderer ─────────────────────────────────────────────────────────────
 
-function renderMotorRow(eq) {
+function renderMotorCard(eq) {
   const hours    = eq.horas || 0;
   const maxHours = eq.max_horas || 100;
   const pct      = Math.min(100, Math.round((hours / maxHours) * 100));
 
-  let statusClass = 'ok';
-  let badgeIcon   = 'check_circle';
-  if (pct >= 95)      { statusClass = 'pending'; badgeIcon = 'warning'; }
-  else if (pct >= 75) { statusClass = 'pending'; badgeIcon = 'schedule'; }
-
   const imgHtml = eq.image_url
-    ? `<img src="${eq.image_url}">`
-    : `<div class="motores-row-icon"><span class="material-icons">${eq.icon || 'settings'}</span></div>`;
+    ? `<img src="${eq.image_url}" alt="${eq.nombre}" style="width: 100%; height: 100%; object-fit: cover;">`
+    : `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f5f5f5; color: #ccc;"><span class="material-icons">settings</span></div>`;
 
   return `
-    <div class="ganado-row" onclick="window.navigateTo('detalle_motor', '${eq.id}')">
-      <div class="ganado-row-img-container">
+    <div class="motor-card-compact" onclick="window.navigateTo('detalle_motor', '${eq.id}')">
+      
+      <!-- Image with Status Indicator -->
+      <div class="motor-compact-img">
         ${imgHtml}
-        <div class="ganado-row-badge ${statusClass === 'ok' ? 'green' : 'orange'}">
-          <span class="material-icons" style="font-size:12px;">${badgeIcon}</span>
+        <div style="position: absolute; bottom: 2px; right: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons" style="font-size: 14px; color: ${pct >= 95 ? '#c62828' : '#2e7d32'};">check_circle</span>
         </div>
       </div>
-      <div class="ganado-row-content">
-        <div class="ganado-col-group">
-          <p class="ganado-col-label">${(eq.serial || 'S/N').toUpperCase()}</p>
-          <p class="ganado-col-value">${eq.nombre}</p>
-        </div>
-        <div class="ganado-col-group">
-          <p class="ganado-col-label">Uso</p>
-          <p class="ganado-col-value">${hours}/${maxHours}h</p>
-        </div>
-        <div style="margin-left: auto;">
-          <button class="ganado-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)">
-            <span class="material-icons">more_vert</span>
+      <!-- Info Group -->
+      <div class="motor-compact-info">
+        <span class="motor-compact-label">S/N</span>
+        <h3 class="motor-compact-title">${eq.nombre}</h3>
+      </div>
+      <!-- Usage Stat -->
+      <div class="motor-compact-usage">
+        <span class="motor-compact-label">USO</span>
+        <div class="motor-compact-usage-val">${hours}/${maxHours}h</div>
+      </div>
+      <!-- More Actions -->
+      <div style="position: relative;">
+        <button onclick="event.stopPropagation(); window.toggleActionMenu(this)" style="border: none; background: transparent; color: #666; cursor: pointer; padding: 8px; border-radius: 50%;">
+          <span class="material-icons">more_vert</span>
+        </button>
+        <div class="action-menu" style="right: 0; bottom: auto; top: 100%;">
+          <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_motor', '${eq.id}')">
+            <span class="material-icons">edit</span><span>Editar</span>
           </button>
-          <div class="action-menu">
-            <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_motor', '${eq.id}')">
-              <span class="material-icons">edit</span><span>Editar</span>
-            </button>
-            <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteMotor('${eq.id}', '${eq.nombre}')">
-              <span class="material-icons">delete</span><span>Eliminar</span>
-            </button>
-          </div>
+          <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteMotor('${eq.id}', '${eq.nombre}')">
+            <span class="material-icons">delete</span><span>Eliminar</span>
+          </button>
         </div>
       </div>
     </div>
