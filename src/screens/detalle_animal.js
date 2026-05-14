@@ -84,6 +84,12 @@ let currentYearFumig = new Date().getFullYear();
 let currentMonthFumig = new Date().getMonth();
 let weightChart = null;
 
+// Pagination state
+const DA_PAGE_SIZE = 5;
+let vaccinesPage = 1;
+let weightsPage = 1;
+let fumigPage = 1;
+
 export async function renderDetalleAnimal(animalId) {
     // Return a skeleton that will be populated by init
     return `
@@ -154,6 +160,11 @@ async function loadAllData(animalId, container) {
         
         fumigaciones = fumigData || [];
 
+        // Reset pagination when fresh data is loaded
+        vaccinesPage = 1;
+        weightsPage = 1;
+        fumigPage = 1;
+
         renderFullContent(container, animalId);
     } catch (err) {
         console.error('Error loading animal data:', err);
@@ -202,11 +213,11 @@ function renderFullContent(container, animalId) {
                 </div>
 
                 <div class="da-hero-actions">
-                    <button class="da-action-btn da-action-edit" id="da-edit-animal">
+                    <button class="da-action-btn primary" id="da-edit-animal">
                         <span class="material-icons">edit</span>
                         Editar Datos
                     </button>
-                    <button class="da-action-btn da-action-delete" id="da-delete-animal">
+                    <button class="da-action-btn secondary" id="da-delete-animal">
                         <span class="material-icons">delete</span>
                         Eliminar
                     </button>
@@ -668,7 +679,7 @@ function renderCalendar() {
         dayEl.onclick = () => showDayDetails(day, dayVaccines);
         daysContainer.appendChild(dayEl);
     }
-    renderVaccinesTable(monthVaccines);
+    renderVaccinesTable(monthVaccines, 1);
 }
 
 function showDayDetails(day, dayEvents) {
@@ -971,16 +982,91 @@ function showInlineWeightForm(animalId) {
     };
 }
 
-function renderVaccinesTable(monthVaccines) {
+function renderVaccinesTable(allVaccines, page) {
     const table = document.getElementById('da-vaccines-table');
     if (!table) return;
 
-    if (monthVaccines.length === 0) {
+    vaccinesPage = page || vaccinesPage;
+    const total = allVaccines.length;
+    const totalPages = Math.ceil(total / DA_PAGE_SIZE);
+    const from = (vaccinesPage - 1) * DA_PAGE_SIZE;
+    const paged = allVaccines.slice(from, from + DA_PAGE_SIZE);
+
+    if (total === 0) {
         table.innerHTML = `<div class="da-empty-state">No hay vacunas registradas en este periodo</div>`;
         return;
     }
 
     const today = getLocalToday();
+
+    const rowsHtml = paged.map(v => {
+        const isPastOrToday = v.fecha <= today;
+        const currentEstado = v.estado || 'Aplicada';
+        let estadoHtml = '';
+        
+        if (currentEstado === 'Programada') {
+            const applyBtn = isPastOrToday ? `
+                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmVaccine('${v.id}')">
+                    <span class="material-icons" style="font-size: 16px;">check</span>
+                </button>
+                <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelVaccine('${v.id}')">
+                    <span class="material-icons" style="font-size: 16px;">close</span>
+                </button>` : `
+                <span class="da-variation-pill pending" style="margin-right: 4px;">
+                    <span class="material-icons">schedule</span>
+                    Programada
+                </span>`;
+            estadoHtml = `
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    ${applyBtn}
+                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editVaccine('${v.id}')">
+                        <span class="material-icons" style="font-size: 16px;">edit</span>
+                    </button>
+                </div>
+            `;
+        } else if (currentEstado === 'Cancelada') {
+            estadoHtml = `
+                <span class="da-variation-pill negative">
+                    <span class="material-icons">cancel</span>
+                    Cancelada
+                </span>
+            `;
+        } else {
+            estadoHtml = `
+                <span class="da-variation-pill positive">
+                    <span class="material-icons">check_circle</span>
+                    Aplicada
+                </span>
+            `;
+        }
+
+        return `
+            <div class="da-table-row">
+                <div class="da-table-cell da-cell-bold" data-label="Vacuna">${v.nombre}</div>
+                <div class="da-table-cell" data-label="Fecha">${new Date(v.fecha).toLocaleDateString()}</div>
+                <div class="da-table-cell" data-label="Estado">
+                    ${estadoHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const paginationHtml = totalPages > 1 ? `
+        <div class="da-pagination">
+            <span class="da-pagination-info">
+                Mostrando <strong>${from + 1}–${Math.min(from + DA_PAGE_SIZE, total)}</strong> de <strong>${total}</strong>
+            </span>
+            <div class="da-pagination-controls">
+                <button class="da-pagination-btn" id="vac-prev-btn" ${vaccinesPage <= 1 ? 'disabled' : ''} title="Anterior">
+                    <span class="material-icons">chevron_left</span>
+                </button>
+                <span style="font-size:14px; font-weight:600; color: var(--on-surface);">${vaccinesPage} / ${totalPages}</span>
+                <button class="da-pagination-btn" id="vac-next-btn" ${vaccinesPage >= totalPages ? 'disabled' : ''} title="Siguiente">
+                    <span class="material-icons">chevron_right</span>
+                </button>
+            </div>
+        </div>
+    ` : '';
 
     table.innerHTML = `
         <div class="da-table-header">
@@ -988,101 +1074,97 @@ function renderVaccinesTable(monthVaccines) {
             <div>Fecha</div>
             <div>Estado</div>
         </div>
-        ${monthVaccines.map(v => {
-            const isPastOrToday = v.fecha <= today;
-            const currentEstado = v.estado || 'Aplicada';
-            let estadoHtml = '';
-            
-            if (currentEstado === 'Programada') {
-                const applyBtn = isPastOrToday ? `
-                    <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmVaccine('${v.id}')">
-                        <span class="material-icons" style="font-size: 16px;">check</span>
-                    </button>
-                    <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelVaccine('${v.id}')">
-                        <span class="material-icons" style="font-size: 16px;">close</span>
-                    </button>` : `
-                    <span class="da-variation-pill pending" style="margin-right: 4px;">
-                        <span class="material-icons">schedule</span>
-                        Programada
-                    </span>`;
-                estadoHtml = `
-                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                        ${applyBtn}
-                        <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editVaccine('${v.id}')">
-                            <span class="material-icons" style="font-size: 16px;">edit</span>
-                        </button>
-                    </div>
-                `;
-            } else if (currentEstado === 'Cancelada') {
-                estadoHtml = `
-                    <span class="da-variation-pill negative">
-                        <span class="material-icons">cancel</span>
-                        Cancelada
-                    </span>
-                `;
-            } else {
-                estadoHtml = `
-                    <span class="da-variation-pill positive">
-                        <span class="material-icons">check_circle</span>
-                        Aplicada
-                    </span>
-                `;
-            }
-
-            return `
-                <div class="da-table-row">
-                    <div class="da-table-cell da-cell-bold" data-label="Vacuna">${v.nombre}</div>
-                    <div class="da-table-cell" data-label="Fecha">${new Date(v.fecha).toLocaleDateString()}</div>
-                    <div class="da-table-cell" data-label="Estado">
-                        ${estadoHtml}
-                    </div>
-                </div>
-            `;
-        }).join('')}
+        ${rowsHtml}
+        ${paginationHtml}
     `;
+
+    // Bind pagination buttons
+    const prevBtn = document.getElementById('vac-prev-btn');
+    const nextBtn = document.getElementById('vac-next-btn');
+    if (prevBtn) prevBtn.onclick = () => { if (vaccinesPage > 1) renderVaccinesTable(allVaccines, vaccinesPage - 1); };
+    if (nextBtn) nextBtn.onclick = () => { if (vaccinesPage < totalPages) renderVaccinesTable(allVaccines, vaccinesPage + 1); };
 }
 
-function renderWeightsTable() {
+function renderWeightsTable(page) {
     const table = document.getElementById('da-weights-table');
     if (!table) return;
 
-    if (weights.length === 0) {
+    weightsPage = page || weightsPage;
+    const sortedWeights = [...weights].reverse();
+    const total = sortedWeights.length;
+    const totalPages = Math.ceil(total / DA_PAGE_SIZE);
+    const from = (weightsPage - 1) * DA_PAGE_SIZE;
+    const paged = sortedWeights.slice(from, from + DA_PAGE_SIZE);
+
+    if (total === 0) {
         table.innerHTML = `<div class="da-empty-state">Sin registros de pesaje</div>`;
         return;
     }
 
-    const sortedWeights = [...weights].reverse();
+    const rowsHtml = paged.map((w, i) => {
+        const globalIdx = from + i;
+        const next = sortedWeights[globalIdx + 1];
+        let diff = next ? parseFloat(w.peso) - parseFloat(next.peso) : 0;
+        const trend = diff > 0 ? 'positive' : (diff < 0 ? 'negative' : 'neutral');
+        return `
+            <div class="da-table-row">
+                <div class="da-table-cell" data-label="Fecha">${new Date(w.fecha).toLocaleDateString()}</div>
+                <div class="da-table-cell da-cell-bold" data-label="Peso">${w.peso} ${currentAnimal.peso_unidad || 'kg'}</div>
+                <div class="da-table-cell" data-label="Variación">
+                    <span class="da-variation-pill ${trend}">
+                        <span class="material-icons">${trend === 'positive' ? 'arrow_upward' : (trend === 'negative' ? 'arrow_downward' : 'horizontal_rule')}</span>
+                        ${diff !== 0 ? Math.abs(diff).toFixed(1) : '0.0'}
+                    </span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const paginationHtml = totalPages > 1 ? `
+        <div class="da-pagination">
+            <span class="da-pagination-info">
+                Mostrando <strong>${from + 1}–${Math.min(from + DA_PAGE_SIZE, total)}</strong> de <strong>${total}</strong>
+            </span>
+            <div class="da-pagination-controls">
+                <button class="da-pagination-btn" id="wt-prev-btn" ${weightsPage <= 1 ? 'disabled' : ''} title="Anterior">
+                    <span class="material-icons">chevron_left</span>
+                </button>
+                <span style="font-size:14px; font-weight:600; color: var(--on-surface);">${weightsPage} / ${totalPages}</span>
+                <button class="da-pagination-btn" id="wt-next-btn" ${weightsPage >= totalPages ? 'disabled' : ''} title="Siguiente">
+                    <span class="material-icons">chevron_right</span>
+                </button>
+            </div>
+        </div>
+    ` : '';
+
     table.innerHTML = `
         <div class="da-table-header">
             <div>Fecha</div>
             <div>Peso</div>
             <div>Variación</div>
         </div>
-        ${sortedWeights.map((w, i) => {
-            const next = sortedWeights[i + 1];
-            let diff = next ? parseFloat(w.peso) - parseFloat(next.peso) : 0;
-            const trend = diff > 0 ? 'positive' : (diff < 0 ? 'negative' : 'neutral');
-            return `
-                <div class="da-table-row">
-                    <div class="da-table-cell" data-label="Fecha">${new Date(w.fecha).toLocaleDateString()}</div>
-                    <div class="da-table-cell da-cell-bold" data-label="Peso">${w.peso} ${currentAnimal.peso_unidad || 'kg'}</div>
-                    <div class="da-table-cell" data-label="Variación">
-                        <span class="da-variation-pill ${trend}">
-                            <span class="material-icons">${trend === 'positive' ? 'arrow_upward' : (trend === 'negative' ? 'arrow_downward' : 'horizontal_rule')}</span>
-                            ${diff !== 0 ? Math.abs(diff).toFixed(1) : '0.0'}
-                        </span>
-                    </div>
-                </div>
-            `;
-        }).join('')}
+        ${rowsHtml}
+        ${paginationHtml}
     `;
+
+    // Bind pagination buttons
+    const prevBtn = document.getElementById('wt-prev-btn');
+    const nextBtn = document.getElementById('wt-next-btn');
+    if (prevBtn) prevBtn.onclick = () => { if (weightsPage > 1) renderWeightsTable(weightsPage - 1); };
+    if (nextBtn) nextBtn.onclick = () => { if (weightsPage < totalPages) renderWeightsTable(weightsPage + 1); };
 }
 
-function renderFumigacionesTable(monthFumigaciones) {
+function renderFumigacionesTable(allFumigaciones, page) {
     const table = document.getElementById('da-fumigaciones-table');
     if (!table) return;
 
-    if (!monthFumigaciones || monthFumigaciones.length === 0) {
+    fumigPage = page || fumigPage;
+    const total = allFumigaciones ? allFumigaciones.length : 0;
+    const totalPages = Math.ceil(total / DA_PAGE_SIZE);
+    const from = (fumigPage - 1) * DA_PAGE_SIZE;
+    const paged = (allFumigaciones || []).slice(from, from + DA_PAGE_SIZE);
+
+    if (total === 0) {
         table.innerHTML = `
             <div class="da-empty-state">
                 <span class="material-icons">bug_report</span>
@@ -1094,55 +1176,48 @@ function renderFumigacionesTable(monthFumigaciones) {
 
     const today = getLocalToday();
 
-    table.innerHTML = `
-        <div class="da-table-header" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
-            <div>Producto</div>
-            <div>Fecha</div>
-            <div>Dosis</div>
-            <div>Estado</div>
-        </div>
-        ${monthFumigaciones.map(f => {
-            const isPastOrToday = f.fecha <= today;
-            const currentEstado = f.estado || 'Aplicada';
-            let estadoHtml = '';
-            
-            if (currentEstado === 'Programada') {
-                const applyBtnF = isPastOrToday ? `
-                    <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmFumigacion('${f.id}')">
-                        <span class="material-icons" style="font-size: 16px;">check</span>
+    const rowsHtml = paged.map(f => {
+        const isPastOrToday = f.fecha <= today;
+        const currentEstado = f.estado || 'Aplicada';
+        let estadoHtml = '';
+        
+        if (currentEstado === 'Programada') {
+            const applyBtnF = isPastOrToday ? `
+                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmFumigacion('${f.id}')">
+                    <span class="material-icons" style="font-size: 16px;">check</span>
+                </button>
+                <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelFumigacion('${f.id}')">
+                    <span class="material-icons" style="font-size: 16px;">close</span>
+                </button>` : `
+                <span class="da-variation-pill pending" style="margin-right: 4px;">
+                    <span class="material-icons">schedule</span>
+                    Programada
+                </span>`;
+            estadoHtml = `
+                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    ${applyBtnF}
+                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editFumigacion('${f.id}')">
+                        <span class="material-icons" style="font-size: 16px;">edit</span>
                     </button>
-                    <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelFumigacion('${f.id}')">
-                        <span class="material-icons" style="font-size: 16px;">close</span>
-                    </button>` : `
-                    <span class="da-variation-pill pending" style="margin-right: 4px;">
-                        <span class="material-icons">schedule</span>
-                        Programada
-                    </span>`;
-                estadoHtml = `
-                    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                        ${applyBtnF}
-                        <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editFumigacion('${f.id}')">
-                            <span class="material-icons" style="font-size: 16px;">edit</span>
-                        </button>
-                    </div>
-                `;
-            } else if (currentEstado === 'Cancelada') {
-                estadoHtml = `
-                    <span class="da-variation-pill negative">
-                        <span class="material-icons">cancel</span>
-                        Cancelada
-                    </span>
-                `;
-            } else {
-                estadoHtml = `
-                    <span class="da-variation-pill positive">
-                        <span class="material-icons">check_circle</span>
-                        Aplicada
-                    </span>
-                `;
-            }
+                </div>
+            `;
+        } else if (currentEstado === 'Cancelada') {
+            estadoHtml = `
+                <span class="da-variation-pill negative">
+                    <span class="material-icons">cancel</span>
+                    Cancelada
+                </span>
+            `;
+        } else {
+            estadoHtml = `
+                <span class="da-variation-pill positive">
+                    <span class="material-icons">check_circle</span>
+                    Aplicada
+                </span>
+            `;
+        }
 
-            return `
+        return `
             <div class="da-table-row" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
                 <div class="da-table-cell da-cell-bold" data-label="Producto">${f.producto}</div>
                 <div class="da-table-cell" data-label="Fecha">${new Date(f.fecha).toLocaleDateString()}</div>
@@ -1150,9 +1225,42 @@ function renderFumigacionesTable(monthFumigaciones) {
                 <div class="da-table-cell" data-label="Estado">${estadoHtml}</div>
             </div>
             ${f.observaciones ? `<div style="padding: 8px 24px 16px; font-size: 13px; color: #666; font-style: italic; background: #fafafa; border-bottom: 1px solid #eee;">Obs: ${f.observaciones}</div>` : ''}
-            `;
-        }).join('')}
+        `;
+    }).join('');
+
+    const paginationHtml = totalPages > 1 ? `
+        <div class="da-pagination" style="grid-column: 1 / -1;">
+            <span class="da-pagination-info">
+                Mostrando <strong>${from + 1}–${Math.min(from + DA_PAGE_SIZE, total)}</strong> de <strong>${total}</strong>
+            </span>
+            <div class="da-pagination-controls">
+                <button class="da-pagination-btn" id="fum-prev-btn" ${fumigPage <= 1 ? 'disabled' : ''} title="Anterior">
+                    <span class="material-icons">chevron_left</span>
+                </button>
+                <span style="font-size:14px; font-weight:600; color: var(--on-surface);">${fumigPage} / ${totalPages}</span>
+                <button class="da-pagination-btn" id="fum-next-btn" ${fumigPage >= totalPages ? 'disabled' : ''} title="Siguiente">
+                    <span class="material-icons">chevron_right</span>
+                </button>
+            </div>
+        </div>
+    ` : '';
+
+    table.innerHTML = `
+        <div class="da-table-header" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+            <div>Producto</div>
+            <div>Fecha</div>
+            <div>Dosis</div>
+            <div>Estado</div>
+        </div>
+        ${rowsHtml}
+        ${paginationHtml}
     `;
+
+    // Bind pagination buttons
+    const prevBtn = document.getElementById('fum-prev-btn');
+    const nextBtn = document.getElementById('fum-next-btn');
+    if (prevBtn) prevBtn.onclick = () => { if (fumigPage > 1) renderFumigacionesTable(allFumigaciones, fumigPage - 1); };
+    if (nextBtn) nextBtn.onclick = () => { if (fumigPage < totalPages) renderFumigacionesTable(allFumigaciones, fumigPage + 1); };
 }
 
 function renderCalendarFumig() {
@@ -1200,7 +1308,7 @@ function renderCalendarFumig() {
         dayEl.onclick = () => showDayDetailsFumig(day, dayFumigaciones);
         daysContainer.appendChild(dayEl);
     }
-    renderFumigacionesTable(monthFumigaciones);
+    renderFumigacionesTable(monthFumigaciones, 1);
 }
 
 function showDayDetailsFumig(day, dayEvents) {

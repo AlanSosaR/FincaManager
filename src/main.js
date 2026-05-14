@@ -12,7 +12,7 @@ import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';
 import { renderHerramientas, initHerramientas } from './screens/herramientas.js';
 import { renderGanado, initGanado } from './screens/ganado.js';
-import { renderPotreros } from './screens/potreros.js';
+import { renderPotreros, initPotreros } from './screens/potreros.js';
 import { renderDetalleMotor } from './screens/detalle_motor.js';
 import { renderDetallePotrero, initDetallePotrero } from './screens/detalle_potrero.js';
 import { renderDetalleAnimal, initDetalleAnimal } from './screens/detalle_animal.js';
@@ -37,8 +37,11 @@ const screens = {
     nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero }
 };
 
+console.log('[DEBUG] Registered screens:', Object.keys(screens));
+
 // Global navigate function for use inside screen HTML
 window.navigateTo = function(screenId, ...args) {
+    console.log('[DEBUG] window.navigateTo called with:', screenId, args);
     const event = new CustomEvent('navigate', { detail: { screenId, args } });
     document.dispatchEvent(event);
 };
@@ -47,7 +50,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('screen-container');
     const titleElement = document.getElementById('current-screen-title');
 
+    // ── View cache for instant navigation ──────────────────────────────────
+    const viewCache = new Map();
+    // These screens should never be cached (forms / detail pages with dynamic data)
+    const NO_CACHE = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero',
+                               'detalle_motor','detalle_animal','detalle_potrero',
+                               'detalle_herramienta']);
+
+    function cacheKey(screenId, args) {
+        return screenId + (args.length ? '/' + args.join('/') : '');
+    }
+
+    async function renderAndInit(screenId, args, html) {
+        container.innerHTML = html;
+        // Highlight active link
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        const activeLink = document.querySelector(`.nav-link[data-screen="${screenId}"]`);
+        if (activeLink) activeLink.classList.add('active');
+        // Init screen
+        if (screenId === 'detalle_motor') {
+            const { initDetalleMotor } = await import('./screens/detalle_motor.js');
+            initDetalleMotor(...args);
+        }
+        if (screenId === 'nuevo_motor')  initNuevoMotor(...args);
+        if (screenId === 'motores')      initMotores();
+        if (screenId === 'herramientas') initHerramientas();
+        if (screenId === 'ganado')       initGanado();
+        if (screenId === 'nuevo_animal') initNuevoAnimal(...args);
+        if (screenId === 'detalle_animal') initDetalleAnimal(...args);
+        if (screenId === 'nuevo_potrero')  initNuevoPotrero(...args);
+        if (screenId === 'potreros')     initPotreros();
+        if (screenId === 'detalle_potrero') initDetallePotrero(...args);
+        if (screenId === 'detalle_herramienta') {
+            const { initDetalleHerramienta } = await import('./screens/detalle_herramienta.js');
+            initDetalleHerramienta(...args);
+        }
+    }
+
     async function navigate(screenId, ...args) {
+        console.log('[DEBUG] Navigating to:', screenId, args);
         const screen = screens[screenId] || screens.motores;
         
         if (screen.backTo) {
@@ -62,49 +103,27 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             titleElement.textContent = screen.title;
         }
-        container.innerHTML = '<div style="padding: 24px;">Cargando...</div>';
-        
-        try {
-            const html = await screen.render(...args);
-            container.innerHTML = html;
 
-            // Highlight active link in sidebar
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            const activeLink = document.querySelector(`.nav-link[data-screen="${screenId}"]`);
-            if (activeLink) activeLink.classList.add('active');
+        const key = cacheKey(screenId, args);
+        const useCache = !NO_CACHE.has(screenId);
 
-            // Initialize screen-specific logic
-            if (screenId === 'detalle_motor') {
-              const { initDetalleMotor } = await import('./screens/detalle_motor.js');
-              initDetalleMotor(...args);
+        if (useCache && viewCache.has(key)) {
+            // ── Instant: serve from cache immediately ──
+            await renderAndInit(screenId, args, viewCache.get(key));
+            // Then silently refresh cache in background
+            screen.render(...args).then(freshHtml => {
+                viewCache.set(key, freshHtml);
+            }).catch(() => {});
+        } else {
+            // ── First visit: fetch, show, then cache ──
+            try {
+                const html = await screen.render(...args);
+                if (useCache) viewCache.set(key, html);
+                await renderAndInit(screenId, args, html);
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `<div style="padding: 24px; color: red;">Error: ${error.message}</div>`;
             }
-            if (screenId === 'nuevo_motor') {
-              initNuevoMotor(...args);
-            }
-            if (screenId === 'motores') {
-              initMotores();
-            }
-            if (screenId === 'herramientas') {
-              initHerramientas();
-            }
-            if (screenId === 'ganado') {
-              initGanado();
-            }
-            if (screenId === 'nuevo_animal') {
-              initNuevoAnimal(...args);
-            }
-            if (screenId === 'detalle_animal') {
-              initDetalleAnimal(...args);
-            }
-            if (screenId === 'nuevo_potrero') {
-              initNuevoPotrero(...args);
-            }
-            if (screenId === 'detalle_potrero') {
-              initDetallePotrero(...args);
-            }
-        } catch (error) {
-            console.error(error);
-            container.innerHTML = `<div style="padding: 24px; color: red;">Error: ${error.message}</div>`;
         }
         
         // Build the new hash including any arguments
@@ -183,7 +202,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarClose = document.getElementById('sidebar-close');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
+    const sidebarCollapse = document.getElementById('sidebar-collapse');
     
+    // Initialize collapsed state from local storage
+    if (localStorage.getItem('sidebar-collapsed') === 'true') {
+        sidebar.classList.add('collapsed');
+    }
+
     function toggleSidebar() {
         const isOpen = sidebar.classList.toggle('open');
         if (overlay) overlay.classList.toggle('active', isOpen);
@@ -192,6 +217,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeSidebar() {
         sidebar.classList.remove('open');
         if (overlay) overlay.classList.remove('active');
+    }
+
+    if (sidebarCollapse) {
+        sidebarCollapse.addEventListener('click', () => {
+            const isCollapsed = sidebar.classList.toggle('collapsed');
+            localStorage.setItem('sidebar-collapsed', isCollapsed);
+        });
     }
 
     if (menuToggle) {

@@ -3,92 +3,90 @@ import { supabase } from '../supabase.js';
 export async function renderNuevaHerramienta(id) {
   const isEdit = !!id;
   return `
-    <div class="m3-form-screen">
-      <div class="m3-grid">
-        <!-- Photo and Tips -->
-        <div class="m3-asymmetric-section">
-          <div class="m3-photo-placeholder" id="photo-dropzone">
+    <div class="da-screen">
+      <div class="da-tabs-section" style="display: flex; flex-direction: column; gap: 40px;">
+        <div class="m3-grid">
+          <!-- Photo and Tips -->
+          <div class="da-hero-img-wrap" id="photo-dropzone" style="cursor: pointer; border: 2px dashed rgba(56, 106, 62, 0.3); background: #f9fbf9;">
             <input type="file" id="tool-photo" accept="image/*" style="display: none">
-            <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-              <span class="material-symbols-outlined">photo_camera</span>
-              <p style="font-weight: 800">Subir foto de la herramienta</p>
-              <p style="font-size: 11px; text-align: center; color: var(--m3-on-surface-variant); margin-top: 10px; line-height: 1.4">
-                Formatos JPG, PNG hasta 10MB.
-              </p>
+            <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
+               <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 80px; height: 80px; border-radius: 50%;">
+                  <span class="material-icons" style="font-size: 40px;">photo_camera</span>
+               </div>
+               <div style="text-align: center;">
+                  <p style="font-weight: 800; color: #2c2c2c; margin: 0;">${isEdit ? 'Cambiar Fotografía' : 'Subir foto de la herramienta'}</p>
+                  <p style="font-size: 12px; color: #888; margin-top: 4px;">Formatos JPG, PNG hasta 10MB.</p>
+               </div>
             </div>
           </div>
 
-          <div class="m3-pro-tip">
-             <span class="material-symbols-outlined icon">lightbulb</span>
-             <div>
-                <h4>Consejo Pro</h4>
-                <p>Mantener el inventario actualizado ayuda a prevenir pérdidas y planificar compras.</p>
-             </div>
+          <div class="da-hero-info">
+            <div>
+              <div class="da-hero-subtitle">${isEdit ? 'Actualizando inventario' : 'Nueva herramienta'}</div>
+              <h2 class="da-hero-title">${isEdit ? 'Editar Herramienta' : 'Detalles de Herramienta'}</h2>
+            </div>
+            
+            <div class="da-badge-row">
+              <div class="da-badge da-badge-surface">
+                <span class="material-icons" style="color: #fbc02d;">lightbulb</span>
+                Mantener el inventario actualizado ayuda a prevenir pérdidas y planificar compras.
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Form Details -->
-        <div class="m3-form-card">
-          <h3>${isEdit ? 'Editar Herramienta' : 'Detalles de la Herramienta'}</h3>
+        <div style="border-top: 1px solid #f0f0f0; padding-top: 32px;">
+          <h3 style="font-size: 20px; font-weight: 800; color: #2c2c2c; margin-bottom: 24px;">Especificaciones</h3>
           
           <form id="form-nueva-herramienta">
-            <div class="m3-grid-2col">
-              <div class="m3-input-group">
-                <label>Nombre de la herramienta</label>
-                <div class="m3-input-wrapper">
-                  <input type="text" name="nombre" placeholder="Ej. Motosierra Stihl MS 170">
-                </div>
+            <div class="m3-grid-2col" style="margin-bottom: 20px;">
+              <div class="m3-field">
+                <input type="text" name="nombre" placeholder=" " required>
+                <label>Nombre de la herramienta (Ej. Motosierra MS 170)</label>
                 <p class="error-text" id="error-nombre">El nombre es obligatorio</p>
               </div>
 
-              <div class="m3-input-group">
+              <div class="m3-field">
+                <select name="categoria" required>
+                  <option value="Manual">Herramienta Manual</option>
+                  <option value="Eléctrica">Eléctrica</option>
+                  <option value="Combustión">Combustión</option>
+                  <option value="Medición">Medición</option>
+                  <option value="Protección">Protección</option>
+                  <option value="Otro">Otro</option>
+                </select>
                 <label>Categoría</label>
-                <div class="m3-input-wrapper">
-                  <select name="categoria">
-                    <option value="Manual">Herramienta Manual</option>
-                    <option value="Eléctrica">Eléctrica</option>
-                    <option value="Combustión">Combustión</option>
-                    <option value="Medición">Medición</option>
-                    <option value="Protección">Protección</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                </div>
               </div>
             </div>
 
-            <div class="m3-grid-2col">
-              <div class="m3-input-group">
-                <label>Ubicación</label>
-                <div class="m3-input-wrapper">
-                  <input type="text" name="ubicacion" placeholder="Ej. Bodega Principal">
-                </div>
+            <div class="m3-grid-2col" style="margin-bottom: 20px;">
+              <div class="m3-field">
+                <input type="text" name="ubicacion" placeholder=" ">
+                <label>Ubicación (Ej. Bodega Principal)</label>
               </div>
 
-              <div class="m3-input-group">
-                <label>Estado</label>
-                <div class="m3-input-wrapper">
-                  <select name="estado">
-                    <option value="Disponible">Disponible</option>
-                    <option value="Reparación">En Reparación</option>
-                    <option value="Baja">Dada de Baja</option>
-                  </select>
-                </div>
+              <div class="m3-field">
+                <select name="estado" required>
+                  <option value="Disponible">Disponible</option>
+                  <option value="Reparación">En Reparación</option>
+                  <option value="Baja">Dada de Baja</option>
+                </select>
+                <label>Estado actual</label>
               </div>
             </div>
 
-            <div class="m3-input-group">
+            <div class="m3-field" style="margin-bottom: 24px;">
+              <input type="text" name="icon" placeholder=" " value="🛠️">
               <label>Icono / Emoji</label>
-              <div class="m3-input-wrapper">
-                <input type="text" name="icon" placeholder="Ej. 🛠️" value="🛠️">
-              </div>
             </div>
 
-            <!-- Internal Actions -->
-            <div class="m3-form-actions">
-              <button type="button" class="btn-m3-text" onclick="window.navigateTo('herramientas')">Cancelar</button>
-              <button type="button" class="btn-m3-primary" id="btn-save-tool">
-                <span class="material-symbols-outlined">${isEdit ? 'update' : 'save'}</span>
-                ${isEdit ? 'Actualizar herramienta' : 'Guardar herramienta'}
+            <div class="da-form-actions">
+              <button type="button" class="da-action-btn primary" id="btn-save-tool">
+                <span class="material-icons">${isEdit ? 'update' : 'save'}</span>
+                <span>${isEdit ? 'Actualizar herramienta' : 'Guardar herramienta'}</span>
+              </button>
+              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('herramientas')">
+                Cancelar
               </button>
             </div>
           </form>
@@ -150,7 +148,7 @@ export async function initNuevaHerramienta(id) {
   btnSave.addEventListener('click', async () => {
     // Reset errors
     document.querySelectorAll('.error-text').forEach(e => e.style.display = 'none');
-    document.querySelectorAll('.m3-input-wrapper').forEach(e => e.classList.remove('error'));
+    document.querySelectorAll('.m3-field').forEach(e => e.classList.remove('error'));
 
     const formData = new FormData(form);
     const formDataObj = Object.fromEntries(formData.entries());
@@ -159,7 +157,7 @@ export async function initNuevaHerramienta(id) {
     let hasError = false;
     if (!formDataObj.nombre) {
       document.getElementById('error-nombre').style.display = 'block';
-      document.querySelector('input[name="nombre"]').parentElement.classList.add('error');
+      document.querySelector('input[name="nombre"]').closest('.m3-field').classList.add('error');
       hasError = true;
     }
 

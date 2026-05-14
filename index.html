@@ -34,34 +34,38 @@
         <!-- Sidebar/Navigation -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
+                <button id="sidebar-close" class="m3-icon-btn-tonal mobile-only" aria-label="Cerrar menú">
+                    <span class="m3-icon-btn-ripple"></span>
+                    <span class="material-icons">menu</span>
+                </button>
                 <div class="header-main">
                     <h1>Finca Manager</h1>
                     <p>Gestión Agrícola</p>
                 </div>
-                <button id="sidebar-close" class="btn-close mobile-only">
-                    <span class="material-icons">close</span>
-                </button>
             </div>
             <ul class="nav-links">
-                <li><a href="#motores" class="nav-link active" data-screen="motores"><span class="material-icons">settings_input_component</span> Motores</a></li>
-                <li><a href="#dashboard" class="nav-link" data-screen="dashboard"><span class="material-icons">psychology_alt</span> Cafetal</a></li>
-                <li><a href="#herramientas" class="nav-link" data-screen="herramientas"><span class="material-icons">construction</span> Herramientas</a></li>
-                <li><a href="#ganado" class="nav-link" data-screen="ganado"><span class="material-icons">pets</span> Ganado</a></li>
-                <li><a href="#potreros" class="nav-link" data-screen="potreros"><span class="material-icons">landscape</span> Potreros</a></li>
+                <li><a href="#ganado" class="nav-link" data-screen="ganado"><img src="/vaca.png" alt="Ganado" style="width: 24px; height: 24px; filter: grayscale(1) opacity(0.8);"> <span class="nav-text">Ganado</span></a></li>
+                <li><a href="#motores" class="nav-link active" data-screen="motores"><span class="material-icons">settings_input_component</span> <span class="nav-text">Motores</span></a></li>
+                <li><a href="#dashboard" class="nav-link" data-screen="dashboard"><img src="/planta-de-cafe.png" alt="Cafetal" style="width: 24px; height: 24px; filter: grayscale(1) opacity(0.8);"> <span class="nav-text">Cafetal</span></a></li>
+                <li><a href="#herramientas" class="nav-link" data-screen="herramientas"><span class="material-icons">construction</span> <span class="nav-text">Herramientas</span></a></li>
+                <li><a href="#potreros" class="nav-link" data-screen="potreros"><span class="material-icons">landscape</span> <span class="nav-text">Potreros</span></a></li>
             </ul>
             <div class="sidebar-footer">
                 <button id="pwa-install" class="nav-link" style="display: none; width: 100%; cursor: pointer; border: none; background: rgba(46,125,50,0.1); color: var(--primary); margin-bottom: 12px;">
-                    <span class="material-icons">install_mobile</span> Instalar App
+                    <span class="material-icons">install_mobile</span> <span class="nav-text">Instalar App</span>
                 </button>
-                <a href="#perfil" class="nav-link"><span class="material-icons">account_circle</span> Mi Perfil</a>
-                <a href="#" class="nav-link logout"><span class="material-icons">logout</span> Cerrar Sesión</a>
+                <a href="#perfil" class="nav-link"><span class="material-icons">account_circle</span> <span class="nav-text">Mi Perfil</span></a>
+                <button id="sidebar-collapse" class="nav-link desktop-only" style="background: transparent; border: none; cursor: pointer; width: 100%; text-align: left; padding-left: 20px;">
+                    <span class="material-icons" title="Contraer menú">view_sidebar</span>
+                </button>
             </div>
         </nav>
 
         <!-- Main Content Area -->
         <main class="main-content">
             <header class="top-bar">
-                <button id="menu-toggle" class="menu-toggle">
+                <button id="menu-toggle" class="menu-toggle m3-icon-btn-tonal" aria-label="Abrir menú">
+                    <span class="m3-icon-btn-ripple"></span>
                     <span class="material-icons">menu</span>
                 </button>
                 <h2 id="current-screen-title">Lista de Motores</h2>

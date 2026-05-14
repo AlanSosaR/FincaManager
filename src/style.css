@@ -39,12 +39,20 @@
   .mobile-only {
     display: flex !important;
   }
+  .desktop-only {
+    display: none !important;
+  }
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 body {
@@ -72,7 +80,7 @@ body {
   border-right: 1px solid rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
-  padding: 32px 24px;
+  padding: 16px 24px 32px;
   transition: var(--transition);
   opacity: 1 !important;
   /* Desktop: always in the flow, not fixed */
@@ -83,7 +91,8 @@ body {
 
 /* Hide sidebar-close button and overlay on desktop */
 @media (min-width: 1025px) {
-  #sidebar-close {
+  #sidebar-close,
+  .m3-icon-btn-tonal.mobile-only {
     display: none !important;
   }
   .sidebar-overlay {
@@ -96,7 +105,8 @@ body {
 
 .sidebar-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: flex-start;
   align-items: flex-start;
   margin-bottom: 40px;
 }
@@ -157,6 +167,44 @@ body {
 
 .logout {
   color: #d32f2f;
+}
+
+/* Sidebar Collapsed State */
+.sidebar.collapsed {
+  width: 80px;
+  min-width: 80px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.sidebar.collapsed .header-main {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.sidebar.collapsed .nav-text {
+  display: none;
+}
+
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 16px 0;
+  gap: 0;
+}
+
+.sidebar.collapsed #sidebar-collapse {
+  color: var(--primary) !important;
+  transform: rotate(180deg);
+  transition: transform 0.3s;
+}
+
+#sidebar-collapse {
+  transition: transform 0.3s;
+  color: #999 !important;
 }
 
 /* Main Content Area */
@@ -416,3 +464,77 @@ body {
   100% { transform: rotate(360deg); }
 }
 
+/* ── M3 Expressive Tonal Icon Button ───────────────────────────────────────── */
+.m3-icon-btn-tonal {
+  /* Pill / squircle shape */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+  /* M3 tonal colour — primary container */
+  background-color: #d7edd9;
+  color: var(--primary);
+  /* Spring-like transition */
+  transition:
+    background-color 0.2s ease,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-radius 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+  /* Slight elevation */
+  box-shadow: 0 1px 3px rgba(0,0,0,0.10);
+  /* Space below before title */
+  margin-bottom: 20px;
+  margin-left: -4px;
+  margin-top: -4px;
+}
+
+.m3-icon-btn-tonal .material-icons {
+  font-size: 22px;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Hover — expressive spring scale + more rounded */
+.m3-icon-btn-tonal:hover {
+  background-color: #c2e3c5;
+  border-radius: 20px;
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.20);
+}
+
+.m3-icon-btn-tonal:hover .material-icons {
+  transform: rotate(-5deg) scale(1.1);
+}
+
+/* Press state */
+.m3-icon-btn-tonal:active {
+  transform: scale(0.94);
+  background-color: #aed6b1;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(46, 125, 50, 0.15);
+  transition: transform 0.1s ease, border-radius 0.1s ease;
+}
+
+/* Ripple element */
+.m3-icon-btn-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(46,125,50,0.18) 0%, transparent 70%);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.m3-icon-btn-tonal:hover .m3-icon-btn-ripple {
+  opacity: 1;
+  transform: scale(1);
+}

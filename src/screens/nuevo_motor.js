@@ -4,47 +4,53 @@ export async function renderNuevoMotor(id) {
   const isEdit = !!id;
   return `
     <div class="m3-form-screen">
-      <div class="m3-grid">
-        <!-- Photo and Tips -->
-        <div class="m3-asymmetric-section">
-          <div class="m3-photo-placeholder" id="photo-dropzone">
-            <input type="file" id="motor-photo" accept="image/*" style="display: none">
-            <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-              <span class="material-symbols-outlined">photo_camera</span>
-              <p style="font-weight: 800">Subir foto del equipo</p>
-              <p style="font-size: 11px; text-align: center; color: var(--m3-on-surface-variant); margin-top: 10px; line-height: 1.4">
-                Formatos JPG, PNG hasta 10MB.
-              </p>
-            </div>
+      <div class="m3-form-card">
+        <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
+          <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons" style="font-size: 32px;">settings</span>
           </div>
-
-          <div class="m3-pro-tip">
-             <span class="material-symbols-outlined icon">lightbulb</span>
-             <div>
-                <h4>Consejo Pro</h4>
-                <p>Registrar las horas iniciales con precisión garantiza alertas de mantenimiento automáticas.</p>
-             </div>
+          <div>
+            <div class="da-hero-subtitle" style="margin:0;">${isEdit ? 'Actualizando registro' : 'Nuevo equipo'}</div>
+            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">${isEdit ? 'Editar Equipo' : 'Registro de Motor'}</h2>
           </div>
         </div>
 
-        <!-- Form Details -->
-        <div class="m3-form-card">
-          <h3>${isEdit ? 'Editar Equipo' : 'Detalles Técnicos'}</h3>
-          
-          <form id="form-nuevo-motor">
-            <div class="m3-grid-2col">
-              <div class="m3-input-group">
-                <label>Nombre del equipo</label>
-                <div class="m3-input-wrapper">
-                  <input type="text" name="nombre" placeholder="Ej. Generador FUNO FN-12GS">
+        <form id="form-nuevo-motor">
+          <div class="m3-grid">
+            <!-- Left Side: Photo -->
+            <div class="m3-asymmetric-section">
+              <div class="m3-photo-placeholder" id="photo-dropzone">
+                <input type="file" id="motor-photo" accept="image/*" style="display: none">
+                <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
+                  <span class="material-icons">photo_camera</span>
+                  <div style="text-align: center;">
+                    <p style="font-weight: 800; color: #2c2c2c; margin: 0;">${isEdit ? 'Cambiar Foto' : 'Subir Foto'}</p>
+                    <p style="font-size: 11px; color: #888; margin-top: 4px;">JPG o PNG</p>
+                  </div>
                 </div>
-                <p class="error-text" id="error-nombre">El nombre es obligatorio</p>
               </div>
 
-              <div class="m3-input-group">
-                <label>Tipo de equipo</label>
-                <div class="m3-input-wrapper">
-                  <select name="icon">
+              <div class="m3-pro-tip">
+                <span class="material-icons icon">lightbulb</span>
+                <div>
+                  <h4>CONSEJO</h4>
+                  <p>Registrar las horas iniciales garantiza alertas de mantenimiento precisas.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Side: Fields -->
+            <div>
+              <div class="m3-grid-2col">
+                <div class="m3-field">
+                  <input type="text" name="nombre" placeholder=" " required>
+                  <label>Nombre del equipo</label>
+                  <p class="error-text" id="error-nombre">El nombre es obligatorio</p>
+                </div>
+
+                <div class="m3-field">
+                  <select name="icon" required>
+                    <option value="" disabled selected hidden></option>
                     <option value="⚙️">Motor Estacionario</option>
                     <option value="⚡">Generador Eléctrico</option>
                     <option value="✂️">Motoguadaña</option>
@@ -54,44 +60,37 @@ export async function renderNuevoMotor(id) {
                     <option value="🚜">Cosechadora</option>
                     <option value="⚙️">Motobomba</option>
                   </select>
+                  <label>Tipo de equipo</label>
+                </div>
+
+                <div class="m3-field">
+                  <input type="date" name="fecha_adquisicion" placeholder=" ">
+                  <label>Fecha de adquisición</label>
+                </div>
+
+                <div class="m3-field">
+                  <input type="number" name="max_horas" value="250" placeholder=" " required>
+                  <label>Límite de horas</label>
                 </div>
               </div>
-            </div>
 
-            <div class="m3-grid-2col">
-              <div class="m3-input-group">
-                <label>Fecha de adquisición</label>
-                <div class="m3-input-wrapper">
-                  <input type="date" name="fecha_adquisicion">
-                </div>
+              <div class="m3-field">
+                <textarea name="notas" placeholder=" " rows="3"></textarea>
+                <label>Notas / Observaciones</label>
               </div>
 
-              <div class="m3-input-group">
-                <label>Límite mantenimiento</label>
-                <div class="m3-input-wrapper">
-                  <input type="number" name="max_horas" value="250">
-                  <span class="m3-unit">HRS</span>
-                </div>
+              <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0;">
+                <button type="button" class="da-action-btn primary" id="btn-save-motor">
+                  <span class="material-icons">${isEdit ? 'update' : 'save'}</span>
+                  <span>${isEdit ? 'Actualizar' : 'Guardar'}</span>
+                </button>
+                <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('motores')">
+                  Cancelar
+                </button>
               </div>
             </div>
-
-            <div class="m3-input-group">
-              <label>Notas / Observaciones</label>
-              <div class="m3-input-wrapper">
-                <textarea name="notas" placeholder="Detalles adicionales..." rows="4"></textarea>
-              </div>
-            </div>
-
-            <!-- Internal Actions -->
-            <div class="m3-form-actions">
-              <button type="button" class="btn-m3-text" onclick="window.navigateTo('motores')">Cancelar</button>
-              <button type="button" class="btn-m3-primary" id="btn-save-motor">
-                <span class="material-symbols-outlined">${isEdit ? 'update' : 'save'}</span>
-                ${isEdit ? 'Actualizar equipo' : 'Guardar equipo'}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   `;
@@ -149,7 +148,7 @@ export async function initNuevoMotor(id) {
   btnSave.addEventListener('click', async () => {
     // Reset errors
     document.querySelectorAll('.error-text').forEach(e => e.style.display = 'none');
-    document.querySelectorAll('.m3-input-wrapper').forEach(e => e.classList.remove('error'));
+    document.querySelectorAll('.m3-field').forEach(e => e.classList.remove('error'));
 
     const formData = new FormData(form);
     const formDataObj = Object.fromEntries(formData.entries());
@@ -158,7 +157,7 @@ export async function initNuevoMotor(id) {
     let hasError = false;
     if (!formDataObj.nombre) {
       document.getElementById('error-nombre').style.display = 'block';
-      document.querySelector('input[name="nombre"]').parentElement.classList.add('error');
+      document.querySelector('input[name="nombre"]').closest('.m3-field').classList.add('error');
       hasError = true;
     }
 

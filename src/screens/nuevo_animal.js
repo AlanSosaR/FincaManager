@@ -3,121 +3,119 @@ import { supabase } from '../supabase.js';
 export async function renderNuevoAnimal(id) {
   const isEdit = !!id;
   return `
-    <div class="da-screen">
-      <div class="da-hero">
-        <div class="da-hero-img-wrap" id="photo-dropzone" style="cursor: pointer; border: 2px dashed rgba(56, 106, 62, 0.3); background: #f9fbf9;">
-          <input type="file" id="animal-photo" accept="image/*" style="display: none">
-          <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
-             <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 80px; height: 80px; border-radius: 50%;">
-                <span class="material-icons" style="font-size: 40px;">photo_camera</span>
-             </div>
-             <div style="text-align: center;">
-                <p style="font-weight: 800; color: #2c2c2c; margin: 0;">${isEdit ? 'Cambiar Fotografía' : 'Subir Fotografía'}</p>
-                <p style="font-size: 12px; color: #888; margin-top: 4px;">Toca para seleccionar o arrastra aquí</p>
-             </div>
+    <div class="m3-form-screen">
+      <div class="m3-form-card">
+        <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
+          <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+            <img src="/vaca.png" alt="Ganado" style="width: 32px; height: 32px; filter: grayscale(1) opacity(0.85);">
           </div>
-        </div>
-
-        <div class="da-hero-info">
           <div>
-            <div class="da-hero-subtitle">${isEdit ? 'Actualizando registro' : 'Nuevo registro de inventario'}</div>
-            <h2 class="da-hero-title">${isEdit ? 'Editar Información' : 'Registrar Nuevo Animal'}</h2>
+            <div class="da-hero-subtitle" style="margin:0;">${isEdit ? 'Actualizando registro' : 'Nuevo registro de inventario'}</div>
+            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">${isEdit ? 'Editar Información' : 'Registrar Animal'}</h2>
           </div>
-          
-          <div class="da-badge-row">
-            <div class="da-badge da-badge-surface">
-              <span class="material-icons">info</span>
-              Completa los campos para mantener tu inventario actualizado.
+        </div>
+
+        <form id="form-nuevo-animal">
+          <div class="m3-grid">
+            <!-- Left Side: Photo -->
+            <div class="m3-asymmetric-section">
+              <div class="m3-photo-placeholder" id="photo-dropzone">
+                <input type="file" id="animal-photo" accept="image/*" style="display: none">
+                <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
+                  <span class="material-icons">photo_camera</span>
+                  <div style="text-align: center;">
+                    <p style="font-weight: 800; color: #2c2c2c; margin: 0;">${isEdit ? 'Cambiar Foto' : 'Subir Foto'}</p>
+                    <p style="font-size: 11px; color: #888; margin-top: 4px;">JPG o PNG</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="m3-pro-tip">
+                <span class="material-icons icon">info</span>
+                <div>
+                  <h4>INFO</h4>
+                  <p>Completa los campos para mantener tu inventario actualizado.</p>
+                </div>
+              </div>
             </div>
-          </div>
 
+            <!-- Right Side: Fields -->
+            <div>
+              <div class="m3-grid-2col">
+                <div class="m3-field">
+                  <input type="text" name="nombre" placeholder=" " required>
+                  <label>Nombre del Animal</label>
+                  <p class="error-text" id="error-nombre">Este campo es obligatorio</p>
+                </div>
 
-        </div>
-      </div>
+                <div class="m3-field">
+                  <select name="potrero_id" id="field-potrero">
+                    <option value="" disabled selected hidden></option>
+                  </select>
+                  <label>Potrero Asignado</label>
+                </div>
 
-      <div class="da-tabs-section">
-        <div class="da-tab-bar">
-          <button class="da-tab active">Información General</button>
-        </div>
+                <div class="m3-field">
+                  <select name="raza" required>
+                    <option value="" disabled selected hidden></option>
+                    <optgroup label="Ganado de Carne">
+                      <option value="Brahman">Brahman</option>
+                      <option value="Nelore">Nelore</option>
+                      <option value="Brangus">Brangus</option>
+                      <option value="Angus">Angus</option>
+                    </optgroup>
+                    <optgroup label="Ganado de Leche">
+                      <option value="Holstein">Holstein</option>
+                      <option value="Jersey">Jersey</option>
+                      <option value="Gyr">Gyr</option>
+                    </optgroup>
+                    <optgroup label="Otros">
+                      <option value="Cruce">Cruce / F1</option>
+                      <option value="Otro">Otro</option>
+                    </optgroup>
+                  </select>
+                  <label>Raza</label>
+                </div>
 
-        <div class="da-tab-content active" style="padding-top: 8px;">
-          <form id="form-nuevo-animal">
-            <div class="m3-grid-2col">
-              <div class="m3-field">
-                <input type="text" name="nombre" placeholder=" " required>
-                <label>Nombre / ID del Animal</label>
-                <p class="error-text" id="error-nombre">Este campo es obligatorio</p>
-              </div>
+                <div class="m3-field">
+                  <select name="sexo" required>
+                    <option value="" disabled selected hidden></option>
+                    <option value="Hembra">Hembra (Vaca/Novilla)</option>
+                    <option value="Macho">Macho (Toro/Novillo)</option>
+                  </select>
+                  <label>Sexo</label>
+                </div>
 
-              <div class="m3-field">
-                <select name="potrero_id" id="field-potrero">
-                  <option value="" disabled selected hidden></option>
-                </select>
-                <label>Potrero Asignado</label>
-              </div>
-
-              <div class="m3-field">
-                <select name="raza" required>
-                  <option value="" disabled selected hidden></option>
-                  <optgroup label="Ganado de Carne">
-                    <option value="Brahman">Brahman</option>
-                    <option value="Nelore">Nelore</option>
-                    <option value="Brangus">Brangus</option>
-                    <option value="Angus">Angus</option>
-                  </optgroup>
-                  <optgroup label="Ganado de Leche">
-                    <option value="Holstein">Holstein</option>
-                    <option value="Jersey">Jersey</option>
-                    <option value="Gyr">Gyr</option>
-                  </optgroup>
-                  <optgroup label="Otros">
-                    <option value="Cruce">Cruce / F1</option>
-                    <option value="Otro">Otro</option>
-                  </optgroup>
-                </select>
-                <label>Raza</label>
-              </div>
-
-              <div class="m3-field">
-                <select name="sexo" required>
-                  <option value="" disabled selected hidden></option>
-                  <option value="Hembra">Hembra (Vaca/Novilla)</option>
-                  <option value="Macho">Macho (Toro/Novillo)</option>
-                </select>
-                <label>Sexo</label>
-              </div>
-
-              <div style="display: flex; gap: 12px;">
-                <div class="m3-field" style="flex: 1;">
+                <div class="m3-field m3-field-combined">
                   <input type="number" step="0.1" name="peso_actual" placeholder=" ">
                   <label>Peso Inicial</label>
+                  <div class="field-suffix">
+                    <select name="peso_unidad">
+                      <option value="kg">kg</option>
+                      <option value="lb">lb</option>
+                    </select>
+                    <span class="material-icons">expand_more</span>
+                  </div>
                 </div>
-                <div class="m3-field" style="width: 100px;">
-                  <select name="peso_unidad">
-                    <option value="kg">kg</option>
-                    <option value="lb">lb</option>
-                  </select>
-                  <label>Unidad</label>
-                </div>
-              </div>
 
-              <div class="m3-field">
-                <input type="date" name="fecha_adquisicion" placeholder=" ">
-                <label>Fecha de Ingreso / Nacimiento</label>
+                <div class="m3-field">
+                  <input type="date" name="fecha_adquisicion" placeholder=" ">
+                  <label>Fecha de Ingreso</label>
+                </div>
+              </div>
+              
+              <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0;">
+                <button type="button" class="da-action-btn primary" id="btn-save-animal">
+                  <span class="material-icons">${isEdit ? 'save' : 'add_circle'}</span>
+                  <span id="save-label">${isEdit ? 'Guardar' : 'Registrar'}</span>
+                </button>
+                <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('${isEdit ? 'detalle_animal' : 'ganado'}'${isEdit ? `, '${id}'` : ''})">
+                  Cancelar
+                </button>
               </div>
             </div>
-            
-            <div class="da-form-actions" style="display: flex; gap: 12px; margin-top: 32px; flex-direction: column;">
-              <button type="button" class="da-action-btn da-action-edit" id="btn-save-animal" style="width: 100%; justify-content: center; padding: 16px;">
-                <span class="material-icons">${isEdit ? 'save' : 'add_circle'}</span>
-                <span id="save-label">${isEdit ? 'Guardar Cambios' : 'Registrar Animal'}</span>
-              </button>
-              <button type="button" class="da-action-btn da-action-delete" style="width: 100%; justify-content: center; padding: 16px; background: #f5f5f5; color: #666; border: 1px solid #e0e0e0;" onclick="window.navigateTo('${isEdit ? 'detalle_animal' : 'ganado'}'${isEdit ? `, '${id}'` : ''})">
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   `;
@@ -167,7 +165,6 @@ export function initNuevoAnimal(id) {
         form.raza.value = data.raza || '';
         form.sexo.value = data.sexo || '';
         form.peso_actual.value = data.peso_actual || '';
-        form.peso_unidad.value = data.peso_unidad || 'kg';
         form.fecha_adquisicion.value = data.fecha_adquisicion || '';
         currentAnimalPotreroId = data.potrero_id;
         

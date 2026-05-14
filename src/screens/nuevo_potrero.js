@@ -3,106 +3,99 @@ import { supabase } from '../supabase.js';
 export async function renderNuevoPotrero(id) {
   const isEdit = !!id;
   return `
-    <div class="m3-form-screen">
-      <div class="m3-grid">
-        <!-- Decoration / Illustration Section -->
-        <div class="m3-asymmetric-section">
-          <div class="m3-photo-placeholder" id="photo-dropzone">
+    <div class="da-screen">
+      <div class="da-tabs-section" style="display: flex; flex-direction: column; gap: 40px;">
+        <div class="m3-grid">
+          <!-- Photo and Tips -->
+          <div class="da-hero-img-wrap" id="photo-dropzone" style="cursor: pointer; border: 2px dashed rgba(56, 106, 62, 0.3); background: #f9fbf9;">
             <input type="file" id="potrero-photo" accept="image/*" style="display: none">
-            <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-              <span class="material-symbols-outlined">landscape</span>
-              <p style="font-weight: 800">Foto del Potrero</p>
-              <p style="font-size: 11px; text-align: center; color: var(--m3-on-surface-variant); margin-top: 10px; line-height: 1.4">
-                Captura la vista general del terreno.
-              </p>
+            <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
+               <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 80px; height: 80px; border-radius: 50%;">
+                  <span class="material-icons" style="font-size: 40px;">landscape</span>
+               </div>
+               <div style="text-align: center;">
+                  <p style="font-weight: 800; color: #2c2c2c; margin: 0;">${isEdit ? 'Cambiar Fotografía' : 'Subir foto del potrero'}</p>
+                  <p style="font-size: 12px; color: #888; margin-top: 4px;">Captura la vista general del terreno.</p>
+               </div>
             </div>
           </div>
 
-          <div class="m3-pro-tip">
-             <span class="material-symbols-outlined icon">info</span>
-             <div>
-                <h4>Gestión de Pasturas</h4>
-                <p>Configurar el ciclo de recuperación ayuda a predecir cuándo el pasto estará listo para el ganado.</p>
-             </div>
+          <div class="da-hero-info">
+            <div>
+              <div class="da-hero-subtitle">${isEdit ? 'Actualizando terreno' : 'Nuevo potrero'}</div>
+              <h2 class="da-hero-title">${isEdit ? 'Editar Potrero' : 'Registro de Potrero'}</h2>
+            </div>
+            
+            <div class="da-badge-row">
+              <div class="da-badge da-badge-surface">
+                <span class="material-icons" style="color: #42a5f5;">info</span>
+                Configurar el ciclo de recuperación ayuda a predecir cuándo el pasto estará listo.
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Form Details -->
-        <div class="m3-form-card">
-          <div class="m3-card-header">
-            <span class="material-symbols-outlined header-icon" style="background: var(--m3-tertiary-container); color: var(--m3-on-tertiary-container)">grid_view</span>
-            <h3>${isEdit ? 'Editar Potrero' : 'Nuevo Potrero'}</h3>
-          </div>
+        <div style="border-top: 1px solid #f0f0f0; padding-top: 32px;">
+          <h3 style="font-size: 20px; font-weight: 800; color: #2c2c2c; margin-bottom: 24px;">Configuración del Terreno</h3>
           
           <form id="form-nuevo-potrero">
-            <div class="m3-input-group">
-              <label>Nombre del Potrero</label>
-              <div class="m3-input-wrapper">
-                <input type="text" name="nombre" placeholder="Ej: La Loma, Potrero Sur...">
-              </div>
+            <div class="m3-field" style="margin-bottom: 20px;">
+              <input type="text" name="nombre" placeholder=" " required>
+              <label>Nombre del Potrero (Ej: La Loma, Potrero Sur...)</label>
               <p class="error-text" id="error-nombre">El nombre es obligatorio</p>
             </div>
 
-            <div class="m3-grid-2col">
-              <div class="m3-input-group">
+            <div class="m3-grid-2col" style="margin-bottom: 20px;">
+              <div class="m3-field">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input type="number" step="0.01" name="area" placeholder=" " style="flex: 1;">
+                  <select name="area_unidad" style="width: auto; border: none; background: #f0f0f0; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 700; color: #386a3e;">
+                    <option value="ha">ha</option>
+                    <option value="m2">m²</option>
+                    <option value="mz">mz</option>
+                  </select>
+                </div>
                 <label>Área Total</label>
-                <div class="m3-input-wrapper">
-                  <input type="number" step="0.01" name="area" placeholder="0.00">
-                  <select name="area_unidad" class="m3-unit-select" style="width: auto; font-weight: 800; color: var(--m3-outline); background: transparent; border: none; cursor: pointer;">
-                    <option value="ha">Hectáreas (ha)</option>
-                    <option value="m2">Metros² (m²)</option>
-                    <option value="mz">Manzanas (mz)</option>
-                  </select>
-                </div>
               </div>
 
-              <div class="m3-input-group">
+              <div class="m3-field">
+                <select name="pasto" required>
+                  <option value="Estrella">Estrella</option>
+                  <option value="Brachiaria">Brachiaria</option>
+                  <option value="Pangola">Pangola</option>
+                  <option value="Guinea">Guinea</option>
+                  <option value="Cratylia">Cratylia</option>
+                  <option value="Natural">Natural / Sabana</option>
+                  <option value="Otro">Otro</option>
+                </select>
                 <label>Tipo de Pasto</label>
-                <div class="m3-input-wrapper">
-                  <select name="pasto">
-                    <option value="Estrella">Estrella</option>
-                    <option value="Brachiaria">Brachiaria</option>
-                    <option value="Pangola">Pangola</option>
-                    <option value="Guinea">Guinea</option>
-                    <option value="Cratylia">Cratylia</option>
-                    <option value="Natural">Natural / Sabana</option>
-                    <option value="Otro">Otro (Especificar en ubicación)</option>
-                  </select>
-                </div>
               </div>
             </div>
 
-            <div class="m3-input-group">
-              <label>Ubicación / Referencia</label>
-              <div class="m3-input-wrapper">
-                <span class="material-symbols-outlined" style="margin-left: 12px; color: var(--m3-outline)">location_on</span>
-                <input type="text" name="ubicacion" placeholder="Coordenadas o descripción de límites">
-              </div>
+            <div class="m3-field" style="margin-bottom: 20px;">
+              <input type="text" name="ubicacion" placeholder=" ">
+              <label>Ubicación / Referencia (Coordenadas o descripción)</label>
             </div>
 
-            <div class="m3-grid-2col">
-              <div class="m3-input-group">
+            <div class="m3-grid-2col" style="margin-bottom: 24px;">
+              <div class="m3-field">
+                <input type="number" name="ciclo_recuperacion" value="30" placeholder=" ">
                 <label>Ciclo de Recuperación (Días)</label>
-                <div class="m3-input-wrapper">
-                  <span class="material-symbols-outlined" style="margin-left: 12px; color: var(--m3-outline)">update</span>
-                  <input type="number" name="ciclo_recuperacion" value="30" placeholder="30">
-                </div>
               </div>
 
-              <div class="m3-input-group">
+              <div class="m3-field">
+                <input type="date" name="ultimo_riego" placeholder=" ">
                 <label>Último Riego</label>
-                <div class="m3-input-wrapper">
-                  <input type="date" name="ultimo_riego">
-                </div>
               </div>
             </div>
 
-            <!-- Internal Actions -->
-            <div class="m3-form-actions">
-              <button type="button" class="btn-m3-text" onclick="window.navigateTo('potreros')">Cancelar</button>
-              <button type="button" class="btn-m3-primary" id="btn-save-potrero">
-                <span class="material-symbols-outlined">${isEdit ? 'save' : 'add'}</span>
-                <span id="save-label">${isEdit ? 'Guardar Cambios' : 'Crear Potrero'}</span>
+            <div class="da-form-actions">
+              <button type="button" class="da-action-btn primary" id="btn-save-potrero">
+                <span class="material-icons">${isEdit ? 'save' : 'add'}</span>
+                <span>${isEdit ? 'Guardar Cambios' : 'Crear Potrero'}</span>
+              </button>
+              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('potreros')">
+                Cancelar
               </button>
             </div>
           </form>
@@ -181,7 +174,7 @@ export function initNuevoPotrero(id) {
   btnSave.addEventListener('click', async () => {
     // Reset errors
     document.querySelectorAll('.error-text').forEach(e => e.style.display = 'none');
-    document.querySelectorAll('.m3-input-wrapper').forEach(e => e.classList.remove('error'));
+    document.querySelectorAll('.m3-field').forEach(e => e.classList.remove('error'));
 
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
@@ -190,7 +183,7 @@ export function initNuevoPotrero(id) {
     let hasError = false;
     if (!data.nombre) {
       document.getElementById('error-nombre').style.display = 'block';
-      form.nombre.parentElement.classList.add('error');
+      form.nombre.closest('.m3-field').classList.add('error');
       hasError = true;
     }
 

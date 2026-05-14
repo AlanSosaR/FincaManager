@@ -287,7 +287,7 @@
 .m3-field {
   position: relative;
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: 24px; /* Increased from 8px to 24px for better separation */
 }
 
 .m3-field input, 
@@ -295,10 +295,10 @@
 .m3-field textarea {
   width: 100%;
   min-height: 56px;
-  padding: 24px 16px 8px 16px;
-  background: var(--m3-surface-container);
-  border: 1px solid transparent;
-  border-radius: 24px; /* Expressive rounding */
+  padding: 16px;
+  background: transparent;
+  border: 1px solid var(--m3-outline);
+  border-radius: 12px; /* Expressive rounding for outlined */
   font-size: 16px;
   font-family: 'Work Sans', sans-serif;
   color: var(--m3-on-surface);
@@ -308,8 +308,8 @@
 
 .m3-field label {
   position: absolute;
-  left: 16px;
-  top: 16px;
+  left: 12px;
+  top: 18px;
   font-size: 16px;
   font-weight: 500;
   color: var(--m3-on-surface-variant);
@@ -317,6 +317,8 @@
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: left top;
   z-index: 1;
+  background: white; /* cover the border */
+  padding: 0 4px;
 }
 
 /* Floating logic using :placeholder-shown */
@@ -325,8 +327,8 @@
 .m3-field textarea:focus ~ label,
 .m3-field textarea:not(:placeholder-shown) ~ label,
 .m3-field select:focus ~ label,
-.m3-field select:not([value=""]) ~ label {
-  transform: translateY(-8px) scale(0.75);
+.m3-field select:valid ~ label {
+  transform: translateY(-27px) scale(0.75);
   color: var(--m3-primary);
   font-weight: 800;
 }
@@ -334,19 +336,20 @@
 .m3-field input:focus, 
 .m3-field select:focus, 
 .m3-field textarea:focus {
-  background: white;
-  border-color: var(--m3-primary);
-  box-shadow: 0 0 0 4px rgba(62, 111, 57, 0.1);
+  background: transparent;
+  border: 2px solid var(--m3-primary);
+  padding: 15px; /* reduce padding by 1px to offset border increase */
+  box-shadow: none;
   outline: none;
 }
 
 /* Date input special handling */
 .m3-field input[type="date"] {
-  padding-top: 24px;
+  padding: 16px;
 }
 
 .m3-field input[type="date"] ~ label {
-  transform: translateY(-8px) scale(0.75);
+  transform: translateY(-27px) scale(0.75);
   color: var(--m3-primary);
   font-weight: 800;
 }
@@ -362,7 +365,7 @@
 .m3-grid-2col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 32px; /* Increased from 24px to 32px */
 }
 
 @media (max-width: 650px) {
@@ -372,3 +375,49 @@
   }
 }
 
+
+/* Combined field (Input + Select Suffix) */
+.m3-field-combined {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.m3-field-combined input {
+  padding-right: 80px !important;
+}
+
+.m3-field-combined .field-suffix {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 1px solid var(--m3-surface-highest);
+  height: 24px;
+  z-index: 2;
+}
+
+.m3-field-combined .field-suffix select {
+  border: none !important;
+  background: transparent !important;
+  min-height: auto !important;
+  width: auto !important;
+  padding: 0 4px 0 0 !important;
+  font-weight: 700 !important;
+  color: var(--m3-primary) !important;
+  cursor: pointer;
+  font-size: 14px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.m3-field-combined .field-suffix .material-icons {
+  position: static !important;
+  font-size: 18px !important;
+  color: var(--m3-primary) !important;
+  pointer-events: none;
+}
