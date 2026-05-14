@@ -137,8 +137,7 @@ export async function renderMotores(page = 1, filter = 'all') {
 
   return `
     <div class="screen-motores" style="padding-bottom: 120px;">
-      <div class="motores-page-title">
-        <h2>Motores &amp; Equipos</h2>
+      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
         <div class="ganado-top-actions">
           <div class="search-container ${currentMotorsSearchQuery ? 'active' : ''}" id="motors-search-container" style="display: flex; align-items: center; background: #f5f5f5; border-radius: 20px; padding: 4px 12px; transition: all 0.3s;">
             <span class="material-icons" style="font-size: 20px; color: #888;">search</span>
@@ -148,6 +147,9 @@ export async function renderMotores(page = 1, filter = 'all') {
             <span class="material-icons">${currentMotorsSearchQuery ? 'close' : 'search'}</span>
           </button>
         </div>
+      </div>
+      <div class="motores-page-title" style="margin-top: -10px; margin-bottom: 24px;">
+        <h2>Motores &amp; Equipos</h2>
       </div>
 
       <div class="da-tabs-section">
