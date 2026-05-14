@@ -188,6 +188,7 @@ export async function initNuevoMotor(id) {
 
       const motorData = {
         ...formDataObj,
+        fecha_adquisicion: formDataObj.fecha_adquisicion || null,
         max_horas: parseInt(formDataObj.max_horas) || 250,
         image_url
       };

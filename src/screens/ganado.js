@@ -48,7 +48,7 @@ export async function renderGanado(page = 1, filter = 'all') {
   }
 
   if (currentSearchQuery) {
-    query = query.or(`nombre.ilike.%${currentSearchQuery}%,identificador.ilike.%${currentSearchQuery}%`);
+    query = query.or(`nombre.ilike.%${currentSearchQuery}%,raza.ilike.%${currentSearchQuery}%`);
   }
 
   const { data: animales, count: filteredCount, error: fetchErr } = await query
@@ -242,7 +242,7 @@ window.changeGanadoPage = async function(page) {
   else if (currentFilter === 'fumigaciones') query = query.in('id', Array.from(setFumigaciones));
 
   if (currentSearchQuery) {
-    query = query.or(`nombre.ilike.%${currentSearchQuery}%,identificador.ilike.%${currentSearchQuery}%`);
+    query = query.or(`nombre.ilike.%${currentSearchQuery}%,raza.ilike.%${currentSearchQuery}%`);
   }
 
   const { data: animales, count, error } = await query
