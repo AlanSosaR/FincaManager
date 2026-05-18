@@ -20,6 +20,8 @@ import { renderDetalleHerramienta } from './screens/detalle_herramienta.js';
 import { renderNuevoMotor, initNuevoMotor } from './screens/nuevo_motor.js';
 import { renderNuevoAnimal, initNuevoAnimal } from './screens/nuevo_animal.js';
 import { renderNuevoPotrero, initNuevoPotrero } from './screens/nuevo_potrero.js';
+import { renderNuevoLote, setupNuevoLoteListeners } from './screens/nuevo_lote.js';
+import { renderDetalleLote, initDetalleLote } from './screens/detalle_lote.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -34,7 +36,9 @@ const screens = {
     detalle_herramienta: { title: 'Detalle de Tool', backTo: 'herramientas', render: renderDetalleHerramienta },
     nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor },
     nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal },
-    nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero }
+    nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero },
+    nuevo_lote:    { title: 'Nuevo Lote de Cafetal', backTo: 'dashboard', render: () => Promise.resolve(renderNuevoLote()) },
+    detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote }
 };
 
 console.log('[DEBUG] Registered screens:', Object.keys(screens));
@@ -79,13 +83,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // These screens should never be cached (forms / detail pages with dynamic data)
     const NO_CACHE = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero',
                                'detalle_motor','detalle_animal','detalle_potrero',
-                               'detalle_herramienta']);
+                               'detalle_herramienta','nuevo_lote','detalle_lote']);
+
+    window.clearScreenCache = (screenId) => {
+      for (const key of viewCache.keys()) {
+        if (key === screenId || key.startsWith(screenId + '/')) {
+          viewCache.delete(key);
+        }
+      }
+    };
 
     function cacheKey(screenId, args) {
         return screenId + (args.length ? '/' + args.join('/') : '');
     }
 
     async function renderAndInit(screenId, args, html) {
+        // Cleanup before rendering new screen
+        if (window.__screenCleanup) {
+            try { window.__screenCleanup(); } catch(e) { console.warn('Cleanup error:', e); }
+            window.__screenCleanup = null;
+        }
         container.innerHTML = html;
         // Highlight active link
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -114,6 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const { initDetalleHerramienta } = await import('./screens/detalle_herramienta.js');
             initDetalleHerramienta(...args);
         }
+        if (screenId === 'nuevo_lote') setupNuevoLoteListeners();
+        if (screenId === 'detalle_lote') initDetalleLote(...args);
     }
 
     async function navigate(screenId, ...args) {

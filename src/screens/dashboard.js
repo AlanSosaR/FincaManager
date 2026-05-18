@@ -4,239 +4,224 @@ export async function renderDashboard() {
   console.log('Rendering Dashboard...');
   try {
     const [
-      { count: potrerosCount },
-      { count: ganadoCount },
-      { data: motores, error: motoresError },
-      { count: herramientasCount },
-      { data: vacunasData },
-      { data: fumigacionesData }
+      { data: lotes, error: lotesErr },
+      { data: aplicaciones, error: appErr }
     ] = await Promise.all([
-      supabase.from('potreros').select('*', { count: 'exact', head: true }),
-      supabase.from('ganado').select('*', { count: 'exact', head: true }),
-      supabase.from('motores').select('*'),
-      supabase.from('herramientas').select('*', { count: 'exact', head: true }),
-      supabase.from('animal_vacunas').select('*, ganado(nombre)').eq('estado', 'Programada').order('fecha', { ascending: true }).limit(5),
-      supabase.from('animal_fumigaciones').select('*, ganado(nombre)').eq('estado', 'Programada').order('fecha', { ascending: true }).limit(5)
+      supabase.from('lotes').select('*').order('created_at', { ascending: false }),
+      supabase.from('lote_aplicaciones').select('*, lotes(nombre)').order('fecha', { ascending: false }).limit(5)
     ]);
 
-    const vacunasPendientes = (vacunasData || []).map(v => ({ ...v, tipo: 'Vacuna', animalNombre: v.ganado?.nombre || 'Animal' }));
-    const fumigacionesPendientes = (fumigacionesData || []).map(f => ({ ...f, tipo: 'Fumigación', animalNombre: f.ganado?.nombre || 'Animal' }));
-    const todasLasTareas = [...vacunasPendientes, ...fumigacionesPendientes].sort((a, b) => new Date(a.fecha) - new Date(b.fecha)).slice(0, 5);
+    if (lotesErr) throw lotesErr;
 
-    const vacunasPendientesCount = vacunasPendientes.length;
-    const fumigacionesPendientesCount = fumigacionesPendientes.length;
-
-    const motoresUrgentes = (motores || []).filter(eq => (eq.horas || 0) >= (eq.max_horas || 100));
-    const motoresCount = (motores || []).length;
-
-    if (motoresUrgentes.length > 0) {
-      setTimeout(() => {
-        if (window.Snackbar && window.Snackbar.confirm) {
-          window.Snackbar.confirm(
-            `<strong>Mantenimiento pendiente:</strong> ${motoresUrgentes.length} motores requieren cambio de aceite.`,
-            () => window.navigateTo('detalle_motor', motoresUrgentes[0].id),
-            null,
-            { confirmText: 'REVISAR', type: 'error', persist: true }
-          );
-        }
-      }, 800);
-    }
+    const totalPlantas = lotes?.reduce((sum, l) => sum + (l.num_plantas || 0), 0) || 0;
 
     return `
-      <div class="pt-6 pb-24 lg:pl-0 pr-6 min-h-screen font-['Work_Sans']">
+      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans">
         <!-- Header & Summary Card -->
-        <section class="mb-10">
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-        <span class="text-primary font-bold tracking-widest text-xs uppercase">Dashboard de Cultivos</span>
-        <h1 class="text-4xl md:text-5xl font-extrabold text-on-surface tracking-tight mt-1 font-['Manrope']">Gestión del Cafetal</h1>
-        </div>
-        <div class="relative group max-w-md w-full">
-        <div class="absolute inset-0 bg-primary opacity-5 rounded-3xl -rotate-1 scale-105 group-hover:rotate-0 transition-transform duration-300"></div>
-        <div class="relative bg-surface-container-lowest p-6 rounded-3xl shadow-sm flex items-center gap-5">
-        <div class="bg-primary-container w-16 h-16 rounded-2xl flex items-center justify-center text-primary">
-        <span class="material-symbols-outlined text-3xl" style="font-variation-settings: &quot;FILL&quot; 1;">eco</span>
-        </div>
-        <div>
-        <p class="text-sm text-on-surface-variant font-medium">Estado General</p>
-        <h3 class="text-xl font-bold text-on-surface">Floración Activa</h3>
-        <div class="flex items-center gap-2 mt-1">
-        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-        <span class="text-xs text-primary font-semibold">Salud Óptima - 94%</span>
-        </div>
-        </div>
-        </div>
-        </div>
-        </div>
+        <section class="m3-mb-10">
+          <div class="m3-flex m3-mobile-flex-col m3-items-end m3-justify-between m3-gap-6">
+            <div>
+              <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-mt-1 m3-font-manrope">Gestión del Cafetal</h1>
+            </div>
+            <div class="m3-relative m3-max-w-md m3-w-full">
+              <div class="m3-card m3-shadow-sm m3-flex m3-items-center m3-gap-4">
+                <div class="m3-bg-primary-container m3-size-16 m3-rounded-2xl m3-flex m3-items-center m3-justify-center m3-text-primary">
+                  <span class="material-symbols-outlined" style="font-size: 30px; font-variation-settings: 'FILL' 1;">eco</span>
+                </div>
+                <div>
+                  <p class="m3-label-small m3-text-on-surface-variant m3-font-medium">Estado General</p>
+                  <h3 class="m3-title-large m3-font-bold m3-text-on-surface">Cosecha Activa</h3>
+                  <div class="m3-flex m3-items-center m3-gap-2 m3-mt-1">
+                    <span class="m3-size-2 m3-rounded-full m3-bg-primary" style="width: 8px; height: 8px;"></span>
+                    <span class="m3-label-small m3-text-primary m3-font-bold">Salud Promedio - 92%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <!-- Left Column: Lotes Grid -->
-        <div class="lg:col-span-3 space-y-8">
-        <div>
-        <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold text-on-surface">Lotes &amp; Microlotes</h2><span class="ml-4 px-3 py-1 bg-primary-container text-on-primary-container text-xs font-bold rounded-full">Total: 24,850 plantas</span>
-        <button class="text-primary font-semibold text-sm flex items-center gap-1 hover:underline">
-                                    Ver todos los lotes <span class="material-symbols-outlined text-sm">arrow_forward</span>
-        </button>
+
+        <div class="m3-grid m3-grid-4 m3-gap-8">
+          <!-- Left Column: Lotes Grid -->
+          <div class="m3-col-span-3 m3-flex m3-flex-col m3-gap-8">
+            <div>
+              <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
+                <h2 class="m3-headline-small m3-font-bold m3-text-on-surface">Lotes & Microlotes</h2>
+                <span class="m3-bg-primary-container m3-text-on-primary-container m3-label-small m3-font-bold m3-rounded-full m3-p-1" style="padding: 4px 12px;">Total: ${totalPlantas.toLocaleString()} plantas</span>
+              </div>
+              
+              <div class="m3-grid m3-grid-2 m3-gap-6">
+                ${lotes && lotes.length > 0 ? lotes.map((lote, index) => {
+                  const seed = encodeURIComponent(lote.id);
+                  const statusColor = lote.salud_porcentaje > 80 ? 'bg-primary' : (lote.salud_porcentaje > 50 ? 'bg-secondary' : 'bg-error');
+                  const badgeColors = ['tertiary', 'secondary', 'primary'];
+                  const theme = badgeColors[index % badgeColors.length];
+                  
+                  const healthIcon = lote.salud_porcentaje > 80 ? 'sentiment_satisfied' : lote.salud_porcentaje > 50 ? 'sentiment_neutral' : 'sentiment_dissatisfied';
+                   return `
+                    <div class="m3-exp-card m3-exp-card-${theme}" 
+                         onclick="window.navigateTo('detalle_lote', '${lote.id}')">
+                      <div class="m3-exp-card-body">
+                        <div class="m3-exp-card-top">
+                          <div class="m3-exp-badge m3-exp-badge-${theme}">
+                            <img src="grano-de-cafe.png" alt="" style="width: 16px; height: 16px; object-fit: contain;">
+                            <span>${lote.variedad || 'Variedad'}</span>
+                          </div>
+                          <div class="m3-exp-card-actions">
+                            <div class="m3-exp-health-chip">
+                              <span class="material-symbols-outlined">${healthIcon}</span>
+                              <span>${lote.salud_porcentaje || 0}%</span>
+                            </div>
+                            <div class="m3-action-menu-container">
+                              <button class="m3-exp-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)">
+                                <span class="material-symbols-outlined">more_vert</span>
+                              </button>
+                              <div class="action-menu">
+                                <div class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_lote', '${lote.id}')">
+                                  <span class="material-icons">edit</span><span>Editar</span>
+                                </div>
+                                <div class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteLote('${lote.id}', '${lote.nombre}')">
+                                  <span class="material-icons">delete</span><span>Eliminar</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <h3 class="m3-exp-card-title">${lote.nombre}</h3>
+                        <div class="m3-exp-card-details">
+                          <div class="m3-exp-detail-item">
+                            <span class="material-symbols-outlined">potted_plant</span>
+                            <span class="m3-exp-detail-label">Plantas</span>
+                            <span class="m3-exp-detail-value">${(lote.num_plantas || 0).toLocaleString()}</span>
+                          </div>
+                          <div class="m3-exp-detail-divider"></div>
+                          <div class="m3-exp-detail-item">
+                            <span class="material-symbols-outlined">square_foot</span>
+                            <span class="m3-exp-detail-label">Área</span>
+                            <span class="m3-exp-detail-value">${lote.area_ha || 0} ha</span>
+                          </div>
+                        </div>
+                        <div class="m3-exp-health-bar">
+                          <div class="m3-exp-health-track">
+                            <div class="m3-exp-health-fill m3-exp-health-${statusColor.replace('bg-', '')}" style="width: ${lote.salud_porcentaje || 0}%"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('') : `
+                  <div class="m3-col-span-3 m3-p-8 m3-bg-surface-container-low m3-rounded-3xl m3-border-dashed" style="text-align: center; border: 2px dashed rgba(130, 128, 121, 0.2); padding-top: 48px; padding-bottom: 48px;">
+                    <span class="material-symbols-outlined m3-mb-2" style="font-size: 48px; opacity: 0.2;">potted_plant</span>
+                    <p class="m3-text-on-surface-variant m3-label-large">No hay lotes registrados aún.</p>
+                    <button onclick="window.navigateTo('nuevo_lote')" class="m3-mt-4 m3-text-primary m3-font-bold m3-bg-none m3-border-none cursor-pointer" style="text-decoration: underline;">Agregar primer lote</button>
+                  </div>
+                `}
+              </div>
+
+              ${lotes && lotes.length > 0 ? `
+              <div class="m3-mt-4 m3-p-4 m3-bg-surface-container-low m3-rounded-2xl m3-flex m3-items-center m3-justify-between">
+                <div class="m3-flex m3-items-center m3-gap-6">
+                  <div class="m3-flex m3-items-center m3-gap-2">
+                    <span class="material-symbols-outlined m3-text-primary" style="font-size: 20px;">potted_plant</span>
+                    <span class="m3-label-medium m3-text-on-surface-variant">Total plantas:</span>
+                    <span class="m3-title-medium m3-font-bold m3-text-on-surface">${totalPlantas.toLocaleString()}</span>
+                  </div>
+                  <div class="m3-flex m3-items-center m3-gap-2">
+                    <span class="material-symbols-outlined m3-text-primary" style="font-size: 20px;">square_foot</span>
+                    <span class="m3-label-medium m3-text-on-surface-variant">Área total:</span>
+                    <span class="m3-title-medium m3-font-bold m3-text-on-surface">${lotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} ha</span>
+                  </div>
+                  <div class="m3-flex m3-items-center m3-gap-2">
+                    <span class="material-symbols-outlined m3-text-primary" style="font-size: 20px;">inventory_2</span>
+                    <span class="m3-label-medium m3-text-on-surface-variant">Lotes:</span>
+                    <span class="m3-title-medium m3-font-bold m3-text-on-surface">${lotes.length}</span>
+                  </div>
+                </div>
+              </div>
+              ` : ''}
+            </div>
+
+            <!-- Aplicaciones Recientes Section -->
+            <div>
+              <h2 class="m3-headline-small m3-font-bold m3-text-on-surface m3-mb-6">Aplicaciones Recientes</h2>
+              <div class="m3-card m3-p-0 m3-overflow-hidden">
+                <div style="overflow-x: auto;">
+                  <table class="m3-table">
+                    <thead>
+                      <tr>
+                        <th>Tipo & Producto</th>
+                        <th>Dosis</th>
+                        <th>Lote / Fecha</th>
+                        <th style="text-align: right;">Operador</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${aplicaciones && aplicaciones.length > 0 ? aplicaciones.map(app => {
+                        const isFertilizante = app.tipo === 'Fertilizante';
+                        const theme = isFertilizante ? 'secondary' : 'tertiary';
+                        const icon = isFertilizante ? 'science' : 'pest_control';
+                        return `
+                        <tr onclick="window.navigateTo('detalle_lote', '${app.lote_id}')">
+                          <td>
+                            <div class="m3-flex m3-items-center m3-gap-3">
+                              <div class="m3-bg-${theme}-container m3-p-2 m3-rounded-2xl m3-text-${theme}">
+                                <span class="material-symbols-outlined" style="font-size: 14px;">${icon}</span>
+                              </div>
+                              <div>
+                                <p class="m3-label-large m3-font-bold m3-text-on-surface">${app.producto}</p>
+                                <p class="m3-label-small m3-text-on-surface-variant">${app.tipo}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td class="m3-label-medium">${app.dosis}</td>
+                          <td>
+                            <p class="m3-label-large m3-font-bold m3-text-on-surface">${app.lotes?.nombre || 'Desconocido'}</p>
+                            <p class="m3-label-small m3-text-on-surface-variant">${new Date(app.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</p>
+                          </td>
+                          <td style="text-align: right;">
+                            <div class="m3-flex m3-items-center m3-justify-end m3-gap-2">
+                              <span class="m3-label-small m3-font-bold m3-text-on-surface">${app.operador || 'Anon'}</span>
+                              <div class="m3-size-8 m3-rounded-full m3-bg-primary m3-text-on-primary m3-flex m3-items-center m3-justify-center m3-label-small" style="background-color: var(--m3-${theme}); color: var(--m3-on-${theme}); font-weight: bold;">
+                                ${(app.operador || 'A').charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      `}).join('') : `
+                        <tr>
+                          <td colspan="4" class="m3-p-8 m3-text-on-surface-variant" style="text-align: center; font-style: italic;">No hay aplicaciones recientes</td>
+                        </tr>
+                      `}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Stats & Insights -->
+          <aside class="m3-flex m3-flex-col m3-gap-8">
+            <div class="m3-card m3-bg-primary-container" style="background-color: rgba(185, 241, 173, 0.2);">
+              <h3 class="m3-title-medium m3-font-bold m3-text-primary m3-mb-4 m3-flex m3-items-center m3-gap-2">
+                <span class="material-symbols-outlined">analytics</span> Resumen
+              </h3>
+              <div class="m3-flex m3-flex-col m3-gap-4">
+                <div class="m3-flex m3-justify-between m3-items-center">
+                  <span class="m3-label-medium m3-text-on-surface-variant">Lotes Activos</span>
+                  <span class="m3-font-bold m3-text-on-surface">${lotes?.length || 0}</span>
+                </div>
+                <div class="m3-flex m3-justify-between m3-items-center">
+                  <span class="m3-label-medium m3-text-on-surface-variant">Área Total</span>
+                  <span class="m3-font-bold m3-text-on-surface">${lotes?.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} ha</span>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Card 1 -->
-        <div class="bg-surface-container-lowest p-6 rounded-lg transition-all hover:bg-surface-bright group">
-        <div class="flex justify-between items-start mb-4">
-        <span class="bg-tertiary-container text-on-tertiary-container px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Premium Geisha</span>
-        <button class="text-outline hover:text-primary transition-colors">
-        <span class="material-symbols-outlined">more_vert</span>
-        </button>
-        </div>
-        <h3 class="text-xl font-bold mb-1 group-hover:text-primary transition-colors">La Cumbre</h3>
-        <div class="flex gap-4 text-xs text-on-surface-variant mb-6">
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">filter_vintage</span> Geisha</span>
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">potted_plant</span> 1,250 plantas</span>
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">square_foot</span> 2.5 ha</span>
-        </div>
-        <div class="space-y-2">
-        <div class="flex justify-between text-xs font-semibold">
-        <span class="">Salud &amp; Nutrición</span>
-        <span class="text-primary">88%</span>
-        </div>
-        <div class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
-        <div class="h-full bg-primary rounded-full shadow-[inset_0px_0px_4px_rgba(255,255,255,0.4)]" style="width: 88%"></div>
-        </div>
-        </div>
-        </div>
-        <!-- Card 2 -->
-        <div class="bg-surface-container-lowest p-6 rounded-lg transition-all hover:bg-surface-bright group">
-        <div class="flex justify-between items-start mb-4">
-        <span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Alta Productividad</span>
-        <button class="text-outline hover:text-primary transition-colors">
-        <span class="material-symbols-outlined">more_vert</span>
-        </button>
-        </div>
-        <h3 class="text-xl font-bold mb-1 group-hover:text-primary transition-colors">El Mirador</h3>
-        <div class="flex gap-4 text-xs text-on-surface-variant mb-6">
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">filter_vintage</span> Caturra Rojo</span>
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">potted_plant</span> 3,400 plantas</span>
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">square_foot</span> 5.2 ha</span>
-        </div>
-        <div class="space-y-2">
-        <div class="flex justify-between text-xs font-semibold">
-        <span class="">Salud &amp; Nutrición</span>
-        <span class="text-primary">72%</span>
-        </div>
-        <div class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
-        <div class="h-full bg-primary rounded-full shadow-[inset_0px_0px_4px_rgba(255,255,255,0.4)]" style="width: 72%"></div>
-        </div>
-        </div>
-        </div>
-        <!-- Card 3 -->
-        <div class="bg-surface-container-lowest p-6 rounded-lg transition-all hover:bg-surface-bright group">
-        <div class="flex justify-between items-start mb-4">
-        <span class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Resistente</span>
-        <button class="text-outline hover:text-primary transition-colors">
-        <span class="material-symbols-outlined">more_vert</span>
-        </button>
-        </div>
-        <h3 class="text-xl font-bold mb-1 group-hover:text-primary transition-colors">Valle Central</h3>
-        <div class="flex gap-4 text-xs text-on-surface-variant mb-6">
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">filter_vintage</span> Castillo</span>
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">potted_plant</span> 2,100 plantas</span>
-        <span class="flex items-center gap-1"><span class="material-symbols-outlined text-base">square_foot</span> 4.0 ha</span>
-        </div>
-        <div class="space-y-2">
-        <div class="flex justify-between text-xs font-semibold">
-        <span class="">Salud &amp; Nutrición</span>
-        <span class="text-primary">95%</span>
-        </div>
-        <div class="w-full h-3 bg-surface-container-highest rounded-full overflow-hidden">
-        <div class="h-full bg-primary rounded-full shadow-[inset_0px_0px_4px_rgba(255,255,255,0.4)]" style="width: 95%"></div>
-        </div>
-        </div>
-        </div>
-        <!-- Card 4: Action Card -->
         
-        </div>
-        </div>
-        <!-- Aplicaciones Recientes Section -->
-        <div>
-        <h2 class="text-2xl font-bold text-on-surface mb-6">Aplicaciones Recientes</h2>
-        <div class="bg-surface-container-lowest rounded-lg overflow-hidden shadow-sm">
-        <table class="w-full text-left border-collapse">
-        <thead>
-        <tr class="bg-surface-container-high text-on-surface-variant text-xs font-bold uppercase tracking-wider">
-        <th class="px-6 py-4">Tipo &amp; Producto</th>
-        <th class="px-6 py-4">Dosis</th>
-        <th class="px-6 py-4">Lote / Fecha</th>
-        <th class="px-6 py-4 text-right">Operador</th>
-        </tr>
-        </thead>
-        <tbody class="divide-y divide-surface-container">
-        <tr class="hover:bg-surface-container-low transition-colors">
-        <td class="px-6 py-4">
-        <div class="flex items-center gap-3">
-        <div class="bg-secondary-container/30 text-secondary p-2 rounded-xl">
-        <span class="material-symbols-outlined text-sm">science</span>
-        </div>
-        <div>
-        <p class="font-bold text-sm">Fertilizante NPK</p>
-        <p class="text-xs text-on-surface-variant">NutriPlant Max</p>
-        </div>
-        </div>
-        </td>
-        <td class="px-6 py-4 text-sm font-medium">150g / Planta</td>
-        <td class="px-6 py-4">
-        <p class="text-sm font-bold">La Cumbre</p>
-        <p class="text-xs text-on-surface-variant">12 Oct 2023</p>
-        </td>
-        <td class="px-6 py-4 text-right">
-        <div class="flex items-center justify-end gap-2">
-        <span class="text-xs font-semibold">Carlos Ruiz</span>
-        <div class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">CR</div>
-        </div>
-        </td>
-        </tr>
-        <tr class="hover:bg-surface-container-low transition-colors">
-        <td class="px-6 py-4">
-        <div class="flex items-center gap-3">
-        <div class="bg-tertiary-container/30 text-tertiary p-2 rounded-xl">
-        <span class="material-symbols-outlined text-sm">pest_control</span>
-        </div>
-        <div>
-        <p class="font-bold text-sm">Fungicida Orgánico</p>
-        <p class="text-xs text-on-surface-variant">BioShield XL</p>
-        </div>
-        </div>
-        </td>
-        <td class="px-6 py-4 text-sm font-medium">2L / Bomba</td>
-        <td class="px-6 py-4">
-        <p class="text-sm font-bold">El Mirador</p>
-        <p class="text-xs text-on-surface-variant">09 Oct 2023</p>
-        </td>
-        <td class="px-6 py-4 text-right">
-        <div class="flex items-center justify-end gap-2">
-        <span class="text-xs font-semibold">Ana Mendez</span>
-        <div class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">AM</div>
-        </div>
-        </td>
-        </tr>
-        </tbody>
-        </table>
-        </div>
-        </div>
-        </div>
-        <!-- Right Column: Stats & Insights -->
-        <aside class="lg:col-span-1 space-y-8">
-        <!-- Total Plants Card -->
-        
-        <!-- Variety Distribution -->
-        
-        <!-- Inventory Status -->
-        
-        </aside>
-        </div>
-        
-        <button class="fixed bottom-24 right-6 lg:bottom-10 lg:right-10 z-50 flex items-center gap-3 bg-[#3E6F39] text-[#ffffff] px-6 py-4 rounded-3xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 group">
-          <span class="material-symbols-outlined text-2xl" style="font-variation-settings: &quot;FILL&quot; 1;">add_location</span>
-          <span class="font-['Manrope'] font-bold tracking-tight">Agregar Lote</span>
+        <button onclick="window.navigateTo('nuevo_lote')" class="m3-fab">
+          <span class="material-symbols-outlined">add_location</span>
+          <span>Agregar Lote</span>
         </button>
       </div>
     `;
@@ -245,3 +230,20 @@ export async function renderDashboard() {
     return `<div style="padding: 24px; color: red;">Error cargando dashboard: ${err.message}</div>`;
   }
 }
+
+window.toggleActionMenu = (btn) => {
+  const menu = btn.nextElementSibling;
+  if (!menu) return;
+  const isActive = menu.classList.contains('active');
+  document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+  if (!isActive) menu.classList.add('active');
+};
+
+window.confirmDeleteLote = (id, name) => {
+  window.Snackbar.confirm(`¿Eliminar el lote "${name}"?`, async () => {
+    const { error } = await supabase.from('lotes').delete().eq('id', id);
+    if (error) window.Snackbar.show('Error: ' + error.message, { type: 'error' });
+    else { window.Snackbar.show('Lote eliminado'); window.clearScreenCache?.('dashboard'); window.navigateTo('dashboard'); }
+  });
+};
+

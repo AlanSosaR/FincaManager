@@ -151,6 +151,35 @@ CREATE TABLE animal_fumigaciones (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 12. LOTES DE CAFETAL
+CREATE TABLE lotes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL,
+  variedad TEXT,
+  num_plantas INT,
+  area_ha NUMERIC,
+  tipo_suelo TEXT,
+  salud_porcentaje NUMERIC DEFAULT 0,
+  estado TEXT DEFAULT 'Activo',
+  notas TEXT,
+  image_url TEXT,
+  coordenadas_json JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 13. APLICACIONES DE LOTE (fertilizantes, fungicidas, etc.)
+CREATE TABLE lote_aplicaciones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lote_id UUID REFERENCES lotes(id) ON DELETE CASCADE,
+  tipo TEXT,
+  producto TEXT,
+  dosis TEXT,
+  operador TEXT,
+  fecha DATE DEFAULT CURRENT_DATE,
+  notas TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ==========================================
 -- RLS POLICIES (Allow public access for dev)
 -- ==========================================
@@ -167,6 +196,8 @@ ALTER TABLE animal_pesajes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_vacunas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE herramienta_mantenimientos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_fumigaciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE lote_aplicaciones ENABLE ROW LEVEL SECURITY;
 
 -- Generic Policies for all tables (Select, Insert, Update, Delete)
 -- Note: Replace [TABLE] with actual table name if needed for granularity
@@ -176,6 +207,18 @@ CREATE POLICY "Allow public read ganado" ON ganado FOR SELECT USING (true);
 CREATE POLICY "Allow public insert ganado" ON ganado FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update ganado" ON ganado FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public delete ganado" ON ganado FOR DELETE USING (true);
+
+-- Lotes Policies
+CREATE POLICY "Allow public read lotes" ON lotes FOR SELECT USING (true);
+CREATE POLICY "Allow public insert lotes" ON lotes FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update lotes" ON lotes FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete lotes" ON lotes FOR DELETE USING (true);
+
+-- Lote Aplicaciones Policies
+CREATE POLICY "Allow public read lote_aplicaciones" ON lote_aplicaciones FOR SELECT USING (true);
+CREATE POLICY "Allow public insert lote_aplicaciones" ON lote_aplicaciones FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update lote_aplicaciones" ON lote_aplicaciones FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete lote_aplicaciones" ON lote_aplicaciones FOR DELETE USING (true);
 
 -- (And so on for all other tables... omitted for brevity here but should be in full schema)
 -- To keep schema.sql clean, you can use a loop in SQL to apply these if running manually.
