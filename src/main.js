@@ -22,6 +22,7 @@ import { renderNuevoAnimal, initNuevoAnimal } from './screens/nuevo_animal.js';
 import { renderNuevoPotrero, initNuevoPotrero } from './screens/nuevo_potrero.js';
 import { renderNuevoLote, setupNuevoLoteListeners } from './screens/nuevo_lote.js';
 import { renderDetalleLote, initDetalleLote } from './screens/detalle_lote.js';
+import { renderNuevaActividad, initNuevaActividad } from './screens/nueva_actividad.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -38,7 +39,8 @@ const screens = {
     nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal },
     nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero },
     nuevo_lote:    { title: 'Nuevo Lote de Cafetal', backTo: 'dashboard', render: () => Promise.resolve(renderNuevoLote()) },
-    detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote }
+    detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote },
+    nueva_actividad: { title: 'Nueva Actividad', backTo: 'dashboard', render: renderNuevaActividad }
 };
 
 console.log('[DEBUG] Registered screens:', Object.keys(screens));
@@ -81,9 +83,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── View cache for instant navigation ──────────────────────────────────
     const viewCache = new Map();
     // These screens should never be cached (forms / detail pages with dynamic data)
-    const NO_CACHE = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero',
+    const NO_CACHE = new Set(['ganado','nuevo_motor','nuevo_animal','nuevo_potrero',
                                'detalle_motor','detalle_animal','detalle_potrero',
-                               'detalle_herramienta','nuevo_lote','detalle_lote']);
+                               'detalle_herramienta','nuevo_lote','detalle_lote',
+                               'nueva_actividad']);
 
     window.clearScreenCache = (screenId) => {
       for (const key of viewCache.keys()) {
@@ -133,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (screenId === 'nuevo_lote') setupNuevoLoteListeners();
         if (screenId === 'detalle_lote') initDetalleLote(...args);
+        if (screenId === 'nueva_actividad') initNuevaActividad(...args);
     }
 
     async function navigate(screenId, ...args) {

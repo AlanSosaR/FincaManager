@@ -274,9 +274,7 @@ function renderFullContent(container, animalId) {
                                     <span class="material-icons">chevron_right</span>
                                 </button>
                             </div>
-                            <button class="btn-m3-tonal" style="padding: 10px 20px;" id="da-add-vaccine">
-                                <span class="material-icons">add</span> Registrar Vacuna
-                            </button>
+
                         </div>
                         <div class="da-calendar-grid">
                             <div class="da-cal-day-name">Lun</div>
@@ -341,9 +339,7 @@ function renderFullContent(container, animalId) {
                                     <span class="material-icons">chevron_right</span>
                                 </button>
                             </div>
-                            <button class="btn-m3-tonal" style="padding: 10px 20px;" id="da-add-fumigacion">
-                                <span class="material-icons">add</span> Registrar Aplicación
-                            </button>
+
                         </div>
                         <div class="da-calendar-grid">
                             <div class="da-cal-day-name">Lun</div>
@@ -439,9 +435,7 @@ function setupEventListeners(animalId, container) {
 
 
     // Registration Actions
-    document.getElementById('da-add-vaccine')?.addEventListener('click', () => showInlineVaccineForm(animalId, getLocalToday(), []));
     document.getElementById('da-add-weight')?.addEventListener('click', () => showInlineWeightForm(animalId));
-    document.getElementById('da-add-fumigacion')?.addEventListener('click', () => showInlineFumigForm(animalId, getLocalToday(), []));
 }
 
 
@@ -501,7 +495,7 @@ async function handleAddVaccine(animalId, defaultDate = null) {
                 <input type="date" name="fecha" value="${dateVal}" placeholder=" " required>
                 <label>Fecha de Aplicación</label>
             </div>
-            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px;">
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
                 <button type="button" class="btn-m3-text" id="cancel-vaccine">Cancelar</button>
                 <button type="submit" class="btn-m3-fill">Registrar</button>
             </div>
@@ -682,12 +676,15 @@ function showDayDetails(day, dayEvents) {
     const dateStr = `${day} de ${new Date(currentYear, currentMonth, 1).toLocaleDateString('es-ES', { month: 'long' })}, ${currentYear}`;
     
     const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isFuture = formattedDate > getLocalToday();
     
     const addBtnHtml = `
         <div style="margin-top: 16px; text-align: center;">
-            <button class="btn-m3-fill" id="da-add-vaccine-specific-date">
-                <span class="material-icons">add</span> Programar Vacuna
-            </button>
+            <select class="da-mobile-tab-select" style="width: auto; min-width: 200px; padding: 10px 36px 10px 16px;" id="da-add-vaccine-specific-date">
+                <option value="">Vacuna...</option>
+                <option value="Programar">Programar Vacuna</option>
+                ${isFuture ? '' : '<option value="Registrar">Registrar Vacuna</option>'}
+            </select>
         </div>
     `;
 
@@ -764,17 +761,19 @@ function showDayDetails(day, dayEvents) {
     }
 
 
-    const btn = document.getElementById('da-add-vaccine-specific-date');
-    if (btn) {
-        btn.onclick = () => {
-            if (currentAnimal && currentAnimal.id) {
-                showInlineVaccineForm(currentAnimal.id, formattedDate, dayEvents);
+    const sel = document.getElementById('da-add-vaccine-specific-date');
+    if (sel) {
+        sel.onchange = () => {
+            const tipo = sel.value;
+            if (tipo && currentAnimal && currentAnimal.id) {
+                showInlineVaccineForm(currentAnimal.id, formattedDate, dayEvents, tipo);
+                sel.value = '';
             }
         };
     }
 }
 
-function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
+function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo = 'Programar') {
     const panel = document.getElementById('da-day-details-panel');
     if (!panel) return;
 
@@ -802,14 +801,13 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
                 </div>
                 <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
                     <button type="button" class="btn-m3-text" id="cancel-inline-vaccine">Cancelar</button>
-                    <button type="submit" class="btn-m3-fill">Programar</button>
+                    <button type="submit" class="btn-m3-fill">Guardar</button>
                 </div>
             </form>
         </div>
     `;
 
     document.getElementById('cancel-inline-vaccine').onclick = () => {
-        // Restore day details view
         showDayDetails(
             parseInt(defaultDate.split('-')[2]),
             existingEvents
@@ -821,8 +819,11 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
         const formData = new FormData(e.target);
         try {
             const selectedDate = formData.get('fecha');
-            const today = getLocalToday();
-            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+            if (tipo === 'Registrar' && selectedDate > getLocalToday()) {
+                showSnackbar('No puedes registrar una vacuna en una fecha futura. Usa "Programar" en su lugar.', 'error');
+                return;
+            }
+            const estadoVal = tipo === 'Registrar' ? 'Aplicada' : 'Programada';
 
             const payload = {
                 animal_id: animalId,
@@ -837,7 +838,7 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
             const { error } = await supabase.from('animal_vacunas').insert(payload);
             if (error) throw error;
 
-            showSnackbar('Vacuna programada ✓');
+            showSnackbar(tipo === 'Registrar' ? 'Vacuna registrada ✓' : 'Vacuna programada ✓');
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {
             console.error(err);
@@ -848,7 +849,7 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = []) {
 
 
 // ─── Inline Fumigacion Form ──────────────────────────────────────────────────
-function showInlineFumigForm(animalId, defaultDate, existingEvents = []) {
+function showInlineFumigForm(animalId, defaultDate, existingEvents = [], tipo = 'Programar') {
     const panel = document.getElementById('da-day-details-panel-fumig');
     if (!panel) return;
 
@@ -876,7 +877,7 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = []) {
                 </div>
                 <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
                     <button type="button" class="btn-m3-text" id="cancel-inline-fumig">Cancelar</button>
-                    <button type="submit" class="btn-m3-fill">Programar</button>
+                    <button type="submit" class="btn-m3-fill">Guardar</button>
                 </div>
             </form>
         </div>
@@ -892,8 +893,11 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = []) {
         const formData = new FormData(e.target);
         try {
             const selectedDate = formData.get('fecha');
-            const today = getLocalToday();
-            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+            if (tipo === 'Registrar' && selectedDate > getLocalToday()) {
+                showSnackbar('No puedes registrar una fumigación en una fecha futura. Usa "Programar" en su lugar.', 'error');
+                return;
+            }
+            const estadoVal = tipo === 'Registrar' ? 'Aplicada' : 'Programada';
 
             const payload = {
                 animal_id: animalId,
@@ -909,7 +913,7 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = []) {
             const { error } = await supabase.from('animal_fumigaciones').insert(payload);
             if (error) throw error;
 
-            showSnackbar('Fumigación programada ✓');
+            showSnackbar(tipo === 'Registrar' ? 'Fumigación registrada ✓' : 'Fumigación programada ✓');
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {
             console.error(err);
@@ -1311,12 +1315,15 @@ function showDayDetailsFumig(day, dayEvents) {
     const dateStr = `${day} de ${new Date(currentYearFumig, currentMonthFumig, 1).toLocaleDateString('es-ES', { month: 'long' })}, ${currentYearFumig}`;
     
     const formattedDate = `${currentYearFumig}-${String(currentMonthFumig + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isFuture = formattedDate > getLocalToday();
     
     const addBtnHtml = `
         <div style="margin-top: 16px; text-align: center;">
-            <button class="btn-m3-fill" id="da-add-fumigacion-specific-date">
-                <span class="material-icons">add</span> Programar Aplicación
-            </button>
+            <select class="da-mobile-tab-select" style="width: auto; min-width: 200px; padding: 10px 36px 10px 16px;" id="da-add-fumigacion-specific-date">
+                <option value="">Aplicación...</option>
+                <option value="Programar">Programar Aplicación</option>
+                ${isFuture ? '' : '<option value="Registrar">Registrar Aplicación</option>'}
+            </select>
         </div>
     `;
 
@@ -1391,11 +1398,13 @@ function showDayDetailsFumig(day, dayEvents) {
         `;
     }
 
-    const btn = document.getElementById('da-add-fumigacion-specific-date');
-    if (btn) {
-        btn.onclick = () => {
-            if (currentAnimal && currentAnimal.id) {
-                showInlineFumigForm(currentAnimal.id, formattedDate, dayEvents);
+    const sel = document.getElementById('da-add-fumigacion-specific-date');
+    if (sel) {
+        sel.onchange = () => {
+            const tipo = sel.value;
+            if (tipo && currentAnimal && currentAnimal.id) {
+                showInlineFumigForm(currentAnimal.id, formattedDate, dayEvents, tipo);
+                sel.value = '';
             }
         };
     }

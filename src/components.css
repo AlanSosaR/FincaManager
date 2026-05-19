@@ -3828,7 +3828,7 @@ input:focus, textarea:focus, select:focus {
 .fab-overlay {
   position: fixed;
   inset: 0;
-  z-index: 99;
+  z-index: 9999;
   background: transparent;
 }
 
@@ -3837,7 +3837,7 @@ input:focus, textarea:focus, select:focus {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 100;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

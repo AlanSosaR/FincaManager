@@ -1,6 +1,44 @@
 import { supabase } from '../supabase.js';
 
-export async function renderDashboard() {
+const LOTES_PAGE_SIZE = 6;
+let currentLotesPage = 1;
+let allLotes = [];
+
+function getPaginationFooterHtml() {
+  const totalPages = Math.ceil(allLotes.length / LOTES_PAGE_SIZE) || 1;
+  let pagesHtml = '';
+  for (let i = 1; i <= totalPages; i++) {
+    pagesHtml += `
+      <button class="da-page-btn ${i === currentLotesPage ? 'active' : ''}" onclick="window.changeLotesPage(${i})">
+        ${i}
+      </button>
+    `;
+  }
+  return `
+    <div class="da-pagination-premium">
+      <button class="da-pagination-circle-btn" id="lotes-prev-btn" ${currentLotesPage <= 1 ? 'disabled' : ''}
+              onclick="if(currentLotesPage > 1) window.changeLotesPage(currentLotesPage - 1)">
+        <span class="material-icons">chevron_left</span>
+      </button>
+      <div class="da-pagination-pages">
+        ${pagesHtml}
+      </div>
+      <button class="da-pagination-circle-btn" id="lotes-next-btn" ${currentLotesPage >= totalPages ? 'disabled' : ''}
+              onclick="if(currentLotesPage < ${totalPages}) window.changeLotesPage(currentLotesPage + 1)">
+        <span class="material-icons">chevron_right</span>
+      </button>
+    </div>
+  `;
+}
+
+window.changeLotesPage = function(page) {
+  currentLotesPage = page;
+  window.clearScreenCache?.('dashboard');
+  window.navigateTo('dashboard', page);
+};
+
+export async function renderDashboard(page) {
+  currentLotesPage = page || 1;
   console.log('Rendering Dashboard...');
   try {
     const [
@@ -13,53 +51,81 @@ export async function renderDashboard() {
 
     if (lotesErr) throw lotesErr;
 
-    const totalPlantas = lotes?.reduce((sum, l) => sum + (l.num_plantas || 0), 0) || 0;
+    allLotes = lotes || [];
+    const totalPlantas = allLotes.reduce((sum, l) => sum + (l.num_plantas || 0), 0) || 0;
+    const from = (currentLotesPage - 1) * LOTES_PAGE_SIZE;
+    const to = from + LOTES_PAGE_SIZE;
+    const pageLotes = allLotes.slice(from, to);
 
     return `
-      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans">
-        <!-- Header & Summary Card -->
-        <section class="m3-mb-10">
-          <div class="m3-flex m3-mobile-flex-col m3-items-end m3-justify-between m3-gap-6">
-            <div>
-              <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-mt-1 m3-font-manrope">Gestión del Cafetal</h1>
-            </div>
-            <div class="m3-relative m3-max-w-md m3-w-full">
-              <div class="m3-card m3-shadow-sm m3-flex m3-items-center m3-gap-4">
-                <div class="m3-bg-primary-container m3-size-16 m3-rounded-2xl m3-flex m3-items-center m3-justify-center m3-text-primary">
-                  <span class="material-symbols-outlined" style="font-size: 30px; font-variation-settings: 'FILL' 1;">eco</span>
-                </div>
-                <div>
-                  <p class="m3-label-small m3-text-on-surface-variant m3-font-medium">Estado General</p>
-                  <h3 class="m3-title-large m3-font-bold m3-text-on-surface">Cosecha Activa</h3>
-                  <div class="m3-flex m3-items-center m3-gap-2 m3-mt-1">
-                    <span class="m3-size-2 m3-rounded-full m3-bg-primary" style="width: 8px; height: 8px;"></span>
-                    <span class="m3-label-small m3-text-primary m3-font-bold">Salud Promedio - 92%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+      <style>
+        @media (max-width: 1100px) and (min-width: 769px) {
+          .db-lotes-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (max-width: 1024px) {
+          .db-page { padding: 0 !important; max-width: 100vw !important; overflow-x: hidden !important; overflow-y: auto !important; }
+        }
+        @media (max-width: 768px) {
+          .db-page .m3-grid-4.m3-gap-8 { gap: 8px !important; min-width: 0 !important; }
+          .db-page .m3-grid-4.m3-gap-8 > * { min-width: 0 !important; }
+          .db-title { font-size: 22px !important; }
+          .db-stats-wrap { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+          .db-stat-row { flex-wrap: wrap !important; gap: 6px !important; width: 100% !important; }
+          .db-stat-row > div { width: 100% !important; padding: 12px 16px !important; background: var(--m3-surface-container-highest) !important; border-radius: 16px !important; }
+          .db-stat-row .m3-title-medium { font-size: 16px !important; }
+          .db-stat-row .m3-label-medium { font-size: 12px !important; }
+          .db-table-wrap { overflow-x: auto !important; }
+          .db-table-wrap table { min-width: 480px !important; }
+          .db-table-wrap th, .db-table-wrap td { padding: 8px !important; font-size: 12px !important; }
+          .db-section-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+          .db-lotes-grid { grid-template-columns: 1fr !important; }
+        }
+      </style>
+      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans db-page">
+        <section class="m3-mb-6">
+          <div>
+            <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-mt-1 m3-font-manrope db-title">Gestión del Cafetal</h1>
           </div>
         </section>
 
+        ${allLotes.length > 0 ? `
+        <div class="m3-p-4 m3-bg-surface-container-low m3-rounded-2xl m3-mb-8 db-stats-wrap" style="margin-left: 0; margin-right: 0;">
+          <div class="m3-flex m3-items-center m3-gap-6 m3-flex-wrap db-stat-row">
+            <div class="m3-flex m3-items-center m3-gap-2 m3-bg-primary-container m3-text-on-primary-container m3-rounded-full m3-px-4 m3-py-2">
+              <img src="sprouts.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
+              <span class="m3-label-medium m3-text-on-primary-container">Total plantas:</span>
+              <span class="m3-title-medium m3-font-bold m3-text-on-primary-container">${totalPlantas.toLocaleString()}</span>
+            </div>
+            <div class="m3-flex m3-items-center m3-gap-2">
+              <img src="area.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
+              <span class="m3-label-medium m3-text-on-surface-variant">Área total:</span>
+              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${allLotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} ha</span>
+            </div>
+            <div class="m3-flex m3-items-center m3-gap-2">
+              <img src="mapa.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
+              <span class="m3-label-medium m3-text-on-surface-variant">Lotes:</span>
+              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${allLotes.length}</span>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
         <div class="m3-grid m3-grid-4 m3-gap-8">
-          <!-- Left Column: Lotes Grid -->
-          <div class="m3-col-span-3 m3-flex m3-flex-col m3-gap-8">
+          <div class="m3-flex m3-flex-col m3-gap-8" style="grid-column: 1 / -1;">
             <div>
-              <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
+              <div class="m3-flex m3-items-center m3-justify-between m3-mb-6 db-section-header">
                 <h2 class="m3-headline-small m3-font-bold m3-text-on-surface">Lotes & Microlotes</h2>
-                <span class="m3-bg-primary-container m3-text-on-primary-container m3-label-small m3-font-bold m3-rounded-full m3-p-1" style="padding: 4px 12px;">Total: ${totalPlantas.toLocaleString()} plantas</span>
               </div>
               
-              <div class="m3-grid m3-grid-2 m3-gap-6">
-                ${lotes && lotes.length > 0 ? lotes.map((lote, index) => {
+              <div class="m3-grid m3-grid-2 m3-gap-6 db-lotes-grid">
+                ${pageLotes.length > 0 ? pageLotes.map((lote, index) => {
                   const seed = encodeURIComponent(lote.id);
                   const statusColor = lote.salud_porcentaje > 80 ? 'bg-primary' : (lote.salud_porcentaje > 50 ? 'bg-secondary' : 'bg-error');
                   const badgeColors = ['tertiary', 'secondary', 'primary'];
                   const theme = badgeColors[index % badgeColors.length];
                   
-                  const healthIcon = lote.salud_porcentaje > 80 ? 'sentiment_satisfied' : lote.salud_porcentaje > 50 ? 'sentiment_neutral' : 'sentiment_dissatisfied';
                    return `
-                    <div class="m3-exp-card m3-exp-card-${theme}" 
+                    <div class="m3-exp-card m3-exp-card-${theme} db-card" 
                          onclick="window.navigateTo('detalle_lote', '${lote.id}')">
                       <div class="m3-exp-card-body">
                         <div class="m3-exp-card-top">
@@ -69,7 +135,6 @@ export async function renderDashboard() {
                           </div>
                           <div class="m3-exp-card-actions">
                             <div class="m3-exp-health-chip">
-                              <span class="material-symbols-outlined">${healthIcon}</span>
                               <span>${lote.salud_porcentaje || 0}%</span>
                             </div>
                             <div class="m3-action-menu-container">
@@ -90,13 +155,13 @@ export async function renderDashboard() {
                         <h3 class="m3-exp-card-title">${lote.nombre}</h3>
                         <div class="m3-exp-card-details">
                           <div class="m3-exp-detail-item">
-                            <span class="material-symbols-outlined">potted_plant</span>
+                            <img src="sprouts.png" alt="" style="width: 18px; height: 18px; object-fit: contain;">
                             <span class="m3-exp-detail-label">Plantas</span>
                             <span class="m3-exp-detail-value">${(lote.num_plantas || 0).toLocaleString()}</span>
                           </div>
                           <div class="m3-exp-detail-divider"></div>
                           <div class="m3-exp-detail-item">
-                            <span class="material-symbols-outlined">square_foot</span>
+                            <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;">
                             <span class="m3-exp-detail-label">Área</span>
                             <span class="m3-exp-detail-value">${lote.area_ha || 0} ha</span>
                           </div>
@@ -111,32 +176,16 @@ export async function renderDashboard() {
                   `;
                 }).join('') : `
                   <div class="m3-col-span-3 m3-p-8 m3-bg-surface-container-low m3-rounded-3xl m3-border-dashed" style="text-align: center; border: 2px dashed rgba(130, 128, 121, 0.2); padding-top: 48px; padding-bottom: 48px;">
-                    <span class="material-symbols-outlined m3-mb-2" style="font-size: 48px; opacity: 0.2;">potted_plant</span>
+                    <img src="sprouts.png" alt="" style="width: 48px; height: 48px; object-fit: contain; opacity: 0.2;" class="m3-mb-2">
                     <p class="m3-text-on-surface-variant m3-label-large">No hay lotes registrados aún.</p>
                     <button onclick="window.navigateTo('nuevo_lote')" class="m3-mt-4 m3-text-primary m3-font-bold m3-bg-none m3-border-none cursor-pointer" style="text-decoration: underline;">Agregar primer lote</button>
                   </div>
                 `}
               </div>
 
-              ${lotes && lotes.length > 0 ? `
-              <div class="m3-mt-4 m3-p-4 m3-bg-surface-container-low m3-rounded-2xl m3-flex m3-items-center m3-justify-between">
-                <div class="m3-flex m3-items-center m3-gap-6">
-                  <div class="m3-flex m3-items-center m3-gap-2">
-                    <span class="material-symbols-outlined m3-text-primary" style="font-size: 20px;">potted_plant</span>
-                    <span class="m3-label-medium m3-text-on-surface-variant">Total plantas:</span>
-                    <span class="m3-title-medium m3-font-bold m3-text-on-surface">${totalPlantas.toLocaleString()}</span>
-                  </div>
-                  <div class="m3-flex m3-items-center m3-gap-2">
-                    <span class="material-symbols-outlined m3-text-primary" style="font-size: 20px;">square_foot</span>
-                    <span class="m3-label-medium m3-text-on-surface-variant">Área total:</span>
-                    <span class="m3-title-medium m3-font-bold m3-text-on-surface">${lotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} ha</span>
-                  </div>
-                  <div class="m3-flex m3-items-center m3-gap-2">
-                    <span class="material-symbols-outlined m3-text-primary" style="font-size: 20px;">inventory_2</span>
-                    <span class="m3-label-medium m3-text-on-surface-variant">Lotes:</span>
-                    <span class="m3-title-medium m3-font-bold m3-text-on-surface">${lotes.length}</span>
-                  </div>
-                </div>
+              ${allLotes.length > 0 ? `
+              <div style="margin-top: 24px;" id="lotes-pagination-wrapper">
+                ${getPaginationFooterHtml()}
               </div>
               ` : ''}
             </div>
@@ -145,7 +194,7 @@ export async function renderDashboard() {
             <div>
               <h2 class="m3-headline-small m3-font-bold m3-text-on-surface m3-mb-6">Aplicaciones Recientes</h2>
               <div class="m3-card m3-p-0 m3-overflow-hidden">
-                <div style="overflow-x: auto;">
+                <div class="db-table-wrap" style="overflow-x: auto;">
                   <table class="m3-table">
                     <thead>
                       <tr>
@@ -156,16 +205,16 @@ export async function renderDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      ${aplicaciones && aplicaciones.length > 0 ? aplicaciones.map(app => {
-                        const isFertilizante = app.tipo === 'Fertilizante';
-                        const theme = isFertilizante ? 'secondary' : 'tertiary';
-                        const icon = isFertilizante ? 'science' : 'pest_control';
-                        return `
+                        ${aplicaciones && aplicaciones.length > 0 ? aplicaciones.map(app => {
+                         const isFertilizante = app.tipo === 'Fertilizante';
+                         const theme = isFertilizante ? 'secondary' : 'tertiary';
+                         const iconHtml = isFertilizante ? '<img src="fertilizante.png" alt="" style="width: 14px; height: 14px; object-fit: contain;">' : '<span class="material-symbols-outlined" style="font-size: 14px;">pest_control</span>';
+                         return `
                         <tr onclick="window.navigateTo('detalle_lote', '${app.lote_id}')">
                           <td>
                             <div class="m3-flex m3-items-center m3-gap-3">
                               <div class="m3-bg-${theme}-container m3-p-2 m3-rounded-2xl m3-text-${theme}">
-                                <span class="material-symbols-outlined" style="font-size: 14px;">${icon}</span>
+                                ${iconHtml}
                               </div>
                               <div>
                                 <p class="m3-label-large m3-font-bold m3-text-on-surface">${app.producto}</p>
@@ -198,25 +247,6 @@ export async function renderDashboard() {
               </div>
             </div>
           </div>
-
-          <!-- Right Column: Stats & Insights -->
-          <aside class="m3-flex m3-flex-col m3-gap-8">
-            <div class="m3-card m3-bg-primary-container" style="background-color: rgba(185, 241, 173, 0.2);">
-              <h3 class="m3-title-medium m3-font-bold m3-text-primary m3-mb-4 m3-flex m3-items-center m3-gap-2">
-                <span class="material-symbols-outlined">analytics</span> Resumen
-              </h3>
-              <div class="m3-flex m3-flex-col m3-gap-4">
-                <div class="m3-flex m3-justify-between m3-items-center">
-                  <span class="m3-label-medium m3-text-on-surface-variant">Lotes Activos</span>
-                  <span class="m3-font-bold m3-text-on-surface">${lotes?.length || 0}</span>
-                </div>
-                <div class="m3-flex m3-justify-between m3-items-center">
-                  <span class="m3-label-medium m3-text-on-surface-variant">Área Total</span>
-                  <span class="m3-font-bold m3-text-on-surface">${lotes?.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} ha</span>
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
         
         <button onclick="window.navigateTo('nuevo_lote')" class="m3-fab">
@@ -246,4 +276,3 @@ window.confirmDeleteLote = (id, name) => {
     else { window.Snackbar.show('Lote eliminado'); window.clearScreenCache?.('dashboard'); window.navigateTo('dashboard'); }
   });
 };
-
