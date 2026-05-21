@@ -597,25 +597,45 @@
   overflow: hidden;
 }
 
-.leaflet-draw-toolbar a {
-  width: 40px !important;
-  height: 40px !important;
-  line-height: 40px !important;
-  background-color: white !important;
+/* ── M3 Draw Toolbar - Material 3 Expressive ── */
+.leaflet-draw-toolbar {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  background: white !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+  border-radius: 16px !important;
   border: none !important;
-  border-radius: 0 !important;
-  transition: background 0.2s !important;
+}
+
+.leaflet-draw-toolbar a {
+  width: 44px !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  background-color: var(--m3-surface-container) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .leaflet-draw-toolbar a:hover {
   background-color: var(--m3-surface-container-high) !important;
+  transform: scale(1.05);
+}
+
+.leaflet-draw-toolbar a:active {
+  transform: scale(0.95);
 }
 
 .leaflet-draw-toolbar a.leaflet-draw-draw-polygon::before {
   content: 'draw' !important;
   font-family: 'Material Icons' !important;
-  font-size: 20px !important;
-  color: #444 !important;
+  font-size: 22px !important;
+  color: var(--m3-on-surface) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -624,8 +644,8 @@
 .leaflet-draw-toolbar a.leaflet-draw-edit-edit::before {
   content: 'edit' !important;
   font-family: 'Material Icons' !important;
-  font-size: 20px !important;
-  color: #444 !important;
+  font-size: 22px !important;
+  color: var(--m3-on-surface) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -634,8 +654,8 @@
 .leaflet-draw-toolbar a.leaflet-draw-edit-remove::before {
   content: 'delete' !important;
   font-family: 'Material Icons' !important;
-  font-size: 20px !important;
-  color: #444 !important;
+  font-size: 22px !important;
+  color: var(--m3-on-surface) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -653,24 +673,72 @@
   background-image: none !important;
 }
 
+/* ── M3 Draw Actions Pill - Material 3 Expressive ── */
 .leaflet-draw-actions {
-  border-radius: 12px !important;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  border-radius: 28px !important;
+  overflow: visible !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important;
+  background: white !important;
+  display: flex;
+  gap: 8px !important;
+  padding: 8px !important;
+  margin-left: 8px !important;
+  align-items: center !important;
+}
+
+/* When Leaflet.draw shows actions via inline display:block, override to flex */
+.leaflet-draw-actions[style*="display: block"] {
+  display: flex !important;
 }
 
 .leaflet-draw-actions a {
-  background-color: white !important;
-  color: var(--m3-on-surface) !important;
+  background-color: var(--m3-primary) !important;
+  color: white !important;
   border: none !important;
-  padding: 8px 16px !important;
+  padding: 12px 24px !important;
   font-family: 'Work Sans', sans-serif !important;
   font-weight: 600 !important;
-  font-size: 12px !important;
+  font-size: 14px !important;
+  border-radius: 20px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-transform: none !important;
+  letter-spacing: 0.2px !important;
+  white-space: nowrap !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  min-width: fit-content !important;
 }
 
 .leaflet-draw-actions a:hover {
-  background-color: var(--m3-surface-container-high) !important;
+  background-color: color-mix(in srgb, var(--m3-primary) 85%, black) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.leaflet-draw-actions a:active {
+  background-color: color-mix(in srgb, var(--m3-primary) 70%, black) !important;
+  transform: translateY(0);
+}
+
+/* Finalizar button - filled style (primary action) */
+.leaflet-draw-actions a.leaflet-draw-actions-save {
+  background-color: var(--m3-primary) !important;
+  color: white !important;
+  font-weight: 700 !important;
+}
+
+/* Cancel button - outlined style */
+.leaflet-draw-actions a.leaflet-draw-actions-cancel {
+  background-color: transparent !important;
+  color: var(--m3-primary) !important;
+  border: 2px solid var(--m3-primary) !important;
+}
+
+.leaflet-draw-actions a.leaflet-draw-actions-cancel:hover {
+  background-color: color-mix(in srgb, var(--m3-primary) 10%, white) !important;
 }
 
 /* ── M3 Popups ── */
@@ -826,9 +894,20 @@
   border-radius: 0 0 20px 20px !important;
 }
 
-/* ── Area info badge animation ── */
+/* ── Area info badge animation ─ */
+@keyframes areaBadgePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
 #area-info-badge {
-  animation: slideIn 0.3s ease-out;
+  animation: areaBadgePulse 0.3s ease-out;
+}
+
+/* ── Hide Leaflet.draw original/ghost shape during editing ─ */
+.leaflet-editing .leaflet-overlay-pane svg path[stroke-dasharray] {
+  display: none !important;
 }
 
 @keyframes slideIn {

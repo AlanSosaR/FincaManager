@@ -23,6 +23,8 @@ import { renderNuevoPotrero, initNuevoPotrero } from './screens/nuevo_potrero.js
 import { renderNuevoLote, setupNuevoLoteListeners } from './screens/nuevo_lote.js';
 import { renderDetalleLote, initDetalleLote } from './screens/detalle_lote.js';
 import { renderNuevaActividad, initNuevaActividad } from './screens/nueva_actividad.js';
+import { renderNuevoPersonal, initNuevoPersonal } from './screens/nuevo_personal.js';
+import { renderDetallePersonal, initDetallePersonal } from './screens/detalle_personal.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -38,9 +40,11 @@ const screens = {
     nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor },
     nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal },
     nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero },
-    nuevo_lote:    { title: 'Nuevo Lote de Cafetal', backTo: 'dashboard', render: () => Promise.resolve(renderNuevoLote()) },
+    nuevo_lote:    { title: 'Nuevo Lote de Cafetal', backTo: 'dashboard', render: (id) => renderNuevoLote(id) },
     detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote },
-    nueva_actividad: { title: 'Nueva Actividad', backTo: 'dashboard', render: renderNuevaActividad }
+    nueva_actividad: { title: 'Nueva Actividad', backTo: 'dashboard', render: renderNuevaActividad },
+    nuevo_personal: { title: 'Nuevo Personal', backTo: 'detalle_lote', render: renderNuevoPersonal },
+    detalle_personal: { title: 'Detalle de Personal', backTo: 'detalle_lote', render: renderDetallePersonal }
 };
 
 console.log('[DEBUG] Registered screens:', Object.keys(screens));
@@ -86,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const NO_CACHE = new Set(['ganado','nuevo_motor','nuevo_animal','nuevo_potrero',
                                'detalle_motor','detalle_animal','detalle_potrero',
                                'detalle_herramienta','nuevo_lote','detalle_lote',
-                               'nueva_actividad']);
+                               'nueva_actividad','nuevo_personal','detalle_personal']);
 
     window.clearScreenCache = (screenId) => {
       for (const key of viewCache.keys()) {
@@ -137,9 +141,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'nuevo_lote') setupNuevoLoteListeners();
         if (screenId === 'detalle_lote') initDetalleLote(...args);
         if (screenId === 'nueva_actividad') initNuevaActividad(...args);
+        if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
+        if (screenId === 'detalle_personal') initDetallePersonal(...args);
     }
 
+    const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
+    const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad','nuevo_personal']);
+
     async function navigate(screenId, ...args) {
+        // Guard: screens that require an ID but got none → redirect to parent
+        if (DETAIL_SCREENS.has(screenId) && (!args || args.length === 0 || !args[0])) {
+            const screenCfg = screens[screenId];
+            if (screenCfg && screenCfg.backTo) {
+                return navigate(screenCfg.backTo);
+            }
+            return navigate('motores');
+        }
+        if (FORM_SCREENS.has(screenId) && args.length > 0 && !args[0]) {
+            const screenCfg = screens[screenId];
+            if (screenCfg && screenCfg.backTo) {
+                return navigate(screenCfg.backTo);
+            }
+            return navigate('motores');
+        }
+
         console.log('[DEBUG] Navigating to:', screenId, args);
         const screen = screens[screenId] || screens.motores;
         

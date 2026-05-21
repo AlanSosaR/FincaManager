@@ -172,12 +172,34 @@ CREATE TABLE lote_aplicaciones (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lote_id UUID REFERENCES lotes(id) ON DELETE CASCADE,
   tipo TEXT,
+  metodo TEXT,
   producto TEXT,
   dosis TEXT,
   operador TEXT,
   fecha DATE DEFAULT CURRENT_DATE,
   notas TEXT,
+  observaciones TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 14. PERSONAL (Personnel assigned to lots)
+CREATE TABLE personal (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT NOT NULL,
+  rol TEXT,
+  iniciales TEXT,
+  pago_diario NUMERIC,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 15. ASISTENCIA DE PERSONAL
+CREATE TABLE personal_asistencia (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  personal_id UUID REFERENCES personal(id) ON DELETE CASCADE,
+  fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+  estado TEXT NOT NULL DEFAULT 'trabajo',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(personal_id, fecha)
 );
 
 -- ==========================================
@@ -198,6 +220,8 @@ ALTER TABLE herramienta_mantenimientos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE animal_fumigaciones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lote_aplicaciones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE personal ENABLE ROW LEVEL SECURITY;
+ALTER TABLE personal_asistencia ENABLE ROW LEVEL SECURITY;
 
 -- Generic Policies for all tables (Select, Insert, Update, Delete)
 -- Note: Replace [TABLE] with actual table name if needed for granularity
@@ -219,6 +243,18 @@ CREATE POLICY "Allow public read lote_aplicaciones" ON lote_aplicaciones FOR SEL
 CREATE POLICY "Allow public insert lote_aplicaciones" ON lote_aplicaciones FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update lote_aplicaciones" ON lote_aplicaciones FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public delete lote_aplicaciones" ON lote_aplicaciones FOR DELETE USING (true);
+
+-- Personal Policies
+CREATE POLICY "Allow public read personal" ON personal FOR SELECT USING (true);
+CREATE POLICY "Allow public insert personal" ON personal FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update personal" ON personal FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete personal" ON personal FOR DELETE USING (true);
+
+-- Personal Asistencia Policies
+CREATE POLICY "Allow public read personal_asistencia" ON personal_asistencia FOR SELECT USING (true);
+CREATE POLICY "Allow public insert personal_asistencia" ON personal_asistencia FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update personal_asistencia" ON personal_asistencia FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete personal_asistencia" ON personal_asistencia FOR DELETE USING (true);
 
 -- (And so on for all other tables... omitted for brevity here but should be in full schema)
 -- To keep schema.sql clean, you can use a loop in SQL to apply these if running manually.

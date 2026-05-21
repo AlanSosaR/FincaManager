@@ -1,14 +1,27 @@
 import { supabase } from '../supabase.js';
 import { showModal } from '../modals.js';
 
+function getInitiales(nombre) {
+  return nombre.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function getAvatarColor(seed) {
+  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2e7d32', '#1565c0', '#6a1b9a'];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
 export async function renderDetalleLote(id) {
   try {
     const [
       { data: lote, error: loteErr },
-      { data: aplicaciones, error: appErr }
+      { data: aplicaciones, error: appErr },
+      { data: personal, error: personalErr }
     ] = await Promise.all([
       supabase.from('lotes').select('*').eq('id', id).single(),
-      supabase.from('lote_aplicaciones').select('*').eq('lote_id', id).order('fecha', { ascending: false })
+      supabase.from('lote_aplicaciones').select('*').eq('lote_id', id).order('fecha', { ascending: false }),
+      supabase.from('personal').select('*').order('nombre', { ascending: true })
     ]);
 
     if (loteErr) throw loteErr;
@@ -54,50 +67,26 @@ export async function renderDetalleLote(id) {
                 <span class="material-symbols-outlined m3-text-primary">groups</span>
                 Personal Asignado
               </h3>
-              <div class="m3-flex m3-flex-col m3-gap-6">
-                <div class="m3-flex m3-items-center m3-justify-between dl-person-row">
+              <div class="m3-flex m3-flex-col m3-gap-6" id="personal-list">
+                ${(personal || []).length > 0 ? personal.map(p => `
+                <div class="m3-flex m3-items-center m3-justify-between dl-person-row" style="cursor: pointer;" onclick="window.navigateTo('detalle_personal', '${p.id}', '${id}')">
                   <div class="m3-flex m3-items-center m3-gap-3">
-                    <div class="m3-size-10 m3-rounded-full m3-bg-primary-container m3-text-on-primary-container m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 12px;">CR</div>
+                    <div class="m3-size-10 m3-rounded-full m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 12px; background: ${getAvatarColor(p.nombre)}; color: white;">${p.iniciales || getInitiales(p.nombre)}</div>
                     <div>
-                      <p class="m3-label-medium m3-font-bold m3-text-on-surface dl-person-name">Carlos Ruiz</p>
-                      <p class="m3-text-on-surface-variant" style="font-size: 10px; font-weight: 500;">Supervisor de Campo</p>
+                      <p class="m3-label-medium m3-font-bold m3-text-on-surface dl-person-name">${p.nombre}</p>
+                      <p class="m3-text-on-surface-variant" style="font-size: 10px; font-weight: 500;">${p.rol || ''}</p>
                     </div>
                   </div>
-                  <span class="material-symbols-outlined m3-text-outline-variant dl-person-chat" style="font-size: 20px; cursor: pointer;">chat</span>
+                  <span class="material-symbols-outlined m3-text-outline-variant" style="font-size: 20px; cursor: pointer;">chevron_right</span>
                 </div>
-                <div class="m3-flex m3-items-center m3-justify-between dl-person-row">
-                  <div class="m3-flex m3-items-center m3-gap-3">
-                    <div class="m3-size-10 m3-rounded-full m3-bg-secondary-container m3-text-on-secondary-container m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 12px;">AM</div>
-                    <div>
-                      <p class="m3-label-medium m3-font-bold m3-text-on-surface dl-person-name">Ana Mendez</p>
-                      <p class="m3-text-on-surface-variant" style="font-size: 10px; font-weight: 500;">Especialista en Podas</p>
-                    </div>
-                  </div>
-                  <span class="material-symbols-outlined m3-text-outline-variant dl-person-chat" style="font-size: 20px; cursor: pointer;">chat</span>
+                `).join('') : `
+                <div class="m3-p-4 m3-text-center m3-text-on-surface-variant m3-label-medium" style="border: 2px dashed var(--m3-outline-variant); border-radius: 16px;">
+                  Sin personal asignado
                 </div>
-                <div class="m3-flex m3-items-center m3-justify-between dl-person-row">
-                  <div class="m3-flex m3-items-center m3-gap-3">
-                    <div class="m3-size-10 m3-rounded-full m3-bg-surface-container-highest m3-text-on-surface-variant m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 12px;">JH</div>
-                    <div>
-                      <p class="m3-label-medium m3-font-bold m3-text-on-surface dl-person-name">Juan Herrera</p>
-                      <p class="m3-text-on-surface-variant" style="font-size: 10px; font-weight: 500;">Operario de Limpieza</p>
-                    </div>
-                  </div>
-                  <span class="material-symbols-outlined m3-text-outline-variant dl-person-chat" style="font-size: 20px; cursor: pointer;">chat</span>
-                </div>
-                <div class="m3-flex m3-items-center m3-justify-between dl-person-row">
-                  <div class="m3-flex m3-items-center m3-gap-3">
-                    <div class="m3-size-10 m3-rounded-full m3-bg-surface-container-highest m3-text-on-surface-variant m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 12px;">LM</div>
-                    <div>
-                      <p class="m3-label-medium m3-font-bold m3-text-on-surface dl-person-name">Luis Mora</p>
-                      <p class="m3-text-on-surface-variant" style="font-size: 10px; font-weight: 500;">Operario de Limpieza</p>
-                    </div>
-                  </div>
-                  <span class="material-symbols-outlined m3-text-outline-variant dl-person-chat" style="font-size: 20px; cursor: pointer;">chat</span>
-                </div>
-              <button class="m3-w-full m3-text-primary m3-label-large m3-font-bold m3-cursor-pointer" style="background: transparent; border: 2px dashed var(--m3-primary); border-radius: 16px; padding: 0 24px; height: 56px; transition: all 0.2s;" onmouseover="this.style.background='color-mix(in srgb, var(--m3-primary) 8%, transparent)'" onmouseout="this.style.background='transparent'">
-                + Asignar más personal
-              </button>
+                `}
+                <button id="btn-add-personal" class="m3-w-full m3-text-primary m3-label-large m3-font-bold m3-cursor-pointer" style="background: transparent; border: 2px dashed var(--m3-primary); border-radius: 16px; padding: 0 24px; height: 56px; transition: all 0.2s;" onclick="window.navigateTo('nuevo_personal', '${id}')" onmouseover="this.style.background='color-mix(in srgb, var(--m3-primary) 8%, transparent)'" onmouseout="this.style.background='transparent'">
+                  + Asignar más personal
+                </button>
               </div>
             </div>
           </div>
@@ -194,21 +183,21 @@ export async function renderDetalleLote(id) {
 
         <div class="m3-fab-speeddial" id="fab-speeddial">
           <div class="m3-fab-actions" id="fab-actions">
-            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Análisis de Suelo')">
-              <span class="m3-fab-action-label">Análisis de Suelo</span>
-              <span class="m3-fab-action-icon"><img src="analisis-de-suelo.png" alt="" style="width: 20px; height: 20px; object-fit: contain;"></span>
+            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Limpieza')">
+              <span class="m3-fab-action-label">Limpieza</span>
+              <span class="m3-fab-action-icon"><span class="material-symbols-outlined">cleaning_services</span></span>
             </button>
             <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Fertilizante')">
               <span class="m3-fab-action-label">Fertilizante</span>
               <span class="m3-fab-action-icon"><img src="fertilizante.png" alt="" style="width: 20px; height: 20px; object-fit: contain;"></span>
             </button>
-            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Limpieza')">
-              <span class="m3-fab-action-label">Limpieza</span>
-              <span class="m3-fab-action-icon"><span class="material-symbols-outlined">cleaning_services</span></span>
-            </button>
             <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Manejo de Tejido')">
               <span class="m3-fab-action-label">Manejo de Tejido</span>
               <span class="m3-fab-action-icon"><img src="tijeras-de-podar.png" alt="" style="width: 20px; height: 20px; object-fit: contain;"></span>
+            </button>
+            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Análisis de Suelo')">
+              <span class="m3-fab-action-label">Análisis de Suelo</span>
+              <span class="m3-fab-action-icon"><img src="analisis-de-suelo.png" alt="" style="width: 20px; height: 20px; object-fit: contain;"></span>
             </button>
           </div>
           <button class="m3-fab-circle" id="fab-main" onclick="window.toggleFabMenu()">
@@ -255,7 +244,15 @@ export function initDetalleLote(id) {
   const mapContainer = document.getElementById('dl-map-container');
   if (mapContainer && mapContainer.dataset.coords) {
     try {
-      const coords = JSON.parse(mapContainer.dataset.coords);
+      const parsed = JSON.parse(mapContainer.dataset.coords);
+      let coords, color;
+      if (Array.isArray(parsed)) {
+        coords = parsed;
+        color = '#3e6f39';
+      } else {
+        coords = parsed.coordinates || [];
+        color = parsed.color || '#3e6f39';
+      }
       if (coords && coords.length > 2) {
         const latlngs = coords.map(c => [c.lat, c.lng]);
         const map = L.map(mapContainer, {
@@ -272,8 +269,8 @@ export function initDetalleLote(id) {
           attribution: 'Tiles &copy; Esri'
         }).addTo(map);
         const polygon = L.polygon(latlngs, {
-          color: '#3e6f39',
-          fillColor: '#3e6f39',
+          color: color,
+          fillColor: color,
           fillOpacity: 0.2,
           weight: 2
         }).addTo(map);

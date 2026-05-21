@@ -1,0 +1,73 @@
+import { supabase } from '../supabase.js';
+
+export async function renderNuevoPersonal(loteId) {
+  return `
+    <div class="m3-form-screen">
+      <div class="m3-form-card">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <button onclick="window.navigateTo('detalle_lote', '${loteId}')" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--m3-on-surface); transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
+            <span class="material-icons">arrow_back</span>
+          </button>
+          <div>
+            <div class="da-hero-subtitle" style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--m3-on-surface-variant); letter-spacing: 0.5px;">Registro de Personal</div>
+            <h2 class="da-hero-title" style="margin: 0; font-size: 24px; font-family: 'Manrope', sans-serif; color: var(--m3-on-surface); font-weight: 800;">Nuevo Trabajador</h2>
+          </div>
+        </div>
+
+        <form id="form-nuevo-personal">
+          <div class="m3-grid-2col">
+            <div class="m3-field m3-col-span-2">
+              <input type="text" name="nombre" placeholder=" " required>
+              <label>Nombre Completo</label>
+            </div>
+
+            <div class="m3-field m3-col-span-2">
+              <input type="text" name="rol" placeholder=" ">
+              <label>Rol / Cargo</label>
+            </div>
+
+            <div class="m3-field">
+              <input type="number" name="pago_diario" placeholder=" " min="0" step="0.01">
+              <label>Pago por día (L)</label>
+            </div>
+          </div>
+
+          <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0; display: flex; justify-content: flex-end; gap: 12px;">
+            <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('detalle_lote', '${loteId}')" style="padding: 12px 24px; border-radius: 9999px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
+              Cancelar
+            </button>
+            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: var(--m3-primary); border: none; color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(62,111,57,0.3); font-family: 'Work Sans', sans-serif;">
+              <span class="material-symbols-outlined" style="font-size: 20px;">save</span>
+              <span>Guardar Personal</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+export function initNuevoPersonal(loteId) {
+  const form = document.getElementById('form-nuevo-personal');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    data.iniciales = data.nombre.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+
+    try {
+      const { error } = await supabase.from('personal').insert([data]);
+      if (error) throw error;
+
+      window.Snackbar.show('Personal registrado');
+      window.clearScreenCache?.('detalle_lote');
+      window.navigateTo('detalle_lote', loteId);
+    } catch (err) {
+      console.error(err);
+      window.Snackbar.show('Error: ' + err.message, { type: 'error' });
+    }
+  });
+}

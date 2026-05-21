@@ -1,88 +1,120 @@
 import { supabase } from '../supabase.js';
 
+function parseCoordenadasJson(json) {
+  try {
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed)) {
+      // Old format: [{lat, lng}, ...]
+      return { coordinates: parsed, color: '#3e6f39' };
+    }
+    // New format: {color, coordinates: [{lat, lng}, ...]}
+    return { coordinates: parsed.coordinates || [], color: parsed.color || '#3e6f39' };
+  } catch {
+    return { coordinates: [], color: '#3e6f39' };
+  }
+}
+
 let mapInstance = null;
 let drawnItems = null;
 let drawControl = null;
 let existingLotesLayer = null;
 let selectedColor = '#3e6f39';
 
-export function renderNuevoLote() {
+export async function renderNuevoLote(id) {
+  let lote = null;
+  if (id) {
+    const { data, error } = await supabase.from('lotes').select('*').eq('id', id).single();
+    if (!error) lote = data;
+  }
+
+  // Store for map initialization
+  window.__currentLoteData = lote;
+
+  const isEdit = !!lote;
+  const title = isEdit ? 'Editar Lote' : 'Nuevo Lote de Cafetal';
+  const subtitle = isEdit ? 'Actualiza la información del cultivo' : 'Registro de cultivo';
+  const btnLabel = isEdit ? 'Actualizar Lote' : 'Guardar Lote';
+
+  const val = (field) => lote ? (lote[field] || '') : '';
+  const selected = (field, value) => lote && lote[field] === value ? 'selected' : '';
+
   return `
     <div class="m3-form-screen">
+      <input type="hidden" name="lote_id" value="${id || ''}">
       <div class="m3-form-card">
         <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
           <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
             <span class="material-icons" style="font-size: 32px;">landscape</span>
           </div>
           <div>
-            <div class="da-hero-subtitle" style="margin:0;">Registro de cultivo</div>
-            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">Nuevo Lote de Cafetal</h2>
+            <div class="da-hero-subtitle" style="margin:0;">${subtitle}</div>
+            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">${title}</h2>
           </div>
         </div>
 
         <form id="form-nuevo-lote">
           <div class="m3-grid-2col">
-            <div class="m3-field">
-              <input type="text" name="nombre" placeholder=" " required>
+            <div class="m3-field ${val('nombre') ? 'has-value' : ''}">
+              <input type="text" name="nombre" placeholder=" " value="${val('nombre')}" required>
               <label>Nombre del Lote</label>
               <p class="error-text" id="error-nombre">El nombre es obligatorio</p>
             </div>
 
-            <div class="m3-field">
+            <div class="m3-field ${val('variedad') ? 'has-value' : ''}">
               <select name="variedad" required>
-                <option value="" disabled selected hidden></option>
-                <option value="Catuai">Catuai</option>
-                <option value="Caturra">Caturra</option>
-                <option value="Pacas">Pacas</option>
-                <option value="IHCAFE 90">IHCAFE 90</option>
-                <option value="Lempira">Lempira</option>
-                <option value="Catimor">Catimor</option>
-                <option value="Parainema">Parainema</option>
-                <option value="Sarchimor">Sarchimor</option>
-                <option value="Bourbon">Bourbon</option>
-                <option value="Geisha">Geisha</option>
-                <option value="Typica">Typica</option>
-                <option value="Mundo Novo">Mundo Novo</option>
-                <option value="Villa Sarchi">Villa Sarchi</option>
-                <option value="Pacamara">Pacamara</option>
-                <option value="Java">Java</option>
-                <option value="Ruiru 11">Ruiru 11</option>
-                <option value="SL28">SL28</option>
-                <option value="Kent">Kent</option>
-                <option value="Arusha">Arusha</option>
-                <option value="Maragogipe">Maragogipe</option>
+                <option value="" disabled ${!lote ? 'selected' : ''} hidden></option>
+                <option value="Catuai" ${selected('variedad', 'Catuai')}>Catuai</option>
+                <option value="Caturra" ${selected('variedad', 'Caturra')}>Caturra</option>
+                <option value="Pacas" ${selected('variedad', 'Pacas')}>Pacas</option>
+                <option value="IHCAFE 90" ${selected('variedad', 'IHCAFE 90')}>IHCAFE 90</option>
+                <option value="Lempira" ${selected('variedad', 'Lempira')}>Lempira</option>
+                <option value="Catimor" ${selected('variedad', 'Catimor')}>Catimor</option>
+                <option value="Parainema" ${selected('variedad', 'Parainema')}>Parainema</option>
+                <option value="Sarchimor" ${selected('variedad', 'Sarchimor')}>Sarchimor</option>
+                <option value="Bourbon" ${selected('variedad', 'Bourbon')}>Bourbon</option>
+                <option value="Geisha" ${selected('variedad', 'Geisha')}>Geisha</option>
+                <option value="Typica" ${selected('variedad', 'Typica')}>Typica</option>
+                <option value="Mundo Novo" ${selected('variedad', 'Mundo Novo')}>Mundo Novo</option>
+                <option value="Villa Sarchi" ${selected('variedad', 'Villa Sarchi')}>Villa Sarchi</option>
+                <option value="Pacamara" ${selected('variedad', 'Pacamara')}>Pacamara</option>
+                <option value="Java" ${selected('variedad', 'Java')}>Java</option>
+                <option value="Ruiru 11" ${selected('variedad', 'Ruiru 11')}>Ruiru 11</option>
+                <option value="SL28" ${selected('variedad', 'SL28')}>SL28</option>
+                <option value="Kent" ${selected('variedad', 'Kent')}>Kent</option>
+                <option value="Arusha" ${selected('variedad', 'Arusha')}>Arusha</option>
+                <option value="Maragogipe" ${selected('variedad', 'Maragogipe')}>Maragogipe</option>
               </select>
               <label>Variedad</label>
             </div>
 
-            <div class="m3-field">
-              <input type="number" name="num_plantas" placeholder=" ">
+            <div class="m3-field ${val('num_plantas') ? 'has-value' : ''}">
+              <input type="number" name="num_plantas" placeholder=" " value="${val('num_plantas')}">
               <label>Número de Plantas</label>
             </div>
 
-            <div class="m3-field">
+            <div class="m3-field ${val('tipo_suelo') ? 'has-value' : ''}">
               <select name="tipo_suelo" required>
-                <option value="" disabled selected hidden></option>
-                <option value="Arcilloso">Arcilloso</option>
-                <option value="Arenoso">Arenoso</option>
-                <option value="Franco">Franco</option>
-                <option value="Franco Arcilloso">Franco Arcilloso</option>
-                <option value="Franco Arenoso">Franco Arenoso</option>
-                <option value="Limoso">Limoso</option>
-                <option value="Franco Limoso">Franco Limoso</option>
-                <option value="Arcilloso Limoso">Arcilloso Limoso</option>
-                <option value="Volcánico">Volcánico</option>
-                <option value="Calcáreo">Calcáreo</option>
-                <option value="Aluvial">Aluvial</option>
-                <option value="Pedregoso">Pedregoso</option>
-                <option value="Orgánico (Humus)">Orgánico (Humus)</option>
+                <option value="" disabled ${!lote ? 'selected' : ''} hidden></option>
+                <option value="Arcilloso" ${selected('tipo_suelo', 'Arcilloso')}>Arcilloso</option>
+                <option value="Arenoso" ${selected('tipo_suelo', 'Arenoso')}>Arenoso</option>
+                <option value="Franco" ${selected('tipo_suelo', 'Franco')}>Franco</option>
+                <option value="Franco Arcilloso" ${selected('tipo_suelo', 'Franco Arcilloso')}>Franco Arcilloso</option>
+                <option value="Franco Arenoso" ${selected('tipo_suelo', 'Franco Arenoso')}>Franco Arenoso</option>
+                <option value="Limoso" ${selected('tipo_suelo', 'Limoso')}>Limoso</option>
+                <option value="Franco Limoso" ${selected('tipo_suelo', 'Franco Limoso')}>Franco Limoso</option>
+                <option value="Arcilloso Limoso" ${selected('tipo_suelo', 'Arcilloso Limoso')}>Arcilloso Limoso</option>
+                <option value="Volcánico" ${selected('tipo_suelo', 'Volcánico')}>Volcánico</option>
+                <option value="Calcáreo" ${selected('tipo_suelo', 'Calcáreo')}>Calcáreo</option>
+                <option value="Aluvial" ${selected('tipo_suelo', 'Aluvial')}>Aluvial</option>
+                <option value="Pedregoso" ${selected('tipo_suelo', 'Pedregoso')}>Pedregoso</option>
+                <option value="Orgánico (Humus)" ${selected('tipo_suelo', 'Orgánico (Humus)')}>Orgánico (Humus)</option>
               </select>
               <label>Tipo de Suelo</label>
             </div>
           </div>
 
-          <div class="m3-field">
-            <textarea name="notas" placeholder=" " rows="3"></textarea>
+          <div class="m3-field ${val('notas') ? 'has-value' : ''}">
+            <textarea name="notas" placeholder=" " rows="3">${val('notas')}</textarea>
             <label>Notas Adicionales</label>
           </div>
 
@@ -165,7 +197,7 @@ export function renderNuevoLote() {
             </button>
             <button type="submit" class="btn-m3-primary">
               <span class="material-icons">save</span>
-              Guardar Lote
+              ${btnLabel}
             </button>
           </div>
         </form>
@@ -181,7 +213,11 @@ async function loadExistingLotes() {
       .select('*');
     
     if (error || !data) return [];
-    return data.filter(l => l.coordenadas_json != null)
+    
+    // Exclude the lote being edited so it doesn't show as dashed overlay
+    const editingId = window.__currentLoteData?.id;
+    
+    return data.filter(l => l.coordenadas_json != null && l.id !== editingId)
                .map(l => ({ id: l.id, nombre: l.nombre, coordenadas_json: l.coordenadas_json, area_ha: l.area_ha }));
   } catch (err) {
     console.error('Error loading lotes:', err);
@@ -465,10 +501,59 @@ function initMap() {
     },
     edit: {
       featureGroup: drawnItems,
-      remove: true
+      remove: true,
+      selectedPathOptions: {
+        color: '#ffffff',
+        fillColor: selectedColor,
+        fillOpacity: 0.5,
+        weight: 2,
+        dashArray: ''
+      }
     }
   });
   mapInstance.addControl(drawControl);
+
+  // ── Toolbar toggle: click button again to close actions pill ──
+  let toolActive = false;
+  mapInstance.on('draw:drawstart draw:editstart', () => { toolActive = true; });
+  mapInstance.on('draw:drawstop draw:editstop', () => { toolActive = false; });
+
+  setTimeout(() => {
+    document.querySelectorAll('.leaflet-draw-toolbar a').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        if (!toolActive) return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+
+        const drawTb = drawControl?._toolbars?.draw;
+        const editTb = drawControl?._toolbars?.edit;
+
+        if (drawTb?._activeHandler) {
+          drawTb._activeHandler.disable();
+          drawTb._deactivate();
+        } else if (editTb?._activeHandler) {
+          editTb._activeHandler.disable();
+          editTb._deactivate();
+        }
+
+        const actions = document.querySelector('.leaflet-draw-actions');
+        if (actions) actions.style.display = 'none';
+
+        toolActive = false;
+      }, true);
+    });
+  }, 500);
+
+  // Remove ghost shape when editing starts (Leaflet.draw creates _originalShape)
+  mapInstance.on('draw:editstart', function() {
+    setTimeout(() => {
+      const overlayPane = document.querySelector('.leaflet-overlay-pane');
+      if (overlayPane) {
+        const paths = overlayPane.querySelectorAll('path[stroke-dasharray]');
+        paths.forEach(p => { p.style.display = 'none'; });
+      }
+    }, 50);
+  });
 
   // On polygon created
   mapInstance.on(L.Draw.Event.CREATED, function (e) {
@@ -521,12 +606,15 @@ function initMap() {
     updateScaleBar();
   });
 
-  // Load existing lotes
+  // Load existing lotes (excludes current editing lote)
   loadExistingLotes().then(lotes => {
+    // Always clear first to avoid duplicates
+    existingLotesLayer.clearLayers();
+    
     lotes.forEach(lote => {
       if (lote.coordenadas_json) {
-        const coords = JSON.parse(lote.coordenadas_json);
-        const latlngs = coords.map(c => [c.lat, c.lng]);
+        const { coordinates } = parseCoordenadasJson(lote.coordenadas_json);
+        const latlngs = coordinates.map(c => [c.lat, c.lng]);
         
         // Main polygon (fill only)
         L.polygon(latlngs, {
@@ -685,9 +773,34 @@ function clearAreaDisplay() {
   if (hint) hint.style.display = 'block';
 }
 
-export function setupNuevoLoteListeners() {
+export async function setupNuevoLoteListeners() {
   const form = document.getElementById('form-nuevo-lote');
   if (!form) return;
+
+  // Capture the lote ID from multiple sources
+  const hiddenInputId = form.querySelector('input[name="lote_id"]')?.value || null;
+  const currentDataId = window.__currentLoteData?.id || null;
+  const loteId = currentDataId || hiddenInputId;
+
+  console.log('[nuevo_lote] Setup - loteId from input:', loteId);
+  console.log('[nuevo_lote] Setup - window.__currentLoteData before refetch:', window.__currentLoteData);
+
+  // Re-fetch lote data if window.__currentLoteData was cleared by previous cleanup
+  let editingLote = window.__currentLoteData;
+  if (loteId && (!editingLote || editingLote.id !== loteId)) {
+    try {
+      const { data, error } = await supabase.from('lotes').select('*').eq('id', loteId).single();
+      if (!error && data) {
+        window.__currentLoteData = data;
+        editingLote = data;
+        console.log('[nuevo_lote] Re-fetched lote data:', data);
+      }
+    } catch (err) {
+      console.warn('[nuevo_lote] Error re-fetching lote:', err);
+    }
+  }
+
+  console.log('[nuevo_lote] Setup - editingLote:', editingLote);
 
   // Register cleanup for when we navigate away
   window.__screenCleanup = () => {
@@ -712,7 +825,60 @@ export function setupNuevoLoteListeners() {
   // Initialize map after DOM is ready
   setTimeout(() => {
     initMap();
-    // Initialize color picker buttons (in case map already init)
+
+    // Draw existing polygon if editing (after map is fully initialized)
+    setTimeout(() => {
+      if (editingLote && editingLote.coordenadas_json && drawnItems) {
+        try {
+          drawnItems.clearLayers(); // Clear any auto-loaded layers
+          
+          // Parse coordinates and get saved color
+          const { coordinates, color: savedColor } = parseCoordenadasJson(editingLote.coordenadas_json);
+          selectedColor = savedColor; // Use the saved color
+          
+          const latlngs = coordinates.map(c => L.latLng(c.lat, c.lng));
+          const polygon = L.polygon(latlngs, {
+            color: '#ffffff',
+            fillColor: selectedColor,
+            fillOpacity: 0.5,
+            weight: 2
+          });
+          drawnItems.addLayer(polygon);
+          
+          // Add glow
+          const glow = L.polygon(latlngs, {
+            color: selectedColor, fillColor: selectedColor, fillOpacity: 0.5, weight: 6, opacity: 0.7
+          });
+          glow._isGlow = true;
+          polygon._glowPolygon = glow;
+          mapInstance.addLayer(glow);
+          
+          // Update color picker to show saved color
+          document.querySelectorAll('.poly-color-btn').forEach(btn => {
+            btn.style.boxShadow = 'none';
+            if (btn.dataset.color === selectedColor) {
+              btn.style.boxShadow = `0 0 0 2px white, 0 0 0 4px ${selectedColor}`;
+            }
+          });
+          
+          mapInstance.fitBounds(polygon.getBounds().pad(0.2));
+          
+          // Show area badge
+          const badge = document.getElementById('area-info-badge');
+          if (badge) badge.style.display = 'flex';
+          const text = document.getElementById('area-calculated-text');
+          if (text && editingLote.area_ha) text.textContent = parseFloat(editingLote.area_ha).toFixed(2) + ' ha';
+          
+          // Show color picker
+          const row = document.getElementById('color-picker-row');
+          if (row) row.style.display = 'flex';
+        } catch (e) {
+          console.warn('Error drawing existing polygon:', e);
+        }
+      }
+    }, 300);
+
+    // Initialize color picker buttons
     document.querySelectorAll('.poly-color-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const color = btn.dataset.color;
@@ -721,13 +887,10 @@ export function setupNuevoLoteListeners() {
         btn.style.boxShadow = `0 0 0 2px white, 0 0 0 4px ${color}`;
         if (drawnItems && drawnItems.getLayers().length > 0) {
           const layer = drawnItems.getLayers()[0];
-          // Remove old glow
           if (layer._glowPolygon && mapInstance.hasLayer(layer._glowPolygon)) {
             mapInstance.removeLayer(layer._glowPolygon);
           }
-          // Apply new style
           layer.setStyle({ color: '#ffffff', fillColor: color, fillOpacity: 0.5, weight: 2 });
-          // Add new glow
           const latlngs = layer.getLatLngs();
           if (latlngs && latlngs[0] && latlngs[0].length > 2) {
             const glow = L.polygon(latlngs, {
@@ -737,7 +900,6 @@ export function setupNuevoLoteListeners() {
             layer._glowPolygon = glow;
             mapInstance.addLayer(glow);
           }
-          // Update badge
           const badge = document.getElementById('area-info-badge');
           if (badge) { badge.style.background = color + '18'; badge.style.borderLeft = `4px solid ${color}`; }
           const text = document.getElementById('area-calculated-text');
@@ -751,28 +913,83 @@ export function setupNuevoLoteListeners() {
     e.preventDefault();
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+    delete data.lote_id;
+
+    console.log('[nuevo_lote] Submit - loteId:', loteId);
+    console.log('[nuevo_lote] Submit - data:', data);
 
     if (data.num_plantas) data.num_plantas = parseInt(data.num_plantas);
     if (data.area_ha) data.area_ha = parseFloat(data.area_ha);
 
-    // Get polygon coordinates if drawn
     if (drawnItems && drawnItems.getLayers().length > 0) {
       const layer = drawnItems.getLayers()[0];
       const latlngs = layer.getLatLngs()[0];
-      data.coordenadas_json = JSON.stringify(latlngs.map(ll => ({ lat: ll.lat, lng: ll.lng })));
+      data.coordenadas_json = JSON.stringify({
+        color: selectedColor,
+        coordinates: latlngs.map(ll => ({ lat: ll.lat, lng: ll.lng }))
+      });
     }
 
     try {
-      const { error } = await supabase.from('lotes').insert([data]);
+      let error;
+      const submitLoteId = loteId || window.__currentLoteData?.id || null;
+      if (submitLoteId) {
+        console.log('[nuevo_lote] UPDATE - loteId:', submitLoteId);
+        const res = await supabase.from('lotes').update(data).eq('id', submitLoteId);
+        error = res.error;
+      } else {
+        console.log('[nuevo_lote] INSERT - creating new lote');
+        const res = await supabase.from('lotes').insert([data]);
+        error = res.error;
+      }
+      
       if (error) throw error;
 
+      // Reload existing lotes layer to show updated data
+      if (existingLotesLayer && mapInstance) {
+        existingLotesLayer.clearLayers();
+        loadExistingLotes().then(lotes => {
+          lotes.forEach(lote => {
+            if (lote.coordenadas_json) {
+              const { coordinates } = parseCoordenadasJson(lote.coordenadas_json);
+              const latlngs = coordinates.map(c => [c.lat, c.lng]);
+              
+              L.polygon(latlngs, {
+                color: '#3e6f39',
+                fillColor: '#3e6f39',
+                fillOpacity: 0.08,
+                weight: 0
+              }).addTo(existingLotesLayer);
+              
+              const borderPoly = L.polygon(latlngs, {
+                color: '#3e6f39',
+                fillColor: 'transparent',
+                fillOpacity: 0,
+                weight: 3,
+                dashArray: '8, 6',
+                lineCap: 'round',
+                lineJoin: 'round',
+                opacity: 0.8
+              }).addTo(existingLotesLayer);
+              
+              borderPoly.bindPopup(`
+                <div style="font-family: 'Work Sans', sans-serif; padding: 8px;">
+                  <h4 style="margin: 0 0 4px 0; color: #3e6f39; font-size: 14px;">${lote.nombre}</h4>
+                  <p style="margin: 0; font-size: 12px; color: #666;">${lote.area_ha} hectáreas</p>
+                </div>
+              `);
+            }
+          });
+        });
+      }
+
       if (window.Snackbar) {
-        window.Snackbar.show('Lote creado exitosamente', { type: 'success' });
+        window.Snackbar.show(loteId ? 'Lote actualizado exitosamente' : 'Lote creado exitosamente', { type: 'success' });
       }
       window.clearScreenCache?.('dashboard');
       window.navigateTo('dashboard');
     } catch (err) {
-      console.error('Error creating lote:', err);
+      console.error('Error saving lote:', err);
       if (window.Snackbar) {
         window.Snackbar.show('Error: ' + err.message, { type: 'error' });
       }

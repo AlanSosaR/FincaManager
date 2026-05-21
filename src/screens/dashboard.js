@@ -1,6 +1,6 @@
 import { supabase } from '../supabase.js';
 
-const LOTES_PAGE_SIZE = 6;
+const LOTES_PAGE_SIZE = 4;
 let currentLotesPage = 1;
 let allLotes = [];
 
@@ -46,10 +46,26 @@ export async function renderDashboard(page) {
       { data: aplicaciones, error: appErr }
     ] = await Promise.all([
       supabase.from('lotes').select('*').order('created_at', { ascending: false }),
-      supabase.from('lote_aplicaciones').select('*, lotes(nombre)').order('fecha', { ascending: false }).limit(5)
+      supabase.from('lote_aplicaciones').select('*, lotes(nombre)').order('fecha', { ascending: false })
     ]);
 
     if (lotesErr) throw lotesErr;
+
+    // Custom sort order for application types
+    const appOrder = {
+      'Limpieza': 1,
+      'Fertilizante': 2,
+      'Manejo de Tejido': 3,
+      'Análisis de Suelo': 4
+    };
+
+    if (aplicaciones) {
+      aplicaciones.sort((a, b) => {
+        const rankA = appOrder[a.tipo] || 99;
+        const rankB = appOrder[b.tipo] || 99;
+        return rankA - rankB;
+      });
+    }
 
     allLotes = lotes || [];
     const totalPlantas = allLotes.reduce((sum, l) => sum + (l.num_plantas || 0), 0) || 0;
@@ -59,7 +75,7 @@ export async function renderDashboard(page) {
 
     return `
       <style>
-        @media (max-width: 1100px) and (min-width: 769px) {
+        @media (min-width: 769px) {
           .db-lotes-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
         @media (max-width: 1024px) {
@@ -99,7 +115,7 @@ export async function renderDashboard(page) {
             <div class="m3-flex m3-items-center m3-gap-2">
               <img src="area.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
               <span class="m3-label-medium m3-text-on-surface-variant">Área total:</span>
-              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${allLotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} ha</span>
+              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${allLotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} hectareas</span>
             </div>
             <div class="m3-flex m3-items-center m3-gap-2">
               <img src="mapa.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
@@ -163,7 +179,7 @@ export async function renderDashboard(page) {
                           <div class="m3-exp-detail-item">
                             <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;">
                             <span class="m3-exp-detail-label">Área</span>
-                            <span class="m3-exp-detail-value">${lote.area_ha || 0} ha</span>
+                            <span class="m3-exp-detail-value">${lote.area_ha ? parseFloat(lote.area_ha).toFixed(2) : '0.00'} hectareas</span>
                           </div>
                         </div>
                         <div class="m3-exp-health-bar">

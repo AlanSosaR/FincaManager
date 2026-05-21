@@ -1,5 +1,43 @@
 /* styles for all detail screens in Finca Manager */
 
+/* ── Calendar ── */
+.cal-nav-btn {
+  background: transparent; border: 1px solid var(--m3-outline); border-radius: 50%;
+  width: 40px; height: 40px; font-size: 22px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: var(--m3-on-surface);
+  transition: background 0.2s; font-weight: 700; line-height: 1;
+}
+.cal-nav-btn:hover { background: rgba(0,0,0,0.05); }
+.cal-view-btn {
+  background: transparent; border: 1px solid var(--m3-outline); border-radius: 9999px;
+  padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  color: var(--m3-on-surface-variant); font-family: 'Work Sans', sans-serif;
+  transition: all 0.2s;
+}
+.cal-view-btn.active { background: var(--m3-primary); color: white; border-color: var(--m3-primary); }
+.cal-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+  margin-bottom: 4px;
+}
+.cal-weekday {
+  text-align: center; font-size: 11px; font-weight: 700; color: var(--m3-on-surface-variant);
+  padding: 8px 0; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-day {
+  aspect-ratio: 1; border-radius: 12px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; cursor: pointer; position: relative;
+  background: var(--m3-surface-container-low); transition: all 0.15s; min-height: 48px;
+}
+.cal-day:hover { background: var(--m3-surface-container-highest); }
+.cal-day-empty { background: transparent; cursor: default; }
+.cal-day-today { border: 2px solid var(--m3-primary); }
+.cal-day-work { background: rgba(46,125,50,0.15); }
+.cal-day-rest { background: rgba(198,40,40,0.1); }
+.cal-day-sun .cal-day-num { color: var(--m3-error); }
+.cal-day-num { font-size: 14px; font-weight: 700; color: var(--m3-on-surface); line-height: 1; }
+.cal-day-label { font-size: 10px; margin-top: 2px; line-height: 1; }
+
 .btn-back {
   display: inline-flex;
   align-items: center;
