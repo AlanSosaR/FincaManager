@@ -256,6 +256,18 @@ CREATE POLICY "Allow public insert personal_asistencia" ON personal_asistencia F
 CREATE POLICY "Allow public update personal_asistencia" ON personal_asistencia FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public delete personal_asistencia" ON personal_asistencia FOR DELETE USING (true);
 
--- (And so on for all other tables... omitted for brevity here but should be in full schema)
--- To keep schema.sql clean, you can use a loop in SQL to apply these if running manually.
+-- 16. ASIGNACIÓN DE PERSONAL A LOTES
+CREATE TABLE lote_personal (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lote_id UUID REFERENCES lotes(id) ON DELETE CASCADE,
+  personal_id UUID REFERENCES personal(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(lote_id, personal_id)
+);
+
+ALTER TABLE lote_personal ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read lote_personal" ON lote_personal FOR SELECT USING (true);
+CREATE POLICY "Allow public insert lote_personal" ON lote_personal FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public delete lote_personal" ON lote_personal FOR DELETE USING (true);
 

@@ -8,10 +8,10 @@ function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-export async function renderDetallePersonal(id, loteId) {
+export async function renderDetallePersonal(personalId, returnScreen, returnId) {
   const [persona, asistencia] = await Promise.all([
-    supabase.from('personal').select('*').eq('id', id).single().then(r => r.data),
-    supabase.from('personal_asistencia').select('*').eq('personal_id', id).order('fecha', { ascending: false }).then(r => r.data || [])
+    supabase.from('personal').select('*').eq('id', personalId).single().then(r => r.data),
+    supabase.from('personal_asistencia').select('*').eq('personal_id', personalId).order('fecha', { ascending: false }).then(r => r.data || [])
   ]);
 
   if (!persona) return '<div class="m3-p-4" style="color:red;">Personal no encontrado</div>';
@@ -23,10 +23,14 @@ export async function renderDetallePersonal(id, loteId) {
   const month = today.getMonth();
   const year = today.getFullYear();
 
+  const backAction = returnScreen === 'detalle_lote'
+    ? `window.navigateTo('detalle_lote', '${returnId}')`
+    : `window.navigateTo('personal')`;
+
   return `
     <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-4xl m3-mx-auto m3-font-work-sans">
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-        <button onclick="window.navigateTo('detalle_lote', '${loteId}')" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--m3-on-surface); transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
+        <button onclick="${backAction}" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--m3-on-surface); transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
           <span class="material-icons">arrow_back</span>
         </button>
         <h2 class="m3-title-large m3-font-bold" style="margin:0;">Detalle de Personal</h2>
@@ -35,11 +39,13 @@ export async function renderDetallePersonal(id, loteId) {
       <div class="m3-card m3-p-8" style="border-radius: 32px; margin-bottom: 24px;">
         <div style="display: flex; align-items: center; gap: 16px;">
           <div style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 28px; background: ${getColor(persona.nombre)}; color: white; flex-shrink: 0;">${persona.iniciales}</div>
-          <div>
+          <div style="flex: 1;">
             <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="font-size: 28px;">${persona.nombre}</h1>
             <p class="m3-label-large m3-text-on-surface-variant m3-font-medium">${persona.rol || 'Sin rol'}</p>
-            <p class="m3-label-medium m3-text-primary m3-font-bold" style="margin-top: 4px;">Pago diario: L${Number(persona.pago_diario || 0).toLocaleString('es-HN')}</p>
           </div>
+        </div>
+        <div id="cal-summary" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--m3-outline-variant);">
+          ${renderSummary(asistencia, persona.pago_diario)}
         </div>
       </div>
 
@@ -61,9 +67,6 @@ export async function renderDetallePersonal(id, loteId) {
           ${renderMonthView(month, year, asisMap)}
         </div>
 
-        <div id="cal-summary" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--m3-outline-variant);">
-          ${renderSummary(asistencia, persona.pago_diario)}
-        </div>
       </div>
     </div>
   `;
@@ -218,9 +221,8 @@ function renderSummary(asistencia, pagoDiario) {
   `;
 }
 
-export function initDetallePersonal(_personalId, _loteId) {
-  const personalId = _personalId;
-  const loteId = _loteId;
+export function initDetallePersonal(personalId, returnScreen, returnId) {
+  const _personalId = personalId;
 
   let currentView = 'month';
   let calDate = new Date();
@@ -237,7 +239,7 @@ export function initDetallePersonal(_personalId, _loteId) {
       const mLbl = ws.getMonth() === we.getMonth()
         ? MONTHS[ws.getMonth()]
         : `${MONTHS[ws.getMonth()]} - ${MONTHS[we.getMonth()]}`;
-      return `Semana ${ws.getDate()} - ${we.getDate()} ${mLBl} ${ws.getFullYear()}`;
+      return `Semana ${ws.getDate()} - ${we.getDate()} ${mLbl} ${ws.getFullYear()}`;
     }
     return `${DAYS_FULL[calDate.getDay()]}, ${calDate.getDate()} de ${MONTHS[calDate.getMonth()]} ${calDate.getFullYear()}`;
   }
@@ -253,13 +255,13 @@ export function initDetallePersonal(_personalId, _loteId) {
     const { data: asistencia } = await supabase
       .from('personal_asistencia')
       .select('*')
-      .eq('personal_id', personalId)
+      .eq('personal_id', _personalId)
       .order('fecha', { ascending: false });
 
     const asisMap = {};
     (asistencia || []).forEach(a => { asisMap[a.fecha] = a.estado; });
 
-    const { data: persona } = await supabase.from('personal').select('pago_diario').eq('id', personalId).single();
+    const { data: persona } = await supabase.from('personal').select('pago_diario').eq('id', _personalId).single();
 
     const calContainer = document.getElementById('cal-container');
     if (calContainer) {
@@ -304,7 +306,7 @@ export function initDetallePersonal(_personalId, _loteId) {
     const { data: existente } = await supabase
       .from('personal_asistencia')
       .select('*')
-      .eq('personal_id', personalId)
+      .eq('personal_id', _personalId)
       .eq('fecha', dateStr)
       .maybeSingle();
 
@@ -312,7 +314,7 @@ export function initDetallePersonal(_personalId, _loteId) {
       const newEstado = existente.estado === 'trabajo' ? 'descanso' : 'trabajo';
       await supabase.from('personal_asistencia').update({ estado: newEstado }).eq('id', existente.id);
     } else {
-      await supabase.from('personal_asistencia').insert([{ personal_id: personalId, fecha: dateStr, estado: 'trabajo' }]);
+      await supabase.from('personal_asistencia').insert([{ personal_id: _personalId, fecha: dateStr, estado: 'trabajo' }]);
     }
     refreshCalendar();
   };
@@ -322,14 +324,14 @@ export function initDetallePersonal(_personalId, _loteId) {
     const { data: existente } = await supabase
       .from('personal_asistencia')
       .select('*')
-      .eq('personal_id', personalId)
+      .eq('personal_id', _personalId)
       .eq('fecha', dateStr)
       .maybeSingle();
 
     if (existente) {
       await supabase.from('personal_asistencia').update({ estado }).eq('id', existente.id);
     } else {
-      await supabase.from('personal_asistencia').insert([{ personal_id: personalId, fecha: dateStr, estado }]);
+      await supabase.from('personal_asistencia').insert([{ personal_id: _personalId, fecha: dateStr, estado }]);
     }
     refreshCalendar();
   };

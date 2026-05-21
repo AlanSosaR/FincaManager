@@ -40,7 +40,6 @@ export async function renderNuevoLote(id) {
 
   return `
     <div class="m3-form-screen">
-      <input type="hidden" name="lote_id" value="${id || ''}">
       <div class="m3-form-card">
         <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
           <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
@@ -53,6 +52,7 @@ export async function renderNuevoLote(id) {
         </div>
 
         <form id="form-nuevo-lote">
+          <input type="hidden" name="area_ha" id="area-ha-input" value="0">
           <div class="m3-grid-2col">
             <div class="m3-field ${val('nombre') ? 'has-value' : ''}">
               <input type="text" name="nombre" placeholder=" " value="${val('nombre')}" required>
@@ -275,8 +275,8 @@ function initMap() {
     terrain: terrainLayer
   };
 
-  // Track which base layer is active
-  let isSatellite = false;
+  // Track which base layer is active (0=street, 1=satellite, 2=terrain)
+  let layerMode = 0;
 
   // ── Tile error handler: show warning when tiles fail ──
   mapInstance.on('tileerror', function(e) {
@@ -677,25 +677,31 @@ function initMap() {
     });
   }
 
-  // Layers toggle - switch street/satellite
+  // Layers toggle - switch street / satellite / terrain
   const btnLayers = document.getElementById('btn-toggle-layers');
   const layersLabel = document.getElementById('layers-label');
   if (btnLayers) {
     btnLayers.addEventListener('click', () => {
-      isSatellite = !isSatellite;
-      if (isSatellite) {
-        mapInstance.removeLayer(streetLayer);
+      layerMode = (layerMode + 1) % 3;
+      mapInstance.removeLayer(streetLayer);
+      mapInstance.removeLayer(satelliteLayer);
+      mapInstance.removeLayer(labelsLayer);
+      mapInstance.removeLayer(terrainLayer);
+      if (layerMode === 0) {
+        mapInstance.addLayer(streetLayer);
+        btnLayers.style.background = '';
+        btnLayers.style.color = '';
+        if (layersLabel) layersLabel.textContent = 'Satélite';
+      } else if (layerMode === 1) {
         mapInstance.addLayer(satelliteLayer);
         mapInstance.addLayer(labelsLayer);
         btnLayers.style.background = '#e8f5e9';
         btnLayers.style.color = '#2e7d32';
-        if (layersLabel) layersLabel.textContent = 'Mapa';
+        if (layersLabel) layersLabel.textContent = 'Relieve';
       } else {
-        mapInstance.removeLayer(satelliteLayer);
-        mapInstance.removeLayer(labelsLayer);
-        mapInstance.addLayer(streetLayer);
-        btnLayers.style.background = '';
-        btnLayers.style.color = '';
+        mapInstance.addLayer(terrainLayer);
+        btnLayers.style.background = '#fff3e0';
+        btnLayers.style.color = '#e65100';
         if (layersLabel) layersLabel.textContent = 'Satélite';
       }
     });

@@ -17,10 +17,12 @@ export async function renderDetalleLote(id) {
     const [
       { data: lote, error: loteErr },
       { data: aplicaciones, error: appErr },
-      { data: personal, error: personalErr }
+      { data: asignaciones, error: asigErr },
+      { data: todoPersonal, error: personalErr }
     ] = await Promise.all([
       supabase.from('lotes').select('*').eq('id', id).single(),
       supabase.from('lote_aplicaciones').select('*').eq('lote_id', id).order('fecha', { ascending: false }),
+      supabase.from('lote_personal').select('id, personal:personal_id(*)').eq('lote_id', id),
       supabase.from('personal').select('*').order('nombre', { ascending: true })
     ]);
 
@@ -28,6 +30,9 @@ export async function renderDetalleLote(id) {
 
     const fertilizantes = (aplicaciones || []).filter(a => a.tipo === 'Fertilizante');
     const otrosApps = (aplicaciones || []).filter(a => a.tipo !== 'Fertilizante');
+    const asignados = (asignaciones || []).map(a => a.personal);
+    const asignadosIds = new Set(asignados.map(p => p.id));
+    const disponibles = (todoPersonal || []).filter(p => !asignadosIds.has(p.id));
 
     return `
       <style>
@@ -55,37 +60,56 @@ export async function renderDetalleLote(id) {
         </section>
 
         <div class="m3-grid m3-grid-4 m3-gap-8">
-          <!-- Map - first in DOM for mobile -->
+          <!-- Map + Personal -->
           <div class="dl-map-grid-cell" style="grid-column: 4; grid-row: 1; ${lote.coordenadas_json ? '' : 'display: none;'}" id="dl-map-grid-wrapper">
             <div class="m3-flex m3-items-center m3-gap-2 m3-text-on-surface-variant m3-label-medium m3-font-bold m3-mb-3" style="padding-left: 4px;">
               <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;"> ${lote.area_ha || 0} Hectáreas
             </div>
             <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' class="m3-card m3-p-8" style="border-radius: 32px; height: 180px; overflow: hidden;"></div>
-            <!-- Personal Asignado - moved here to sit right below map -->
-            <div class="m3-card m3-p-8" style="border-radius: 32px; margin-top: 24px;">
+            <!-- Personal Asignado -->
+            <div class="m3-card m3-p-6" style="border-radius: 32px; margin-top: 24px;">
               <h3 class="m3-title-large m3-font-bold m3-mb-6 m3-flex m3-items-center m3-gap-2" style="white-space: nowrap;">
                 <span class="material-symbols-outlined m3-text-primary">groups</span>
                 Personal Asignado
+                <span class="m3-label-medium m3-text-on-surface-variant" style="font-weight: 400; margin-left: 2px;">(${asignados.length})</span>
               </h3>
-              <div class="m3-flex m3-flex-col m3-gap-6" id="personal-list">
-                ${(personal || []).length > 0 ? personal.map(p => `
-                <div class="m3-flex m3-items-center m3-justify-between dl-person-row" style="cursor: pointer;" onclick="window.navigateTo('detalle_personal', '${p.id}', '${id}')">
-                  <div class="m3-flex m3-items-center m3-gap-3">
-                    <div class="m3-size-10 m3-rounded-full m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 12px; background: ${getAvatarColor(p.nombre)}; color: white;">${p.iniciales || getInitiales(p.nombre)}</div>
+
+              <div class="m3-flex m3-flex-col" style="gap: 14px;" id="personal-list">
+                ${asignados.length > 0 ? asignados.map(p => `
+                <div class="m3-flex m3-items-center m3-justify-between" style="cursor: pointer; padding: 14px 18px; background: var(--m3-surface-container-low); border-radius: 18px; transition: background 0.2s;" onclick="window.navigateTo('detalle_personal', '${p.id}', 'detalle_lote', '${id}')" onmouseover="this.style.background='var(--m3-surface-container-highest)'" onmouseout="this.style.background='var(--m3-surface-container-low)'">
+                  <div class="m3-flex m3-items-center" style="gap: 14px;">
+                    <div class="m3-rounded-full m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 14px; width: 42px; height: 42px; background: ${getAvatarColor(p.nombre)}; color: white; flex-shrink: 0;">${p.iniciales || getInitiales(p.nombre)}</div>
                     <div>
-                      <p class="m3-label-medium m3-font-bold m3-text-on-surface dl-person-name">${p.nombre}</p>
-                      <p class="m3-text-on-surface-variant" style="font-size: 10px; font-weight: 500;">${p.rol || ''}</p>
+                      <p class="m3-label-medium m3-font-bold m3-text-on-surface">${p.nombre}</p>
+                      <p class="m3-label-small m3-text-on-surface-variant" style="margin-top: 2px;">${p.rol || ''}</p>
                     </div>
                   </div>
-                  <span class="material-symbols-outlined m3-text-outline-variant" style="font-size: 20px; cursor: pointer;">chevron_right</span>
+                  <div class="m3-flex m3-items-center" style="gap: 6px;">
+                    <span class="material-symbols-outlined m3-text-outline-variant" style="font-size: 20px; cursor: pointer; padding: 6px; border-radius: 50%;" onclick="event.stopPropagation(); window.removePersonalFromLote('${id}', '${p.id}')" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'">remove_circle_outline</span>
+                    <span class="material-symbols-outlined m3-text-outline-variant" style="font-size: 20px;">chevron_right</span>
+                  </div>
                 </div>
                 `).join('') : `
-                <div class="m3-p-4 m3-text-center m3-text-on-surface-variant m3-label-medium" style="border: 2px dashed var(--m3-outline-variant); border-radius: 16px;">
+                <div class="m3-p-8 m3-text-center m3-text-on-surface-variant m3-label-medium" style="background: var(--m3-surface-container-low); border-radius: 18px;">
+                  <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.35;">group_off</span>
                   Sin personal asignado
                 </div>
                 `}
-                <button id="btn-add-personal" class="m3-w-full m3-text-primary m3-label-large m3-font-bold m3-cursor-pointer" style="background: transparent; border: 2px dashed var(--m3-primary); border-radius: 16px; padding: 0 24px; height: 56px; transition: all 0.2s;" onclick="window.navigateTo('nuevo_personal', '${id}')" onmouseover="this.style.background='color-mix(in srgb, var(--m3-primary) 8%, transparent)'" onmouseout="this.style.background='transparent'">
-                  + Asignar más personal
+              </div>
+
+              <!-- Assign personnel -->
+              <div class="m3-flex m3-items-center m3-gap-4" style="flex-wrap: wrap; margin-top: 32px;">
+                <div class="m3-field" style="flex: 1; min-width: 180px; margin-bottom: 0;">
+                  <select id="select-asignar-personal" style="width: 100%; padding: 14px 20px; border-radius: 9999px; border: 1.5px solid var(--m3-outline); background: var(--m3-surface-container-low); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--m3-on-surface); cursor: pointer; outline: none; appearance: none;">
+                    <option value="" disabled selected>Seleccionar persona</option>
+                    ${disponibles.map(p => `
+                      <option value="${p.id}">${p.nombre}${p.rol ? ' — ' + p.rol : ''}</option>
+                    `).join('')}
+                  </select>
+                </div>
+                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="padding: 14px 32px; border-radius: 9999px; border: none; background: var(--m3-primary); color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; white-space: nowrap; box-shadow: 0 4px 12px rgba(62,111,57,0.3);">
+                  <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
+                  Agregar
                 </button>
               </div>
             </div>
@@ -141,7 +165,7 @@ export async function renderDetalleLote(id) {
             <div class="m3-card m3-p-8" style="border-radius: 32px;">
               <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
                 <div class="m3-flex m3-items-center m3-gap-3">
-                  <img src="poda-de-jardin.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
+                  <img src="tijeras-de-podar.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
                   <h2 class="m3-headline-small m3-font-bold m3-text-on-surface">Podas y Limpieza</h2>
                 </div>
               </div>
@@ -214,6 +238,39 @@ export async function renderDetalleLote(id) {
 
 export function initDetalleLote(id) {
   window.showModal = showModal;
+
+  window.assignPersonalToLote = async (loteId) => {
+    const select = document.getElementById('select-asignar-personal');
+    const personalId = select?.value;
+    if (!personalId) {
+      window.Snackbar?.show('Selecciona una persona', { type: 'warning' });
+      return;
+    }
+    const { error } = await supabase.from('lote_personal').insert([{ lote_id: loteId, personal_id: personalId }]);
+    if (error) {
+      window.Snackbar?.show('Error: ' + error.message, { type: 'error' });
+    } else {
+      window.Snackbar?.show('Personal asignado');
+      window.clearScreenCache?.('detalle_lote');
+      window.navigateTo('detalle_lote', loteId);
+    }
+  };
+
+  window.removePersonalFromLote = async (loteId, personalId) => {
+    window.Snackbar?.confirm('¿Quitar esta persona del lote?', async () => {
+      const { error } = await supabase.from('lote_personal')
+        .delete()
+        .eq('lote_id', loteId)
+        .eq('personal_id', personalId);
+      if (error) {
+        window.Snackbar?.show('Error: ' + error.message, { type: 'error' });
+      } else {
+        window.Snackbar?.show('Personal removido');
+        window.clearScreenCache?.('detalle_lote');
+        window.navigateTo('detalle_lote', loteId);
+      }
+    });
+  };
 
   window.toggleFabMenu = () => {
     const actions = document.getElementById('fab-actions');

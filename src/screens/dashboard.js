@@ -136,7 +136,6 @@ export async function renderDashboard(page) {
               <div class="m3-grid m3-grid-2 m3-gap-6 db-lotes-grid">
                 ${pageLotes.length > 0 ? pageLotes.map((lote, index) => {
                   const seed = encodeURIComponent(lote.id);
-                  const statusColor = lote.salud_porcentaje > 80 ? 'bg-primary' : (lote.salud_porcentaje > 50 ? 'bg-secondary' : 'bg-error');
                   const badgeColors = ['tertiary', 'secondary', 'primary'];
                   const theme = badgeColors[index % badgeColors.length];
                   
@@ -150,9 +149,6 @@ export async function renderDashboard(page) {
                             <span>${lote.variedad || 'Variedad'}</span>
                           </div>
                           <div class="m3-exp-card-actions">
-                            <div class="m3-exp-health-chip">
-                              <span>${lote.salud_porcentaje || 0}%</span>
-                            </div>
                             <div class="m3-action-menu-container">
                               <button class="m3-exp-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)">
                                 <span class="material-symbols-outlined">more_vert</span>
@@ -180,11 +176,6 @@ export async function renderDashboard(page) {
                             <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;">
                             <span class="m3-exp-detail-label">Área</span>
                             <span class="m3-exp-detail-value">${lote.area_ha ? parseFloat(lote.area_ha).toFixed(2) : '0.00'} hectareas</span>
-                          </div>
-                        </div>
-                        <div class="m3-exp-health-bar">
-                          <div class="m3-exp-health-track">
-                            <div class="m3-exp-health-fill m3-exp-health-${statusColor.replace('bg-', '')}" style="width: ${lote.salud_porcentaje || 0}%"></div>
                           </div>
                         </div>
                       </div>

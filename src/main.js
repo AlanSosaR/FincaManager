@@ -25,6 +25,7 @@ import { renderDetalleLote, initDetalleLote } from './screens/detalle_lote.js';
 import { renderNuevaActividad, initNuevaActividad } from './screens/nueva_actividad.js';
 import { renderNuevoPersonal, initNuevoPersonal } from './screens/nuevo_personal.js';
 import { renderDetallePersonal, initDetallePersonal } from './screens/detalle_personal.js';
+import { renderListaPersonal, initListaPersonal } from './screens/lista_personal.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -33,6 +34,7 @@ const screens = {
     herramientas: { title: 'Inventario de Herramientas', render: renderHerramientas },
     ganado: { title: 'Gestión de Ganado', render: renderGanado },
     potreros: { title: 'Control de Potreros', render: renderPotreros },
+    personal: { title: 'Personal', render: renderListaPersonal },
     detalle_motor: { title: 'Detalle de Motor', backTo: 'motores', render: renderDetalleMotor },
     detalle_potrero: { title: 'Detalle de Potrero', backTo: 'potreros', render: renderDetallePotrero },
     detalle_animal: { title: 'Detalle de Animal', backTo: 'ganado', render: renderDetalleAnimal },
@@ -43,8 +45,8 @@ const screens = {
     nuevo_lote:    { title: 'Nuevo Lote de Cafetal', backTo: 'dashboard', render: (id) => renderNuevoLote(id) },
     detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote },
     nueva_actividad: { title: 'Nueva Actividad', backTo: 'dashboard', render: renderNuevaActividad },
-    nuevo_personal: { title: 'Nuevo Personal', backTo: 'detalle_lote', render: renderNuevoPersonal },
-    detalle_personal: { title: 'Detalle de Personal', backTo: 'detalle_lote', render: renderDetallePersonal }
+    nuevo_personal: { title: 'Nuevo Personal', render: renderNuevoPersonal },
+    detalle_personal: { title: 'Detalle de Personal', render: renderDetallePersonal }
 };
 
 console.log('[DEBUG] Registered screens:', Object.keys(screens));
@@ -90,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const NO_CACHE = new Set(['ganado','nuevo_motor','nuevo_animal','nuevo_potrero',
                                'detalle_motor','detalle_animal','detalle_potrero',
                                'detalle_herramienta','nuevo_lote','detalle_lote',
-                               'nueva_actividad','nuevo_personal','detalle_personal']);
+                               'nueva_actividad','nuevo_personal','detalle_personal','personal']);
 
     window.clearScreenCache = (screenId) => {
       for (const key of viewCache.keys()) {
@@ -129,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'motores')      initMotores();
         if (screenId === 'herramientas') initHerramientas();
         if (screenId === 'ganado')       initGanado();
+        if (screenId === 'personal')     initListaPersonal();
         if (screenId === 'nuevo_animal') initNuevoAnimal(...args);
         if (screenId === 'detalle_animal') initDetalleAnimal(...args);
         if (screenId === 'nuevo_potrero')  initNuevoPotrero(...args);
@@ -155,18 +158,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (screenCfg && screenCfg.backTo) {
                 return navigate(screenCfg.backTo);
             }
-            return navigate('motores');
+            return navigate('dashboard');
         }
         if (FORM_SCREENS.has(screenId) && args.length > 0 && !args[0]) {
             const screenCfg = screens[screenId];
             if (screenCfg && screenCfg.backTo) {
                 return navigate(screenCfg.backTo);
             }
-            return navigate('motores');
+            return navigate('dashboard');
         }
 
         console.log('[DEBUG] Navigating to:', screenId, args);
-        const screen = screens[screenId] || screens.motores;
+        const screen = screens[screenId] || screens.dashboard;
         
         if (screen.backTo) {
             titleElement.innerHTML = `
@@ -270,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial load based on hash
     const hashParams = window.location.hash.replace('#', '').split('/');
-    const initialScreen = hashParams[0] || 'motores';
+    const initialScreen = hashParams[0] || 'dashboard';
     const initArgs = hashParams.slice(1);
     navigate(initialScreen, ...initArgs);
 

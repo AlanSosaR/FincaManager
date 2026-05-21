@@ -1,11 +1,16 @@
 import { supabase } from '../supabase.js';
 
-export async function renderNuevoPersonal(loteId) {
+export async function renderNuevoPersonal(returnScreen, returnId) {
+  const isFromLote = returnScreen === 'detalle_lote';
+  const backAction = isFromLote
+    ? `window.navigateTo('detalle_lote', '${returnId}')`
+    : `window.navigateTo('lista_personal')`;
+
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-          <button onclick="window.navigateTo('detalle_lote', '${loteId}')" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--m3-on-surface); transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
+          <button onclick="${backAction}" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--m3-on-surface); transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
             <span class="material-icons">arrow_back</span>
           </button>
           <div>
@@ -33,7 +38,7 @@ export async function renderNuevoPersonal(loteId) {
           </div>
 
           <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0; display: flex; justify-content: flex-end; gap: 12px;">
-            <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('detalle_lote', '${loteId}')" style="padding: 12px 24px; border-radius: 9999px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
+            <button type="button" class="da-action-btn secondary" onclick="${backAction}" style="padding: 12px 24px; border-radius: 9999px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
               Cancelar
             </button>
             <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: var(--m3-primary); border: none; color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(62,111,57,0.3); font-family: 'Work Sans', sans-serif;">
@@ -47,7 +52,7 @@ export async function renderNuevoPersonal(loteId) {
   `;
 }
 
-export function initNuevoPersonal(loteId) {
+export function initNuevoPersonal(returnScreen, returnId) {
   const form = document.getElementById('form-nuevo-personal');
   if (!form) return;
 
@@ -63,8 +68,14 @@ export function initNuevoPersonal(loteId) {
       if (error) throw error;
 
       window.Snackbar.show('Personal registrado');
-      window.clearScreenCache?.('detalle_lote');
-      window.navigateTo('detalle_lote', loteId);
+
+      const isFromLote = returnScreen === 'detalle_lote';
+      if (isFromLote) {
+        window.clearScreenCache?.('detalle_lote');
+        window.navigateTo('detalle_lote', returnId);
+      } else {
+        window.navigateTo('personal');
+      }
     } catch (err) {
       console.error(err);
       window.Snackbar.show('Error: ' + err.message, { type: 'error' });
