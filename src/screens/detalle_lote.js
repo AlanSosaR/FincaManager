@@ -312,26 +312,38 @@ export function initDetalleLote(id) {
       }
       if (coords && coords.length > 2) {
         const latlngs = coords.map(c => [c.lat, c.lng]);
-        const map = L.map(mapContainer, {
-          zoomControl: false,
-          attributionControl: false,
-          dragging: false,
-          scrollWheelZoom: false,
-          doubleClickZoom: false,
-          touchZoom: false,
-          keyboard: false
-        });
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 19,
-          attribution: 'Tiles &copy; Esri'
-        }).addTo(map);
-        const polygon = L.polygon(latlngs, {
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.2,
-          weight: 2
-        }).addTo(map);
-        map.fitBounds(polygon.getBounds().pad(0.15));
+        setTimeout(() => {
+          const map = L.map(mapContainer, {
+            zoomControl: false,
+            attributionControl: false,
+            dragging: false,
+            scrollWheelZoom: false,
+            doubleClickZoom: false,
+            touchZoom: false,
+            keyboard: false
+          });
+          const tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            maxNativeZoom: 18,
+            attribution: 'Tiles &copy; Esri'
+          }).addTo(map);
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 19,
+            opacity: 0.8
+          }).addTo(map);
+          tileLayer.on('tileerror', (e) => {
+            console.warn('[detalle_lote] Tile failed:', e.tile.src);
+          });
+          const polygon = L.polygon(latlngs, {
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.2,
+            weight: 2
+          }).addTo(map);
+          map.fitBounds(polygon.getBounds().pad(0.15));
+          setTimeout(() => map.invalidateSize(), 300);
+        }, 200);
       }
     } catch (e) {
       console.warn('Error loading map:', e);
