@@ -180,19 +180,18 @@ function renderDayView(date, asisMap) {
   `;
 }
 
-function renderSummary(asistencia, pagoDiario) {
+function renderSummary(asistencia, pagoDiario, month, year) {
   const diario = Number(pagoDiario || 0);
   const trabajados = (asistencia || []).filter(a => a.estado === 'trabajo');
 
   const today = new Date();
+  const targetMonth = month ?? today.getMonth();
+  const targetYear = year ?? today.getFullYear();
   const weekStart = new Date(today);
   weekStart.setDate(today.getDate() - today.getDay() + 1);
   weekStart.setHours(0,0,0,0);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
-
-  const thisMonth = today.getMonth();
-  const thisYear = today.getFullYear();
 
   const weekAsistencia = trabajados.filter(a => {
     const d = new Date(a.fecha + 'T00:00:00');
@@ -201,7 +200,7 @@ function renderSummary(asistencia, pagoDiario) {
 
   const monthAsistencia = trabajados.filter(a => {
     const d = new Date(a.fecha + 'T00:00:00');
-    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+    return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
   });
 
   const daysThisWeek = weekAsistencia.length;
@@ -217,7 +216,7 @@ function renderSummary(asistencia, pagoDiario) {
         <p class="m3-label-medium m3-font-bold">L${weekTotal.toLocaleString('es-HN')}</p>
       </div>
       <div class="m3-p-4 m3-bg-surface-container m3-rounded-2xl">
-        <p class="m3-label-small m3-text-on-surface-variant">${MONTHS[thisMonth]} ${thisYear}</p>
+        <p class="m3-label-small m3-text-on-surface-variant">${MONTHS[targetMonth]} ${targetYear}</p>
         <p class="m3-title-large m3-font-bold m3-text-primary">${daysThisMonth} días</p>
         <p class="m3-label-medium m3-font-bold">L${monthTotal.toLocaleString('es-HN')}</p>
       </div>
@@ -287,7 +286,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
 
     const summary = document.getElementById('cal-summary');
     if (summary) {
-      summary.innerHTML = renderSummary(asistencia || [], persona?.pago_diario);
+      summary.innerHTML = renderSummary(asistencia || [], persona?.pago_diario, calDate.getMonth(), calDate.getFullYear());
     }
   }
 
