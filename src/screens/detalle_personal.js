@@ -191,15 +191,23 @@ function renderSummary(asistencia, pagoDiario) {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
 
+  const thisMonth = today.getMonth();
+  const thisYear = today.getFullYear();
+
   const weekAsistencia = trabajados.filter(a => {
     const d = new Date(a.fecha + 'T00:00:00');
     return d >= weekStart && d <= weekEnd;
   });
 
+  const monthAsistencia = trabajados.filter(a => {
+    const d = new Date(a.fecha + 'T00:00:00');
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  });
+
   const daysThisWeek = weekAsistencia.length;
   const weekTotal = daysThisWeek * diario;
-  const totalDias = trabajados.length;
-  const totalPagado = totalDias * diario;
+  const daysThisMonth = monthAsistencia.length;
+  const monthTotal = daysThisMonth * diario;
 
   return `
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
@@ -209,9 +217,9 @@ function renderSummary(asistencia, pagoDiario) {
         <p class="m3-label-medium m3-font-bold">L${weekTotal.toLocaleString('es-HN')}</p>
       </div>
       <div class="m3-p-4 m3-bg-surface-container m3-rounded-2xl">
-        <p class="m3-label-small m3-text-on-surface-variant">Total histórico</p>
-        <p class="m3-title-large m3-font-bold m3-text-primary">${totalDias} días</p>
-        <p class="m3-label-medium m3-font-bold">L${totalPagado.toLocaleString('es-HN')}</p>
+        <p class="m3-label-small m3-text-on-surface-variant">${MONTHS[thisMonth]} ${thisYear}</p>
+        <p class="m3-title-large m3-font-bold m3-text-primary">${daysThisMonth} días</p>
+        <p class="m3-label-medium m3-font-bold">L${monthTotal.toLocaleString('es-HN')}</p>
       </div>
       <div class="m3-p-4 m3-bg-surface-container m3-rounded-2xl">
         <p class="m3-label-small m3-text-on-surface-variant">Pago por día</p>

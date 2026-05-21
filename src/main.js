@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
-    const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad','nuevo_personal']);
+    const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad']);
 
     async function navigate(screenId, ...args) {
         // Guard: screens that require an ID but got none → redirect to parent

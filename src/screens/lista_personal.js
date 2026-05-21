@@ -52,6 +52,69 @@ export async function renderListaPersonal() {
           font-size: 20px;
           flex-shrink: 0;
         }
+        .lp-card-right {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          position: relative;
+        }
+        .lp-btn-more {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--m3-outline-variant);
+          transition: background 0.2s;
+        }
+        .lp-btn-more:hover {
+          background: rgba(0,0,0,0.05);
+        }
+        .action-menu {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          z-index: 100;
+          background: var(--m3-surface-container-high, #fff);
+          border-radius: 16px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+          padding: 6px;
+          min-width: 160px;
+          display: none;
+          overflow: hidden;
+        }
+        .action-menu.active {
+          display: block;
+        }
+        .action-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border: none;
+          background: none;
+          cursor: pointer;
+          font-family: 'Work Sans', sans-serif;
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--m3-on-surface);
+          width: 100%;
+          text-align: left;
+          border-radius: 12px;
+          transition: background 0.15s;
+        }
+        .action-item:hover {
+          background: var(--m3-surface-container-highest, rgba(0,0,0,0.05));
+        }
+        .action-item.delete {
+          color: var(--m3-error, #b3261e);
+        }
+        .action-item .material-icons {
+          font-size: 20px;
+        }
         @media (max-width: 768px) {
           .lp-card { padding: 14px 16px; }
         }
@@ -69,25 +132,37 @@ export async function renderListaPersonal() {
 
         <div class="lp-list">
           ${(personal || []).length > 0 ? personal.map(p => `
-            <div class="lp-card" onclick="window.navigateTo('detalle_personal', '${p.id}', 'lista_personal')">
-              <div class="m3-flex m3-items-center" style="gap: 16px;">
-                <div class="lp-avatar" style="background: ${getColor(p.nombre)}; color: white;">${p.iniciales || getInitiales(p.nombre)}</div>
-                <div>
-                  <p class="m3-label-large m3-font-bold m3-text-on-surface">${p.nombre}</p>
-                  <div class="m3-flex m3-items-center m3-gap-3 m3-mt-1">
-                    ${p.rol ? `<span class="m3-label-small m3-text-on-surface-variant">${p.rol}</span>` : ''}
-                    ${p.pago_diario ? `<span class="m3-label-small m3-font-bold m3-text-primary">L${Number(p.pago_diario).toLocaleString('es-HN')}/día</span>` : ''}
+              <div class="lp-card" onclick="window.navigateTo('detalle_personal', '${p.id}', 'personal')">
+                <div class="m3-flex m3-items-center" style="gap: 16px;">
+                  <div class="lp-avatar" style="background: ${getColor(p.nombre)}; color: white;">${p.iniciales || getInitiales(p.nombre)}</div>
+                  <div>
+                    <p class="m3-label-large m3-font-bold m3-text-on-surface">${p.nombre}</p>
+                    <div class="m3-flex m3-items-center m3-gap-3 m3-mt-1">
+                      ${p.rol ? `<span class="m3-label-small m3-text-on-surface-variant">${p.rol}</span>` : ''}
+                      ${p.pago_diario ? `<span class="m3-label-small m3-font-bold m3-text-primary">L${Number(p.pago_diario).toLocaleString('es-HN')}/día</span>` : ''}
+                    </div>
+                  </div>
+                </div>
+                <div class="lp-card-right">
+                  <button class="lp-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)" aria-label="Más opciones">
+                    <span class="material-icons">more_vert</span>
+                  </button>
+                  <div class="action-menu">
+                    <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_personal', '${p.id}', 'personal')">
+                      <span class="material-icons">edit</span><span>Editar</span>
+                    </button>
+                    <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeletePersonal('${p.id}', '${p.nombre.replace(/'/g, "\\'")}')">
+                      <span class="material-icons">delete</span><span>Eliminar</span>
+                    </button>
                   </div>
                 </div>
               </div>
-              <span class="material-symbols-outlined m3-text-outline-variant" style="font-size: 20px;">chevron_right</span>
-            </div>
           `).join('') : `
             <div class="m3-p-8 m3-text-center" style="background: var(--m3-surface-container-low); border-radius: 24px;">
               <span class="material-symbols-outlined" style="font-size: 48px; display: block; margin-bottom: 12px; opacity: 0.3;">groups</span>
               <p class="m3-title-medium m3-font-bold m3-text-on-surface-variant m3-mt-4">No hay personal registrado</p>
               <p class="m3-label-medium m3-text-on-surface-variant">Agrega tu primer trabajador</p>
-              <button onclick="window.navigateTo('nuevo_personal', 'lista_personal')" class="m3-mt-4 m3-text-primary m3-font-bold m3-bg-none m3-border-none" style="text-decoration: underline; cursor: pointer;">
+              <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-mt-4 m3-text-primary m3-font-bold m3-bg-none m3-border-none" style="text-decoration: underline; cursor: pointer;">
                 + Agregar Personal
               </button>
             </div>
@@ -95,7 +170,7 @@ export async function renderListaPersonal() {
         </div>
       </div>
 
-      <button onclick="window.navigateTo('nuevo_personal', 'personal')" class="m3-fab-circle" style="position: fixed; bottom: 24px; right: 24px; z-index: 999; width: 56px; height: 56px; border-radius: 16px; background: var(--m3-primary); border: none; box-shadow: 0 4px 16px rgba(62,111,57,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 20px rgba(62,111,57,0.5)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(62,111,57,0.4)';" aria-label="Agregar personal">
+      <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-fab-circle" style="position: fixed; bottom: 24px; right: 24px; z-index: 999; width: 56px; height: 56px; border-radius: 16px; background: var(--m3-primary); border: none; box-shadow: 0 4px 16px rgba(62,111,57,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 20px rgba(62,111,57,0.5)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(62,111,57,0.4)';" aria-label="Agregar personal">
         <span class="material-symbols-outlined" style="font-size: 28px; color: var(--m3-on-primary);">add</span>
       </button>
     `;
@@ -106,4 +181,30 @@ export async function renderListaPersonal() {
 }
 
 export function initListaPersonal() {
+  window.toggleActionMenu = (btn) => {
+    const menu = btn.nextElementSibling;
+    if (!menu) return;
+    const isActive = menu.classList.contains('active');
+    document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+    if (!isActive) menu.classList.add('active');
+  };
+
+  window.confirmDeletePersonal = (id, name) => {
+    window.Snackbar.confirm(`¿Eliminar a ${name}?`, async () => {
+      const { error } = await supabase.from('personal').delete().eq('id', id);
+      if (error) {
+        window.Snackbar.show('Error: ' + error.message, { type: 'error' });
+      } else {
+        window.Snackbar.show('Personal eliminado');
+        window.clearScreenCache?.('personal');
+        window.navigateTo('personal');
+      }
+    });
+  };
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.action-menu') && !e.target.closest('.lp-btn-more')) {
+      document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+    }
+  });
 }
