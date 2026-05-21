@@ -19,7 +19,14 @@ export async function renderNuevaActividad(loteId, tipo) {
   const ph = placeholdersByType[tipo] || { producto: '', dosis: '' };
   const methods = methodOptionsByType[tipo] || [''];
 
-  const { data: personal } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
+  let personal = [];
+  try {
+    const { data } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
+    personal = data || [];
+  } catch (error) {
+    console.warn('Error fetching personal for nueva_actividad:', error);
+    personal = [];
+  }
 
   return `
     <div class="m3-form-screen">
@@ -251,6 +258,8 @@ export function initNuevaActividad(loteId, tipo) {
 
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
+    // Remove equipo_usado as it's not in the database schema
+    delete data.equipo_usado;
 
     // Clean up or map manual cleaning equipment to product
     if (tipo === 'Limpieza' && data.metodo === 'Manual') {
