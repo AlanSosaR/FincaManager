@@ -180,15 +180,15 @@ function renderDayView(date, asisMap) {
   `;
 }
 
-function renderSummary(asistencia, pagoDiario, month, year) {
+function renderSummary(asistencia, pagoDiario, month, year, weekDate) {
   const diario = Number(pagoDiario || 0);
   const trabajados = (asistencia || []).filter(a => a.estado === 'trabajo');
 
-  const today = new Date();
-  const targetMonth = month ?? today.getMonth();
-  const targetYear = year ?? today.getFullYear();
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay() + 1);
+  const targetMonth = month ?? new Date().getMonth();
+  const targetYear = year ?? new Date().getFullYear();
+  const weekRef = weekDate ? new Date(weekDate) : new Date();
+  const weekStart = new Date(weekRef);
+  weekStart.setDate(weekRef.getDate() - weekRef.getDay() + 1);
   weekStart.setHours(0,0,0,0);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
@@ -286,7 +286,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
 
     const summary = document.getElementById('cal-summary');
     if (summary) {
-      summary.innerHTML = renderSummary(asistencia || [], persona?.pago_diario, calDate.getMonth(), calDate.getFullYear());
+      summary.innerHTML = renderSummary(asistencia || [], persona?.pago_diario, calDate.getMonth(), calDate.getFullYear(), calDate);
     }
   }
 
