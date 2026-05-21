@@ -23,17 +23,8 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId) 
   const month = today.getMonth();
   const year = today.getFullYear();
 
-  const backAction = returnScreen === 'detalle_lote'
-    ? `window.navigateTo('detalle_lote', '${returnId}')`
-    : `window.navigateTo('personal')`;
-
   return `
     <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-4xl m3-mx-auto m3-font-work-sans">
-      <div style="margin-bottom: 8px;">
-        <button onclick="${backAction}" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--m3-on-surface); transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
-          <span class="material-icons">arrow_back</span>
-        </button>
-      </div>
 
       <div class="m3-card m3-p-8" style="border-radius: 32px; margin-bottom: 24px;">
         <div style="display: flex; align-items: center; gap: 16px;">

@@ -46,7 +46,7 @@ const screens = {
     detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote },
     nueva_actividad: { title: 'Nueva Actividad', backTo: 'dashboard', render: renderNuevaActividad },
     nuevo_personal: { title: 'Nuevo Personal', render: renderNuevoPersonal },
-    detalle_personal: { title: 'Detalle de Personal', render: renderDetallePersonal }
+    detalle_personal: { title: 'Detalle de Personal', backTo: 'personal', render: renderDetallePersonal }
 };
 
 console.log('[DEBUG] Registered screens:', Object.keys(screens));

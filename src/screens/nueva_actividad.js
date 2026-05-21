@@ -19,6 +19,8 @@ export async function renderNuevaActividad(loteId, tipo) {
   const ph = placeholdersByType[tipo] || { producto: '', dosis: '' };
   const methods = methodOptionsByType[tipo] || [''];
 
+  const { data: personal } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
+
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card">
@@ -79,12 +81,7 @@ export async function renderNuevaActividad(loteId, tipo) {
             <input type="text" id="operador-input" list="operadores-sugeridos" placeholder=" " style="padding-right: 60px;">
             <label>Operador / Responsable</label>
             <datalist id="operadores-sugeridos">
-              <option value="Juan Gómez"></option>
-              <option value="Carlos Ruiz"></option>
-              <option value="María Delgado"></option>
-              <option value="José Hernández"></option>
-              <option value="Pedro Mendoza"></option>
-              <option value="Luis Castro"></option>
+              ${(personal || []).map(p => `<option value="${p.nombre}"></option>`).join('')}
             </datalist>
             <button type="button" id="btn-add-operador" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: var(--m3-primary); border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.2s; z-index: 2;">
               <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
