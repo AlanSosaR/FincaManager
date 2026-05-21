@@ -29,11 +29,10 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId) 
 
   return `
     <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-4xl m3-mx-auto m3-font-work-sans">
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+      <div style="margin-bottom: 8px;">
         <button onclick="${backAction}" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--m3-on-surface); transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
           <span class="material-icons">arrow_back</span>
         </button>
-        <h2 class="m3-title-large m3-font-bold" style="margin:0;">Detalle de Personal</h2>
       </div>
 
       <div class="m3-card m3-p-8" style="border-radius: 32px; margin-bottom: 24px;">
