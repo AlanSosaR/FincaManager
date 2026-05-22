@@ -44,7 +44,11 @@ const screens = {
     nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero },
     nuevo_lote:    { title: 'Nuevo Lote de Cafetal', backTo: 'dashboard', render: (id) => renderNuevoLote(id) },
     detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote },
-    nueva_actividad: { title: 'Nueva Actividad', backTo: 'dashboard', render: renderNuevaActividad },
+    nueva_actividad: { 
+        title: 'Nueva Actividad', 
+        backTo: (...args) => args[0] ? ['detalle_lote', args[0]] : 'dashboard', 
+        render: renderNuevaActividad 
+    },
     nuevo_personal: { title: 'Nuevo Personal', render: renderNuevoPersonal },
     detalle_personal: { title: 'Detalle de Personal', backTo: 'personal', render: renderDetallePersonal }
 };
@@ -156,14 +160,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (DETAIL_SCREENS.has(screenId) && (!args || args.length === 0 || !args[0])) {
             const screenCfg = screens[screenId];
             if (screenCfg && screenCfg.backTo) {
-                return navigate(screenCfg.backTo);
+                const backTarget = typeof screenCfg.backTo === 'function' ? screenCfg.backTo(...args) : screenCfg.backTo;
+                return navigate(...(Array.isArray(backTarget) ? backTarget : [backTarget]));
             }
             return navigate('dashboard');
         }
         if (FORM_SCREENS.has(screenId) && args.length > 0 && !args[0]) {
             const screenCfg = screens[screenId];
             if (screenCfg && screenCfg.backTo) {
-                return navigate(screenCfg.backTo);
+                const backTarget = typeof screenCfg.backTo === 'function' ? screenCfg.backTo(...args) : screenCfg.backTo;
+                return navigate(...(Array.isArray(backTarget) ? backTarget : [backTarget]));
             }
             return navigate('dashboard');
         }
@@ -172,9 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const screen = screens[screenId] || screens.dashboard;
         
         if (screen.backTo) {
+            const backTarget = typeof screen.backTo === 'function' ? screen.backTo(...args) : screen.backTo;
+            const onClick = Array.isArray(backTarget) 
+                ? backTarget.map(s => `'${s}'`).join(', ')
+                : `'${backTarget}'`;
             titleElement.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <button onclick="window.navigateTo('${screen.backTo}')" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; color: #333; margin-left: -8px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
+                    <button onclick="window.navigateTo(${onClick})" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; color: #333; margin-left: -8px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atrás">
                         <span class="material-icons">arrow_back</span>
                     </button>
                     <span>${screen.title}</span>
