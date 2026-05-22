@@ -43,10 +43,19 @@ export async function renderNuevaActividad(loteId, tipo) {
 
         <form id="form-nueva-aplicacion">
           <input type="hidden" name="lote_id" value="${loteId}">
-          <input type="hidden" name="tipo" value="${tipo}">
-          
+
           <div class="m3-grid-2col">
-            <!-- 1. Método de Aplicación (Moved First) -->
+            <!-- 0. Tipo de Actividad -->
+            <div class="m3-field" id="field-tipo">
+              <select name="tipo" required>
+                <option value="Fertilizante" ${tipo === 'Fertilizante' ? 'selected' : ''}>Fertilizante</option>
+                <option value="Manejo de Tejido" ${tipo === 'Manejo de Tejido' ? 'selected' : ''}>Manejo de Tejido</option>
+                <option value="Limpieza" ${tipo === 'Limpieza' ? 'selected' : ''}>Limpieza</option>
+                <option value="Análisis de Suelo" ${tipo === 'Análisis de Suelo' ? 'selected' : ''}>Análisis de Suelo</option>
+              </select>
+              <label>Tipo de Actividad</label>
+            </div>
+            <!-- 1. Método de Aplicación -->
             <div class="m3-field" id="field-metodo">
               <select name="metodo" required>
                 ${methods.map((m, idx) => `<option value="${m}" ${idx === 0 ? 'selected' : ''}>${m}</option>`).join('')}
@@ -125,13 +134,28 @@ export function initNuevaActividad(loteId, tipo) {
   if (!form) return;
 
   // 1. DYNAMIC CONDITIONAL FIELDS FOR LIMPIEZA
+  const selectTipo = form.querySelector('select[name="tipo"]');
   const selectMetodo = form.querySelector('select[name="metodo"]');
   const fieldProducto = document.getElementById('field-producto');
   const fieldDosis = document.getElementById('field-dosis');
   const fieldEquipo = document.getElementById('field-equipo');
+  const tipoHeading = document.querySelector('.da-hero-title');
+
+  const updateMethods = () => {
+    const newTipo = selectTipo.value;
+    const newMethods = methodOptionsByType[newTipo] || [''];
+    selectMetodo.innerHTML = newMethods.map((m, idx) => `<option value="${m}" ${idx === 0 ? 'selected' : ''}>${m}</option>`).join('');
+    const ph = placeholdersByType[newTipo] || { producto: '', dosis: '' };
+    const prodInput = document.querySelector('input[name="producto"]');
+    const dosisInput = document.querySelector('input[name="dosis"]');
+    if (prodInput) prodInput.placeholder = ph.producto;
+    if (dosisInput) dosisInput.placeholder = ph.dosis;
+    if (tipoHeading) tipoHeading.textContent = newTipo;
+  };
 
   const updateFieldsVisibility = () => {
-    if (tipo === 'Limpieza') {
+    const currentTipo = selectTipo.value;
+    if (currentTipo === 'Limpieza') {
       const metodo = selectMetodo.value;
       if (metodo === 'Manual') {
         // Hide Producto and Dosis
@@ -182,8 +206,14 @@ export function initNuevaActividad(loteId, tipo) {
 
   if (selectMetodo) {
     selectMetodo.addEventListener('change', updateFieldsVisibility);
-    // Trigger initial run
     updateFieldsVisibility();
+  }
+
+  if (selectTipo) {
+    selectTipo.addEventListener('change', () => {
+      updateMethods();
+      updateFieldsVisibility();
+    });
   }
 
   // 2. MULTIPLE OPERATORS UX LOGIC
@@ -258,14 +288,16 @@ export function initNuevaActividad(loteId, tipo) {
 
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
-    // Remove equipo_usado as it's not in the database schema
-    delete data.equipo_usado;
 
     // Clean up or map manual cleaning equipment to product
-    if (tipo === 'Limpieza' && data.metodo === 'Manual') {
-      data.producto = `Limpieza Manual (${data.equipo_usado})`;
-      data.dosis = 'N/A'; // Manual cleaning
-      delete data.equipo_usado; // Clean database submit object
+    const submitTipo = selectTipo ? selectTipo.value : tipo;
+    if (submitTipo === 'Limpieza' && data.metodo === 'Manual') {
+      const equipoUsado = data.equipo_usado || '';
+      data.producto = `Limpieza Manual (${equipoUsado})`;
+      data.dosis = 'N/A';
+      delete data.equipo_usado;
+    } else {
+      delete data.equipo_usado;
     }
 
     try {

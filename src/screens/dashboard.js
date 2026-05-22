@@ -4,6 +4,96 @@ const LOTES_PAGE_SIZE = 4;
 let currentLotesPage = 1;
 let allLotes = [];
 
+async function getCoffeePrice() {
+  const today = new Date().toISOString().split('T')[0];
+  const cached = localStorage.getItem('coffee_price_data');
+  
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (parsed.date === today) return parsed.price;
+    } catch (_) {}
+  }
+
+  // Helper: wrap a fetch with timeout
+  const fetchWithTimeout = (url, ms = 8000) => {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(id));
+  };
+
+  // 1 — Try direct fetch (some networks allow CORS)
+  for (const url of [
+    'https://query1.finance.yahoo.com/v8/finance/chart/KC=F?interval=1d&range=1d',
+    'https://query1.finance.yahoo.com/v7/finance/quote?symbols=KC=F',
+  ]) {
+    try {
+      const res = await fetchWithTimeout(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const p = data?.chart?.result?.[0]?.meta?.regularMarketPrice
+            ?? data?.quoteResponse?.result?.[0]?.regularMarketPrice;
+      if (p && p > 0) { setAndReturn(p); return p; }
+    } catch (_) {}
+  }
+
+  // 2 — JSONP (v7 quote API — known to support callback)
+  try {
+    const p = await new Promise((resolve) => {
+      const cb = 'coffeeCb_' + Date.now();
+      const to = setTimeout(() => { cleanup(); resolve(null); }, 10000);
+      const cleanup = () => {
+        clearTimeout(to);
+        delete window[cb];
+        document.getElementById('coffee-jsonp')?.remove();
+      };
+      window[cb] = (d) => {
+        cleanup();
+        resolve(d?.quoteResponse?.result?.[0]?.regularMarketPrice ?? null);
+      };
+      const s = document.createElement('script');
+      s.id = 'coffee-jsonp';
+      s.src = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=KC=F&format=json&callback=${cb}`;
+      s.onerror = () => { cleanup(); resolve(null); };
+      document.head.appendChild(s);
+    });
+    if (p && p > 0) { setAndReturn(p); return p; }
+  } catch (_) {}
+
+  // 3 — CORS proxies
+  const proxies = [
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ];
+  const targets = [
+    'https://query1.finance.yahoo.com/v8/finance/chart/KC=F?interval=1d&range=1d',
+    'https://query1.finance.yahoo.com/v7/finance/quote?symbols=KC=F',
+  ];
+  for (const t of targets) {
+    for (const p of proxies) {
+      try {
+        const res = await fetchWithTimeout(p(t));
+        if (!res.ok) continue;
+        const data = await res.json();
+        const val = data?.chart?.result?.[0]?.meta?.regularMarketPrice
+                 ?? data?.quoteResponse?.result?.[0]?.regularMarketPrice;
+        if (val && val > 0) { setAndReturn(val); return val; }
+      } catch (_) {}
+    }
+  }
+
+  function setAndReturn(price) {
+    localStorage.setItem('coffee_price_data', JSON.stringify({ date: today, price }));
+  }
+
+  // Fallback to stale cache
+  if (cached) {
+    try { return JSON.parse(cached).price; } catch (_) {}
+  }
+  return null;
+}
+
 function getPaginationFooterHtml() {
   const totalPages = Math.ceil(allLotes.length / LOTES_PAGE_SIZE) || 1;
   let pagesHtml = '';
@@ -72,6 +162,10 @@ export async function renderDashboard(page) {
     const from = (currentLotesPage - 1) * LOTES_PAGE_SIZE;
     const to = from + LOTES_PAGE_SIZE;
     const pageLotes = allLotes.slice(from, to);
+    const coffeePrice = await getCoffeePrice();
+    const coffeeHtml = coffeePrice != null
+      ? `$${(coffeePrice / 100).toFixed(2)} <span style="font-weight:400;font-size:13px;color:var(--m3-on-surface-variant);">/ lb</span>`
+      : `<span style="color:var(--m3-on-surface-variant);font-size:13px;">No disponible</span>`;
 
     return `
       <style>
@@ -121,6 +215,11 @@ export async function renderDashboard(page) {
               <img src="mapa.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
               <span class="m3-label-medium m3-text-on-surface-variant">Lotes:</span>
               <span class="m3-title-medium m3-font-bold m3-text-on-surface">${allLotes.length}</span>
+            </div>
+            <div class="m3-flex m3-items-center m3-gap-2">
+              <img src="granos-de-cafe.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
+              <span class="m3-label-medium m3-text-on-surface-variant">Precio Café:</span>
+              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${coffeeHtml}</span>
             </div>
           </div>
         </div>

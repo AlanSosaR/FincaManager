@@ -206,16 +206,6 @@ function renderFullContent(container, animalId) {
                     </div>
                 </div>
 
-                <div class="da-hero-actions">
-                    <button class="da-action-btn primary" id="da-edit-animal">
-                        <span class="material-icons">edit</span>
-                        Editar Datos
-                    </button>
-                    <button class="da-action-btn secondary" id="da-delete-animal">
-                        <span class="material-icons">delete</span>
-                        Eliminar
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -429,30 +419,11 @@ function setupEventListeners(animalId, container) {
         renderCalendarFumig(); 
     });
 
-    // CRUD Actions
-    document.getElementById('da-edit-animal')?.addEventListener('click', () => window.navigateTo('nuevo_animal', animalId));
-    document.getElementById('da-delete-animal')?.addEventListener('click', () => handleDeleteAnimal(animalId));
-
-
     // Registration Actions
     document.getElementById('da-add-weight')?.addEventListener('click', () => showInlineWeightForm(animalId));
 }
 
 
-
-function handleDeleteAnimal(animalId) {
-    window.Snackbar.confirm('¿Estás seguro de que deseas eliminar este animal? Esta acción no se puede deshacer.', async () => {
-        try {
-            const { error } = await supabase.from('ganado').delete().eq('id', animalId);
-            if (error) throw error;
-            
-            showSnackbar('Animal eliminado del inventario');
-            window.location.hash = '#ganado';
-        } catch (err) {
-            showSnackbar('Error al eliminar: ' + err.message, 'error');
-        }
-    });
-}
 
 async function handleEditPhoto(animalId) {
     showModal('Cambiar Foto', `

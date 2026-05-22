@@ -46,10 +46,11 @@ const screens = {
     detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote },
     nueva_actividad: { 
         title: 'Nueva Actividad', 
-        backTo: (...args) => args[0] ? ['detalle_lote', args[0]] : 'dashboard', 
+        backTo: (...args) => args[0] ? ['detalle_lote', args[0]] : 'dashboard',
+        highlight: 'dashboard',
         render: renderNuevaActividad 
     },
-    nuevo_personal: { title: 'Nuevo Personal', render: renderNuevoPersonal },
+    nuevo_personal: { title: 'Nuevo Personal', backTo: 'personal', highlight: 'personal', render: renderNuevoPersonal },
     detalle_personal: { title: 'Detalle de Personal', backTo: 'personal', render: renderDetallePersonal }
 };
 
@@ -120,9 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Highlight active link
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
         
-        // Use backTo if available to highlight the parent category in the menu
         const screenCfg = screens[screenId];
-        const highlightId = (screenCfg && screenCfg.backTo) ? screenCfg.backTo : screenId;
+        const highlightId = screenCfg?.highlight || (typeof screenCfg?.backTo === 'string' ? screenCfg.backTo : screenId);
         
         const activeLink = document.querySelector(`.nav-link[data-screen="${highlightId}"]`);
         if (activeLink) activeLink.classList.add('active');
@@ -216,19 +216,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Build the new hash including any arguments
+        // Build the new hash with URI-encoded args
         let newHash = screenId;
         if (args && args.length > 0) {
-            newHash += '/' + args.join('/');
+            newHash += '/' + args.map(a => encodeURIComponent(String(a))).join('/');
         }
-        if (window.location.hash !== '#' + newHash) {
+        // Compare against raw encoded fragment from href
+        const href = window.location.href;
+        const hashIdx = href.indexOf('#');
+        const currentRawHash = hashIdx >= 0 ? href.slice(hashIdx + 1) : '';
+        if (currentRawHash !== newHash) {
             window.location.hash = newHash;
         }
     }
 
+    function getHashParts() {
+        const href = window.location.href;
+        const idx = href.indexOf('#');
+        const raw = idx >= 0 ? href.slice(idx + 1) : '';
+        return raw.split('/').map(decodeURIComponent);
+    }
+
     // Handle browser back/forward buttons
     window.addEventListener('hashchange', () => {
-        const hashParams = window.location.hash.replace('#', '').split('/');
+        const hashParams = getHashParts();
         const screenId = hashParams[0];
         const args = hashParams.slice(1);
         if (screenId && screens[screenId]) {
@@ -282,9 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Initial load based on hash
-    const hashParams = window.location.hash.replace('#', '').split('/');
+    const hashParams = getHashParts();
     const initialScreen = hashParams[0] || 'dashboard';
-    const initArgs = hashParams.slice(1);
+    const initArgs = hashParams.slice(1).filter(s => s !== '');
     navigate(initialScreen, ...initArgs);
 
     // Sidebar Toggle
