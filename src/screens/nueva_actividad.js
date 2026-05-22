@@ -31,10 +31,14 @@ export async function renderNuevaActividad(loteId, tipo) {
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card">
-        <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
-          <div class="da-stat-icon" style="background: rgba(62, 111, 57, 0.1); color: var(--m3-primary); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-            <span class="material-symbols-outlined" style="font-size: 32px; color: var(--m3-primary);">history_edu</span>
-          </div>
+    <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
+      <div class="da-stat-icon" style="background: rgba(62, 111, 57, 0.1); color: var(--m3-primary); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+        ${tipo === 'Fertilizante' ? '<img src="npk.png" alt="" style="width: 40px; height: 40px; object-fit: contain;">' :
+          tipo === 'Manejo de Tejido' ? '<img src="tijeras-de-podar.png" alt="" style="width: 40px; height: 40px; object-fit: contain;">' :
+          tipo === 'Limpieza' ? '<img src="sale-de.png" alt="" style="width: 40px; height: 40px; object-fit: contain;">' :
+          tipo === 'Análisis de Suelo' ? '<img src="analisis-de-suelo.png" alt="" style="width: 40px; height: 40px; object-fit: contain;">' :
+          '<span class="material-symbols-outlined" style="font-size: 32px; color: var(--m3-primary);">history_edu</span>'}
+      </div>
           <div>
             <div class="da-hero-subtitle" style="margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--m3-on-surface-variant); letter-spacing: 0.5px;">Registro de Actividad</div>
             <h2 class="da-hero-title" style="margin: 0; font-size: 24px; font-family: 'Manrope', sans-serif; color: var(--m3-on-surface); font-weight: 800;">${tipo}</h2>
@@ -43,18 +47,9 @@ export async function renderNuevaActividad(loteId, tipo) {
 
         <form id="form-nueva-aplicacion">
           <input type="hidden" name="lote_id" value="${loteId}">
+          <input type="hidden" name="tipo" value="${tipo}">
 
           <div class="m3-grid-2col">
-            <!-- 0. Tipo de Actividad -->
-            <div class="m3-field" id="field-tipo">
-              <select name="tipo" required>
-                <option value="Fertilizante" ${tipo === 'Fertilizante' ? 'selected' : ''}>Fertilizante</option>
-                <option value="Manejo de Tejido" ${tipo === 'Manejo de Tejido' ? 'selected' : ''}>Manejo de Tejido</option>
-                <option value="Limpieza" ${tipo === 'Limpieza' ? 'selected' : ''}>Limpieza</option>
-                <option value="Análisis de Suelo" ${tipo === 'Análisis de Suelo' ? 'selected' : ''}>Análisis de Suelo</option>
-              </select>
-              <label>Tipo de Actividad</label>
-            </div>
             <!-- 1. Método de Aplicación -->
             <div class="m3-field" id="field-metodo">
               <select name="metodo" required>
@@ -64,7 +59,7 @@ export async function renderNuevaActividad(loteId, tipo) {
             </div>
 
             <!-- 2. Fecha de Aplicación -->
-            <div class="m3-field">
+            <div class="m3-field" id="field-fecha">
               <input type="date" name="fecha" value="${today}" placeholder=" " required style="color-scheme: light;">
               <label>Fecha de Aplicación</label>
             </div>
@@ -109,9 +104,181 @@ export async function renderNuevaActividad(loteId, tipo) {
           <input type="hidden" name="operador" id="operador-hidden-input">
 
           <!-- 7. Observaciones -->
-          <div class="m3-field">
+          <div class="m3-field" id="field-observaciones">
             <textarea name="observaciones" placeholder="Describa el estado del cultivo o cualquier novedad durante la aplicación..." rows="3"></textarea>
             <label>Observaciones / Detalles técnicos</label>
+          </div>
+
+          <!-- 8. Análisis de Suelo (only shown for this tipo) -->
+          <div id="field-analisis-suelo" style="display:none;">
+            <hr style="margin: 20px 0 16px; border: none; border-top: 1px solid var(--m3-outline-variant);">
+
+            <h3 style="font-size:16px;font-weight:700;margin:0 0 12px;color:var(--m3-on-surface);">1. Datos Generales</h3>
+            <div class="m3-grid-2col">
+              <div class="m3-field">
+                <input type="text" name="edad_cafetal" placeholder=" ">
+                <label>Edad del Cafetal (años)</label>
+              </div>
+              <div class="m3-field">
+                <select name="variedad">
+                  <option value="">Seleccionar...</option>
+                  <option value="Lempira">Lempira</option>
+                  <option value="IHCAFE-90">IHCAFE-90</option>
+                  <option value="Obata">Obata</option>
+                  <option value="Catimor">Catimor</option>
+                  <option value="Catuai">Catuai</option>
+                  <option value="Caturra">Caturra</option>
+                  <option value="Borbón">Borbón</option>
+                  <option value="Típica">Típica</option>
+                  <option value="Otra">Otra</option>
+                </select>
+                <label>Variedad</label>
+              </div>
+              <div class="m3-field">
+                <input type="number" name="altitud" placeholder=" ">
+                <label>Altitud (msnm)</label>
+              </div>
+              <div class="m3-field">
+                <select name="sombra">
+                  <option value="">Seleccionar...</option>
+                  <option value="Plena exposición">Plena exposición</option>
+                  <option value="Sombra (Leguminosa)">Sombra (Leguminosa)</option>
+                  <option value="Sombra (Musácea)">Sombra (Musácea)</option>
+                  <option value="Sombra (Frutal)">Sombra (Frutal)</option>
+                  <option value="Sombra (Otra)">Sombra (Otra)</option>
+                </select>
+                <label>Sombra</label>
+              </div>
+            </div>
+
+            <h3 style="font-size:16px;font-weight:700;margin:16px 0 12px;color:var(--m3-on-surface);">2. Parámetros Físicos</h3>
+            <div class="m3-grid-2col">
+              <div class="m3-field">
+                <select name="textura">
+                  <option value="">Seleccionar...</option>
+                  <option value="Arenosa">Arenosa</option>
+                  <option value="Franca">Franca (ideal)</option>
+                  <option value="Arcillosa">Arcillosa</option>
+                </select>
+                <label>Textura</label>
+              </div>
+              <div class="m3-field">
+                <input type="number" name="profundidad_efectiva" placeholder=" ">
+                <label>Profundidad Efectiva (cm)</label>
+              </div>
+              <div class="m3-field">
+                <select name="pendiente">
+                  <option value="">Seleccionar...</option>
+                  <option value="Plana">Plana</option>
+                  <option value="Media">Media</option>
+                  <option value="Fuerte">Fuerte</option>
+                </select>
+                <label>Pendiente</label>
+              </div>
+              <div class="m3-field">
+                <select name="drenaje">
+                  <option value="">Seleccionar...</option>
+                  <option value="Bueno">Bueno</option>
+                  <option value="Regular">Regular</option>
+                  <option value="Malo">Malo</option>
+                </select>
+                <label>Drenaje</label>
+              </div>
+            </div>
+
+            <h3 style="font-size:16px;font-weight:700;margin:16px 0 12px;color:var(--m3-on-surface);">3. Parámetros Químicos</h3>
+            <div class="m3-grid-2col">
+              <div class="m3-field">
+                <input type="number" name="ph" step="0.1" placeholder=" ">
+                <label>pH (ideal café: 5.0 – 6.0)</label>
+              </div>
+              <div class="m3-field">
+                <input type="number" name="materia_organica" step="0.1" placeholder=" ">
+                <label>Materia Orgánica (%)</label>
+              </div>
+              <div class="m3-field">
+                <input type="number" name="cic" step="0.1" placeholder=" ">
+                <label>CIC (cmol+/kg)</label>
+              </div>
+              <div class="m3-field">
+                <input type="number" name="aluminio" step="0.01" placeholder=" ">
+                <label>Aluminio Interc. (meq/100g)</label>
+              </div>
+            </div>
+
+            <h3 style="font-size:16px;font-weight:700;margin:16px 0 12px;color:var(--m3-on-surface);">4. Niveles de Nutrientes</h3>
+            <div class="m3-grid-2col">
+              <div class="m3-field">
+                <select name="n_nivel">
+                  <option value="">Seleccionar...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+                <label>Nitrógeno (N)</label>
+              </div>
+              <div class="m3-field">
+                <select name="p_nivel">
+                  <option value="">Seleccionar...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+                <label>Fósforo (P)</label>
+              </div>
+              <div class="m3-field">
+                <select name="k_nivel">
+                  <option value="">Seleccionar...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+                <label>Potasio (K)</label>
+              </div>
+              <div class="m3-field">
+                <select name="ca_nivel">
+                  <option value="">Seleccionar...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+                <label>Calcio (Ca)</label>
+              </div>
+              <div class="m3-field">
+                <select name="mg_nivel">
+                  <option value="">Seleccionar...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+                <label>Magnesio (Mg)</label>
+              </div>
+              <div class="m3-field">
+                <select name="micro_nivel">
+                  <option value="">Seleccionar...</option>
+                  <option value="Bajo">Bajo</option>
+                  <option value="Medio">Medio</option>
+                  <option value="Alto">Alto</option>
+                </select>
+                <label>Micronutrientes (Zn, B, Cu)</label>
+              </div>
+            </div>
+
+            <h3 style="font-size:16px;font-weight:700;margin:16px 0 12px;color:var(--m3-on-surface);">5. Recomendaciones Técnicas</h3>
+            <div class="m3-grid-2col">
+              <div class="m3-field">
+                <input type="text" name="encalado" placeholder="Ej: 2 qq/mz">
+                <label>Encalado (Cal Agrícola) qq/mz</label>
+              </div>
+              <div class="m3-field">
+                <input type="text" name="fertilizante_recomendado" placeholder="Ej: 18-46-00">
+                <label>Fertilizante (Fórmula)</label>
+              </div>
+              <div class="m3-field" style="grid-column: 1 / -1;">
+                <input type="text" name="epocas_aplicacion" placeholder="Ej: Pre-floración, Post-cosecha">
+                <label>Épocas de Aplicación</label>
+              </div>
+            </div>
           </div>
 
           <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0; display: flex; justify-content: flex-end; gap: 12px;">
@@ -133,32 +300,18 @@ export function initNuevaActividad(loteId, tipo) {
   const form = document.getElementById('form-nueva-aplicacion');
   if (!form) return;
 
-  // 1. DYNAMIC CONDITIONAL FIELDS FOR LIMPIEZA
-  const selectTipo = form.querySelector('select[name="tipo"]');
+  // 1. DYNAMIC CONDITIONAL FIELDS
   const selectMetodo = form.querySelector('select[name="metodo"]');
   const fieldProducto = document.getElementById('field-producto');
   const fieldDosis = document.getElementById('field-dosis');
   const fieldEquipo = document.getElementById('field-equipo');
-  const tipoHeading = document.querySelector('.da-hero-title');
-
-  const updateMethods = () => {
-    const newTipo = selectTipo.value;
-    const newMethods = methodOptionsByType[newTipo] || [''];
-    selectMetodo.innerHTML = newMethods.map((m, idx) => `<option value="${m}" ${idx === 0 ? 'selected' : ''}>${m}</option>`).join('');
-    const ph = placeholdersByType[newTipo] || { producto: '', dosis: '' };
-    const prodInput = document.querySelector('input[name="producto"]');
-    const dosisInput = document.querySelector('input[name="dosis"]');
-    if (prodInput) prodInput.placeholder = ph.producto;
-    if (dosisInput) dosisInput.placeholder = ph.dosis;
-    if (tipoHeading) tipoHeading.textContent = newTipo;
-  };
+  const fieldAnalisis = document.getElementById('field-analisis-suelo');
 
   const updateFieldsVisibility = () => {
-    const currentTipo = selectTipo.value;
-    if (currentTipo === 'Limpieza') {
+    if (tipo === 'Limpieza') {
+      if (fieldAnalisis) fieldAnalisis.style.display = 'none';
       const metodo = selectMetodo.value;
       if (metodo === 'Manual') {
-        // Hide Producto and Dosis
         if (fieldProducto) {
           fieldProducto.style.display = 'none';
           fieldProducto.querySelector('input').required = false;
@@ -167,13 +320,11 @@ export function initNuevaActividad(loteId, tipo) {
           fieldDosis.style.display = 'none';
           fieldDosis.querySelector('input').required = false;
         }
-        // Show Tipo de equipo usado
         if (fieldEquipo) {
           fieldEquipo.style.display = 'block';
           fieldEquipo.querySelector('select').required = true;
         }
       } else {
-        // Química or others
         if (fieldProducto) {
           fieldProducto.style.display = 'block';
           fieldProducto.querySelector('input').required = true;
@@ -187,8 +338,38 @@ export function initNuevaActividad(loteId, tipo) {
           fieldEquipo.querySelector('select').required = false;
         }
       }
+    } else if (tipo === 'Manejo de Tejido') {
+      if (fieldAnalisis) fieldAnalisis.style.display = 'none';
+      if (fieldProducto) {
+        fieldProducto.style.display = 'none';
+        fieldProducto.querySelector('input').required = false;
+      }
+      if (fieldDosis) {
+        fieldDosis.style.display = 'none';
+        fieldDosis.querySelector('input').required = false;
+      }
+      if (fieldEquipo) {
+        fieldEquipo.style.display = 'none';
+        fieldEquipo.querySelector('select').required = false;
+      }
+    } else if (tipo === 'Análisis de Suelo') {
+      if (fieldProducto) {
+        fieldProducto.style.display = 'none';
+        fieldProducto.querySelector('input').required = false;
+      }
+      if (fieldDosis) {
+        fieldDosis.style.display = 'none';
+        fieldDosis.querySelector('input').required = false;
+      }
+      if (fieldEquipo) {
+        fieldEquipo.style.display = 'none';
+        fieldEquipo.querySelector('select').required = false;
+      }
+      if (fieldAnalisis) {
+        fieldAnalisis.style.display = 'block';
+      }
     } else {
-      // For non-Limpieza, hide equipo and ensure product/dosis are shown and required
+      if (fieldAnalisis) fieldAnalisis.style.display = 'none';
       if (fieldEquipo) {
         fieldEquipo.style.display = 'none';
         fieldEquipo.querySelector('select').required = false;
@@ -209,11 +390,13 @@ export function initNuevaActividad(loteId, tipo) {
     updateFieldsVisibility();
   }
 
-  if (selectTipo) {
-    selectTipo.addEventListener('change', () => {
-      updateMethods();
-      updateFieldsVisibility();
-    });
+  // Move observaciones to end and change date label for soil analysis
+  if (tipo === 'Análisis de Suelo') {
+    const obs = document.getElementById('field-observaciones');
+    const analisis = document.getElementById('field-analisis-suelo');
+    if (obs && analisis) analisis.after(obs);
+    const fechaLabel = document.querySelector('#field-fecha label');
+    if (fechaLabel) fechaLabel.textContent = 'Fecha de Muestreo';
   }
 
   // 2. MULTIPLE OPERATORS UX LOGIC
@@ -290,14 +473,25 @@ export function initNuevaActividad(loteId, tipo) {
     const data = Object.fromEntries(formData.entries());
 
     // Clean up or map manual cleaning equipment to product
-    const submitTipo = selectTipo ? selectTipo.value : tipo;
-    if (submitTipo === 'Limpieza' && data.metodo === 'Manual') {
+    if (tipo === 'Limpieza' && data.metodo === 'Manual') {
       const equipoUsado = data.equipo_usado || '';
       data.producto = `Limpieza Manual (${equipoUsado})`;
       data.dosis = 'N/A';
       delete data.equipo_usado;
     } else {
       delete data.equipo_usado;
+    }
+
+    // Collect structured soil analysis data into observaciones
+    if (tipo === 'Análisis de Suelo') {
+      const soilFields = ['edad_cafetal','variedad','altitud','sombra','textura','profundidad_efectiva','pendiente','drenaje','ph','materia_organica','cic','aluminio','n_nivel','p_nivel','k_nivel','ca_nivel','mg_nivel','micro_nivel','encalado','fertilizante_recomendado','epocas_aplicacion'];
+      const soilData = {};
+      soilFields.forEach(k => { soilData[k] = data[k] || ''; delete data[k]; });
+      data.producto = 'Análisis de Suelo';
+      data.dosis = 'Completo';
+      data.observaciones = data.observaciones
+        ? data.observaciones + '\n\n--- DATOS DE LABORATORIO ---\n' + JSON.stringify(soilData, null, 2)
+        : JSON.stringify(soilData, null, 2);
     }
 
     try {

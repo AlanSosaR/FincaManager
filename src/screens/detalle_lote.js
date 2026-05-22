@@ -120,7 +120,7 @@ export async function renderDetalleLote(id) {
             <!-- Fertilización Section -->
             <div class="m3-card m3-p-8" style="border-radius: 32px;">
               <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
-                <div class="m3-flex m3-items-center m3-gap-3">
+                <div class="m3-flex m3-items-center m3-gap-4">
                   <img src="fertilizante.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
                   <h2 class="m3-headline-small m3-font-bold m3-text-on-surface">Fertilización</h2>
                 </div>
@@ -133,7 +133,7 @@ export async function renderDetalleLote(id) {
                   <div class="m3-flex m3-items-center m3-justify-between m3-p-4 m3-bg-surface-container m3-rounded-2xl">
                     <div class="m3-flex m3-items-center m3-gap-4">
                       <div class="m3-size-12 m3-rounded-xl m3-bg-secondary-container m3-flex m3-items-center m3-justify-center m3-text-on-secondary-container">
-                        <span class="material-symbols-outlined">inventory_2</span>
+                        <img src="npk.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
                       </div>
                       <div>
                         <p class="m3-label-large m3-font-bold m3-text-on-surface">${app.producto}</p>
@@ -164,7 +164,7 @@ export async function renderDetalleLote(id) {
             <!-- Otras Aplicaciones Section -->
             <div class="m3-card m3-p-8" style="border-radius: 32px;">
               <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
-                <div class="m3-flex m3-items-center m3-gap-3">
+                <div class="m3-flex m3-items-center m3-gap-4">
                   <img src="tijeras-de-podar.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
                   <h2 class="m3-headline-small m3-font-bold m3-text-on-surface">Podas y Limpieza</h2>
                 </div>
@@ -209,19 +209,19 @@ export async function renderDetalleLote(id) {
           <div class="m3-fab-actions" id="fab-actions">
             <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Limpieza')">
               <span class="m3-fab-action-label">Limpieza</span>
-              <span class="m3-fab-action-icon"><span class="material-symbols-outlined">cleaning_services</span></span>
+              <span class="m3-fab-action-icon"><img src="sale-de.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
             </button>
             <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Fertilizante')">
               <span class="m3-fab-action-label">Fertilizante</span>
-              <span class="m3-fab-action-icon"><img src="fertilizante.png" alt="" style="width: 20px; height: 20px; object-fit: contain;"></span>
+              <span class="m3-fab-action-icon"><img src="fertilizante.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
             </button>
             <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Manejo de Tejido')">
               <span class="m3-fab-action-label">Manejo de Tejido</span>
-              <span class="m3-fab-action-icon"><img src="tijeras-de-podar.png" alt="" style="width: 20px; height: 20px; object-fit: contain;"></span>
+              <span class="m3-fab-action-icon"><img src="tijeras-de-podar.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
             </button>
             <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Análisis de Suelo')">
               <span class="m3-fab-action-label">Análisis de Suelo</span>
-              <span class="m3-fab-action-icon"><img src="analisis-de-suelo.png" alt="" style="width: 20px; height: 20px; object-fit: contain;"></span>
+              <span class="m3-fab-action-icon"><img src="analisis-de-suelo.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
             </button>
           </div>
           <button class="m3-fab-circle" id="fab-main" onclick="window.toggleFabMenu()">
