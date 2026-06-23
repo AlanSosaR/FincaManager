@@ -1,6 +1,6 @@
 import { supabase } from '../supabase.js';
 let currentGanadoPage = 1;
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 8;
 let currentFilter = 'all';
 let currentSearchQuery = '';
 let totalGanadoCount = 0;
