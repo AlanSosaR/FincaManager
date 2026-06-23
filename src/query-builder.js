@@ -15,6 +15,8 @@ export default class QueryBuilder {
     this._insertData = null;
     this._updateData = null;
     this._deleteMode = false;
+    this._rangeFrom = null;
+    this._rangeTo = null;
   }
 
   select(columns, options = {}) {
@@ -73,6 +75,12 @@ export default class QueryBuilder {
   order(field, dir = { ascending: false }) {
     this._orderField = field;
     this._orderDir = dir.ascending ? 'asc' : 'desc';
+    return this;
+  }
+
+  range(from, to) {
+    this._rangeFrom = from;
+    this._rangeTo = to;
     return this;
   }
 
@@ -218,6 +226,10 @@ export default class QueryBuilder {
         const cmp = av > bv ? 1 : av < bv ? -1 : 0;
         return dir === 'asc' ? cmp : -cmp;
       });
+    }
+
+    if (this._rangeFrom != null && this._rangeTo != null) {
+      results = results.slice(this._rangeFrom, this._rangeTo + 1);
     }
 
     for (const join of this._joins) {

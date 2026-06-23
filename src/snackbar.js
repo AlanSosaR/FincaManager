@@ -24,6 +24,15 @@ class SnackbarSystem {
     this.processQueue();
   }
 
+  dismissAll() {
+    this.container.querySelectorAll('.m3-snackbar').forEach(el => {
+      el.classList.remove('visible');
+      el.remove();
+    });
+    this.active = false;
+    this.queue = [];
+  }
+
   async processQueue() {
     if (this.active || this.queue.length === 0) return;
     this.active = true;
