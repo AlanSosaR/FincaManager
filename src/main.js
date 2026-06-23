@@ -37,25 +37,70 @@ function updateSyncUI(state) {
   }
 }
 
+const container = document.getElementById('screen-container');
 let syncStarted = false;
+
+function showDownloadBanner(msg) {
+  if (!container) return;
+  container.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
+      <span class="material-icons animate-spin" style="font-size:48px;color:var(--m3-primary,#2e7d32);margin-bottom:24px;">sync</span>
+      <h2 style="font-size:22px;font-weight:700;font-family:'Manrope',sans-serif;color:#1a1a1a;margin-bottom:8px;">${msg}</h2>
+      <p style="color:#666;font-size:14px;max-width:320px;">Esto puede tomar unos segundos dependiendo de tu conexión.</p>
+    </div>
+  `;
+}
+
+function hideDownloadBanner() {
+  if (!container) return;
+  const banner = container.querySelector('[data-download-banner]');
+  if (banner) banner.remove();
+}
+
+function showInitialPrompt() {
+  if (!container) return;
+  container.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
+      <span class="material-icons" style="font-size:56px;color:var(--m3-primary,#2e7d32);margin-bottom:16px;">cloud_download</span>
+      <h2 style="font-size:24px;font-weight:800;font-family:'Manrope',sans-serif;color:#1a1a1a;margin-bottom:8px;">Descargar datos en local</h2>
+      <p style="color:#666;font-size:14px;max-width:360px;margin-bottom:24px;line-height:1.5;">
+        Para usar la app sin necesidad de internet, descarga tus datos existentes en el dispositivo.
+      </p>
+      <button id="btn-start-download" style="background:var(--m3-primary,#2e7d32);color:#fff;border:none;padding:14px 32px;border-radius:40px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(46,125,50,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <span class="material-icons" style="vertical-align:middle;margin-right:8px;">cloud_download</span>
+        Descargar ahora
+      </button>
+    </div>
+  `;
+  document.getElementById('btn-start-download')?.addEventListener('click', () => {
+    fullDownload();
+  });
+}
 
 setSyncStatusCallback((msg) => {
   if (msg && !syncStarted) {
     syncStarted = true;
     updateSyncUI('syncing');
-    window.Snackbar.show('Descargando datos en local...', { persist: true });
+    showDownloadBanner(msg);
   } else if (msg === null && syncStarted) {
     syncStarted = false;
     updateSyncUI('done');
-    window.Snackbar.dismissAll();
-    setTimeout(() => {
-      window.Snackbar.show('✓ Datos sincronizados en local', { type: 'success', duration: 3000 });
-    }, 100);
+    hideDownloadBanner();
+    localStorage.setItem('finca_sync_complete', 'true');
+    const hashParams = window.location.hash.replace('#', '').split('/');
+    const screen = hashParams[0] || 'dashboard';
+    const args = hashParams.slice(1).filter(Boolean);
+    window.navigateTo(screen, ...args);
   }
 });
 
 if (isOnline()) {
-  initSync();
+  const syncComplete = localStorage.getItem('finca_sync_complete');
+  if (!syncComplete) {
+    showInitialPrompt();
+  } else {
+    initSync();
+  }
 } else {
   updateSyncUI('offline');
   window.addEventListener('online', () => {
@@ -63,12 +108,6 @@ if (isOnline()) {
     initSync();
   }, { once: true });
 }
-
-syncIcon?.addEventListener('click', () => {
-  if (!syncStarted && isOnline()) {
-    fullDownload();
-  }
-});
 
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';

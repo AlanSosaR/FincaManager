@@ -228,6 +228,8 @@ export default class QueryBuilder {
       });
     }
 
+    const totalCount = results.length;
+
     if (this._rangeFrom != null && this._rangeTo != null) {
       results = results.slice(this._rangeFrom, this._rangeTo + 1);
     }
@@ -236,15 +238,13 @@ export default class QueryBuilder {
       results = await this._applyJoin(results, join);
     }
 
-    const count = results.length;
-
     if (this._count === 'exact' && this._head) {
-      return { data: null, count, error: null };
+      return { data: null, count: totalCount, error: null };
     }
     if (this._single || this._maybeSingle) {
       return { data: results[0] || null, error: null };
     }
-    return { data: results, count: this._count ? count : undefined, error: null };
+    return { data: results, count: this._count ? totalCount : undefined, error: null };
   }
 
   async _applyJoin(results, join) {
