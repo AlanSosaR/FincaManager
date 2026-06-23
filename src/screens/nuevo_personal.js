@@ -53,7 +53,7 @@ export async function renderNuevoPersonal(personalId, returnScreen, returnId) {
             <button type="button" class="da-action-btn secondary" onclick="${backAction}" style="padding: 12px 24px; border-radius: 9999px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
               Cancelar
             </button>
-            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: var(--m3-primary); border: none; color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(62,111,57,0.3); font-family: 'Work Sans', sans-serif;">
+            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: var(--m3-primary); border: none; color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(69,87,67,0.3); font-family: 'Work Sans', sans-serif;">
               <span class="material-symbols-outlined" style="font-size: 20px;">save</span>
               <span>${btnLabel}</span>
             </button>

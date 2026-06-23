@@ -11,7 +11,7 @@ export default defineConfig({
         name: 'Finca Manager',
         short_name: 'FincaMgr',
         description: 'Gestión integral de fincas agrícolas: ganado, motores, herramientas y cafetal',
-        theme_color: '#2e7d32',
+        theme_color: '#2d3e2c',
         background_color: '#fdf9f3',
         display: 'standalone',
         start_url: '/',

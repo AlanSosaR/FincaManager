@@ -5,7 +5,7 @@ function getInitiales(nombre) {
 }
 
 function getColor(seed) {
-  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2e7d32', '#1565c0', '#6a1b9a'];
+  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2d3e2c', '#2c666e', '#6a1b9a'];
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
@@ -170,7 +170,7 @@ export async function renderListaPersonal() {
         </div>
       </div>
 
-      <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-fab-circle" style="position: fixed; bottom: 24px; right: 24px; z-index: 999; width: 56px; height: 56px; border-radius: 16px; background: var(--m3-primary); border: none; box-shadow: 0 4px 16px rgba(62,111,57,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 20px rgba(62,111,57,0.5)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(62,111,57,0.4)';" aria-label="Agregar personal">
+      <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-fab-circle" style="position: fixed; bottom: 24px; right: 24px; z-index: 999; width: 56px; height: 56px; border-radius: 16px; background: var(--m3-primary); border: none; box-shadow: 0 4px 16px rgba(69,87,67,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 20px rgba(69,87,67,0.5)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(69,87,67,0.4)';" aria-label="Agregar personal">
         <span class="material-symbols-outlined" style="font-size: 28px; color: var(--m3-on-primary);">add</span>
       </button>
     `;

@@ -90,7 +90,7 @@ export async function renderDetallePotrero(potreroId) {
         <div class="section">
           <div class="section-title">
             <h3>Animales en el Lote</h3>
-            <span class="tag" style="background:#e8f5e9; color:#43a047">${animales ? animales.length : 0} Activos</span>
+            <span class="tag" style="background:#e4fd97; color:#43a047">${animales ? animales.length : 0} Activos</span>
           </div>
           <div class="animal-list" style="margin-top: 12px; gap: 8px;">
             ${animales && animales.length > 0 ? animales.map(a => `
@@ -126,7 +126,7 @@ export async function renderDetallePotrero(potreroId) {
                   <button class="btn-m3-text btn-edit-note" data-id="${b.id}" style="padding: 4px; min-width: 32px; height: 32px; border-radius: 50%;">
                     <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
                   </button>
-                  <button class="btn-m3-text btn-delete-note" data-id="${b.id}" style="padding: 4px; min-width: 32px; height: 32px; border-radius: 50%; color: #d32f2f;">
+                  <button class="btn-m3-text btn-delete-note" data-id="${b.id}" style="padding: 4px; min-width: 32px; height: 32px; border-radius: 50%; color: #ff4103;">
                     <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
                   </button>
                 </div>

@@ -1,39 +1,39 @@
 :root {
-  /* Material 3 Expressive Palette - Grounded in #3e6f39 */
-  --m3-primary: #3e6f39;
+  /* Material 3 Palette - Seed: #2d3e2c (Fresh Canopy) */
+  --m3-primary: #2d3e2c;
   --m3-on-primary: #ffffff;
-  --m3-primary-container: #b9f1ad;
-  --m3-on-primary-container: #0c2009;
-  --m3-primary-fixed: #b9f1ad;
-  --m3-primary-fixed-dim: #9ed693;
+  --m3-primary-container: #e4fd97;
+  --m3-on-primary-container: #0f1f0f;
+  --m3-primary-fixed: #e4fd97;
+  --m3-primary-fixed-dim: #88d98a;
   
-  --m3-secondary: #52634f;
+  --m3-secondary: #526350;
   --m3-on-secondary: #ffffff;
-  --m3-secondary-container: #ffdf9e;
-  --m3-on-secondary-container: #694d00;
+  --m3-secondary-container: #daeed5;
+  --m3-on-secondary-container: #101f10;
   
-  --m3-tertiary: #38656a;
+  --m3-tertiary: #2c666e;
   --m3-on-tertiary: #ffffff;
-  --m3-tertiary-container: #ffa17d;
-  --m3-on-tertiary-container: #651f00;
+  --m3-tertiary-container: #b9f2fb;
+  --m3-on-tertiary-container: #001f23;
   
-  --m3-error: #ba1a1a;
+  --m3-error: #ff4103;
   --m3-on-error: #ffffff;
-  --m3-error-container: #ffdad6;
-  --m3-on-error-container: #410002;
+  --m3-error-container: #ffe2db;
+  --m3-on-error-container: #3c0800;
   
-  --m3-surface: #f7fbf1;
-  --m3-on-surface: #191d17;
-  --m3-surface-variant: #dee5d8;
-  --m3-on-surface-variant: #42493f;
-  --m3-outline: #72796e;
-  --m3-outline-variant: #c2c9bd;
+  --m3-surface: #f0ede4;
+  --m3-on-surface: #1a1c19;
+  --m3-surface-variant: #e4eade;
+  --m3-on-surface-variant: #424940;
+  --m3-outline: #72796f;
+  --m3-outline-variant: #c7cec3;
   
   --m3-surface-container-lowest: #ffffff;
-  --m3-surface-container-low: #f1f5eb;
-  --m3-surface-container: #ebefe6;
-  --m3-surface-container-high: #e5e9e0;
-  --m3-surface-container-highest: #dfe4da;
+  --m3-surface-container-low: #f3f4ee;
+  --m3-surface-container: #e2e3dd;
+  --m3-surface-container-high: #d7d8d2;
+  --m3-surface-container-highest: #cbcdc7;
 
   /* Expressive Tokens */
   --m3-radius-none: 0;
@@ -50,9 +50,9 @@
   --primary: var(--m3-primary);
   --primary-container: var(--m3-primary-container);
   --on-primary-container: var(--m3-on-primary-container);
-  --primary-light: #60ad5e;
-  --primary-dark: #2c5c28;
-  --primary-dim: #32632e;
+  --primary-light: #83967f;
+  --primary-dark: #2f402e;
+  --primary-dim: #455743;
   --secondary: var(--m3-secondary);
   --secondary-container: var(--m3-secondary-container);
   --on-secondary-container: var(--m3-on-secondary-container);
@@ -85,6 +85,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @keyframes spin {
@@ -183,14 +184,14 @@ body {
 }
 
 .nav-link:hover {
-  background: rgba(46, 125, 50, 0.05);
+  background: rgba(69, 87, 67, 0.05);
   color: var(--primary);
 }
 
 .nav-link.active {
   background: var(--primary);
   color: #fff !important;
-  box-shadow: 0 12px 24px rgba(46, 125, 50, 0.25);
+  box-shadow: 0 12px 24px rgba(69, 87, 67, 0.25);
   transform: translateX(4px);
 }
 
@@ -204,7 +205,7 @@ body {
 }
 
 .logout {
-  color: #d32f2f;
+  color: var(--m3-error);
 }
 
 /* Sidebar Collapsed State */
@@ -453,7 +454,7 @@ body {
 .form-group textarea:focus,
 .m3-input-wrapper input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+  box-shadow: 0 0 0 3px rgba(69, 87, 67, 0.1);
 }
 
 .modal-footer {
@@ -516,7 +517,7 @@ body {
   cursor: pointer;
   overflow: hidden;
   /* M3 tonal colour — primary container */
-  background-color: #d7edd9;
+  background-color: #daeed5;
   color: var(--primary);
   /* Spring-like transition */
   transition:
@@ -541,10 +542,10 @@ body {
 
 /* Hover — expressive spring scale + more rounded */
 .m3-icon-btn-tonal:hover {
-  background-color: #c2e3c5;
+  background-color: #e4eade;
   border-radius: 20px;
   transform: scale(1.08);
-  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.20);
+  box-shadow: 0 4px 12px rgba(69, 87, 67, 0.20);
 }
 
 /* ── M3 Expressive Utility Classes ─────────────────────────────────────────── */
@@ -711,7 +712,7 @@ body {
 }
 
 .m3-btn-text:hover {
-  background-color: rgba(62, 111, 57, 0.08);
+  background-color: rgba(69, 87, 67, 0.08);
 }
 
 .m3-fab .material-icons, .m3-fab .material-symbols-outlined {
@@ -799,9 +800,9 @@ body {
 /* Press state */
 .m3-icon-btn-tonal:active {
   transform: scale(0.94);
-  background-color: #aed6b1;
+  background-color: #e2e3dd;
   border-radius: 14px;
-  box-shadow: 0 1px 4px rgba(46, 125, 50, 0.15);
+  box-shadow: 0 1px 4px rgba(69, 87, 67, 0.15);
   transition: transform 0.1s ease, border-radius 0.1s ease;
 }
 
@@ -811,7 +812,7 @@ body {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(circle at center, rgba(46,125,50,0.18) 0%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(69,87,67,0.18) 0%, transparent 70%);
   opacity: 0;
   transform: scale(0.6);
   transition: opacity 0.3s ease, transform 0.3s ease;

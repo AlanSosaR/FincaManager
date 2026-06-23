@@ -32,7 +32,7 @@ export async function renderNuevaActividad(loteId, tipo) {
     <div class="m3-form-screen">
       <div class="m3-form-card">
     <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
-      <div class="da-stat-icon" style="background: rgba(62, 111, 57, 0.1); color: var(--m3-primary); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+      <div class="da-stat-icon" style="background: rgba(69, 87, 67, 0.1); color: var(--m3-primary); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
         ${tipo === 'Fertilizante' ? '<img src="npk.png" alt="" style="width: 40px; height: 40px; object-fit: contain;">' :
           tipo === 'Manejo de Tejido' ? '<img src="tijeras-de-podar.png" alt="" style="width: 40px; height: 40px; object-fit: contain;">' :
           tipo === 'Limpieza' ? '<img src="sale-de.png" alt="" style="width: 40px; height: 40px; object-fit: contain;">' :
@@ -285,7 +285,7 @@ export async function renderNuevaActividad(loteId, tipo) {
             <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('detalle_lote', '${loteId}')" style="padding: 12px 24px; border-radius: 9999px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
               Cancelar
             </button>
-            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: var(--m3-primary); border: none; color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(62,111,57,0.3); font-family: 'Work Sans', sans-serif;">
+            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: var(--m3-primary); border: none; color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(69,87,67,0.3); font-family: 'Work Sans', sans-serif;">
               <span class="material-symbols-outlined" style="font-size: 20px;">save</span>
               <span>Guardar Actividad</span>
             </button>

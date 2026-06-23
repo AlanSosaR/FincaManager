@@ -32,7 +32,7 @@
 .cal-day:hover { background: var(--m3-surface-container-highest); }
 .cal-day-empty { background: transparent; cursor: default; }
 .cal-day-today { border: 2px solid var(--m3-primary); }
-.cal-day-work { background: rgba(46,125,50,0.15); }
+.cal-day-work { background: rgba(69,87,67,0.15); }
 .cal-day-rest { background: rgba(198,40,40,0.1); }
 .cal-day-sun .cal-day-num { color: var(--m3-error); }
 .cal-day-num { font-size: 14px; font-weight: 700; color: var(--m3-on-surface); line-height: 1; }
@@ -129,7 +129,7 @@
 .history-icon {
   font-size: 24px;
   color: var(--primary);
-  background: rgba(46,125,50,0.1);
+  background: rgba(69,87,67,0.1);
   padding: 8px;
   border-radius: 12px;
 }
@@ -161,7 +161,7 @@
 
 /* Maint Card Refinement (Matching Reference) */
 .maint-card {
-  background: #fbf7f0;
+  background: #f0ede4;
   border-radius: 32px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0,0,0,0.06);
@@ -180,18 +180,18 @@
 }
 
 .maint-card.alert-mode {
-  background: #f86e49;
+  background: var(--m3-error);
   border: none;
 }
 
 .maint-card.alert-mode .maint-label-small {
-  color: #5b211a;
+  color: var(--m3-on-error-container);
   opacity: 0.8;
 }
 
 .maint-card.alert-mode .maint-big-number,
 .maint-card.alert-mode .maint-big-unit {
-  color: #3b0e0a;
+  color: var(--m3-on-error-container);
 }
 
 .maint-card.alert-mode .maint-progress-track {
@@ -199,17 +199,17 @@
 }
 
 .maint-card.alert-mode .maint-progress-fill {
-  background: #3b0e0a;
+  background: var(--m3-on-error-container);
 }
 
 .maint-card.alert-mode .maint-footer-date {
-  color: #3b0e0a;
+  color: var(--m3-on-error-container);
   border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* Button "Registrar Cambio Ahora" */
 .btn-maint-alert {
-  background: #3b0e0a;
+  background: var(--m3-on-error-container);
   color: white;
   border: none;
   border-radius: 40px;
@@ -220,7 +220,7 @@
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  box-shadow: 0 10px 20px rgba(59, 14, 10, 0.3);
+  box-shadow: 0 10px 20px rgba(60, 8, 0, 0.3);
   margin-left: auto;
   transition: transform 0.2s;
 }
@@ -245,7 +245,7 @@
 
 /* Operation Card (Timer) */
 .operation-card {
-  background: #d1f2d1;
+  background: var(--m3-primary-container);
   border-radius: 32px;
   overflow: hidden;
 }

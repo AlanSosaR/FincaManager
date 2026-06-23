@@ -147,7 +147,7 @@ async function loadAllData(animalId, container) {
             weightChange = 0;
             weightTrend = 'neutral';
         } else {
-            lastWeight = 0;
+            lastWeight = parseFloat(currentAnimal.peso_actual) || 0;
             weightChange = 0;
             weightTrend = 'neutral';
         }
@@ -170,7 +170,7 @@ async function loadAllData(animalId, container) {
         console.error('Error loading animal data:', err);
         container.innerHTML = `
             <div class="error-state" style="padding: 40px; text-align: center;">
-                <span class="material-icons" style="font-size: 48px; color: #c62828; margin-bottom: 16px;">error</span>
+                <span class="material-icons" style="font-size: 48px; color: #ff4103; margin-bottom: 16px;">error</span>
                 <p>Error al cargar datos del animal</p>
                 <button class="btn-m3-tonal" onclick="window.location.reload()" style="margin-top: 16px;">Reintentar</button>
             </div>
@@ -227,7 +227,7 @@ function renderFullContent(container, animalId) {
                     <span class="material-icons">monitor_weight</span>
                 </div>
                 <div>
-                    <div class="da-stat-label">Último Pesaje</div>
+                    <div class="da-stat-label">${weights.length <= 1 ? 'Peso Inicial' : 'Último Pesaje'}</div>
                     <div class="da-stat-value">${lastWeight} <small class="da-stat-value-md">${currentAnimal.peso_unidad || 'kg'}</small></div>
                     <div class="da-stat-sub">
                         <span class="da-variation-pill ${weightTrend}">
@@ -239,7 +239,7 @@ function renderFullContent(container, animalId) {
             </div>
 
             <div class="da-stat-card da-stat-tab" data-tab="fumigacion" style="cursor:pointer;" title="Ver Fumigación y Químicos">
-                <div class="da-stat-icon" style="background: #e1f5fe; color: #0288d1;">
+                <div class="da-stat-icon" style="background: #e1f5fe; color: #2c666e;">
                     <span class="material-icons">bug_report</span>
                 </div>
                 <div>
@@ -343,7 +343,7 @@ function renderFullContent(container, animalId) {
                             <div class="da-cal-days-container" id="calendar-days-fumig"></div>
                         </div>
                         <div class="da-cal-legend">
-                            <div class="da-cal-dot" style="background: #0288d1;"></div>
+                            <div class="da-cal-dot" style="background: #2c666e;"></div>
                             <span>Días con fumigación</span>
                         </div>
                     </div>
@@ -677,7 +677,7 @@ function showDayDetails(day, dayEvents) {
                 ${dayEvents.map(v => {
                     const currentEstado = v.estado || 'Aplicada';
                     const isPastOrToday = v.fecha <= getLocalToday();
-                    let iconColor = '#386a3e';
+                    let iconColor = '#455743';
                     let iconName = 'vaccines';
                     let subtitle = 'Vacunación aplicada';
                     let actionsHtml = '';
@@ -688,22 +688,22 @@ function showDayDetails(day, dayEvents) {
                         subtitle = 'Vacunación programada';
                         // Edit button always shown for scheduled
                         const applyRow = isPastOrToday ? `
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
                                 <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
                             </button>
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
                                 <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
                             </button>` : '';
                         actionsHtml = `
                             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
                                 ${applyRow}
-                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0; flex: 1;" onclick="window.editVaccine('${v.id}')">
+                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e; flex: 1;" onclick="window.editVaccine('${v.id}')">
                                     <span class="material-icons" style="font-size: 16px;">edit</span> Editar
                                 </button>
                             </div>
                         `;
                     } else if (currentEstado === 'Cancelada') {
-                        iconColor = '#c62828';
+                        iconColor = '#ff4103';
                         iconName = 'cancel';
                         subtitle = 'Vacunación cancelada';
                     }
@@ -976,10 +976,10 @@ function renderVaccinesTable(allVaccines, page) {
         
         if (currentEstado === 'Programada') {
             const applyBtn = isPastOrToday ? `
-                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmVaccine('${v.id}')">
+                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c;" onclick="window.confirmVaccine('${v.id}')">
                     <span class="material-icons" style="font-size: 16px;">check</span>
                 </button>
-                <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelVaccine('${v.id}')">
+                <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103;" onclick="window.cancelVaccine('${v.id}')">
                     <span class="material-icons" style="font-size: 16px;">close</span>
                 </button>` : `
                 <span class="da-variation-pill pending" style="margin-right: 4px;">
@@ -989,7 +989,7 @@ function renderVaccinesTable(allVaccines, page) {
             estadoHtml = `
                 <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                     ${applyBtn}
-                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editVaccine('${v.id}')">
+                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e;" onclick="window.editVaccine('${v.id}')">
                         <span class="material-icons" style="font-size: 16px;">edit</span>
                     </button>
                 </div>
@@ -1153,10 +1153,10 @@ function renderFumigacionesTable(allFumigaciones, page) {
         
         if (currentEstado === 'Programada') {
             const applyBtnF = isPastOrToday ? `
-                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32;" onclick="window.confirmFumigacion('${f.id}')">
+                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c;" onclick="window.confirmFumigacion('${f.id}')">
                     <span class="material-icons" style="font-size: 16px;">check</span>
                 </button>
-                <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffebee; color: #c62828;" onclick="window.cancelFumigacion('${f.id}')">
+                <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103;" onclick="window.cancelFumigacion('${f.id}')">
                     <span class="material-icons" style="font-size: 16px;">close</span>
                 </button>` : `
                 <span class="da-variation-pill pending" style="margin-right: 4px;">
@@ -1166,7 +1166,7 @@ function renderFumigacionesTable(allFumigaciones, page) {
             estadoHtml = `
                 <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                     ${applyBtnF}
-                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0;" onclick="window.editFumigacion('${f.id}')">
+                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e;" onclick="window.editFumigacion('${f.id}')">
                         <span class="material-icons" style="font-size: 16px;">edit</span>
                     </button>
                 </div>
@@ -1271,7 +1271,7 @@ function renderCalendarFumig() {
             if (hasPending) {
                 dotsHtml = '<div class="da-cal-pending-dot"></div>';
             } else {
-                dotsHtml = '<div class="da-cal-event-dot" style="background: #0288d1;"></div>';
+                dotsHtml = '<div class="da-cal-event-dot" style="background: #2c666e;"></div>';
             }
         }
         dayEl.innerHTML = `<span>${day}</span>${dotsHtml}`;
@@ -1316,7 +1316,7 @@ function showDayDetailsFumig(day, dayEvents) {
                 ${dayEvents.map(f => {
                     const currentEstado = f.estado || 'Aplicada';
                     const isPastOrToday = f.fecha <= getLocalToday();
-                    let iconColor = '#0288d1';
+                    let iconColor = '#2c666e';
                     let iconName = 'bug_report';
                     let subtitle = 'Fumigación aplicada';
                     let actionsHtml = '';
@@ -1326,22 +1326,22 @@ function showDayDetailsFumig(day, dayEvents) {
                         iconName = 'schedule';
                         subtitle = 'Fumigación programada';
                         const applyRowF = isPastOrToday ? `
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e8f5e9; color: #2e7d32; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
                                 <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
                             </button>
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffebee; color: #c62828; flex: 1;" onclick="window.cancelFumigacion('${f.id}')">
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelFumigacion('${f.id}')">
                                 <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
                             </button>` : '';
                         actionsHtml = `
                             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
                                 ${applyRowF}
-                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e3f2fd; color: #1565c0; flex: 1;" onclick="window.editFumigacion('${f.id}')">
+                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e; flex: 1;" onclick="window.editFumigacion('${f.id}')">
                                     <span class="material-icons" style="font-size: 16px;">edit</span> Editar
                                 </button>
                             </div>
                         `;
                     } else if (currentEstado === 'Cancelada') {
-                        iconColor = '#c62828';
+                        iconColor = '#ff4103';
                         iconName = 'cancel';
                         subtitle = 'Fumigación cancelada';
                     }
@@ -1396,12 +1396,12 @@ function initChart() {
             datasets: [{
                 label: 'Peso (' + (currentAnimal.peso_unidad || 'kg') + ')',
                 data: data,
-                borderColor: '#386a3e',
-                backgroundColor: 'rgba(56, 106, 62, 0.1)',
+                borderColor: '#455743',
+                backgroundColor: 'rgba(69, 87, 67, 0.1)',
                 borderWidth: 3,
                 tension: 0.4,
                 fill: true,
-                pointBackgroundColor: '#386a3e',
+                pointBackgroundColor: '#455743',
                 pointRadius: 4
             }]
         },
@@ -1437,7 +1437,7 @@ async function handleEditVaccine(vaccineId) {
 
     container.innerHTML = `
         <div class="da-inline-form-card" style="margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);">
-            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#386a3e;">Editar Vacuna</h3>
+            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#455743;">Editar Vacuna</h3>
             <form id="form-edit-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
                 <div class="m3-field">
                     <input type="text" name="nombre" value="${v.nombre || ''}" placeholder=" " required autocomplete="off">
@@ -1457,7 +1457,7 @@ async function handleEditVaccine(vaccineId) {
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-                    <button type="button" class="btn-m3-tonal" id="delete-edit-vaccine" style="background:#ffebee; color:#c62828;">
+                    <button type="button" class="btn-m3-tonal" id="delete-edit-vaccine" style="background:#ffe2db; color:#ff4103;">
                         <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
                     </button>
                     <div style="display:flex; gap:12px;">
@@ -1532,7 +1532,7 @@ async function handleEditFumigacion(fumigacionId) {
 
     container.innerHTML = `
         <div class="da-inline-form-card" style="margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);">
-            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#386a3e;">Editar Fumigación</h3>
+            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#455743;">Editar Fumigación</h3>
             <form id="form-edit-fumigacion" style="display: flex; flex-direction: column; gap: 16px;">
                 <div class="m3-field">
                     <input type="text" name="producto" value="${f.producto || ''}" placeholder=" " required autocomplete="off">
@@ -1552,7 +1552,7 @@ async function handleEditFumigacion(fumigacionId) {
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-                    <button type="button" class="btn-m3-tonal" id="delete-edit-fumigacion" style="background:#ffebee; color:#c62828;">
+                    <button type="button" class="btn-m3-tonal" id="delete-edit-fumigacion" style="background:#ffe2db; color:#ff4103;">
                         <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
                     </button>
                     <div style="display:flex; gap:12px;">

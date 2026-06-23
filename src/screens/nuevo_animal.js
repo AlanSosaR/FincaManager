@@ -6,7 +6,7 @@ export async function renderNuevoAnimal(id) {
     <div class="m3-form-screen">
       <div class="m3-form-card">
         <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
-          <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div class="da-stat-icon" style="background: rgba(69, 87, 67, 0.1); color: #455743; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
             <img src="/vaca.png" alt="Ganado" style="width: 32px; height: 32px; filter: grayscale(1) opacity(0.85);">
           </div>
           <div>
@@ -46,13 +46,6 @@ export async function renderNuevoAnimal(id) {
                   <input type="text" name="nombre" placeholder=" " required>
                   <label>Nombre del Animal</label>
                   <p class="error-text" id="error-nombre">Este campo es obligatorio</p>
-                </div>
-
-                <div class="m3-field">
-                  <select name="potrero_id" id="field-potrero">
-                    <option value="" disabled selected hidden></option>
-                  </select>
-                  <label>Potrero Asignado</label>
                 </div>
 
                 <div class="m3-field">
@@ -133,29 +126,9 @@ export function initNuevoAnimal(id) {
   let selectedFile = null;
   let existingImageUrl = null;
 
-  // Load potreros for select
-  supabase.from('potreros').select('id, nombre').then(({ data }) => {
-    const select = document.getElementById('field-potrero');
-    if (select && data) {
-      data.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.nombre;
-        select.appendChild(opt);
-      });
-      
-      // If editing, re-select current potrero after options are loaded
-      if (id && currentAnimalPotreroId) {
-        select.value = currentAnimalPotreroId;
-      }
-    }
-  });
-
-  let currentAnimalPotreroId = null;
-
   // If editing, load data
   if (id) {
-    supabase.from('ganado').select('*').eq('id', id).single().then(({ data, error }) => {
+    supabase.from('ganado').select('*').eq('id', id).single().then(async ({ data, error }) => {
       if (error) {
         window.Snackbar.show('Error al cargar datos: ' + error.message, { type: 'error' });
         return;
@@ -166,10 +139,11 @@ export function initNuevoAnimal(id) {
         form.sexo.value = data.sexo || '';
         form.peso_actual.value = data.peso_actual || '';
         form.fecha_adquisicion.value = data.fecha_adquisicion || '';
-        currentAnimalPotreroId = data.potrero_id;
-        
-        const potreroSelect = document.getElementById('field-potrero');
-        if (potreroSelect) potreroSelect.value = data.potrero_id || '';
+
+        const { data: pesajes } = await supabase.from('animal_pesajes').select('peso').eq('animal_id', id).order('fecha', { ascending: false });
+        if (pesajes && pesajes.length > 0) {
+          form.peso_actual.value = pesajes[0].peso;
+        }
 
         existingImageUrl = data.image_url;
 
@@ -258,7 +232,6 @@ export function initNuevoAnimal(id) {
         peso_actual: parseFloat(data.peso_actual) || 0,
         peso_unidad: data.peso_unidad || 'kg',
         fecha_adquisicion: fechaFinal,
-        potrero_id: data.potrero_id || null,
         image_url: image_url || existingImageUrl
       };
 

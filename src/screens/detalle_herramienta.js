@@ -61,7 +61,7 @@ export async function renderDetalleHerramienta(toolId) {
           </div>
           <div class="detail-stat-item">
             <span class="detail-stat-label">Estado</span>
-            <span class="tag" style="background: ${toolData.estado === 'Disponible' ? '#e8f5e9' : '#fff3e0'}; color: ${toolData.estado === 'Disponible' ? '#2e7d32' : '#ef6c00'}; font-size: 12px; margin-top: 4px; display: inline-block;">
+            <span class="tag" style="background: ${toolData.estado === 'Disponible' ? '#e4fd97' : '#fff3e0'}; color: ${toolData.estado === 'Disponible' ? '#2d3e2c' : '#ef6c00'}; font-size: 12px; margin-top: 4px; display: inline-block;">
               ${toolData.estado}
             </span>
           </div>
@@ -94,7 +94,7 @@ export async function renderDetalleHerramienta(toolId) {
                   <button class="btn-m3-text btn-edit-mant" data-id="${m.id}" style="padding: 4px; min-width: 32px; height: 32px; border-radius: 50%;">
                     <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
                   </button>
-                  <button class="btn-m3-text btn-delete-mant" data-id="${m.id}" style="padding: 4px; min-width: 32px; height: 32px; border-radius: 50%; color: #d32f2f;">
+                  <button class="btn-m3-text btn-delete-mant" data-id="${m.id}" style="padding: 4px; min-width: 32px; height: 32px; border-radius: 50%; color: #ff4103;">
                     <span class="material-symbols-outlined" style="font-size: 18px;">delete</span>
                   </button>
                 </div>

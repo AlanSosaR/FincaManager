@@ -6,7 +6,7 @@ function getInitiales(nombre) {
 }
 
 function getAvatarColor(seed) {
-  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2e7d32', '#1565c0', '#6a1b9a'];
+  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2d3e2c', '#2c666e', '#6a1b9a'];
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
@@ -107,7 +107,7 @@ export async function renderDetalleLote(id) {
                     `).join('')}
                   </select>
                 </div>
-                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="padding: 14px 32px; border-radius: 9999px; border: none; background: var(--m3-primary); color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; white-space: nowrap; box-shadow: 0 4px 12px rgba(62,111,57,0.3);">
+                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="padding: 14px 32px; border-radius: 9999px; border: none; background: var(--m3-primary); color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; white-space: nowrap; box-shadow: 0 4px 12px rgba(69,87,67,0.3);">
                   <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
                   Agregar
                 </button>
@@ -141,7 +141,7 @@ export async function renderDetalleLote(id) {
                       </div>
                     </div>
                     <div class="m3-text-right">
-                      <span class="m3-text-primary m3-label-small m3-font-bold m3-px-2 m3-py-1 m3-rounded-full m3-uppercase" style="background: rgba(62,111,57,0.1); font-size: 10px;">Realizado</span>
+                      <span class="m3-text-primary m3-label-small m3-font-bold m3-px-2 m3-py-1 m3-rounded-full m3-uppercase" style="background: rgba(69,87,67,0.1); font-size: 10px;">Realizado</span>
                       <p class="m3-label-small m3-font-medium m3-mt-1 m3-text-on-surface-variant">${new Date(app.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                     </div>
                   </div>
@@ -305,10 +305,10 @@ export function initDetalleLote(id) {
       let coords, color;
       if (Array.isArray(parsed)) {
         coords = parsed;
-        color = '#3e6f39';
+        color = '#2d3e2c';
       } else {
         coords = parsed.coordinates || [];
-        color = parsed.color || '#3e6f39';
+        color = parsed.color || '#2d3e2c';
       }
       if (coords && coords.length > 2) {
         const latlngs = coords.map(c => [c.lat, c.lng]);

@@ -138,7 +138,7 @@ export async function renderMotores(page = 1, filter = 'all') {
   return `
     <div class="screen-motores" style="padding-bottom: 120px;">
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="motors-search-wrapper" style="display: flex; align-items: center; background: ${currentMotorsSearchQuery ? '#f0fdf4' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
+        <div class="search-wrapper" id="motors-search-wrapper" style="display: flex; align-items: center; background: ${currentMotorsSearchQuery ? '#e4fd97' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
           <button id="motors-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentMotorsSearchQuery ? 'transparent' : ''};" title="Buscar">
             <span class="material-icons" style="color: var(--primary);">search</span>
           </button>
@@ -254,7 +254,7 @@ export function initMotores() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#f0fdf4';
+        searchWrapper.style.background = '#e4fd97';
         searchToggle.style.background = 'transparent';
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';
@@ -313,7 +313,7 @@ function renderMotorCard(eq) {
       <div class="motor-compact-img">
         ${imgHtml}
         <div style="position: absolute; bottom: 2px; right: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-          <span class="material-icons" style="font-size: 14px; color: ${pct >= 95 ? '#c62828' : '#2e7d32'};">check_circle</span>
+          <span class="material-icons" style="font-size: 14px; color: ${pct >= 95 ? '#ff4103' : '#2d3e2c'};">check_circle</span>
         </div>
       </div>
       <!-- Info Group -->

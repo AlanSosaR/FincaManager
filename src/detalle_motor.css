@@ -1,8 +1,8 @@
 /* Restoration & Refinement for Detalle Motor (Matching Image 1) */
 
 :root {
-  --color-accent-orange: #f86e49;
-  --color-accent-green: #d1f2d1;
+  --color-accent-orange: var(--m3-error);
+  --color-accent-green: #e4fd97;
   --color-dark-brown: #3b0e0a;
   --color-shadow: rgba(0,0,0,0.06);
   --radius-premium: 32px;
@@ -141,7 +141,7 @@
 .maint-big-text {
   font-size: 80px;
   font-weight: 950;
-  color: #386a3e;
+  color: #455743;
   line-height: 1;
   letter-spacing: -2px;
 }
@@ -197,7 +197,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #1b5e20;
+  color: #2f402e;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -224,7 +224,7 @@
 .clock-digital {
   font-size: 64px;
   font-weight: 800;
-  color: #1b5e20;
+  color: #2f402e;
   font-family: 'JetBrains Mono', monospace;
   display: block;
 }
@@ -233,7 +233,7 @@
   font-size: 14px;
   font-weight: 700;
   opacity: 0.4;
-  color: #1b5e20;
+  color: #2f402e;
 }
 
 .timer-controls-circles {
@@ -250,7 +250,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2e7d32;
+  color: #2d3e2c;
   cursor: pointer;
   transition: all 0.2s;
   box-shadow: 0 4px 10px rgba(0,0,0,0.05);
@@ -262,7 +262,7 @@
 .btn-circle-white .material-icons { font-size: 28px; }
 
 .btn-finish-session {
-  background: #8c2a1a;
+  background: var(--m3-error);
   color: white;
   border: none;
   padding: 16px 24px;
@@ -303,7 +303,7 @@
 
 .session-icon-box {
   width: 48px; height: 48px;
-  background: #fdf9f3;
+  background: #f0ede4;
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -341,7 +341,7 @@
 }
 
 .btn-download-pdf:hover {
-  background-color: #fdfaf6;
+  background-color: #f0ede4;
   border-color: #ddd;
   color: #444;
 }
@@ -368,7 +368,7 @@
 }
 
 .timeline-title .material-icons {
-  color: #386a3e;
+  color: #455743;
   font-size: 24px;
 }
 
@@ -404,9 +404,9 @@
 .tl-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
-  background: #c5c5c5;
+  background: #c7cec3;
   border: 2px solid white;
-  box-shadow: 0 0 0 1px #c5c5c5;
+  box-shadow: 0 0 0 1px #c7cec3;
 }
 
 .timeline-item-premium:not(:last-child)::before {
@@ -414,14 +414,14 @@
   position: absolute;
   left: 3px; top: 16px; bottom: -32px;
   width: 1px;
-  background: #eaeaea;
+  background: #e2e3dd;
   z-index: 1;
 }
 
 .timeline-item-premium.is-recent .tl-dot {
-  background: #386a3e;
+  background: #455743;
   border: 2px solid white;
-  box-shadow: 0 0 0 1px #386a3e;
+  box-shadow: 0 0 0 1px #455743;
   margin-top: -2px;
 }
 
@@ -451,16 +451,16 @@
 }
 
 .tl-pill {
-  background: #fdfaf6;
+  background: #f0ede4;
   padding: 6px 14px;
   border-radius: 100px;
   font-size: 10.5px;
   font-weight: 800;
-  color: #9a8a7e;
+  color: #72796f;
 }
 
 .tl-badge {
-  color: #558758;
+  color: #2d3e2c;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1.5px;
@@ -494,7 +494,7 @@
 }
 
 .m3-input-container {
-  background: #f8f8f8;
+  background: #f3f4ee;
   border: 1px solid #eee;
   border-radius: 16px;
   display: flex;
@@ -508,7 +508,7 @@
 .m3-input-container:focus-within {
   background: white;
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(46, 125, 50, 0.1);
+  box-shadow: 0 0 0 4px rgba(69, 87, 67, 0.1);
 }
 
 .m3-input-container input {
@@ -524,8 +524,8 @@
 }
 
 .m3-result-bubble {
-  background: #fdf9f3;
-  border: 2px dashed #eaddcf;
+  background: #f0ede4;
+  border: 2px dashed #c7cec3;
   border-radius: 20px;
   padding: 20px;
   display: flex;
@@ -543,7 +543,7 @@
 .m3-result-label {
   font-size: 10px;
   font-weight: 900;
-  color: #bc9f84;
+  color: #72796f;
 }
 
 .m3-result-value {
@@ -559,7 +559,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #bc9f84;
+  color: #72796f;
   box-shadow: 0 4px 10px rgba(0,0,0,0.03);
 }
 
@@ -573,13 +573,13 @@
   font-weight: 800;
   font-size: 16px;
   cursor: pointer;
-  box-shadow: 0 10px 25px rgba(46, 125, 50, 0.2);
+  box-shadow: 0 10px 25px rgba(0, 71, 65, 0.2);
   transition: all 0.2s;
 }
 
 .m3-btn-save:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(46, 125, 50, 0.3);
+  box-shadow: 0 15px 30px rgba(0, 71, 65, 0.3);
 }
 
 .m3-btn-save:active { transform: scale(0.98); }

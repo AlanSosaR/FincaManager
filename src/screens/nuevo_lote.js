@@ -5,12 +5,12 @@ function parseCoordenadasJson(json) {
     const parsed = JSON.parse(json);
     if (Array.isArray(parsed)) {
       // Old format: [{lat, lng}, ...]
-      return { coordinates: parsed, color: '#3e6f39' };
+      return { coordinates: parsed, color: '#2d3e2c' };
     }
     // New format: {color, coordinates: [{lat, lng}, ...]}
-    return { coordinates: parsed.coordinates || [], color: parsed.color || '#3e6f39' };
+    return { coordinates: parsed.coordinates || [], color: parsed.color || '#2d3e2c' };
   } catch {
-    return { coordinates: [], color: '#3e6f39' };
+    return { coordinates: [], color: '#2d3e2c' };
   }
 }
 
@@ -18,7 +18,7 @@ let mapInstance = null;
 let drawnItems = null;
 let drawControl = null;
 let existingLotesLayer = null;
-let selectedColor = '#3e6f39';
+let selectedColor = '#2d3e2c';
 
 export async function renderNuevoLote(id) {
   let lote = null;
@@ -42,7 +42,7 @@ export async function renderNuevoLote(id) {
     <div class="m3-form-screen">
       <div class="m3-form-card">
         <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
-          <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div class="da-stat-icon" style="background: rgba(69, 87, 67, 0.1); color: #455743; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
             <span class="material-icons" style="font-size: 32px;">landscape</span>
           </div>
           <div>
@@ -164,10 +164,10 @@ export async function renderNuevoLote(id) {
                 <span class="material-icons" style="font-size: 18px;">palette</span> Color:
               </span>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button type="button" class="poly-color-btn" data-color="#3e6f39" data-label="Verde" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #3e6f39; background: #3e6f39; cursor: pointer; transition: all 0.2s; box-shadow: 0 0 0 2px white, 0 0 0 4px #3e6f39;" title="Verde"></button>
+                <button type="button" class="poly-color-btn" data-color="#2d3e2c" data-label="Verde" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #2d3e2c; background: #2d3e2c; cursor: pointer; transition: all 0.2s; box-shadow: 0 0 0 2px white, 0 0 0 4px #2d3e2c;" title="Verde"></button>
                 <button type="button" class="poly-color-btn" data-color="#1976d2" data-label="Azul" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #1976d2; background: #1976d2; cursor: pointer; transition: all 0.2s;" title="Azul"></button>
                 <button type="button" class="poly-color-btn" data-color="#f57c00" data-label="Naranja" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #f57c00; background: #f57c00; cursor: pointer; transition: all 0.2s;" title="Naranja"></button>
-                <button type="button" class="poly-color-btn" data-color="#c62828" data-label="Rojo" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #c62828; background: #c62828; cursor: pointer; transition: all 0.2s;" title="Rojo"></button>
+                <button type="button" class="poly-color-btn" data-color="#ff4103" data-label="Rojo" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #ff4103; background: #ff4103; cursor: pointer; transition: all 0.2s;" title="Rojo"></button>
                 <button type="button" class="poly-color-btn" data-color="#7b1fa2" data-label="Púrpura" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #7b1fa2; background: #7b1fa2; cursor: pointer; transition: all 0.2s;" title="Púrpura"></button>
                 <button type="button" class="poly-color-btn" data-color="#00796b" data-label="Teal" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #00796b; background: #00796b; cursor: pointer; transition: all 0.2s;" title="Teal"></button>
                 <button type="button" class="poly-color-btn" data-color="#c2185b" data-label="Rosa" style="width: 32px; height: 32px; border-radius: 50%; border: 3px solid #c2185b; background: #c2185b; cursor: pointer; transition: all 0.2s;" title="Rosa"></button>
@@ -415,7 +415,7 @@ function initMap() {
   }
 
   // ── Color Picker Logic ──
-  selectedColor = '#3e6f39';
+  selectedColor = '#2d3e2c';
 
   function applyColorToPolygon(layer, color) {
     // Remove existing glow if any
@@ -619,15 +619,15 @@ function initMap() {
         
         // Main polygon (fill only)
         L.polygon(latlngs, {
-          color: '#3e6f39',
-          fillColor: '#3e6f39',
+          color: '#2d3e2c',
+          fillColor: '#2d3e2c',
           fillOpacity: 0.08,
           weight: 0
         }).addTo(existingLotesLayer);
         
         // Dashed border overlay for distinction
         const borderPoly = L.polygon(latlngs, {
-          color: '#3e6f39',
+          color: '#2d3e2c',
           fillColor: 'transparent',
           fillOpacity: 0,
           weight: 3,
@@ -639,7 +639,7 @@ function initMap() {
         
         borderPoly.bindPopup(`
           <div style="font-family: 'Work Sans', sans-serif; padding: 8px;">
-            <h4 style="margin: 0 0 4px 0; color: #3e6f39; font-size: 14px;">${lote.nombre}</h4>
+            <h4 style="margin: 0 0 4px 0; color: #2d3e2c; font-size: 14px;">${lote.nombre}</h4>
             <p style="margin: 0; font-size: 12px; color: #666;">${lote.area_ha} hectáreas</p>
           </div>
         `);
@@ -696,8 +696,8 @@ function initMap() {
       } else if (layerMode === 1) {
         mapInstance.addLayer(satelliteLayer);
         mapInstance.addLayer(labelsLayer);
-        btnLayers.style.background = '#e8f5e9';
-        btnLayers.style.color = '#2e7d32';
+        btnLayers.style.background = '#e4fd97';
+        btnLayers.style.color = '#2d3e2c';
         if (layersLabel) layersLabel.textContent = 'Relieve';
       } else {
         mapInstance.addLayer(terrainLayer);
@@ -962,14 +962,14 @@ export async function setupNuevoLoteListeners() {
               const latlngs = coordinates.map(c => [c.lat, c.lng]);
               
               L.polygon(latlngs, {
-                color: '#3e6f39',
-                fillColor: '#3e6f39',
+                color: '#2d3e2c',
+                fillColor: '#2d3e2c',
                 fillOpacity: 0.08,
                 weight: 0
               }).addTo(existingLotesLayer);
               
               const borderPoly = L.polygon(latlngs, {
-                color: '#3e6f39',
+                color: '#2d3e2c',
                 fillColor: 'transparent',
                 fillOpacity: 0,
                 weight: 3,
@@ -981,7 +981,7 @@ export async function setupNuevoLoteListeners() {
               
               borderPoly.bindPopup(`
                 <div style="font-family: 'Work Sans', sans-serif; padding: 8px;">
-                  <h4 style="margin: 0 0 4px 0; color: #3e6f39; font-size: 14px;">${lote.nombre}</h4>
+                  <h4 style="margin: 0 0 4px 0; color: #2d3e2c; font-size: 14px;">${lote.nombre}</h4>
                   <p style="margin: 0; font-size: 12px; color: #666;">${lote.area_ha} hectáreas</p>
                 </div>
               `);

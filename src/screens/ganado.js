@@ -16,6 +16,7 @@ export async function renderGanado(page = 1, filter = 'all') {
     { count: totalAnimales },
     { count: hembrasCount },
     { count: machosCount },
+    { data: vendidos },
     { data: vacunasPendientes },
     { data: pesajesPendientes },
     { data: fumigacionesPendientes }
@@ -23,10 +24,12 @@ export async function renderGanado(page = 1, filter = 'all') {
     supabase.from('ganado').select('*', { count: 'exact', head: true }),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).ilike('sexo', 'hembra'),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).ilike('sexo', 'macho'),
+    supabase.from('ganado').select('id').eq('estado', 'Vendido'),
     supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada'),
     supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada'),
     supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada')
   ]);
+  const vendidosCount = (vendidos || []).length;
 
   const setVacunas = new Set((vacunasPendientes || []).map(v => v.animal_id));
   const setPesajes = new Set((pesajesPendientes || []).map(p => p.animal_id));
@@ -45,6 +48,8 @@ export async function renderGanado(page = 1, filter = 'all') {
     query = query.in('id', Array.from(setPesajes));
   } else if (currentFilter === 'fumigaciones') {
     query = query.in('id', Array.from(setFumigaciones));
+  } else if (currentFilter === 'vendido') {
+    query = query.eq('estado', 'Vendido');
   }
 
   if (currentSearchQuery) {
@@ -69,7 +74,7 @@ export async function renderGanado(page = 1, filter = 'all') {
   return `
     <div class="screen-ganado" style="padding-bottom: 120px;">
       <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="ganado-search-wrapper" style="display: flex; align-items: center; background: ${currentSearchQuery ? '#f0fdf4' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
+        <div class="search-wrapper" id="ganado-search-wrapper" style="display: flex; align-items: center; background: ${currentSearchQuery ? '#e4fd97' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
           <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentSearchQuery ? 'transparent' : ''};" title="Buscar">
             <span class="material-icons" style="color: var(--primary);">search</span>
           </button>
@@ -138,12 +143,22 @@ export async function renderGanado(page = 1, filter = 'all') {
           ` : ''}
 
           ${setFumigaciones.size > 0 ? `
-          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" data-filter="fumigaciones" style="border-left: 4px solid #0288d1;">
+          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" data-filter="fumigaciones" style="border-left: 4px solid #2c666e;">
             <div class="ganado-card-header">
-              <span class="material-icons" style="font-size:28px; color: #0288d1;">bug_report</span>
-              <span class="ganado-card-label" style="color: #0288d1;">Fumigaciones Pdtes.</span>
+              <span class="material-icons" style="font-size:28px; color: #2c666e;">bug_report</span>
+              <span class="ganado-card-label" style="color: #2c666e;">Fumigaciones Pdtes.</span>
             </div>
             <div class="ganado-card-body"><h3 class="ganado-card-value">${setFumigaciones.size}</h3></div>
+          </div>
+          ` : ''}
+
+          ${vendidosCount > 0 ? `
+          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'vendido' ? 'active' : ''}" data-filter="vendido" style="border-left: 4px solid #d32f2f;">
+            <div class="ganado-card-header">
+              <span class="material-icons" style="font-size:28px; color: #d32f2f;">payments</span>
+              <span class="ganado-card-label" style="color: #d32f2f;">Vendidos</span>
+            </div>
+            <div class="ganado-card-body"><h3 class="ganado-card-value">${vendidosCount}</h3></div>
           </div>
           ` : ''}
         </section>
@@ -240,6 +255,7 @@ window.changeGanadoPage = async function(page) {
   else if (currentFilter === 'vacunas') query = query.in('id', Array.from(setVacunas));
   else if (currentFilter === 'pesajes') query = query.in('id', Array.from(setPesajes));
   else if (currentFilter === 'fumigaciones') query = query.in('id', Array.from(setFumigaciones));
+  else if (currentFilter === 'vendido') query = query.eq('estado', 'Vendido');
 
   if (currentSearchQuery) {
     query = query.or(`nombre.ilike.%${currentSearchQuery}%,raza.ilike.%${currentSearchQuery}%`);
@@ -264,13 +280,15 @@ window.changeGanadoPage = async function(page) {
 
 
 function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
+  const isSold = a.estado === 'Vendido';
   const pendingVacuna = setVacunas.has(a.id);
   const pendingPesaje = setPesajes.has(a.id);
   const pendingFumigacion = setFumigaciones.has(a.id);
   
   let pendingIcon = 'check_circle';
   let badgeClass = 'green';
-  if (pendingVacuna) { pendingIcon = 'vaccines'; badgeClass = 'orange'; }
+  if (isSold) { pendingIcon = 'payments'; badgeClass = 'sold'; }
+  else if (pendingVacuna) { pendingIcon = 'vaccines'; badgeClass = 'orange'; }
   else if (pendingFumigacion) { pendingIcon = 'bug_report'; badgeClass = 'orange'; }
   else if (pendingPesaje) { pendingIcon = 'monitor_weight'; badgeClass = 'orange'; }
 
@@ -279,7 +297,7 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
   const shortId = a.id && a.id.startsWith('#') ? a.id : `#${String(a.id).substring(0, 3).toUpperCase()}`;
 
   return `
-    <div class="ganado-row" onclick="window.navigateTo('detalle_animal', '${a.id}')">
+    <div class="ganado-row ${isSold ? 'ganado-row-sold' : ''}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
       <div class="ganado-row-img-container">
         <img src="${imageUrl}">
         <div class="ganado-row-badge ${badgeClass}"><span class="material-icons">${pendingIcon}</span></div>
@@ -288,19 +306,28 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
         <div class="ganado-col-group">
           <p class="ganado-col-label">${(a.raza || 'BOVINO').toUpperCase()}</p>
           <p class="ganado-col-value">${a.nombre || 'Sin nombre'}</p>
+          ${isSold ? '<p class="ganado-col-sold-tag">Vendido</p>' : ''}
         </div>
-        <div style="margin-left: auto;">
-          <button class="ganado-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)">
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 16px; position: relative;">
+          <div class="ganado-col-weight">
+            <span class="ganado-col-weight-value">${a.peso_actual || 0}</span>
+            <span class="ganado-col-weight-unit">${a.peso_unidad || 'kg'}</span>
+          </div>
+          ${!isSold ? `<button class="ganado-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)">
             <span class="material-icons">more_vert</span>
           </button>
-          <div class="action-menu">
-            <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_animal', '${a.id}')">
+          <div class="action-menu" style="background:#e4fd97;">
+            <button class="action-item" style="background:#e4fd97;" onmouseover="this.style.background='#d0e680'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.navigateTo('nuevo_animal', '${a.id}')">
               <span class="material-icons">edit</span><span>Editar</span>
             </button>
-            <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteAnimal('${a.id}', '${a.nombre}')">
+            <button class="action-item" style="background:#e4fd97;" onmouseover="this.style.background='#d0e680'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.confirmSellAnimal('${a.id}', '${a.nombre}')">
+              <span class="material-icons">payments</span><span>Vender / Dar de baja</span>
+            </button>
+            <button class="action-item delete" style="background:#e4fd97;" onmouseover="this.style.background='#f5b8a8'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.confirmDeleteAnimal('${a.id}', '${a.nombre}')">
               <span class="material-icons">delete</span><span>Eliminar</span>
             </button>
-          </div>
+          </div>` : `
+          <span class="ganado-sold-label">Vendido</span>`}
         </div>
       </div>
     </div>
@@ -325,6 +352,14 @@ export function initGanado() {
     });
   };
 
+  window.confirmSellAnimal = (id, name) => {
+    window.Snackbar.confirm(`¿Dar de baja a ${name}?`, async () => {
+      const { error } = await supabase.from('ganado').update({ estado: 'Vendido' }).eq('id', id);
+      if (error) window.Snackbar.show('Error: ' + error.message, { type: 'error' });
+      else { window.Snackbar.show(`${name} marcado como vendido`); window.navigateTo('ganado'); }
+    });
+  };
+
   // Filter cards logic
   document.querySelectorAll('.ganado-card-filter').forEach(card => {
     card.addEventListener('click', () => {
@@ -342,7 +377,7 @@ export function initGanado() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#f0fdf4';
+        searchWrapper.style.background = '#e4fd97';
         searchToggle.style.background = 'transparent';
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';

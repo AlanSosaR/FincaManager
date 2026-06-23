@@ -15,7 +15,7 @@
 }
 
 .m3-picker-card {
-  background: #f7f4ed;
+  background: #f0ede4;
   border-radius: 28px;
   width: 90%;
   max-width: 360px;
@@ -94,11 +94,11 @@
 }
 
 .m3-day-cell:hover {
-  background: rgba(62, 93, 62, 0.1);
+  background: rgba(69, 87, 67, 0.1);
 }
 
 .m3-day-cell.selected {
-  background: #3e5d3e;
+  background: #2d3e2c;
   color: white;
 }
 
@@ -107,8 +107,8 @@
 }
 
 .m3-day-cell.today {
-  border: 1px solid #3e5d3e;
-  color: #3e5d3e;
+  border: 1px solid #2d3e2c;
+  color: #2d3e2c;
 }
 
 /* Time Picker Styling */
@@ -148,8 +148,8 @@
 }
 
 .m3-time-box.active {
-  background: #c8e6c9;
-  color: #002100;
+  background: #e4fd97;
+  color: #0f1f0f;
 }
 
 .m3-time-col {
@@ -169,7 +169,7 @@
 }
 
 .m3-arrow-btn:hover {
-  color: #3e5d3e;
+  color: #2d3e2c;
 }
 
 .m3-time-separator {
@@ -198,7 +198,7 @@
 }
 
 .m3-ampm-btn.active {
-  background: #3e5d3e;
+  background: #2d3e2c;
   color: white;
 }
 
@@ -218,9 +218,9 @@
   background: none;
   border-radius: 100px;
   cursor: pointer;
-  color: #3e5d3e;
+  color: #2d3e2c;
 }
 
 .m3-picker-footer button:hover {
-  background: rgba(62, 93, 62, 0.08);
+  background: rgba(69, 87, 67, 0.08);
 }

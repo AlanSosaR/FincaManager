@@ -335,7 +335,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
 }
 
 function getColor(seed) {
-  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2e7d32', '#1565c0', '#6a1b9a'];
+  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2d3e2c', '#2c666e', '#6a1b9a'];
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];

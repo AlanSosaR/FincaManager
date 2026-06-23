@@ -7,10 +7,10 @@ export async function renderNuevaHerramienta(id) {
       <div class="da-tabs-section" style="display: flex; flex-direction: column; gap: 40px;">
         <div class="m3-grid">
           <!-- Photo and Tips -->
-          <div class="da-hero-img-wrap" id="photo-dropzone" style="cursor: pointer; border: 2px dashed rgba(56, 106, 62, 0.3); background: #f9fbf9;">
+          <div class="da-hero-img-wrap" id="photo-dropzone" style="cursor: pointer; border: 2px dashed rgba(0, 71, 65, 0.3); background: #f0ede4;">
             <input type="file" id="tool-photo" accept="image/*" style="display: none">
             <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
-               <div class="da-stat-icon" style="background: rgba(56, 106, 62, 0.1); color: #386a3e; width: 80px; height: 80px; border-radius: 50%;">
+               <div class="da-stat-icon" style="background: rgba(69, 87, 67, 0.1); color: #455743; width: 80px; height: 80px; border-radius: 50%;">
                   <span class="material-icons" style="font-size: 40px;">photo_camera</span>
                </div>
                <div style="text-align: center;">

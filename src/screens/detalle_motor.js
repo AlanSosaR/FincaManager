@@ -74,7 +74,7 @@ export async function renderDetalleMotor(motorId) {
           <div>
             <span style="font-size: 12px; font-weight: 600; color: #888; display: block; margin-bottom: 8px;">Estado</span>
             <div style="margin-top: 4px;">
-              <span style="background: ${requiresAlert ? '#ffebee' : '#e8f5e9'}; color: ${requiresAlert ? '#c62828' : '#2e7d32'}; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-block;">
+              <span style="background: ${requiresAlert ? '#ffe2db' : '#e4fd97'}; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-block;">
                 ${requiresAlert ? 'Atención' : 'Operativo'}
               </span>
             </div>
@@ -85,16 +85,16 @@ export async function renderDetalleMotor(motorId) {
         <div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span style="font-size: 12px; font-weight: 700; color: #666;">Vida útil del aceite</span>
-            <span style="font-size: 12px; font-weight: 800; color: ${requiresAlert ? '#c62828' : '#2e7d32'};">${pct}%</span>
+            <span style="font-size: 12px; font-weight: 800; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'};">${pct}%</span>
           </div>
           <div style="height: 8px; background: #eee; border-radius: 4px; overflow: hidden; position: relative;">
-            <div style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#c62828' : '#2e7d32'}; border-radius: 4px; transition: width 1s ease-out;"></div>
+            <div style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; border-radius: 4px; transition: width 1s ease-out;"></div>
           </div>
         </div>
 
         <!-- Register Oil Button (only if alert) -->
         ${requiresAlert ? `
-          <button class="btn-m3-fill" id="btn-alert-register-oil" style="margin-top: 24px; width: 100%; background: #c62828; box-shadow: 0 4px 12px rgba(198, 40, 40, 0.2);">
+          <button class="btn-m3-fill" id="btn-alert-register-oil" style="margin-top: 24px; width: 100%; background: #ff4103; box-shadow: 0 4px 12px rgba(198, 40, 40, 0.2);">
             <span class="material-icons" style="font-size: 20px; margin-right: 8px; vertical-align: middle;">oil_barrel</span>
             Registrar Cambio de Aceite
           </button>
@@ -471,7 +471,7 @@ function registerOilChange(motorId) {
           descripcion: 'Mantenimiento preventivo.',
           fecha: new Date().toISOString(),
           icon: 'oil_barrel',
-          color: '#c62828',
+          color: '#ff4103',
           total_horas: motor.horas || 0,
           historial_sesiones: sesiones || []
         });
