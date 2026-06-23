@@ -192,10 +192,11 @@ function renderFullContent(container, animalId) {
                 </div>
                 
                 <div class="da-badge-row">
+                    ${currentAnimal.potreros?.nombre ? `
                     <div class="da-badge da-badge-surface">
                         <span class="material-icons">location_on</span>
-                        Potrero: ${currentAnimal.potreros?.nombre || 'Sin asignar'}
-                    </div>
+                        Potrero: ${currentAnimal.potreros.nombre}
+                    </div>` : ''}
                     <div class="da-badge da-badge-surface">
                         <span class="material-icons">cake</span>
                         Acuquisición: ${currentAnimal.fecha_adquisicion ? new Date(currentAnimal.fecha_adquisicion).toLocaleDateString() : 'N/A'}
