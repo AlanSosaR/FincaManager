@@ -82,6 +82,7 @@ export async function renderNuevoLote(id) {
                 <option value="SL28" ${selected('variedad', 'SL28')}>SL28</option>
                 <option value="Kent" ${selected('variedad', 'Kent')}>Kent</option>
                 <option value="Arusha" ${selected('variedad', 'Arusha')}>Arusha</option>
+                <option value="ANACAFE 14" ${selected('variedad', 'ANACAFE 14')}>ANACAFE 14</option>
                 <option value="Maragogipe" ${selected('variedad', 'Maragogipe')}>Maragogipe</option>
               </select>
               <label>Variedad</label>

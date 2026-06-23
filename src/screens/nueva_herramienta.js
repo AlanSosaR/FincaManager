@@ -169,21 +169,11 @@ export async function initNuevaHerramienta(id) {
     try {
       let image_url = currentImageUrl;
       if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `herramientas/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('equipos')
-          .upload(filePath, selectedFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('equipos')
-          .getPublicUrl(filePath);
-        
-        image_url = urlData.publicUrl;
+        image_url = await new Promise(resolve => {
+          const r = new FileReader();
+          r.onload = e => resolve(e.target.result);
+          r.readAsDataURL(selectedFile);
+        });
       }
 
       const toolData = {

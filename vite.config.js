@@ -33,7 +33,57 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,ico,png}']
+        globPatterns: ['**/*.{js,css,html,svg,ico,png}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'google-fonts-css',
+              expiration: { maxEntries: 10, maxAgeSeconds: 86400 * 365 },
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-woff2',
+              expiration: { maxEntries: 50, maxAgeSeconds: 86400 * 365 },
+            }
+          },
+          {
+            urlPattern: /^https:\/\/unpkg\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'unpkg-cdn',
+              expiration: { maxEntries: 30, maxAgeSeconds: 86400 * 365 },
+            }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.cartocdn\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles-carto',
+              expiration: { maxEntries: 1000, maxAgeSeconds: 86400 * 30 },
+            }
+          },
+          {
+            urlPattern: /^https:\/\/server\.arcgisonline\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles-arcgis',
+              expiration: { maxEntries: 1000, maxAgeSeconds: 86400 * 30 },
+            }
+          },
+          {
+            urlPattern: /^https:\/\/nominatim\.openstreetmap\.org\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'nominatim-geocoder',
+              expiration: { maxEntries: 200, maxAgeSeconds: 86400 * 7 },
+            }
+          }
+        ]
       }
     }),
   ],

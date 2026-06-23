@@ -8,6 +8,26 @@ import { registerSW } from 'virtual:pwa-register';
 // Register Service Worker for PWA
 registerSW({ immediate: true });
 
+import { initSync, setSyncStatusCallback, isOnline } from './sync.js';
+
+// Sync indicator element
+const syncIndicator = document.createElement('div');
+syncIndicator.id = 'sync-indicator';
+syncIndicator.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;background:var(--m3-primary,#2e7d32);color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;font-family:sans-serif;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+document.body.appendChild(syncIndicator);
+
+setSyncStatusCallback((msg) => {
+  syncIndicator.textContent = msg || '✓ Datos locales';
+  syncIndicator.style.opacity = msg ? '1' : '0';
+});
+
+// Start sync when online
+if (isOnline()) {
+  initSync();
+} else {
+  window.addEventListener('online', () => initSync(), { once: true });
+}
+
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';
 import { renderHerramientas, initHerramientas } from './screens/herramientas.js';

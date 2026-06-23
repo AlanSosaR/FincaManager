@@ -239,24 +239,11 @@ export function initNuevoAnimal(id) {
     try {
       let image_url = null;
       if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `animales/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('animales')
-          .upload(filePath, selectedFile);
-
-        // If bucket "animales" does not exist, this might fail. We log but continue.
-        if (uploadError) {
-            console.warn('No se pudo subir la foto (puede que el bucket "animales" no exista):', uploadError.message);
-        } else {
-            const { data: urlData } = supabase.storage
-              .from('animales')
-              .getPublicUrl(filePath);
-            
-            image_url = urlData.publicUrl;
-        }
+        image_url = await new Promise(resolve => {
+          const r = new FileReader();
+          r.onload = e => resolve(e.target.result);
+          r.readAsDataURL(selectedFile);
+        });
       }
 
       // Clean empty dates so Supabase doesn't error out on empty strings

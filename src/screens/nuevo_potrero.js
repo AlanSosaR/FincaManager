@@ -195,20 +195,11 @@ export function initNuevoPotrero(id) {
     try {
       let image_url = null;
       if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `potreros/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('potreros')
-          .upload(filePath, selectedFile);
-
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from('potreros')
-            .getPublicUrl(filePath);
-          image_url = urlData.publicUrl;
-        }
+        image_url = await new Promise(resolve => {
+          const r = new FileReader();
+          r.onload = e => resolve(e.target.result);
+          r.readAsDataURL(selectedFile);
+        });
       }
 
       const potreroData = {
