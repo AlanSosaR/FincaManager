@@ -72,8 +72,9 @@
                 </button>
                 <h2 id="current-screen-title">Dashboard Cafetal</h2>
                 <div class="user-actions" id="sync-status-area" style="position:relative;">
-                    <span id="sync-icon" class="material-icons">notifications</span>
-                    <span id="sync-badge" style="position:absolute;top:8px;right:8px;width:10px;height:10px;border-radius:50%;background:#4caf50;border:2px solid var(--m3-surface,#fdf9f3);display:none;transition:all .3s;"></span>
+                    <span id="sync-icon" class="material-icons" style="cursor:pointer;">notifications</span>
+                    <span id="sync-badge" style="position:absolute;top:4px;right:4px;min-width:18px;height:18px;border-radius:9px;background:#e53935;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--m3-surface,#fdf9f3);transition:all .3s;padding:0 4px;line-height:1;"></span>
+                    <div id="notif-dropdown" style="display:none;position:absolute;top:100%;right:0;width:340px;max-height:400px;overflow-y:auto;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);z-index:1000;margin-top:8px;padding:8px 0;"></div>
                 </div>
             </header>
 
