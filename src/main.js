@@ -8,16 +8,45 @@ import { registerSW } from 'virtual:pwa-register';
 // Register Service Worker for PWA
 registerSW({ immediate: true });
 
-import { initSync, setSyncStatusCallback, isOnline } from './sync.js';
+import { initSync, setSyncStatusCallback, isOnline, fullDownload } from './sync.js';
+
+const syncIcon = document.getElementById('sync-icon');
+const syncBadge = document.getElementById('sync-badge');
+
+function updateSyncUI(state) {
+  if (!syncIcon || !syncBadge) return;
+  if (state === 'syncing') {
+    syncIcon.textContent = 'sync';
+    syncIcon.classList.add('animate-spin');
+    syncBadge.style.display = 'block';
+    syncBadge.style.background = '#ff9800';
+  } else if (state === 'done') {
+    syncIcon.textContent = 'check_circle';
+    syncIcon.classList.remove('animate-spin');
+    syncBadge.style.display = 'block';
+    syncBadge.style.background = '#4caf50';
+    setTimeout(() => { syncBadge.style.display = 'none'; }, 3000);
+  } else if (state === 'offline') {
+    syncIcon.textContent = 'cloud_off';
+    syncIcon.classList.remove('animate-spin');
+    syncBadge.style.display = 'none';
+  } else {
+    syncIcon.textContent = 'notifications';
+    syncIcon.classList.remove('animate-spin');
+    syncBadge.style.display = 'none';
+  }
+}
 
 let syncStarted = false;
 
 setSyncStatusCallback((msg) => {
   if (msg && !syncStarted) {
     syncStarted = true;
+    updateSyncUI('syncing');
     window.Snackbar.show('Descargando datos en local...', { persist: true });
   } else if (msg === null && syncStarted) {
     syncStarted = false;
+    updateSyncUI('done');
     window.Snackbar.dismissAll();
     setTimeout(() => {
       window.Snackbar.show('✓ Datos sincronizados en local', { type: 'success', duration: 3000 });
@@ -28,8 +57,18 @@ setSyncStatusCallback((msg) => {
 if (isOnline()) {
   initSync();
 } else {
-  window.addEventListener('online', () => initSync(), { once: true });
+  updateSyncUI('offline');
+  window.addEventListener('online', () => {
+    updateSyncUI('idle');
+    initSync();
+  }, { once: true });
 }
+
+syncIcon?.addEventListener('click', () => {
+  if (!syncStarted && isOnline()) {
+    fullDownload();
+  }
+});
 
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';
