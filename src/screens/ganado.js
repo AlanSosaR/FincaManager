@@ -21,7 +21,7 @@ export async function renderGanado(page = 1, filter = 'all') {
     { data: pesajesPendientes },
     { data: fumigacionesPendientes }
   ] = await Promise.all([
-    supabase.from('ganado').select('*', { count: 'exact', head: true }),
+    supabase.from('ganado').select('*', { count: 'exact', head: true }).neq('estado', 'Vendido'),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).ilike('sexo', 'hembra'),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).ilike('sexo', 'macho'),
     supabase.from('ganado').select('id').eq('estado', 'Vendido'),
@@ -38,7 +38,9 @@ export async function renderGanado(page = 1, filter = 'all') {
   // Build the main query based on filter
   let query = supabase.from('ganado').select('*', { count: 'exact' });
 
-  if (currentFilter === 'hembra') {
+  if (currentFilter === 'all') {
+    query = query.neq('estado', 'Vendido');
+  } else if (currentFilter === 'hembra') {
     query = query.ilike('sexo', 'hembra');
   } else if (currentFilter === 'macho') {
     query = query.ilike('sexo', 'macho');
@@ -250,7 +252,8 @@ window.changeGanadoPage = async function(page) {
   const setFumigaciones = new Set((fumigacionesPendientes || []).map(f => f.animal_id));
 
   let query = supabase.from('ganado').select('*', { count: 'exact' });
-  if (currentFilter === 'hembra') query = query.ilike('sexo', 'hembra');
+  if (currentFilter === 'all') query = query.neq('estado', 'Vendido');
+  else if (currentFilter === 'hembra') query = query.ilike('sexo', 'hembra');
   else if (currentFilter === 'macho') query = query.ilike('sexo', 'macho');
   else if (currentFilter === 'vacunas') query = query.in('id', Array.from(setVacunas));
   else if (currentFilter === 'pesajes') query = query.in('id', Array.from(setPesajes));
@@ -285,8 +288,8 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
   const pendingPesaje = setPesajes.has(a.id);
   const pendingFumigacion = setFumigaciones.has(a.id);
   
-  let pendingIcon = 'check_circle';
-  let badgeClass = 'green';
+  let pendingIcon = '';
+  let badgeClass = '';
   if (isSold) { pendingIcon = 'payments'; badgeClass = 'sold'; }
   else if (pendingVacuna) { pendingIcon = 'vaccines'; badgeClass = 'orange'; }
   else if (pendingFumigacion) { pendingIcon = 'bug_report'; badgeClass = 'orange'; }
@@ -300,7 +303,7 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
     <div class="ganado-row ${isSold ? 'ganado-row-sold' : ''}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
       <div class="ganado-row-img-container">
         <img src="${imageUrl}">
-        <div class="ganado-row-badge ${badgeClass}"><span class="material-icons">${pendingIcon}</span></div>
+        ${pendingIcon ? `<div class="ganado-row-badge ${badgeClass}"><span class="material-icons">${pendingIcon}</span></div>` : ''}
       </div>
       <div class="ganado-row-content">
         <div class="ganado-col-group">
@@ -320,8 +323,8 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
             <button class="action-item" style="background:#e4fd97;" onmouseover="this.style.background='#d0e680'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.navigateTo('nuevo_animal', '${a.id}')">
               <span class="material-icons">edit</span><span>Editar</span>
             </button>
-            <button class="action-item" style="background:#e4fd97;" onmouseover="this.style.background='#d0e680'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.confirmSellAnimal('${a.id}', '${a.nombre}')">
-              <span class="material-icons">payments</span><span>Vender / Dar de baja</span>
+            <button class="action-item" style="background:#e4fd97;" onmouseover="this.style.background='#d0e680'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}', 'vender')">
+              <span class="material-icons">payments</span><span>Registrar venta</span>
             </button>
             <button class="action-item delete" style="background:#e4fd97;" onmouseover="this.style.background='#f5b8a8'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.confirmDeleteAnimal('${a.id}', '${a.nombre}')">
               <span class="material-icons">delete</span><span>Eliminar</span>
@@ -357,14 +360,6 @@ export function initGanado() {
       const { error } = await supabase.from('ganado').delete().eq('id', id);
       if (error) window.Snackbar.show('Error: ' + error.message, { type: 'error' });
       else { window.Snackbar.show('Animal eliminado'); window.navigateTo('ganado'); }
-    });
-  };
-
-  window.confirmSellAnimal = (id, name) => {
-    window.Snackbar.confirm(`¿Dar de baja a ${name}?`, async () => {
-      const { error } = await supabase.from('ganado').update({ estado: 'Vendido' }).eq('id', id);
-      if (error) window.Snackbar.show('Error: ' + error.message, { type: 'error' });
-      else { window.Snackbar.show(`${name} marcado como vendido`); window.navigateTo('ganado'); }
     });
   };
 

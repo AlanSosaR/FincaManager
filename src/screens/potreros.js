@@ -290,9 +290,10 @@ function renderPotreroRow(p) {
     <div class="ganado-row" onclick="window.navigateTo('detalle_potrero', '${p.id}')">
       <div class="ganado-row-img-container" style="background: var(--surface-container-high); display: flex; align-items: center; justify-content: center;">
         <span class="material-icons" style="color: var(--primary-container); font-size: 24px;">landscape</span>
+        ${statusClass !== 'libre' ? `
         <div class="ganado-row-badge ${statusClass === 'ocupado' ? 'orange' : 'green'}">
           ${statusIcon}
-        </div>
+        </div>` : ''}
       </div>
 
       <div class="ganado-row-content">

@@ -166,7 +166,7 @@ import { renderGanado, initGanado } from './screens/ganado.js';
 import { renderPotreros, initPotreros } from './screens/potreros.js';
 import { renderDetalleMotor } from './screens/detalle_motor.js';
 import { renderDetallePotrero, initDetallePotrero } from './screens/detalle_potrero.js';
-import { renderDetalleAnimal, initDetalleAnimal } from './screens/detalle_animal.js';
+import { renderDetalleAnimal, initDetalleAnimal } from './screens/detalle_animal.jsx';
 import { renderDetalleHerramienta } from './screens/detalle_herramienta.js';
 import { renderNuevoMotor, initNuevoMotor } from './screens/nuevo_motor.js';
 import { renderNuevoAnimal, initNuevoAnimal } from './screens/nuevo_animal.js';

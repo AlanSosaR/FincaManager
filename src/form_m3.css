@@ -154,7 +154,7 @@
   padding: 12px 4px;
   font-size: 16px;
   font-weight: 500;
-  color: var(--m3-on-surface);
+  color: #2d3e2c;
   font-family: 'Work Sans', sans-serif;
 }
 
@@ -301,7 +301,7 @@
   border-radius: 12px; /* Expressive rounding for outlined */
   font-size: 16px;
   font-family: 'Work Sans', sans-serif;
-  color: var(--m3-on-surface);
+  color: #2d3e2c;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   appearance: none;
 }
@@ -330,7 +330,7 @@
 .m3-field select:valid ~ label,
 .m3-field.has-value label {
   transform: translateY(-27px) scale(0.75);
-  color: var(--m3-primary);
+  color: #2d3e2c;
   font-weight: 800;
 }
 
@@ -338,7 +338,7 @@
 .m3-field select:focus, 
 .m3-field textarea:focus {
   background: transparent;
-  border: 2px solid var(--m3-primary);
+  border: 2px solid #2d3e2c;
   padding: 15px; /* reduce padding by 1px to offset border increase */
   box-shadow: none;
   outline: none;
@@ -351,7 +351,7 @@
 
 .m3-field input[type="date"] ~ label {
   transform: translateY(-27px) scale(0.75);
-  color: var(--m3-primary);
+  color: #2d3e2c;
   font-weight: 800;
 }
 
@@ -409,7 +409,7 @@
   width: auto !important;
   padding: 0 4px 0 0 !important;
   font-weight: 700 !important;
-  color: var(--m3-primary) !important;
+  color: #2d3e2c !important;
   cursor: pointer;
   font-size: 14px;
   appearance: none;
@@ -419,7 +419,7 @@
 .m3-field-combined .field-suffix .material-icons {
   position: static !important;
   font-size: 18px !important;
-  color: var(--m3-primary) !important;
+  color: #2d3e2c !important;
   pointer-events: none;
 }
 

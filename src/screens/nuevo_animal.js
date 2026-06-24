@@ -96,6 +96,18 @@ export async function renderNuevoAnimal(id) {
                   <label>Fecha de Ingreso</label>
                 </div>
               </div>
+
+              <div class="m3-field" style="margin-top:16px;">
+                <select name="origen" id="origen-select">
+                  <option value="Criollo">Criollo (nacido en la finca)</option>
+                  <option value="Comprado">Comprado (adquirido de fuera)</option>
+                </select>
+                <label>Origen</label>
+              </div>
+              <div class="m3-field" id="precio-compra-field" style="display:none;">
+                <input type="number" step="0.01" name="precio_compra" placeholder=" ">
+                <label>Precio de compra ($)</label>
+              </div>
               
               <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0;">
                 <button type="button" class="da-action-btn primary" id="btn-save-animal">
@@ -139,6 +151,9 @@ export function initNuevoAnimal(id) {
         form.sexo.value = data.sexo || '';
         form.peso_actual.value = data.peso_actual || '';
         form.fecha_adquisicion.value = data.fecha_adquisicion || '';
+        form.origen.value = data.origen || 'Criollo';
+        form.precio_compra.value = data.precio_compra || '';
+        if (data.origen === 'Comprado' && precioCompraField) precioCompraField.style.display = 'block';
 
         const { data: pesajes } = await supabase.from('animal_pesajes').select('peso').eq('animal_id', id).order('fecha', { ascending: false });
         if (pesajes && pesajes.length > 0) {
@@ -189,6 +204,15 @@ export function initNuevoAnimal(id) {
 
   if (!btnSave || !form) return;
 
+  // Origen toggle
+  const origenSelect = document.getElementById('origen-select');
+  const precioCompraField = document.getElementById('precio-compra-field');
+  if (origenSelect && precioCompraField) {
+    origenSelect.addEventListener('change', () => {
+      precioCompraField.style.display = origenSelect.value === 'Comprado' ? 'block' : 'none';
+    });
+  }
+
   btnSave.addEventListener('click', async () => {
     // Reset errors
     document.querySelectorAll('.error-text').forEach(e => e.style.display = 'none');
@@ -232,6 +256,8 @@ export function initNuevoAnimal(id) {
         peso_actual: parseFloat(data.peso_actual) || 0,
         peso_unidad: data.peso_unidad || 'kg',
         fecha_adquisicion: fechaFinal,
+        origen: data.origen || 'Criollo',
+        precio_compra: data.origen === 'Comprado' ? (parseFloat(data.precio_compra) || null) : null,
         image_url: image_url || existingImageUrl
       };
 

@@ -102,14 +102,14 @@ export async function renderDetalleAnimal(animalId) {
     `;
 }
 
-export async function initDetalleAnimal(animalId) {
+export async function initDetalleAnimal(animalId, flag) {
     const container = document.getElementById('da-container');
     if (!container) return;
 
-    await loadAllData(animalId, container);
+    await loadAllData(animalId, container, flag);
 }
 
-async function loadAllData(animalId, container) {
+async function loadAllData(animalId, container, flag) {
     try {
         const { data: animalData, error: animalError } = await supabase
             .from('ganado')
@@ -160,12 +160,26 @@ async function loadAllData(animalId, container) {
         
         fumigaciones = fumigData || [];
 
+        const { data: ventaData } = await supabase
+            .from('animal_ventas')
+            .select('*')
+            .eq('animal_id', animalId)
+            .order('fecha_venta', { ascending: false })
+            .maybeSingle();
+
+        if (ventaData) {
+            animalData.precio_venta = ventaData.precio_venta;
+            animalData.fecha_venta = ventaData.fecha_venta;
+            animalData.comprador = ventaData.comprador;
+            animalData.peso_venta = ventaData.peso_venta;
+        }
+
         // Reset pagination when fresh data is loaded
         vaccinesPage = 1;
         weightsPage = 1;
         fumigPage = 1;
 
-        renderFullContent(container, animalId);
+        renderFullContent(container, animalId, flag);
     } catch (err) {
         console.error('Error loading animal data:', err);
         container.innerHTML = `
@@ -178,7 +192,9 @@ async function loadAllData(animalId, container) {
     }
 }
 
-function renderFullContent(container, animalId) {
+function renderFullContent(container, animalId, flag) {
+    const isSold = currentAnimal.estado === 'Vendido';
+    const sellMode = flag === 'vender';
     container.innerHTML = `
 
         <div class="da-hero">
@@ -205,8 +221,70 @@ function renderFullContent(container, animalId) {
                         <span class="material-icons">${currentAnimal.sexo === 'Macho' ? 'male' : 'female'}</span>
                         ${currentAnimal.sexo || 'Sexo N/A'}
                     </div>
-                </div>
+                    <div class="da-badge da-badge-surface">
+                        <span class="material-icons">${currentAnimal.origen === 'Comprado' ? 'shopping_cart' : 'eco'}</span>
+                        ${currentAnimal.origen || 'Criollo'}${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
+                    </div>
+                    ${sellMode ? `
+                    ${isSold ? `
+                    <div class="da-badge" style="border:1px solid #d4e8b0;background:#f0f7e6;color:#2d3e2c;">
+                        <span class="material-icons">payments</span>
+                        <strong>Vendido</strong>
+                        ${currentAnimal.precio_venta ? `<span style="color:#555;">— $${currentAnimal.precio_venta}</span>` : ''}
+                    </div>` : sellMode ? `
+                    <div class="da-badge da-badge-clickable" id="da-sell-toggle" onclick="document.getElementById('da-sell-form').classList.toggle('open');this.style.display='none';">
+                        <span class="material-icons">payments</span>
+                        <span>Registrar venta</span>
+                    </div>` : ''}
+                </div>` : ''}
 
+                ${isSold ? `
+                <div class="m3-card-filled">
+                <div class="da-sell-card sold">
+                    <div class="da-sell-header">
+                        <span class="material-icons">payments</span>
+                        <span class="da-sell-title">Información de Venta</span>
+                    </div>
+                    <div class="da-sell-details">
+                        <div class="da-sell-row"><span>Precio venta</span><strong>$${currentAnimal.precio_venta || '—'}</strong></div>
+                        <div class="da-sell-row"><span>Fecha</span><strong>${currentAnimal.fecha_venta ? new Date(currentAnimal.fecha_venta).toLocaleDateString() : '—'}</strong></div>
+                        ${currentAnimal.comprador ? `<div class="da-sell-row"><span>Comprador</span><strong>${currentAnimal.comprador}</strong></div>` : ''}
+                        ${currentAnimal.peso_venta ? `<div class="da-sell-row"><span>Peso venta</span><strong>${currentAnimal.peso_venta} kg</strong></div>` : ''}
+                        ${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? `<div class="da-sell-row"><span>Precio compra</span><strong>$${currentAnimal.precio_compra}</strong></div>` : ''}
+                        ${currentAnimal.origen ? `<div class="da-sell-row"><span>Origen</span><strong>${currentAnimal.origen}</strong></div>` : ''}
+                    </div>
+                </div>
+                </div>` : (sellMode ? `
+                <div class="m3-card-filled">
+                <div class="da-sell-form open" id="da-sell-form">
+                    <form id="form-sell-animal">
+                        <div class="da-sell-grid">
+                            <div class="da-sell-field">
+                                <label>Precio de venta ($)</label>
+                                <input type="number" step="0.01" id="sell-precio" required>
+                            </div>
+                            <div class="da-sell-field">
+                                <label>Fecha</label>
+                                <input type="date" id="sell-fecha" value="${new Date().toISOString().split('T')[0]}">
+                            </div>
+                            <div class="da-sell-field">
+                                <label>Comprador (opcional)</label>
+                                <input type="text" id="sell-comprador">
+                            </div>
+                            <div class="da-sell-field">
+                                <label>Peso (kg)</label>
+                                <input type="number" step="0.1" id="sell-peso" value="${currentAnimal.peso_actual || 0}">
+                            </div>
+                        </div>
+                        <div class="da-sell-actions">
+                            <button type="button" class="da-sell-btn da-sell-btn-secondary" onclick="document.getElementById('da-sell-form').classList.remove('open'); document.getElementById('da-sell-toggle').style.display='';">Cancelar</button>
+                            <button type="submit" class="da-sell-btn da-sell-btn-primary" id="btn-sell-confirm">
+                                <span class="material-icons">payments</span> Confirmar venta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                </div>` : '')}
             </div>
         </div>
 
@@ -366,16 +444,96 @@ function renderFullContent(container, animalId) {
             </div>
         </div>
     `;
-
-    setupEventListeners(animalId, container);
+ 
+    setupEventListeners(animalId, container, sellMode);
     renderCalendar();
     renderWeightsTable();
     renderCalendarFumig();
 }
 
-function setupEventListeners(animalId, container) {
+function setupEventListeners(animalId, container, sellMode) {
     const contents = container.querySelectorAll('.da-tab-content');
     const statCards = container.querySelectorAll('.da-stat-tab');
+
+    // Auto-expand sell form and scroll
+    if (sellMode) {
+        const sellForm = document.getElementById('da-sell-form');
+        const sellToggle = document.getElementById('da-sell-toggle');
+        if (sellForm) {
+            sellForm.classList.add('open');
+            if (sellToggle) sellToggle.style.display = 'none';
+            setTimeout(() => {
+                const section = document.getElementById('da-sell-form');
+                if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                document.getElementById('sell-precio')?.focus();
+            }, 300);
+        }
+    }
+
+    // Sell form submit
+    const sellFormEl = document.getElementById('form-sell-animal');
+    if (sellFormEl) {
+        sellFormEl.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const precio = document.getElementById('sell-precio').value;
+            if (!precio) { document.getElementById('sell-precio').focus(); return; }
+            const btn = document.getElementById('btn-sell-confirm');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Guardando...';
+            try {
+                const { error: ventaErr } = await supabase.from('animal_ventas').insert({
+                    animal_id: animalId,
+                    precio_venta: parseFloat(precio),
+                    fecha_venta: document.getElementById('sell-fecha').value,
+                    comprador: document.getElementById('sell-comprador').value || null,
+                    peso_venta: document.getElementById('sell-peso').value ? parseFloat(document.getElementById('sell-peso').value) : null,
+                });
+                if (ventaErr) throw ventaErr;
+                const { error: updateErr } = await supabase.from('ganado').update({ estado: 'Vendido' }).eq('id', animalId);
+                if (updateErr) throw updateErr;
+                showSnackbar('Venta registrada');
+
+                currentAnimal.estado = 'Vendido';
+                currentAnimal.precio_venta = parseFloat(precio);
+                currentAnimal.fecha_venta = document.getElementById('sell-fecha').value;
+                currentAnimal.comprador = document.getElementById('sell-comprador').value || null;
+                currentAnimal.peso_venta = document.getElementById('sell-peso').value ? parseFloat(document.getElementById('sell-peso').value) : null;
+
+                const sellForm = document.getElementById('da-sell-form');
+                if (sellForm) {
+                    const parent = sellForm.parentElement;
+                    const card = document.createElement('div');
+                    card.className = 'da-sell-card sold';
+                    card.innerHTML = '<div class="da-sell-header">' +
+                        '<span class="material-icons">payments</span>' +
+                        '<span class="da-sell-title">Vendido</span>' +
+                    '</div>' +
+                    '<div class="da-sell-details">' +
+                        '<div class="da-sell-row"><span>Precio</span><strong>$' + currentAnimal.precio_venta + '</strong></div>' +
+                        '<div class="da-sell-row"><span>Fecha</span><strong>' + new Date(currentAnimal.fecha_venta).toLocaleDateString() + '</strong></div>' +
+                        (currentAnimal.comprador ? '<div class="da-sell-row"><span>Comprador</span><strong>' + currentAnimal.comprador + '</strong></div>' : '') +
+                        (currentAnimal.peso_venta ? '<div class="da-sell-row"><span>Peso venta</span><strong>' + currentAnimal.peso_venta + ' kg</strong></div>' : '') +
+                    '</div>';
+                    parent.replaceChild(card, sellForm);
+                }
+
+                const toggleBadge = document.getElementById('da-sell-toggle');
+                if (toggleBadge) {
+                    const soldBadge = document.createElement('div');
+                    soldBadge.className = 'da-badge';
+                    soldBadge.style.cssText = 'border:1px solid #d4e8b0;background:#f0f7e6;color:#2d3e2c;';
+                    soldBadge.innerHTML = '<span class="material-icons">payments</span>' +
+                        '<strong>Vendido</strong>' +
+                        '<span style="color:#555;">— $' + currentAnimal.precio_venta + '</span>';
+                    toggleBadge.parentNode.replaceChild(soldBadge, toggleBadge);
+                }
+            } catch (err) {
+                showSnackbar(err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-icons">payments</span> Confirmar venta';
+            }
+        });
+    }
 
     function switchTab(target) {
         contents.forEach(c => c.classList.remove('active'));

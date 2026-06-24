@@ -23,4 +23,8 @@ db.version(1).stores({
   _sync_queue: '++id, table, action, timestamp',
 });
 
+db.version(2).stores({
+  animal_ventas: '&id, animal_id, fecha_venta, created_at',
+});
+
 export default db;

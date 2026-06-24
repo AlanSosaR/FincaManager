@@ -57,6 +57,11 @@ export default class QueryBuilder {
     return this;
   }
 
+  neq(field, value) {
+    this._filters.push({ type: 'neq', field, value });
+    return this;
+  }
+
   in(field, values) {
     this._filters.push({ type: 'in', field, values });
     return this;
@@ -189,6 +194,8 @@ export default class QueryBuilder {
     for (const filter of this._filters) {
       if (filter.type === 'eq') {
         results = results.filter(r => r[filter.field] === filter.value);
+      } else if (filter.type === 'neq') {
+        results = results.filter(r => r[filter.field] !== filter.value);
       } else if (filter.type === 'in') {
         results = results.filter(r => filter.values.includes(r[filter.field]));
       } else if (filter.type === 'ilike') {

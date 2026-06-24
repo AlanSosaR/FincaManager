@@ -272,9 +272,10 @@ function renderToolRow(tool) {
     <div class="ganado-row" onclick="window.navigateTo('detalle_herramienta', '${tool.id}')">
       <div class="ganado-row-img-container" style="background: var(--surface-container-high); display: flex; align-items: center; justify-content: center; font-size: 24px;">
         ${icon}
-        <div class="ganado-row-badge ${statusClass === 'ok' ? 'green' : 'orange'}">
+        ${statusClass !== 'ok' ? `
+        <div class="ganado-row-badge orange">
           <span class="material-icons" style="font-size:12px;">${statusIcon}</span>
-        </div>
+        </div>` : ''}
       </div>
 
       <div class="ganado-row-content">

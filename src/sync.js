@@ -9,7 +9,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1
 const SUPABASE_TABLES = [
   'motores', 'motor_sesiones', 'motor_mantenimientos',
   'potreros', 'ganado', 'herramientas', 'potrero_eventos',
-  'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones',
+  'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
 ];
@@ -91,8 +91,6 @@ export async function processSyncQueue() {
   try {
     const queue = await db._sync_queue.orderBy('id').toArray();
     if (!queue.length) return;
-
-    onSyncStatusChange?.(`Sincronizando ${queue.length} cambios...`);
 
     for (const item of queue) {
       try {

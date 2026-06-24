@@ -279,7 +279,28 @@ body {
   position: relative;
 }
 #menu-toggle.m3-icon-btn-tonal {
-  color: var(--m3-primary);
+  background-color: #e4fd97;
+  color: #2d3e2c;
+}
+#menu-toggle.m3-icon-btn-tonal:hover {
+  background-color: #c4e680;
+  color: #2d3e2c;
+}
+#menu-toggle.m3-icon-btn-tonal:active {
+  background-color: #a3b94a;
+  color: #2d3e2c;
+}
+#sidebar-close.m3-icon-btn-tonal {
+  background-color: #e4fd97;
+  color: #2d3e2c;
+}
+#sidebar-close.m3-icon-btn-tonal:hover {
+  background-color: #c4e680;
+  color: #2d3e2c;
+}
+#sidebar-close.m3-icon-btn-tonal:active {
+  background-color: #a3b94a;
+  color: #2d3e2c;
 }
 
 #current-screen-title {
@@ -519,9 +540,9 @@ body {
   border: none;
   cursor: pointer;
   overflow: hidden;
-  /* M3 tonal colour — primary container */
-  background-color: #daeed5;
-  color: var(--primary-container);
+  /* M3 tonal colour — surface container */
+  background-color: var(--m3-surface-container-highest);
+  color: var(--m3-on-surface-variant);
   /* Spring-like transition */
   transition:
     background-color 0.2s ease,
@@ -545,10 +566,10 @@ body {
 
 /* Hover — expressive spring scale + more rounded */
 .m3-icon-btn-tonal:hover {
-  background-color: #e4eade;
+  background-color: var(--m3-surface-container);
   border-radius: 20px;
   transform: scale(1.08);
-  box-shadow: 0 4px 12px rgba(107, 130, 69, 0.20);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
 }
 
 /* ── M3 Expressive Utility Classes ─────────────────────────────────────────── */
@@ -650,6 +671,13 @@ body {
 .m3-card:hover {
   background: var(--m3-surface-container-low);
   border-color: var(--m3-primary);
+}
+
+.m3-card-filled {
+  background: var(--m3-surface-container-highest);
+  border-radius: var(--m3-radius-xl);
+  padding: 24px;
+  margin: 16px 0 8px;
 }
 
 /* FAB - Floating Action Button */
@@ -803,9 +831,9 @@ body {
 /* Press state */
 .m3-icon-btn-tonal:active {
   transform: scale(0.94);
-  background-color: #e2e3dd;
+  background-color: var(--m3-surface);
   border-radius: 14px;
-  box-shadow: 0 1px 4px rgba(107, 130, 69, 0.15);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   transition: transform 0.1s ease, border-radius 0.1s ease;
 }
 
@@ -815,7 +843,7 @@ body {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(circle at center, rgba(69,87,67,0.18) 0%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(0,0,0,0.08) 0%, transparent 70%);
   opacity: 0;
   transform: scale(0.6);
   transition: opacity 0.3s ease, transform 0.3s ease;

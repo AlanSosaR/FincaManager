@@ -312,9 +312,10 @@ function renderMotorCard(eq) {
       <!-- Image with Status Indicator -->
       <div class="motor-compact-img">
         ${imgHtml}
+        ${pct >= 95 ? `
         <div style="position: absolute; bottom: 2px; right: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-          <span class="material-icons" style="font-size: 14px; color: ${pct >= 95 ? '#ff4103' : '#2d3e2c'};">check_circle</span>
-        </div>
+          <span class="material-icons" style="font-size: 14px; color: #ff4103;">warning</span>
+        </div>` : ''}
       </div>
       <!-- Info Group -->
       <div class="motor-compact-info">

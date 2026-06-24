@@ -86,7 +86,19 @@ export default defineConfig({
         ]
       }
     }),
+    {
+      name: 'skip-esbuild-detalle-animal',
+      enforce: 'pre',
+      transform(code, id) {
+        if (id.includes('detalle_animal')) {
+          return { code, map: null };
+        }
+      },
+    },
   ],
+  optimizeDeps: {
+    exclude: ['src/screens/detalle_animal'],
+  },
   server: {
     host: true
   }

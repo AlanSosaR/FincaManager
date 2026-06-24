@@ -2634,6 +2634,120 @@ input:focus, textarea:focus, select:focus {
   gap: 16px;
 }
 
+/* ── Sell Section ──────────────────────────────────────────── */
+.da-sell-card {
+  margin: 16px 0 8px;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.da-sell-card.sold {
+  background: #f0f7e6;
+  border: 1px solid #d4e8b0;
+  padding: 16px 20px;
+}
+.da-sell-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 16px;
+  color: #2d3e2c;
+  margin-bottom: 10px;
+}
+.da-sell-header .material-icons { font-size: 22px; }
+.da-sell-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.da-sell-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
+}
+.da-sell-row strong {
+  color: #2d3e2c;
+  font-weight: 800;
+}
+.da-badge-clickable {
+  background: #e4fd97 !important;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.da-badge-clickable:hover {
+  background: #d0e680 !important;
+  transform: translateY(-1px);
+}
+.da-sell-form {
+  display: none;
+  background: #f9fbf5;
+  border: 1px solid #e4fd97;
+  border-radius: 16px;
+  padding: 20px;
+}
+.da-sell-form.open { display: block; }
+.m3-card-filled .da-sell-form {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.da-sell-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.da-sell-field { display: flex; flex-direction: column; gap: 4px; }
+.da-sell-field label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+}
+.da-sell-field input {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #2d3e2c;
+  background: white;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.da-sell-field input:focus { border-color: #2d3e2c; }
+.da-sell-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.da-sell-btn {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.da-sell-btn-primary {
+  background: #2d3e2c;
+  color: white;
+}
+.da-sell-btn-primary:hover { background: #1e2b1d; }
+.da-sell-btn-secondary {
+  background: #eee;
+  color: #555;
+}
+.da-sell-btn-secondary:hover { background: #ddd; }
+
 .da-action-btn {
   display: flex;
   align-items: center;
@@ -2738,7 +2852,6 @@ input:focus, textarea:focus, select:focus {
 }
 .da-stat-tab.active {
   border: 2px solid var(--primary, #455743);
-  box-shadow: 0 0 0 4px rgba(0,71,65,0.10), 0 4px 20px rgba(0,0,0,0.06);
   transform: translateY(-2px);
 }
 
@@ -2891,7 +3004,7 @@ input:focus, textarea:focus, select:focus {
   background: #fdfdfd;
   font-size: 16px;
   font-family: inherit;
-  color: #455743;
+  color: #2d3e2c;
   font-weight: 700;
   appearance: none;
   background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23386a3e%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
@@ -2904,7 +3017,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .da-mobile-tab-select:focus {
-  border-color: #455743;
+  border-color: #2d3e2c;
   box-shadow: 0 0 0 4px rgba(107, 130, 69, 0.1);
 }
 
@@ -3346,6 +3459,7 @@ input:focus, textarea:focus, select:focus {
   .da-badge-row, .da-hero-actions {
     justify-content: center;
   }
+  .da-sell-grid { grid-template-columns: 1fr; }
   .da-tabs-section {
     padding: 20px;
     border-radius: 24px;
@@ -3532,7 +3646,7 @@ input:focus, textarea:focus, select:focus {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #333;
+  color: #2d3e2c;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
@@ -3575,7 +3689,7 @@ input:focus, textarea:focus, select:focus {
   font-weight: 700;
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 14px;
-  color: #666;
+  color: #2d3e2c;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -3587,7 +3701,7 @@ input:focus, textarea:focus, select:focus {
 
 .da-page-btn.active {
   background: var(--primary);
-  color: white;
+  color: #2d3e2c;
   box-shadow: 0 8px 20px rgba(107, 130, 69, 0.25);
   transform: scale(1.05);
 }
