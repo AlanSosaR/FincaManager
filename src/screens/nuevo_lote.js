@@ -32,6 +32,7 @@ let hasShownDistanceHint = false;
 let walkLastAccuracy = null;
 let walkPanel = null;
 let walkControl = null;
+let lastGpsPosition = null;
 
 export async function renderNuevoLote(id) {
   let lote = null;
@@ -190,7 +191,7 @@ export async function renderNuevoLote(id) {
               </div>
             </div>
 
-            <div id="area-info-badge" style="display: none; margin-top: 12px; padding: 16px 24px; background: var(--m3-primary-container); border-radius: 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div id="area-info-badge" style="display: none; margin-top: 12px; padding: 16px 24px; background: var(--m3-primary-container); border-radius: 16px; align-items: center; justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <span class="material-icons" style="color: var(--m3-on-primary-container); font-size: 28px;">check_circle</span>
                 <div>
@@ -823,7 +824,7 @@ function createWalkControl() {
   const WalkControl = L.Control.extend({
     onAdd: function() {
       const div = L.DomUtil.create('div', 'm3-walk-control');
-      div.innerHTML = `<button id="btn-walk-toggle" class="m3-walk-btn" title="Registrar caminando">
+      div.innerHTML = `<button type="button" id="btn-walk-toggle" class="m3-walk-btn" title="Registrar caminando">
         <span class="material-icons">directions_walk</span>
       </button>`;
       L.DomEvent.disableClickPropagation(div);
@@ -872,6 +873,9 @@ function createWalkPanel() {
       <button id="btn-walk-stop" class="m3-walk-action-btn" style="display:none;background:var(--m3-primary);color:white;">
         <span class="material-icons" style="font-size:16px;">stop</span> Detener
       </button>
+      <button id="btn-walk-add-point" class="m3-walk-action-btn" style="display:none;background:var(--m3-primary);color:white;">
+        <span class="material-icons" style="font-size:16px;">add_location</span> Punto
+      </button>
       <button id="btn-walk-discard" class="m3-walk-action-btn" style="background:transparent;border:1px solid var(--m3-outline);color:var(--m3-on-surface-variant);">
         <span class="material-icons" style="font-size:16px;">delete</span> Descartar
       </button>
@@ -889,6 +893,7 @@ function createWalkPanel() {
     document.getElementById('btn-walk-pause')?.addEventListener('click', pauseWalking);
     document.getElementById('btn-walk-resume')?.addEventListener('click', resumeWalking);
     document.getElementById('btn-walk-stop')?.addEventListener('click', stopWalking);
+    document.getElementById('btn-walk-add-point')?.addEventListener('click', addManualPoint);
     document.getElementById('btn-walk-discard')?.addEventListener('click', discardWalking);
   }, 100);
 }
@@ -927,7 +932,9 @@ function updateWalkPanelUI(state) {
   }
   if (pauseBtn) pauseBtn.style.display = s === 'recording' ? 'flex' : 'none';
   if (resumeBtn) resumeBtn.style.display = s === 'paused' ? 'flex' : 'none';
+  const addPointBtn = document.getElementById('btn-walk-add-point');
   if (stopBtn) stopBtn.style.display = (s === 'recording' || s === 'paused') ? 'flex' : 'none';
+  if (addPointBtn) addPointBtn.style.display = s === 'recording' ? 'flex' : 'none';
   if (discardBtn) discardBtn.style.display = s !== 'idle' ? 'flex' : 'none';
   if (pointsCount) pointsCount.textContent = walkPoints.length;
   if (accuracyValue) accuracyValue.textContent = walkLastAccuracy !== null ? walkLastAccuracy : '--';
@@ -962,7 +969,6 @@ function startWalking() {
 
   walkState = 'searching';
   walkPoints = [];
-  hasShownDistanceHint = false;
   pointCountSinceLastArea = 0;
   walkLastAccuracy = null;
 
@@ -1081,6 +1087,7 @@ function onWalkPositionSuccess(pos) {
     if (accuracy > 30) return;
 
     walkLastAccuracy = Math.round(accuracy);
+    lastGpsPosition = { latitude, longitude };
 
     const lastPt = walkPoints[walkPoints.length - 1];
     const dist = turf.distance(
@@ -1102,36 +1109,52 @@ function onWalkPositionSuccess(pos) {
     }
 
     // Valid new point
-    hasShownDistanceHint = false;
-    walkPoints.push({ lat: latitude, lng: longitude });
+    addWalkPoint(latitude, longitude);
+  }
+}
 
-    // Update polygon (closed: connect last point to first)
-    const allLatLngs = walkPoints.map(p => [p.lat, p.lng]);
-    allLatLngs.push(allLatLngs[0]);
-    walkPolygon.setLatLngs(allLatLngs);
+function addWalkPoint(latitude, longitude) {
+  walkPoints.push({ lat: latitude, lng: longitude });
 
-    // Update path line
-    walkPathLine.setLatLngs(walkPoints.map(p => [p.lat, p.lng]));
+  // Update polygon (closed: connect last point to first)
+  const allLatLngs = walkPoints.map(p => [p.lat, p.lng]);
+  allLatLngs.push(allLatLngs[0]);
+  walkPolygon.setLatLngs(allLatLngs);
 
-    // Move GPS marker
-    gpsMarker.setLatLng([latitude, longitude]);
+  // Update path line
+  walkPathLine.setLatLngs(walkPoints.map(p => [p.lat, p.lng]));
 
-    // Pan map to follow user
-    mapInstance.panTo([latitude, longitude], { animate: true, duration: 0.3 });
+  // Move GPS marker
+  gpsMarker.setLatLng([latitude, longitude]);
 
-    // Update area every 4 points
-    pointCountSinceLastArea++;
-    if (pointCountSinceLastArea % 4 === 0) {
-      updateWalkPanelUI('recording');
-    } else {
-      // Just update points count and accuracy
-      const pointsEl = document.getElementById('walk-points-count');
-      if (pointsEl) pointsEl.textContent = walkPoints.length;
-      const accEl = document.getElementById('walk-accuracy-value');
-      if (accEl) accEl.textContent = walkLastAccuracy;
+  // Pan map to follow user
+  mapInstance.panTo([latitude, longitude], { animate: true, duration: 0.3 });
+
+  // Update area every 4 points
+  pointCountSinceLastArea++;
+  if (pointCountSinceLastArea % 4 === 0) {
+    updateWalkPanelUI('recording');
+  } else {
+    // Just update points count and accuracy
+    const pointsEl = document.getElementById('walk-points-count');
+    if (pointsEl) pointsEl.textContent = walkPoints.length;
+    const accEl = document.getElementById('walk-accuracy-value');
+    if (accEl) accEl.textContent = walkLastAccuracy;
+  }
+
+  saveWalkingSession();
+}
+
+function addManualPoint() {
+  if (walkState !== 'recording' || !lastGpsPosition) {
+    if (window.Snackbar) {
+      window.Snackbar.show('Espera a tener señal GPS', { type: 'warning', duration: 3000 });
     }
-
-    saveWalkingSession();
+    return;
+  }
+  addWalkPoint(lastGpsPosition.latitude, lastGpsPosition.longitude);
+  if (window.Snackbar) {
+    window.Snackbar.show('Punto agregado manualmente', { type: 'success', duration: 2000 });
   }
 }
 
@@ -1287,7 +1310,6 @@ function cleanupWalkingState() {
   walkState = 'idle';
   walkPoints = [];
   pointCountSinceLastArea = 0;
-  hasShownDistanceHint = false;
   walkLastAccuracy = null;
 
   hideWalkPanel();

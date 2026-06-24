@@ -225,18 +225,7 @@ function renderFullContent(container, animalId, flag) {
                         <span class="material-icons">${currentAnimal.origen === 'Comprado' ? 'shopping_cart' : 'eco'}</span>
                         ${currentAnimal.origen || 'Criollo'}${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
                     </div>
-                    ${sellMode ? `
-                    ${isSold ? `
-                    <div class="da-badge" style="border:1px solid #d4e8b0;background:#f0f7e6;color:#2d3e2c;">
-                        <span class="material-icons">payments</span>
-                        <strong>Vendido</strong>
-                        ${currentAnimal.precio_venta ? `<span style="color:#555;">— $${currentAnimal.precio_venta}</span>` : ''}
-                    </div>` : sellMode ? `
-                    <div class="da-badge da-badge-clickable" id="da-sell-toggle" onclick="document.getElementById('da-sell-form').classList.toggle('open');this.style.display='none';">
-                        <span class="material-icons">payments</span>
-                        <span>Registrar venta</span>
-                    </div>` : ''}
-                </div>` : ''}
+                </div>
 
                 ${isSold ? `
                 <div class="m3-card-filled">
@@ -257,28 +246,28 @@ function renderFullContent(container, animalId, flag) {
                 </div>` : (sellMode ? `
                 <div class="m3-card-filled">
                 <div class="da-sell-form open" id="da-sell-form">
-                    <form id="form-sell-animal">
-                        <div class="da-sell-grid">
-                            <div class="da-sell-field">
+                    <form id="form-sell-animal" class="da-sell-form-inner">
+                        <div class="da-sell-grid-fields">
+                            <div class="m3-field">
+                                <input type="number" step="0.01" id="sell-precio" placeholder=" " required>
                                 <label>Precio de venta ($)</label>
-                                <input type="number" step="0.01" id="sell-precio" required>
                             </div>
-                            <div class="da-sell-field">
+                            <div class="m3-field">
+                                <input type="date" id="sell-fecha" value="${new Date().toISOString().split('T')[0]}" placeholder=" ">
                                 <label>Fecha</label>
-                                <input type="date" id="sell-fecha" value="${new Date().toISOString().split('T')[0]}">
                             </div>
-                            <div class="da-sell-field">
+                            <div class="m3-field">
+                                <input type="text" id="sell-comprador" placeholder=" ">
                                 <label>Comprador (opcional)</label>
-                                <input type="text" id="sell-comprador">
                             </div>
-                            <div class="da-sell-field">
+                            <div class="m3-field">
+                                <input type="number" step="0.1" id="sell-peso" value="${currentAnimal.peso_actual || 0}" placeholder=" ">
                                 <label>Peso (kg)</label>
-                                <input type="number" step="0.1" id="sell-peso" value="${currentAnimal.peso_actual || 0}">
                             </div>
                         </div>
                         <div class="da-sell-actions">
-                            <button type="button" class="da-sell-btn da-sell-btn-secondary" onclick="document.getElementById('da-sell-form').classList.remove('open'); document.getElementById('da-sell-toggle').style.display='';">Cancelar</button>
-                            <button type="submit" class="da-sell-btn da-sell-btn-primary" id="btn-sell-confirm">
+                            <button type="button" class="btn-m3-text" onclick="document.getElementById('da-sell-form').classList.remove('open'); document.getElementById('da-sell-toggle').style.display='';">Cancelar</button>
+                            <button type="submit" class="btn-m3-primary" id="btn-sell-confirm" style="gap:6px;">
                                 <span class="material-icons">payments</span> Confirmar venta
                             </button>
                         </div>

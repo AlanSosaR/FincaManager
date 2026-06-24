@@ -164,6 +164,12 @@ body {
 .nav-links {
   list-style: none;
   flex-grow: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.nav-links::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-link {
@@ -255,6 +261,11 @@ body {
   overflow-y: auto;
   position: relative;
   background: var(--background);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.main-content::-webkit-scrollbar {
+  display: none;
 }
 
 .top-bar {
@@ -346,6 +357,11 @@ body {
   .preview-container {
     padding: 24px;
   }
+  @media (max-width: 600px) {
+    .preview-container {
+      padding: 8px;
+    }
+  }
 
   .sidebar-overlay {
     position: fixed;
@@ -384,6 +400,12 @@ body {
 @media (max-width: 768px) {
   .grid-2 {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .ganado-top-actions-container {
+    margin-top: 8px;
   }
 }
 
@@ -674,7 +696,7 @@ body {
 }
 
 .m3-card-filled {
-  background: var(--m3-surface-container-highest);
+  background: white;
   border-radius: var(--m3-radius-xl);
   padding: 24px;
   margin: 16px 0 8px;
