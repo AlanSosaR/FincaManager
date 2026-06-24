@@ -51,7 +51,7 @@ window.changeMotorsPage = async function(page) {
 
   listContainer.innerHTML = `
     <div style="padding: 32px; text-align: center; color: #888; grid-column: 1 / -1;">
-      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary);">autorenew</span>
+      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
   // Re-fetch urgent IDs if needed
@@ -140,7 +140,7 @@ export async function renderMotores(page = 1, filter = 'all') {
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
         <div class="search-wrapper" id="motors-search-wrapper" style="display: flex; align-items: center; background: ${currentMotorsSearchQuery ? '#e4fd97' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
           <button id="motors-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentMotorsSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: var(--primary);">search</span>
+            <span class="material-icons" style="color: var(--primary-container);">search</span>
           </button>
           <input type="text" id="motors-search-input" placeholder="Buscar equipo..." value="${currentMotorsSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentMotorsSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentMotorsSearchQuery ? '1' : '0'}; padding: ${currentMotorsSearchQuery ? '0 8px 0 0' : '0'}; color: #333;">
           <button id="motors-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentMotorsSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #666; height: 100%;" title="Limpiar búsqueda">

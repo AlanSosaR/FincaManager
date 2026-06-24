@@ -308,7 +308,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--primary);
+  color: var(--primary-container);
 }
 
 /* Empty State for Timeline */
@@ -507,8 +507,8 @@
 
 .m3-input-container:focus-within {
   background: white;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(69, 87, 67, 0.1);
+  border-color: var(--primary-container);
+  box-shadow: 0 0 0 4px rgba(107, 130, 69, 0.1);
 }
 
 .m3-input-container input {
@@ -593,7 +593,7 @@
 }
 
 .link-all {
-  color: var(--primary);
+  color: var(--primary-container);
   text-decoration: none;
   font-size: 14px;
   font-weight: 700;

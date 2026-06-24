@@ -114,7 +114,7 @@ export async function renderDetallePotrero(potreroId) {
           <div class="activity-list" style="margin-top: 12px;">
             ${bitacora && bitacora.length > 0 ? bitacora.map(b => `
               <div class="activity-item" style="padding: 12px; gap: 12px; border-bottom: 1px solid #f0f0f0;">
-                <div class="activity-icon" style="background: rgba(46,125,50,0.1); color: var(--primary); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <div class="activity-icon" style="background: rgba(46,125,50,0.1); color: var(--primary-container); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                   <span class="material-icons" style="font-size: 18px;">${b.icon || 'history'}</span>
                 </div>
                 <div class="activity-content" style="flex: 1;">

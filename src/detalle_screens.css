@@ -56,8 +56,8 @@
 }
 .btn-back:hover {
   background: #f5f5f5;
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--primary-container);
+  color: var(--primary-container);
 }
 
 .detail-hero {
@@ -128,7 +128,7 @@
 }
 .history-icon {
   font-size: 24px;
-  color: var(--primary);
+  color: var(--primary-container);
   background: rgba(69,87,67,0.1);
   padding: 8px;
   border-radius: 12px;

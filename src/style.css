@@ -1,11 +1,11 @@
 :root {
   /* Material 3 Palette - Seed: #2d3e2c (Fresh Canopy) */
-  --m3-primary: #2d3e2c;
-  --m3-on-primary: #ffffff;
-  --m3-primary-container: #e4fd97;
-  --m3-on-primary-container: #0f1f0f;
+  --m3-primary: #e4fd97;
+  --m3-on-primary: #0f1f0f;
+  --m3-primary-container: #2d3e2c;
+  --m3-on-primary-container: #ffffff;
   --m3-primary-fixed: #e4fd97;
-  --m3-primary-fixed-dim: #88d98a;
+  --m3-primary-fixed-dim: #c4e680;
   
   --m3-secondary: #526350;
   --m3-on-secondary: #ffffff;
@@ -50,9 +50,9 @@
   --primary: var(--m3-primary);
   --primary-container: var(--m3-primary-container);
   --on-primary-container: var(--m3-on-primary-container);
-  --primary-light: #83967f;
-  --primary-dark: #2f402e;
-  --primary-dim: #455743;
+  --primary-light: #f0feb8;
+  --primary-dark: #a3b94a;
+  --primary-dim: #6b8245;
   --secondary: var(--m3-secondary);
   --secondary-container: var(--m3-secondary-container);
   --on-secondary-container: var(--m3-on-secondary-container);
@@ -153,7 +153,7 @@ body {
 .sidebar-header h1 {
   font-size: 24px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-container);
 }
 
 .sidebar-header p {
@@ -184,19 +184,19 @@ body {
 }
 
 .nav-link:hover {
-  background: rgba(69, 87, 67, 0.05);
-  color: var(--primary);
+  background: rgba(107, 130, 69, 0.05);
+  color: var(--primary-container);
 }
 
 .nav-link.active {
   background: var(--primary);
-  color: #fff !important;
-  box-shadow: 0 12px 24px rgba(69, 87, 67, 0.25);
+  color: var(--primary-container) !important;
+  box-shadow: 0 12px 24px rgba(107, 130, 69, 0.25);
   transform: translateX(4px);
 }
 
 .nav-link.active span {
-  color: #fff !important;
+  color: var(--primary-container) !important;
 }
 
 .sidebar-footer {
@@ -236,7 +236,7 @@ body {
 }
 
 .sidebar.collapsed #sidebar-collapse {
-  color: var(--primary) !important;
+  color: var(--primary-container) !important;
   transform: rotate(180deg);
   transition: transform 0.3s;
 }
@@ -277,6 +277,9 @@ body {
   padding: 8px;
   z-index: 5000;
   position: relative;
+}
+#menu-toggle.m3-icon-btn-tonal {
+  color: var(--m3-primary);
 }
 
 #current-screen-title {
@@ -408,7 +411,7 @@ body {
 .modal-header h3 {
   font-size: 20px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-container);
 }
 
 .btn-close {
@@ -453,8 +456,8 @@ body {
 .form-group select:focus, 
 .form-group textarea:focus,
 .m3-input-wrapper input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(69, 87, 67, 0.1);
+  border-color: var(--primary-container);
+  box-shadow: 0 0 0 3px rgba(107, 130, 69, 0.1);
 }
 
 .modal-footer {
@@ -518,7 +521,7 @@ body {
   overflow: hidden;
   /* M3 tonal colour — primary container */
   background-color: #daeed5;
-  color: var(--primary);
+  color: var(--primary-container);
   /* Spring-like transition */
   transition:
     background-color 0.2s ease,
@@ -545,7 +548,7 @@ body {
   background-color: #e4eade;
   border-radius: 20px;
   transform: scale(1.08);
-  box-shadow: 0 4px 12px rgba(69, 87, 67, 0.20);
+  box-shadow: 0 4px 12px rgba(107, 130, 69, 0.20);
 }
 
 /* ── M3 Expressive Utility Classes ─────────────────────────────────────────── */
@@ -712,7 +715,7 @@ body {
 }
 
 .m3-btn-text:hover {
-  background-color: rgba(69, 87, 67, 0.08);
+  background-color: rgba(107, 130, 69, 0.08);
 }
 
 .m3-fab .material-icons, .m3-fab .material-symbols-outlined {
@@ -802,7 +805,7 @@ body {
   transform: scale(0.94);
   background-color: #e2e3dd;
   border-radius: 14px;
-  box-shadow: 0 1px 4px rgba(69, 87, 67, 0.15);
+  box-shadow: 0 1px 4px rgba(107, 130, 69, 0.15);
   transition: transform 0.1s ease, border-radius 0.1s ease;
 }
 

@@ -76,7 +76,7 @@ export async function renderGanado(page = 1, filter = 'all') {
       <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
         <div class="search-wrapper" id="ganado-search-wrapper" style="display: flex; align-items: center; background: ${currentSearchQuery ? '#e4fd97' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
           <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: var(--primary);">search</span>
+            <span class="material-icons" style="color: var(--primary-container);">search</span>
           </button>
           <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentSearchQuery ? '1' : '0'}; padding: ${currentSearchQuery ? '0 8px 0 0' : '0'}; color: #333;">
           <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #666; height: 100%;" title="Limpiar búsqueda">
@@ -231,7 +231,7 @@ window.changeGanadoPage = async function(page) {
 
   listContainer.innerHTML = `
     <div style="padding: 32px; text-align: center; color: #888;">
-      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary);">autorenew</span>
+      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
   // We need to re-fetch the "pendientes" sets to render rows correctly
@@ -339,9 +339,17 @@ export function initGanado() {
   // Action menus logic
   window.toggleActionMenu = (btn) => {
     const menu = btn.nextElementSibling;
+    const row = btn.closest('.ganado-row');
     const isActive = menu.classList.contains('active');
-    document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
-    if (!isActive) menu.classList.add('active');
+    document.querySelectorAll('.action-menu.active').forEach(m => {
+      m.classList.remove('active');
+      const r = m.closest('.ganado-row');
+      if (r) r.classList.remove('menu-open');
+    });
+    if (!isActive) {
+      menu.classList.add('active');
+      if (row) row.classList.add('menu-open');
+    }
   };
 
   window.confirmDeleteAnimal = (id, name) => {
@@ -413,7 +421,11 @@ export function initGanado() {
   // Close menus when clicking outside
   const closeMenus = (e) => {
     if (!e.target.closest('.ganado-btn-more')) {
-      document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+      document.querySelectorAll('.action-menu.active').forEach(m => {
+        m.classList.remove('active');
+        const r = m.closest('.ganado-row');
+        if (r) r.classList.remove('menu-open');
+      });
     }
   };
   window.removeEventListener('click', closeMenus);

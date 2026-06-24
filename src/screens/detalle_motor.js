@@ -113,7 +113,7 @@ export async function renderDetalleMotor(motorId) {
               <span style="font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">Control de Sesión</span>
             </div>
             
-            <div id="clock-display" style="font-size: 64px; font-weight: 900; color: var(--primary); font-family: 'JetBrains Mono', monospace; margin: 24px 0; letter-spacing: -2px;">00:00:00</div>
+            <div id="clock-display" style="font-size: 64px; font-weight: 900; color: var(--primary-container); font-family: 'JetBrains Mono', monospace; margin: 24px 0; letter-spacing: -2px;">00:00:00</div>
             
             <div style="display: flex; gap: 24px; justify-content: center; margin-top: 32px;">
               <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
@@ -175,7 +175,7 @@ export async function renderDetalleMotor(motorId) {
               <div style="background: var(--surface-variant); padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; border: 1px dashed #ccc;">
                 <div style="display: flex; flex-direction: column;">
                   <span style="font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase;">Duración Calculada</span>
-                  <span id="calc-manual-result" style="font-size: 18px; font-weight: 900; color: var(--primary);">4h 00m</span>
+                  <span id="calc-manual-result" style="font-size: 18px; font-weight: 900; color: var(--primary-container);">4h 00m</span>
                 </div>
                 <button id="btn-save-manual" class="btn-m3-fill" style="padding: 12px 24px;">Guardar</button>
               </div>
@@ -195,7 +195,7 @@ export async function renderDetalleMotor(motorId) {
           <div class="activity-list" style="margin-bottom: 32px;">
             ${sesiones && sesiones.length > 0 ? sesiones.map(s => `
               <div class="activity-item" style="padding: 16px; border-bottom: 1px solid var(--m3-outline-variant);">
-                <div class="activity-icon" style="background: var(--primary-container); color: var(--primary); border-radius: 12px; width: 44px; height: 44px;">
+                <div class="activity-icon" style="background: var(--primary-container); color: var(--primary-container); border-radius: 12px; width: 44px; height: 44px;">
                   <span class="material-icons" style="font-size: 20px;">history</span>
                 </div>
                 <div class="activity-content" style="flex: 1;">
@@ -205,7 +205,7 @@ export async function renderDetalleMotor(motorId) {
                   <p style="font-size: 12px; color: #666; margin: 4px 0;">
                     ${s.hora_inicio || ''} - ${s.hora_fin || ''} • Operador: ${s.operador || 'Admin'}
                   </p>
-                  <span class="history-date" style="font-weight: 800; color: var(--primary);">
+                  <span class="history-date" style="font-weight: 800; color: var(--primary-container);">
                     ${s.duracion_mins ? Math.floor(s.duracion_mins / 60) + 'h ' + (s.duracion_mins % 60) + 'm' : s.total_horas + 'h'} trabajadas
                   </span>
                 </div>
@@ -229,7 +229,7 @@ export async function renderDetalleMotor(motorId) {
                   <span class="material-icons" style="font-size: 20px;">oil_barrel</span>
                 </div>
                 <div class="activity-content" style="flex: 1;">
-                  <h4 style="font-size: 15px; margin: 0; font-weight: 800; color: var(--primary);">${m.titulo || 'Cambio de Aceite'}</h4>
+                  <h4 style="font-size: 15px; margin: 0; font-weight: 800; color: var(--primary-container);">${m.titulo || 'Cambio de Aceite'}</h4>
                   <p style="font-size: 12px; color: #555; margin: 4px 0; line-height: 1.4;">${m.descripcion || 'Mantenimiento preventivo de rutina.'}</p>
                   <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                     <span class="history-date" style="font-size: 11px; font-weight: 700; color: #888;">

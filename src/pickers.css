@@ -94,7 +94,7 @@
 }
 
 .m3-day-cell:hover {
-  background: rgba(69, 87, 67, 0.1);
+  background: rgba(107, 130, 69, 0.1);
 }
 
 .m3-day-cell.selected {
@@ -222,5 +222,5 @@
 }
 
 .m3-picker-footer button:hover {
-  background: rgba(69, 87, 67, 0.08);
+  background: rgba(107, 130, 69, 0.08);
 }

@@ -10,7 +10,7 @@ export async function renderNuevoPotrero(id) {
           <div class="da-hero-img-wrap" id="photo-dropzone" style="cursor: pointer; border: 2px dashed rgba(0, 71, 65, 0.3); background: #f0ede4;">
             <input type="file" id="potrero-photo" accept="image/*" style="display: none">
             <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
-               <div class="da-stat-icon" style="background: rgba(69, 87, 67, 0.1); color: #455743; width: 80px; height: 80px; border-radius: 50%;">
+               <div class="da-stat-icon" style="background: rgba(107, 130, 69, 0.1); color: #6b8245; width: 80px; height: 80px; border-radius: 50%;">
                   <span class="material-icons" style="font-size: 40px;">landscape</span>
                </div>
                <div style="text-align: center;">
@@ -49,7 +49,7 @@ export async function renderNuevoPotrero(id) {
               <div class="m3-field">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <input type="number" step="0.01" name="area" placeholder=" " style="flex: 1;">
-                  <select name="area_unidad" style="width: auto; border: none; background: #f0f0f0; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 700; color: #455743;">
+                  <select name="area_unidad" style="width: auto; border: none; background: #f0f0f0; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 700; color: #6b8245;">
                     <option value="ha">ha</option>
                     <option value="m2">m²</option>
                     <option value="mz">mz</option>

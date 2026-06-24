@@ -48,7 +48,7 @@ window.changePotrerosPage = async function(page) {
 
   listContainer.innerHTML = `
     <div style="padding: 32px; text-align: center; color: #888; grid-column: 1 / -1;">
-      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary);">autorenew</span>
+      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
   const { data: potreros, error } = await supabase
@@ -80,7 +80,7 @@ async function changePotrerosPage(page) {
 
   listContainer.innerHTML = `
     <div style="padding: 32px; text-align: center; color: #888;">
-      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary);">autorenew</span>
+      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
   const { data: potreros, error } = await supabase
@@ -289,7 +289,7 @@ function renderPotreroRow(p) {
   return `
     <div class="ganado-row" onclick="window.navigateTo('detalle_potrero', '${p.id}')">
       <div class="ganado-row-img-container" style="background: var(--surface-container-high); display: flex; align-items: center; justify-content: center;">
-        <span class="material-icons" style="color: var(--primary); font-size: 24px;">landscape</span>
+        <span class="material-icons" style="color: var(--primary-container); font-size: 24px;">landscape</span>
         <div class="ganado-row-badge ${statusClass === 'ocupado' ? 'orange' : 'green'}">
           ${statusIcon}
         </div>

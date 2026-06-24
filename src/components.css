@@ -110,7 +110,7 @@
 }
 .stat-icon {
   font-size: 28px !important;
-  color: var(--primary);
+  color: var(--primary-container);
   background: rgba(69,87,67,0.1);
   padding: 10px;
   border-radius: 14px;
@@ -1156,7 +1156,7 @@
 
 .motor-edit-btn:hover {
   background: #e2e3dd;
-  color: var(--primary);
+  color: var(--primary-container);
   transform: scale(1.1);
 }
 
@@ -1399,8 +1399,11 @@ input:focus, textarea:focus, select:focus {
 
 /* Green card — Total Animales */
 .ganado-card-primary {
-  background-color: var(--primary-container);
-  color: var(--on-primary-container);
+  background: var(--primary);
+  color: var(--primary-container);
+}
+.ganado-card-primary .ganado-card-value {
+  color: var(--primary-container);
 }
 
 /* Beige/surface cards — Hembras & Machos */
@@ -1608,6 +1611,12 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid rgba(0,0,0,0.04);
   box-shadow: 0 2px 8px rgba(0,0,0,0.03);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+}
+
+.ganado-row.menu-open {
+  z-index: 100;
 }
 
 @media (max-width: 650px) {
@@ -1755,7 +1764,7 @@ input:focus, textarea:focus, select:focus {
 .ganado-col-weight-value {
   font-size: 18px;
   font-weight: 800;
-  color: var(--primary);
+  color: var(--primary-container);
 }
 
 .ganado-col-weight-unit {
@@ -1843,7 +1852,7 @@ input:focus, textarea:focus, select:focus {
 
 .ganado-btn-more:hover {
   background: var(--surface-container);
-  color: var(--primary);
+  color: var(--primary-container);
 }
 
 /* Load more button */
@@ -1852,7 +1861,7 @@ input:focus, textarea:focus, select:focus {
   padding: 16px;
   font-size: 14px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-container);
   border: 2px dashed rgba(130, 128, 121, 0.3);
   border-radius: 16px;
   background: none;
@@ -2500,7 +2509,7 @@ input:focus, textarea:focus, select:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--primary);
+  color: var(--primary-container);
 }
 
 .quick-action-info h4 {
@@ -2548,7 +2557,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .da-back-btn:hover {
-  color: var(--primary);
+  color: var(--primary-container);
 }
 
 .da-hero {
@@ -2896,7 +2905,7 @@ input:focus, textarea:focus, select:focus {
 
 .da-mobile-tab-select:focus {
   border-color: #455743;
-  box-shadow: 0 0 0 4px rgba(69, 87, 67, 0.1);
+  box-shadow: 0 0 0 4px rgba(107, 130, 69, 0.1);
 }
 
 .da-tab-bar {
@@ -3531,9 +3540,9 @@ input:focus, textarea:focus, select:focus {
 .da-pagination-circle-btn:hover:not(:disabled) {
   background: white;
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--primary-container);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(69, 87, 67, 0.1);
+  box-shadow: 0 4px 12px rgba(107, 130, 69, 0.1);
 }
 
 .da-pagination-circle-btn:active:not(:disabled) {
@@ -3571,15 +3580,15 @@ input:focus, textarea:focus, select:focus {
 }
 
 .da-page-btn:hover:not(.active) {
-  background: rgba(69, 87, 67, 0.08);
-  color: var(--primary);
+  background: rgba(107, 130, 69, 0.08);
+  color: var(--primary-container);
   transform: scale(1.1);
 }
 
 .da-page-btn.active {
   background: var(--primary);
   color: white;
-  box-shadow: 0 8px 20px rgba(69, 87, 67, 0.25);
+  box-shadow: 0 8px 20px rgba(107, 130, 69, 0.25);
   transform: scale(1.05);
 }
 
@@ -3669,7 +3678,7 @@ input:focus, textarea:focus, select:focus {
   border-radius: var(--m3-radius-full);
   font-size: 12px;
   font-weight: 700;
-  background: rgba(69, 87, 67, 0.08);
+  background: rgba(107, 130, 69, 0.08);
   color: var(--m3-primary);
 }
 

@@ -677,7 +677,7 @@ function showDayDetails(day, dayEvents) {
                 ${dayEvents.map(v => {
                     const currentEstado = v.estado || 'Aplicada';
                     const isPastOrToday = v.fecha <= getLocalToday();
-                    let iconColor = '#455743';
+                    let iconColor = '#6b8245';
                     let iconName = 'vaccines';
                     let subtitle = 'Vacunación aplicada';
                     let actionsHtml = '';
@@ -909,7 +909,7 @@ function showInlineWeightForm(animalId) {
     formContainer.className = 'da-day-details';
     formContainer.style.cssText = 'margin-bottom: 16px; padding: 20px; display:flex; flex-direction:column; gap:14px;';
     formContainer.innerHTML = `
-        <h4 style="font-size:16px; font-weight:700; color:var(--primary);">Nuevo Pesaje</h4>
+        <h4 style="font-size:16px; font-weight:700; color:var(--primary-container);">Nuevo Pesaje</h4>
         <form id="form-inline-weight" style="display: flex; flex-direction: column; gap: 14px;">
             <div class="m3-field">
                 <input type="number" step="0.1" name="peso" id="inline-weight-peso" placeholder=" " required>
@@ -1396,12 +1396,12 @@ function initChart() {
             datasets: [{
                 label: 'Peso (' + (currentAnimal.peso_unidad || 'kg') + ')',
                 data: data,
-                borderColor: '#455743',
-                backgroundColor: 'rgba(69, 87, 67, 0.1)',
+                borderColor: '#6b8245',
+                backgroundColor: 'rgba(107, 130, 69, 0.1)',
                 borderWidth: 3,
                 tension: 0.4,
                 fill: true,
-                pointBackgroundColor: '#455743',
+                pointBackgroundColor: '#6b8245',
                 pointRadius: 4
             }]
         },
@@ -1437,7 +1437,7 @@ async function handleEditVaccine(vaccineId) {
 
     container.innerHTML = `
         <div class="da-inline-form-card" style="margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);">
-            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#455743;">Editar Vacuna</h3>
+            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#6b8245;">Editar Vacuna</h3>
             <form id="form-edit-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
                 <div class="m3-field">
                     <input type="text" name="nombre" value="${v.nombre || ''}" placeholder=" " required autocomplete="off">
@@ -1532,7 +1532,7 @@ async function handleEditFumigacion(fumigacionId) {
 
     container.innerHTML = `
         <div class="da-inline-form-card" style="margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);">
-            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#455743;">Editar Fumigación</h3>
+            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#6b8245;">Editar Fumigación</h3>
             <form id="form-edit-fumigacion" style="display: flex; flex-direction: column; gap: 16px;">
                 <div class="m3-field">
                     <input type="text" name="producto" value="${f.producto || ''}" placeholder=" " required autocomplete="off">

@@ -10,7 +10,7 @@ export async function renderNuevaHerramienta(id) {
           <div class="da-hero-img-wrap" id="photo-dropzone" style="cursor: pointer; border: 2px dashed rgba(0, 71, 65, 0.3); background: #f0ede4;">
             <input type="file" id="tool-photo" accept="image/*" style="display: none">
             <div id="photo-preview" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; transition: all 0.3s;">
-               <div class="da-stat-icon" style="background: rgba(69, 87, 67, 0.1); color: #455743; width: 80px; height: 80px; border-radius: 50%;">
+               <div class="da-stat-icon" style="background: rgba(107, 130, 69, 0.1); color: #6b8245; width: 80px; height: 80px; border-radius: 50%;">
                   <span class="material-icons" style="font-size: 40px;">photo_camera</span>
                </div>
                <div style="text-align: center;">

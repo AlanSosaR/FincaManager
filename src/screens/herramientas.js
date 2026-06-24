@@ -48,7 +48,7 @@ window.changeToolsPage = async function(page) {
 
   listContainer.innerHTML = `
     <div style="padding: 32px; text-align: center; color: #888; grid-column: 1 / -1;">
-      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary);">autorenew</span>
+      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
   const { data: tools, error } = await supabase
@@ -80,7 +80,7 @@ async function changeToolsPage(page) {
 
   listContainer.innerHTML = `
     <div style="padding: 32px; text-align: center; color: #888;">
-      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary);">autorenew</span>
+      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
   const { data: tools, error } = await supabase
