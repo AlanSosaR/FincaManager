@@ -281,7 +281,7 @@
   padding: 16px 32px;
   border-radius: 99px;
   border: none;
-  background: var(--m3-primary);
+  background: #2d3e2c;
   color: white;
   font-weight: 700;
   display: flex;
@@ -293,7 +293,7 @@
 }
 
 .btn-m3-primary:hover {
-  background: var(--primary-dim);
+  background: #1f2b1e;
   transform: translateY(-2px);
 }
 
@@ -920,7 +920,18 @@
 }
 
 #area-info-badge {
+  background: #e4fd97 !important;
+  border-left: none !important;
   animation: areaBadgePulse 0.3s ease-out;
+}
+
+#area-info-badge .material-icons,
+#area-info-badge p {
+  color: #2d3e2c !important;
+}
+
+#area-calculated-text {
+  color: #2d3e2c !important;
 }
 
 /* ── Hide Leaflet.draw original/ghost shape during editing ─ */
@@ -976,23 +987,12 @@
 
 /* Walk status panel (bottom overlay inside map) */
 #walk-panel {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 1001;
-  background: rgba(0,0,0,0.78);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 16px 20px;
-  border-radius: 16px 16px 0 0;
-  color: white;
-  animation: walkPanelIn 0.3s ease-out;
-}
-
-@keyframes walkPanelIn {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  margin-top: 12px;
+  padding: 16px 24px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--m3-outline-variant);
+  animation: fadeIn 0.3s ease-out;
 }
 
 .walk-status-dot {
@@ -1039,67 +1039,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255,255,255,0.15);
-  color: white;
 }
 
 .m3-walk-action-btn:hover {
-  background: rgba(255,255,255,0.25);
+  filter: brightness(0.9);
 }
 
-.m3-walk-action-btn.primary {
-  background: #2d3e2c;
-  color: white;
-}
-
-.m3-walk-action-btn.primary:hover {
-  background: #1f2b1e;
-}
-
-.m3-walk-action-btn.danger {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.25);
-  color: rgba(255,255,255,0.8);
-}
-
-.m3-walk-action-btn.danger:hover {
-  background: rgba(255,65,3,0.2);
-  border-color: #ff4103;
-  color: white;
-}
-
-#walk-panel .walk-grip {
-  width: 36px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255,255,255,0.3);
-  margin: -8px auto 12px auto;
-}
-
-/* Searching state overlay */
-#walk-searching-overlay {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 1000;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  animation: fadeIn 0.3s ease-out;
-}
-
-#walk-searching-overlay .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(255,255,255,0.2);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 16px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* ── End Walking Controls ─────────────────────────────────────── */

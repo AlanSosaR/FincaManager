@@ -459,12 +459,6 @@ function initMap() {
       mapInstance.addLayer(glow);
     }
 
-    // Update area badge color
-    const badge = document.getElementById('area-info-badge');
-    if (badge) {
-      badge.style.background = color + '20';
-      badge.style.borderLeft = `4px solid ${color}`;
-    }
   }
 
   function initColorPicker() {
@@ -685,11 +679,36 @@ function initMap() {
   // Locate button
   const locateBtn = document.getElementById('btn-locate');
   if (locateBtn) {
+    let userMarker = null;
+    mapInstance.on('locationfound', function(e) {
+      if (userMarker) mapInstance.removeLayer(userMarker);
+      userMarker = L.circleMarker(e.latlng, {
+        radius: 10,
+        color: '#fff',
+        fillColor: '#4285f4',
+        fillOpacity: 1,
+        weight: 3
+      }).addTo(mapInstance).bindPopup('Tu ubicación actual');
+
+      mapInstance.setView(e.latlng, 17, { animate: true });
+    });
+    mapInstance.on('locationerror', function(e) {
+      if (window.Snackbar) {
+        const msg = e.code === 1
+          ? 'Permiso de ubicación denegado — actívalo en la configuración del navegador'
+          : 'No se pudo obtener tu ubicación: ' + e.message;
+        window.Snackbar.show(msg, { type: 'error', duration: 5000 });
+      }
+    });
     locateBtn.addEventListener('click', () => {
+      if (window.Snackbar) {
+        window.Snackbar.show('Buscando ubicación...', { type: 'info', duration: 2000 });
+      }
       mapInstance.locate({ 
-        setView: true, 
-        maxZoom: 16,
-        strings: { title: 'Tu ubicación actual' }
+        setView: false,
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000
       });
     });
   }
@@ -777,10 +796,7 @@ function calculateArea(layer) {
   const text = document.getElementById('area-calculated-text');
   if (badge && text) {
     badge.style.display = 'flex';
-    badge.style.background = selectedColor + '18';
-    badge.style.borderLeft = `4px solid ${selectedColor}`;
     text.textContent = areaHectares.toFixed(2) + ' ha';
-    text.style.color = selectedColor;
   }
 
   const hint = document.getElementById('area-hint');
@@ -832,41 +848,40 @@ function createWalkControl() {
 
 function createWalkPanel() {
   if (walkPanel) return;
-  const container = document.getElementById('lote-map-container');
-  if (!container) return;
+  const badge = document.getElementById('area-info-badge');
+  if (!badge || !badge.parentNode) return;
 
   const panel = document.createElement('div');
   panel.id = 'walk-panel';
   panel.style.display = 'none';
   panel.innerHTML = `
-    <div class="walk-grip"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="walk-status-dot idle" id="walk-status-dot"></span>
-        <span id="walk-status-text" style="font-weight:600;font-size:14px;">Listo</span>
+        <span id="walk-status-text" style="font-weight:600;font-size:14px;color:var(--m3-on-surface);">Listo</span>
       </div>
-      <span id="walk-area-text" style="font-size:20px;font-weight:800;font-family:Manrope,sans-serif;">0.00 ha</span>
+      <span id="walk-area-text" style="font-size:20px;font-weight:800;font-family:Manrope,sans-serif;color:var(--m3-on-surface);">0.00 ha</span>
     </div>
-    <div id="walk-actions-row" style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button id="btn-walk-pause" class="m3-walk-action-btn" style="display:none;">
+    <div id="walk-actions-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+      <button id="btn-walk-pause" class="m3-walk-action-btn" style="display:none;background:var(--m3-surface-highest);color:var(--m3-on-surface);">
         <span class="material-icons" style="font-size:16px;">pause</span> Pausar
       </button>
-      <button id="btn-walk-resume" class="m3-walk-action-btn primary" style="display:none;">
+      <button id="btn-walk-resume" class="m3-walk-action-btn" style="display:none;background:var(--m3-primary);color:white;">
         <span class="material-icons" style="font-size:16px;">play_arrow</span> Reanudar
       </button>
-      <button id="btn-walk-stop" class="m3-walk-action-btn primary" style="display:none;">
+      <button id="btn-walk-stop" class="m3-walk-action-btn" style="display:none;background:var(--m3-primary);color:white;">
         <span class="material-icons" style="font-size:16px;">stop</span> Detener
       </button>
-      <button id="btn-walk-discard" class="m3-walk-action-btn danger">
+      <button id="btn-walk-discard" class="m3-walk-action-btn" style="background:transparent;border:1px solid var(--m3-outline);color:var(--m3-on-surface-variant);">
         <span class="material-icons" style="font-size:16px;">delete</span> Descartar
       </button>
     </div>
-    <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;">
+    <div style="font-size:12px;color:var(--m3-on-surface-variant);margin-top:8px;">
       Puntos: <span id="walk-points-count">0</span> 
-      <span id="walk-accuracy-display" style="margin-left:12px;">Señal: ±<span id="walk-accuracy-value">--</span>m</span>
+      <span id="walk-accuracy-display" style="margin-left:16px;">Señal: ±<span id="walk-accuracy-value">--</span>m</span>
     </div>
   `;
-  container.appendChild(panel);
+  badge.parentNode.insertBefore(panel, badge);
   walkPanel = panel;
 
   // Wire buttons
@@ -951,6 +966,9 @@ function startWalking() {
   pointCountSinceLastArea = 0;
   walkLastAccuracy = null;
 
+  // Hide area badge while walking
+  clearAreaDisplay();
+
   // Update toggle button
   const toggleBtn = document.getElementById('btn-walk-toggle');
   if (toggleBtn) {
@@ -962,19 +980,6 @@ function startWalking() {
   disableDrawControl();
 
   showWalkPanel('searching');
-
-  // Show searching overlay
-  const container = document.getElementById('lote-map-container');
-  if (container && !document.getElementById('walk-searching-overlay')) {
-    const overlay = document.createElement('div');
-    overlay.id = 'walk-searching-overlay';
-    overlay.innerHTML = `
-      <div class="spinner"></div>
-      <div style="font-size:16px;font-weight:600;margin-bottom:4px;">Buscando señal GPS</div>
-      <div style="font-size:13px;opacity:0.8;">Camina hacia el primer punto del lote</div>
-    `;
-    container.appendChild(overlay);
-  }
 
   // Create GPS marker
   if (!gpsMarker) {
@@ -1018,6 +1023,21 @@ function startWalking() {
     { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
   );
 
+  // Fallback: if no fix within 25s, retry without enableHighAccuracy
+  window._walkSearchTimeout = setTimeout(() => {
+    if (walkState === 'searching' && watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = navigator.geolocation.watchPosition(
+        onWalkPositionSuccess,
+        onWalkPositionError,
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 10000 }
+      );
+      if (window.Snackbar) {
+        window.Snackbar.show('Cambiando a modo de precisión estándar...', { type: 'info' });
+      }
+    }
+  }, 25000);
+
   saveWalkingSession();
 }
 
@@ -1025,15 +1045,20 @@ function onWalkPositionSuccess(pos) {
   const { latitude, longitude, accuracy } = pos.coords;
 
   if (walkState === 'searching') {
-    if (accuracy <= 30) {
-      // First valid point - start recording
+    walkLastAccuracy = Math.round(accuracy);
+    updateWalkPanelUI('searching');
+
+    // Accept first fix up to 100m (covers WiFi positioning; GPS is typically <10m)
+    if (accuracy <= 100) {
+      // Clear fallback timeout
+      if (window._walkSearchTimeout) {
+        clearTimeout(window._walkSearchTimeout);
+        window._walkSearchTimeout = null;
+      }
+
       walkState = 'recording';
       walkPoints = [{ lat: latitude, lng: longitude }];
       walkLastAccuracy = Math.round(accuracy);
-
-      // Remove searching overlay
-      const overlay = document.getElementById('walk-searching-overlay');
-      if (overlay) overlay.remove();
 
       // Update marker
       gpsMarker.setLatLng([latitude, longitude]);
@@ -1132,22 +1157,12 @@ function pauseWalking(silent) {
   }
 
   walkState = 'paused';
-
-  if (!silent) {
-    updateWalkPanelUI('paused');
-  } else {
-    updateWalkPanelUI('paused');
-  }
-
+  updateWalkPanelUI('paused');
   saveWalkingSession();
 }
 
 function resumeWalking() {
   if (walkState !== 'paused') return;
-
-  // Remove searching overlay if it somehow exists
-  const overlay = document.getElementById('walk-searching-overlay');
-  if (overlay) overlay.remove();
 
   walkState = walkPoints.length > 0 ? 'recording' : 'searching';
 
@@ -1259,9 +1274,6 @@ function discardWalking() {
   if (gpsMarker && mapInstance && mapInstance.hasLayer(gpsMarker)) {
     mapInstance.removeLayer(gpsMarker);
   }
-
-  const overlay = document.getElementById('walk-searching-overlay');
-  if (overlay) overlay.remove();
 
   cleanupWalkingState();
   enableDrawControl();
@@ -1405,8 +1417,6 @@ export async function setupNuevoLoteListeners() {
     if (walkPolygon && mapInstance?.hasLayer(walkPolygon)) mapInstance.removeLayer(walkPolygon);
     if (walkPathLine && mapInstance?.hasLayer(walkPathLine)) mapInstance.removeLayer(walkPathLine);
     if (gpsMarker && mapInstance?.hasLayer(gpsMarker)) mapInstance.removeLayer(gpsMarker);
-    const overlay = document.getElementById('walk-searching-overlay');
-    if (overlay) overlay.remove();
 
     if (drawnItems) {
       drawnItems.eachLayer(l => {
@@ -1505,10 +1515,7 @@ export async function setupNuevoLoteListeners() {
             layer._glowPolygon = glow;
             mapInstance.addLayer(glow);
           }
-          const badge = document.getElementById('area-info-badge');
-          if (badge) { badge.style.background = color + '18'; badge.style.borderLeft = `4px solid ${color}`; }
           const text = document.getElementById('area-calculated-text');
-          if (text) text.style.color = color;
         }
       });
     });
