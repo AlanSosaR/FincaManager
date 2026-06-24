@@ -1,8 +1,8 @@
 :root {
   /* Material 3 Palette - Seed: #2d3e2c (Fresh Canopy) */
-  --m3-primary: #e4fd97;
-  --m3-on-primary: #0f1f0f;
-  --m3-primary-container: #2d3e2c;
+  --m3-primary: #2d3e2c;
+  --m3-on-primary: #ffffff;
+  --m3-primary-container: #e4fd97;
   --m3-on-primary-container: #ffffff;
   --m3-primary-fixed: #e4fd97;
   --m3-primary-fixed-dim: #c4e680;
