@@ -294,15 +294,15 @@ body {
   position: relative;
 }
 #menu-toggle.m3-icon-btn-tonal {
-  background: transparent;
+  background-color: #2d3e2c;
   color: #ffffff;
 }
 #menu-toggle.m3-icon-btn-tonal:hover {
-  background: transparent;
+  background-color: #3a5240;
   color: #ffffff;
 }
 #menu-toggle.m3-icon-btn-tonal:active {
-  background: transparent;
+  background-color: #3a5240;
   color: #ffffff;
 }
 #sidebar-close.m3-icon-btn-tonal {
