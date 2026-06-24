@@ -3761,7 +3761,7 @@ input:focus, textarea:focus, select:focus {
 
 .da-page-btn.active {
   background: var(--primary);
-  color: #2d3e2c;
+  color: #ffffff;
   box-shadow: 0 8px 20px rgba(107, 130, 69, 0.25);
   transform: scale(1.05);
 }
