@@ -2718,13 +2718,12 @@ input:focus, textarea:focus, select:focus {
 }
 .da-sell-grid-fields {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
 @media (max-width: 768px) {
   .da-sell-grid-fields {
-    grid-template-columns: 1fr;
     gap: 0;
   }
 }
@@ -2899,7 +2898,7 @@ input:focus, textarea:focus, select:focus {
   height: 64px;
   border-radius: 20px;
   background: #2d3e2c;
-  color: #2d3e2c;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3226,7 +3225,7 @@ input:focus, textarea:focus, select:focus {
 
 .da-cal-today {
   background: #2d3e2c;
-  color: #2d3e2c;
+  color: #ffffff;
   font-weight: 900;
 }
 

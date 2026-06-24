@@ -50,7 +50,7 @@ export async function fullDownload() {
   if (syncInProgress) return;
   syncInProgress = true;
   try {
-    onSyncStatusChange?.('Descargando datos...');
+    onSyncStatusChange?.('Descargando datos...', 0);
     const pendingIds = new Map();
     const pending = await db._sync_queue.toArray();
     for (const item of pending) {
@@ -60,8 +60,11 @@ export async function fullDownload() {
       }
     }
 
-    for (const tableName of SUPABASE_TABLES) {
-      onSyncStatusChange?.(`Descargando ${tableName}...`);
+    const totalTables = SUPABASE_TABLES.length;
+    for (let i = 0; i < totalTables; i++) {
+      const tableName = SUPABASE_TABLES[i];
+      const progress = Math.round(((i + 1) / totalTables) * 100);
+      onSyncStatusChange?.(`Descargando ${tableName}...`, progress);
       let allData = [];
       let from = 0;
       const limit = 1000;
@@ -97,11 +100,11 @@ export async function fullDownload() {
     }
     await updateSyncMeta('last_full_sync', new Date().toISOString());
     localStorage.setItem('finca_sync_complete', 'true');
-    onSyncStatusChange?.(null);
+    onSyncStatusChange?.(null, 100);
   } catch (err) {
     console.error('fullDownload error:', err);
-    onSyncStatusChange?.('Error de conexión');
-    setTimeout(() => onSyncStatusChange?.(null), 3000);
+    onSyncStatusChange?.('Error de conexión', 0);
+    setTimeout(() => onSyncStatusChange?.(null, 100), 3000);
   } finally {
     syncInProgress = false;
   }

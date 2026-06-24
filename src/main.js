@@ -91,23 +91,40 @@ function updateSyncUI(state) {
 const container = document.getElementById('screen-container');
 let syncStarted = false;
 
-function showDownloadBanner(msg) {
+function showDownloadBanner(msg, progress) {
   if (!container) return;
+  if (msg === null) {
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
+        <span class="material-icons" style="font-size:56px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">check_circle</span>
+        <h2 style="font-size:24px;font-weight:800;font-family:'Manrope',sans-serif;color:#2d3e2c;margin-bottom:8px;">Todo listo</h2>
+        <p style="color:#666;font-size:14px;max-width:360px;line-height:1.5;">Los datos se descargaron correctamente. Ya puedes usar la app sin conexión.</p>
+      </div>
+    `;
+    return;
+  }
+  const bar = Math.round(progress || 0);
   container.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
       <span class="material-icons animate-spin" style="font-size:48px;color:var(--m3-primary,#2d3e2c);margin-bottom:24px;">sync</span>
       <h2 style="font-size:22px;font-weight:700;font-family:'Manrope',sans-serif;color:#1a1a1a;margin-bottom:8px;">${msg}</h2>
-      <p style="color:#666;font-size:14px;max-width:320px;">Esto puede tomar unos segundos dependiendo de tu conexion.</p>
+      <p style="color:#666;font-size:14px;max-width:320px;margin-bottom:24px;">Esto puede tomar unos segundos dependiendo de tu conexion.</p>
+      <div style="width:100%;max-width:320px;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;">
+        <div style="width:${bar}%;height:100%;background:#2d3e2c;border-radius:4px;transition:width 0.3s ease;"></div>
+      </div>
+      <p style="color:#888;font-size:13px;margin-top:8px;">${bar}%</p>
     </div>
   `;
 }
 
-setSyncStatusCallback((msg) => {
+setSyncStatusCallback((msg, progress) => {
   if (msg && !syncStarted) {
     syncStarted = true;
     updateSyncUI('syncing');
     addNotif('download', 'sync', 'Descargando datos...', msg === 'Descargando datos...' ? 'Descargando datos para usar la app sin internet...' : msg);
-    showDownloadBanner(msg);
+    showDownloadBanner(msg, progress);
+  } else if (msg && syncStarted) {
+    showDownloadBanner(msg, progress);
   } else if (msg === null && syncStarted) {
     syncStarted = false;
     updateSyncUI('done');
@@ -115,6 +132,8 @@ setSyncStatusCallback((msg) => {
     addNotif('download_ok', 'check_circle', 'Datos descargados', 'Ya puedes usar la app sin conexion.');
     localStorage.setItem('finca_sync_complete', 'true');
     window.clearScreenCache?.();
+    showDownloadBanner(null, 100);
+    setTimeout(() => window.navigateTo?.('dashboard'), 1500);
   }
 });
 
