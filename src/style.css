@@ -294,24 +294,24 @@ body {
   position: relative;
 }
 #menu-toggle.m3-icon-btn-tonal {
-  background-color: #2d3e2c;
-  color: #2d3e2c;
+  background: transparent;
+  color: #ffffff;
 }
 #menu-toggle.m3-icon-btn-tonal:hover {
-  background-color: #c4e680;
-  color: #2d3e2c;
+  background: transparent;
+  color: #ffffff;
 }
 #menu-toggle.m3-icon-btn-tonal:active {
-  background-color: #a3b94a;
-  color: #2d3e2c;
+  background: transparent;
+  color: #ffffff;
 }
 #sidebar-close.m3-icon-btn-tonal {
   background-color: #2d3e2c;
-  color: #2d3e2c;
+  color: #ffffff;
 }
 #sidebar-close.m3-icon-btn-tonal:hover {
-  background-color: #c4e680;
-  color: #2d3e2c;
+  background-color: #3a5240;
+  color: #ffffff;
 }
 #sidebar-close.m3-icon-btn-tonal:active {
   background-color: #a3b94a;
