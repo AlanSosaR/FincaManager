@@ -158,20 +158,20 @@ export async function renderListaPersonal() {
                 </div>
               </div>
           `).join('') : `
-            <div class="m3-p-8 m3-text-center" style="background: var(--m3-surface-container-low); border-radius: 24px;">
-              <span class="material-symbols-outlined" style="font-size: 48px; display: block; margin-bottom: 12px; opacity: 0.3;">groups</span>
-              <p class="m3-title-medium m3-font-bold m3-text-on-surface-variant m3-mt-4">No hay personal registrado</p>
-              <p class="m3-label-medium m3-text-on-surface-variant">Agrega tu primer trabajador</p>
-              <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-mt-4 m3-text-primary m3-font-bold m3-bg-none m3-border-none" style="text-decoration: underline; cursor: pointer;">
-                + Agregar Personal
-              </button>
+            <div class="m3-flex m3-flex-col m3-items-center m3-justify-center" style="padding: 64px 24px; background: var(--m3-surface-container-low); border-radius: 32px; text-align: center;">
+              <div style="width: 80px; height: 80px; border-radius: 24px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                <span class="material-symbols-outlined" style="font-size: 40px; color: #6b8245;">groups</span>
+              </div>
+              <p class="m3-title-medium m3-font-bold m3-text-on-surface" style="margin-bottom: 4px;">No hay personal registrado</p>
+              <p class="m3-body-medium m3-text-on-surface-variant" style="margin-bottom: 24px; max-width: 280px;">Agrega tu primer trabajador para comenzar a gestionar tu equipo</p>
             </div>
           `}
         </div>
       </div>
 
-      <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-fab-circle" style="position: fixed; bottom: 24px; right: 24px; z-index: 999; width: 56px; height: 56px; border-radius: 16px; background: var(--m3-primary); border: none; box-shadow: 0 4px 16px rgba(69,87,67,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.08)'; this.style.boxShadow='0 6px 20px rgba(69,87,67,0.5)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 16px rgba(69,87,67,0.4)';" aria-label="Agregar personal">
-        <span class="material-symbols-outlined" style="font-size: 28px; color: var(--m3-on-primary);">add</span>
+      <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-fab" style="background: #2d3e2c; color: white;">
+        <span class="material-symbols-outlined">add</span>
+        <span>Registrar Personal</span>
       </button>
     `;
   } catch (err) {

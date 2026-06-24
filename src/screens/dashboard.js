@@ -106,10 +106,10 @@ export async function renderDashboard(page) {
         ${allLotes.length > 0 ? `
         <div class="m3-p-4 m3-bg-surface-container-low m3-rounded-2xl m3-mb-8 db-stats-wrap" style="margin-left: 0; margin-right: 0;">
           <div class="m3-flex m3-items-center m3-gap-6 m3-flex-wrap db-stat-row">
-            <div class="m3-flex m3-items-center m3-gap-2 m3-bg-primary-container m3-text-on-primary-container m3-rounded-full m3-px-4 m3-py-2">
+            <div class="m3-flex m3-items-center m3-gap-2 m3-bg-primary m3-text-on-primary m3-rounded-full m3-px-4 m3-py-2">
               <img src="sprouts.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
-              <span class="m3-label-medium m3-text-on-primary-container">Total plantas:</span>
-              <span class="m3-title-medium m3-font-bold m3-text-on-primary-container">${totalPlantas.toLocaleString()}</span>
+              <span class="m3-label-medium m3-text-on-primary">Total plantas:</span>
+              <span class="m3-title-medium m3-font-bold m3-text-on-primary">${totalPlantas.toLocaleString()}</span>
             </div>
             <div class="m3-flex m3-items-center m3-gap-2">
               <img src="area.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
@@ -255,7 +255,7 @@ export async function renderDashboard(page) {
           </div>
         </div>
         
-        <button onclick="window.navigateTo('nuevo_lote')" class="m3-fab">
+        <button onclick="window.navigateTo('nuevo_lote')" class="m3-fab" style="background: #2d3e2c; color: white;">
           <span class="material-symbols-outlined">add_location</span>
           <span>Agregar Lote</span>
         </button>

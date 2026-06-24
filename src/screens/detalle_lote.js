@@ -59,15 +59,15 @@ export async function renderDetalleLote(id) {
           </div>
         </section>
 
-        <div class="m3-grid m3-grid-4 m3-gap-8">
+        <div class="m3-grid m3-grid-4 m3-gap-8" style="grid-template-columns: 3fr 2fr;">
           <!-- Map + Personal -->
-          <div class="dl-map-grid-cell" style="grid-column: 4; grid-row: 1; ${lote.coordenadas_json ? '' : 'display: none;'}" id="dl-map-grid-wrapper">
+          <div class="dl-map-grid-cell" style="grid-column: 2; grid-row: 1; ${lote.coordenadas_json ? '' : 'display: none;'}" id="dl-map-grid-wrapper">
             <div class="m3-flex m3-items-center m3-gap-2 m3-text-on-surface-variant m3-label-medium m3-font-bold m3-mb-3" style="padding-left: 4px;">
               <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;"> ${lote.area_ha || 0} Hectáreas
             </div>
             <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' class="m3-card m3-p-8" style="border-radius: 32px; height: 180px; overflow: hidden;"></div>
             <!-- Personal Asignado -->
-            <div class="m3-card m3-p-6" style="border-radius: 32px; margin-top: 24px;">
+            <div class="m3-card m3-p-6" style="border-radius: 32px; margin-top: 24px; overflow: hidden;">
               <h3 class="m3-title-large m3-font-bold m3-mb-6 m3-flex m3-items-center m3-gap-2" style="white-space: nowrap;">
                 <span class="material-symbols-outlined m3-text-primary">groups</span>
                 Personal Asignado
@@ -98,16 +98,16 @@ export async function renderDetalleLote(id) {
               </div>
 
               <!-- Assign personnel -->
-              <div class="m3-flex m3-items-center m3-gap-4" style="flex-wrap: wrap; margin-top: 32px;">
-                <div class="m3-field" style="flex: 1; min-width: 180px; margin-bottom: 0;">
-                  <select id="select-asignar-personal" style="width: 100%; padding: 14px 20px; border-radius: 9999px; border: 1.5px solid var(--m3-outline); background: var(--m3-surface-container-low); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--m3-on-surface); cursor: pointer; outline: none; appearance: none;">
+              <div style="margin-top: 32px;">
+                <div class="m3-field" style="margin-bottom: 12px;">
+                  <select id="select-asignar-personal" style="width: 100%; box-sizing: border-box; padding: 14px 20px; border-radius: 9999px; border: 1.5px solid var(--m3-outline); background: var(--m3-surface-container-low); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--m3-on-surface); cursor: pointer; outline: none; appearance: none;">
                     <option value="" disabled selected>Seleccionar persona</option>
                     ${disponibles.map(p => `
                       <option value="${p.id}">${p.nombre}${p.rol ? ' — ' + p.rol : ''}</option>
                     `).join('')}
                   </select>
                 </div>
-                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="padding: 14px 32px; border-radius: 9999px; border: none; background: var(--m3-primary); color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; white-space: nowrap; box-shadow: 0 4px 12px rgba(69,87,67,0.3);">
+                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="width: 100%; justify-content: center; box-sizing: border-box; padding: 14px 32px; border-radius: 9999px; border: none; background: #2d3e2c; color: white; font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; box-shadow: 0 4px 12px rgba(45,62,44,0.4);">
                   <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
                   Agregar
                 </button>
@@ -115,7 +115,7 @@ export async function renderDetalleLote(id) {
             </div>
           </div>
           <!-- Main Column -->
-          <div class="m3-col-span-3 m3-flex m3-flex-col m3-gap-8 dl-main-col" style="margin-top: 8px;">
+          <div class="m3-flex m3-flex-col m3-gap-8 dl-main-col" style="margin-top: 8px; grid-column: 1;">
 
             <!-- Fertilización Section -->
             <div class="m3-card m3-p-8" style="border-radius: 32px;">

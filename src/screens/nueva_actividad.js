@@ -94,7 +94,7 @@ export async function renderNuevaActividad(loteId, tipo) {
             <datalist id="operadores-sugeridos">
               ${(personal || []).map(p => `<option value="${p.nombre}"></option>`).join('')}
             </datalist>
-            <button type="button" id="btn-add-operador" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: var(--m3-primary); border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.2s; z-index: 2;">
+            <button type="button" id="btn-add-operador" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #2d3e2c; border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.2s; z-index: 2;">
               <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
             </button>
           </div>
@@ -285,7 +285,7 @@ export async function renderNuevaActividad(loteId, tipo) {
             <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('detalle_lote', '${loteId}')" style="padding: 12px 24px; border-radius: 9999px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
               Cancelar
             </button>
-            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: var(--m3-primary); border: none; color: var(--m3-on-primary); font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(69,87,67,0.3); font-family: 'Work Sans', sans-serif;">
+            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: #2d3e2c; border: none; color: white; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(45,62,44,0.4); font-family: 'Work Sans', sans-serif;">
               <span class="material-symbols-outlined" style="font-size: 20px;">save</span>
               <span>Guardar Actividad</span>
             </button>
