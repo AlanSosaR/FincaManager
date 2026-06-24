@@ -138,12 +138,12 @@ export async function renderMotores(page = 1, filter = 'all') {
   return `
     <div class="screen-motores" style="padding-bottom: 120px;">
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="motors-search-wrapper" style="display: flex; align-items: center; background: ${currentMotorsSearchQuery ? '#e4fd97' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
+        <div class="search-wrapper" id="motors-search-wrapper" style="display: flex; align-items: center; background: ${currentMotorsSearchQuery ? '#2d3e2c' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
           <button id="motors-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentMotorsSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: var(--primary-container);">search</span>
+            <span class="material-icons" style="color: ${currentMotorsSearchQuery ? '#ffffff' : 'var(--primary-container)'};">search</span>
           </button>
-          <input type="text" id="motors-search-input" placeholder="Buscar equipo..." value="${currentMotorsSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentMotorsSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentMotorsSearchQuery ? '1' : '0'}; padding: ${currentMotorsSearchQuery ? '0 8px 0 0' : '0'}; color: #333;">
-          <button id="motors-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentMotorsSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #666; height: 100%;" title="Limpiar búsqueda">
+          <input type="text" id="motors-search-input" placeholder="Buscar equipo..." value="${currentMotorsSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentMotorsSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentMotorsSearchQuery ? '1' : '0'}; padding: ${currentMotorsSearchQuery ? '0 8px 0 0' : '0'}; color: ${currentMotorsSearchQuery ? '#ffffff' : '#333'};">
+          <button id="motors-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentMotorsSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: ${currentMotorsSearchQuery ? '#ffffff' : '#666'}; height: 100%;" title="Limpiar búsqueda">
             <span class="material-icons" style="font-size: 20px;">close</span>
           </button>
         </div>
@@ -254,11 +254,14 @@ export function initMotores() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#e4fd97';
+        searchWrapper.style.background = '#2d3e2c';
         searchToggle.style.background = 'transparent';
+        searchToggle.querySelector('.material-icons').style.color = '#ffffff';
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
+        searchInput.style.color = '#ffffff';
+        searchClear.style.color = '#ffffff';
         searchClear.style.display = 'flex';
         searchInput.focus();
       }
@@ -269,9 +272,12 @@ export function initMotores() {
       searchInput.value = '';
       searchWrapper.style.background = 'transparent';
       searchToggle.style.background = '';
+      searchToggle.querySelector('.material-icons').style.color = '';
       searchInput.style.width = '0px';
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
+      searchInput.style.color = '';
+      searchClear.style.color = '';
       searchClear.style.display = 'none';
       window.changeMotorsPage(1);
     });

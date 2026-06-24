@@ -44,7 +44,7 @@ function updateNotifUI() {
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:14px;color:#2d3e2c;">${n.title}</div>
         <div style="font-size:13px;color:#2d3e2c;margin-top:2px;">${n.desc}</div>
-        ${n.action ? `<button style="margin-top:8px;background:var(--m3-primary,#2d3e2c);color:#2d3e2c;border:none;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">${n.action.label}</button>` : ''}
+        ${n.action ? `<button style="margin-top:8px;background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">${n.action.label}</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -114,10 +114,7 @@ setSyncStatusCallback((msg) => {
     removeNotif('download');
     addNotif('download_ok', 'check_circle', 'Datos descargados', 'Ya puedes usar la app sin conexion.');
     localStorage.setItem('finca_sync_complete', 'true');
-    const hashParams = window.location.hash.replace('#', '').split('/');
-    const screen = hashParams[0] || 'dashboard';
-    const args = hashParams.slice(1).filter(Boolean);
-    window.navigateTo(screen, ...args);
+    window.clearScreenCache?.();
   }
 });
 
@@ -130,7 +127,7 @@ function showInitialPrompt() {
       <p style="color:#2d3e2c;font-size:14px;max-width:360px;margin-bottom:24px;line-height:1.5;">
         Para usar la app sin necesidad de internet, descarga tus datos existentes en el dispositivo.
       </p>
-      <button id="btn-start-download" style="background:var(--m3-primary,#2d3e2c);color:#2d3e2c;border:none;padding:14px 32px;border-radius:40px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,71,65,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+      <button id="btn-start-download" style="background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:14px 32px;border-radius:40px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,71,65,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
         <span class="material-icons" style="vertical-align:middle;margin-right:8px;">cloud_download</span>
         Descargar ahora
       </button>
@@ -173,6 +170,8 @@ window.addEventListener('online', () => {
   setTimeout(async () => {
     try {
       await processSyncQueue();
+      await fullDownload();
+      window.clearScreenCache?.();
     } catch (e) {
       console.warn('online sync error:', e);
     }
@@ -195,6 +194,15 @@ async function updateQueueBadge() {
 if (isOnline()) {
   updateQueueBadge();
   queueCheckInterval = setInterval(updateQueueBadge, 10000);
+  // Silent periodic refresh every 5 minutes
+  setInterval(async () => {
+    if (navigator.onLine) {
+      try {
+        await fullDownload();
+        window.clearScreenCache?.();
+      } catch (e) { /* silent */ }
+    }
+  }, 300000);
 }
 
 // ─── Screen imports ──────────────────────────────────────────────────────────
@@ -260,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                'nueva_actividad','nuevo_personal','detalle_personal','personal']);
 
     window.clearScreenCache = (screenId) => {
+      if (!screenId) { viewCache.clear(); return; }
       for (const key of viewCache.keys()) {
         if (key === screenId || key.startsWith(screenId + '/')) {
           viewCache.delete(key);

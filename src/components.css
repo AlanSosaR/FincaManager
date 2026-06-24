@@ -265,7 +265,7 @@
 
 .item-status.urgent { background: #ff7c52; color: white; }
 .item-status.warning { background: #ffe2db; color: #d97706; }
-.item-status.ok { background: #e4fd97; color: #4caf50; }
+.item-status.ok { background: #2d3e2c; color: #4caf50; }
 
 .item-card-content {
   flex-grow: 1;
@@ -524,7 +524,7 @@
   font-size: 11px;
   font-weight: 600;
 }
-.vacuna-badge.ok { background: #e4fd97; color: #2d3e2c; }
+.vacuna-badge.ok { background: #2d3e2c; color: #ffffff; }
 .vacuna-badge.pending { background: #ffe2db; color: #ff4103; }
 
 /* ---- Mobile Navigation Bottom Bar ---- */
@@ -790,7 +790,7 @@
 }
 
 .m3-snackbar-btn.confirm:hover {
-  background: #e4fd97;
+  background: #2d3e2c;
 }
 
 .m3-snackbar-btn.cancel {
@@ -806,7 +806,7 @@
   position: absolute;
   right: 0;
   top: 100%;
-  background: #e4fd97 !important;
+  background: #2d3e2c !important;
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.15);
   min-width: 160px;
@@ -829,7 +829,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  color: #2d3e2c;
+  color: #ffffff;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -841,8 +841,8 @@
 }
 
 .action-item:hover {
-  background: #d0e680 !important;
-  color: #1a2a1a;
+  background: #3a5240 !important;
+  color: #ffffff;
 }
 
 .action-item.delete {
@@ -914,12 +914,12 @@
 }
 
 .m3-premium-badge.ok {
-  background: #e4fd97;
+  background: #2d3e2c;
   color: #2d3e2c;
 }
 
 .m3-premium-badge.warning {
-  background: #e4fd97;
+  background: #2d3e2c;
   color: #5c4a2e;
 }
 
@@ -1400,10 +1400,13 @@ input:focus, textarea:focus, select:focus {
 /* Green card — Total Animales */
 .ganado-card-primary {
   background: var(--primary);
-  color: var(--primary-container);
+  color: #ffffff;
 }
 .ganado-card-primary .ganado-card-value {
-  color: var(--primary-container);
+  color: #ffffff;
+}
+.ganado-card-primary img {
+  filter: brightness(0) invert(1) !important;
 }
 
 /* Beige/surface cards — Hembras & Machos */
@@ -2236,7 +2239,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .potreros-pill.recuperando {
-  background-color: #e4fd97;
+  background-color: #2d3e2c;
   color: #fb8c00;
 }
 
@@ -2684,12 +2687,12 @@ input:focus, textarea:focus, select:focus {
   font-weight: 800;
 }
 .da-badge-clickable {
-  background: #e4fd97 !important;
+  background: #2d3e2c !important;
   cursor: pointer;
   transition: all 0.2s;
 }
 .da-badge-clickable:hover {
-  background: #d0e680 !important;
+  background: #3a5240 !important;
   transform: translateY(-1px);
 }
 .da-sell-form {
@@ -2895,7 +2898,7 @@ input:focus, textarea:focus, select:focus {
   width: 64px;
   height: 64px;
   border-radius: 20px;
-  background: #e4fd97;
+  background: #2d3e2c;
   color: #2d3e2c;
   display: flex;
   align-items: center;
@@ -3222,7 +3225,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .da-cal-today {
-  background: #e4fd97;
+  background: #2d3e2c;
   color: #2d3e2c;
   font-weight: 900;
 }
@@ -3369,7 +3372,7 @@ input:focus, textarea:focus, select:focus {
   font-weight: 800;
 }
 
-.da-variation-pill.positive { background: #e4fd97; color: #2d3e2c; }
+.da-variation-pill.positive { background: #2d3e2c; color: #ffffff; }
 .da-variation-pill.negative { background: #ffe2db; color: #ff4103; }
 .da-variation-pill.neutral  { background: #f5f5f5; color: #666; }
 .da-variation-pill.pending  { background: #ffe2db; color: #e65100; }

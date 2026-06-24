@@ -76,12 +76,12 @@ export async function renderGanado(page = 1, filter = 'all') {
   return `
     <div class="screen-ganado" style="padding-bottom: 120px;">
       <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="ganado-search-wrapper" style="display: flex; align-items: center; background: ${currentSearchQuery ? '#e4fd97' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
+        <div class="search-wrapper" id="ganado-search-wrapper" style="display: flex; align-items: center; background: ${currentSearchQuery ? '#2d3e2c' : 'transparent'}; border-radius: 40px; transition: all 0.3s; height: 48px;">
           <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: var(--primary-container);">search</span>
+            <span class="material-icons" style="color: ${currentSearchQuery ? '#ffffff' : 'var(--primary-container)'};">search</span>
           </button>
-          <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentSearchQuery ? '1' : '0'}; padding: ${currentSearchQuery ? '0 8px 0 0' : '0'}; color: #333;">
-          <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #666; height: 100%;" title="Limpiar búsqueda">
+          <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentSearchQuery ? '1' : '0'}; padding: ${currentSearchQuery ? '0 8px 0 0' : '0'}; color: ${currentSearchQuery ? '#ffffff' : '#333'};">
+          <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: ${currentSearchQuery ? '#ffffff' : '#666'}; height: 100%;" title="Limpiar búsqueda">
             <span class="material-icons" style="font-size: 20px;">close</span>
           </button>
         </div>
@@ -319,14 +319,14 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
           ${!isSold ? `<button class="ganado-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)">
             <span class="material-icons">more_vert</span>
           </button>
-          <div class="action-menu" style="background:#e4fd97;">
-            <button class="action-item" style="background:#e4fd97;" onmouseover="this.style.background='#d0e680'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.navigateTo('nuevo_animal', '${a.id}')">
+          <div class="action-menu" style="background:#2d3e2c;">
+            <button class="action-item" style="background:#2d3e2c;" onmouseover="this.style.background='#3a5240'" onmouseout="this.style.background='#2d3e2c'" onclick="event.stopPropagation(); window.navigateTo('nuevo_animal', '${a.id}')">
               <span class="material-icons">edit</span><span>Editar</span>
             </button>
-            <button class="action-item" style="background:#e4fd97;" onmouseover="this.style.background='#d0e680'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}', 'vender')">
+            <button class="action-item" style="background:#2d3e2c;" onmouseover="this.style.background='#3a5240'" onmouseout="this.style.background='#2d3e2c'" onclick="event.stopPropagation(); window.navigateTo('detalle_animal', '${a.id}', 'vender')">
               <span class="material-icons">payments</span><span>Registrar venta</span>
             </button>
-            <button class="action-item delete" style="background:#e4fd97;" onmouseover="this.style.background='#f5b8a8'" onmouseout="this.style.background='#e4fd97'" onclick="event.stopPropagation(); window.confirmDeleteAnimal('${a.id}', '${a.nombre}')">
+            <button class="action-item delete" style="background:#2d3e2c;" onmouseover="this.style.background='#f5b8a8'" onmouseout="this.style.background='#2d3e2c'" onclick="event.stopPropagation(); window.confirmDeleteAnimal('${a.id}', '${a.nombre}')">
               <span class="material-icons">delete</span><span>Eliminar</span>
             </button>
           </div>` : `
@@ -380,11 +380,14 @@ export function initGanado() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#e4fd97';
+        searchWrapper.style.background = '#2d3e2c';
         searchToggle.style.background = 'transparent';
+        searchToggle.querySelector('.material-icons').style.color = '#ffffff';
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
+        searchInput.style.color = '#ffffff';
+        searchClear.style.color = '#ffffff';
         searchClear.style.display = 'flex';
         searchInput.focus();
       }
@@ -395,9 +398,12 @@ export function initGanado() {
       searchInput.value = '';
       searchWrapper.style.background = 'transparent';
       searchToggle.style.background = '';
+      searchToggle.querySelector('.material-icons').style.color = '';
       searchInput.style.width = '0px';
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
+      searchInput.style.color = '';
+      searchClear.style.color = '';
       searchClear.style.display = 'none';
       window.changeGanadoPage(1);
     });

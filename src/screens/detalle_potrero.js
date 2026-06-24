@@ -90,7 +90,7 @@ export async function renderDetallePotrero(potreroId) {
         <div class="section">
           <div class="section-title">
             <h3>Animales en el Lote</h3>
-            <span class="tag" style="background:#e4fd97; color:#43a047">${animales ? animales.length : 0} Activos</span>
+            <span class="tag" style="background:#2d3e2c; color:#43a047">${animales ? animales.length : 0} Activos</span>
           </div>
           <div class="animal-list" style="margin-top: 12px; gap: 8px;">
             ${animales && animales.length > 0 ? animales.map(a => `

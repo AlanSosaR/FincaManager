@@ -202,7 +202,7 @@ export async function renderDashboard(page) {
             <div>
               <h2 class="m3-headline-small m3-font-bold m3-text-on-surface m3-mb-6">Aplicaciones Recientes</h2>
               <div class="m3-card m3-overflow-hidden" style="padding: 0; border: none;">
-                <div style="padding: 20px 24px; background: #e4fd97; border-radius: 28px 28px 0 0; display: flex; align-items: center; gap: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--m3-on-primary);">
+                <div style="padding: 20px 24px; background: #2d3e2c; border-radius: 28px 28px 0 0; display: flex; align-items: center; gap: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--m3-on-primary);">
                   <span style="flex: 2;">Tipo & Producto</span>
                   <span style="flex: 1;">Dosis</span>
                   <span style="flex: 1.5;">Lote / Fecha</span>

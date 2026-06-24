@@ -61,7 +61,7 @@ export async function renderDetalleHerramienta(toolId) {
           </div>
           <div class="detail-stat-item">
             <span class="detail-stat-label">Estado</span>
-            <span class="tag" style="background: ${toolData.estado === 'Disponible' ? '#e4fd97' : '#fff3e0'}; color: ${toolData.estado === 'Disponible' ? '#2d3e2c' : '#ef6c00'}; font-size: 12px; margin-top: 4px; display: inline-block;">
+            <span class="tag" style="background: ${toolData.estado === 'Disponible' ? '#2d3e2c' : '#fff3e0'}; color: ${toolData.estado === 'Disponible' ? '#ffffff' : '#ef6c00'}; font-size: 12px; margin-top: 4px; display: inline-block;">
               ${toolData.estado}
             </span>
           </div>

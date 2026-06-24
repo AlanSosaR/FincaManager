@@ -835,7 +835,7 @@ function showDayDetails(day, dayEvents) {
                         subtitle = 'Vacunación programada';
                         // Edit button always shown for scheduled
                         const applyRow = isPastOrToday ? `
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
                                 <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
                             </button>
                             <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
@@ -1123,7 +1123,7 @@ function renderVaccinesTable(allVaccines, page) {
         
         if (currentEstado === 'Programada') {
             const applyBtn = isPastOrToday ? `
-                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c;" onclick="window.confirmVaccine('${v.id}')">
+                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff;" onclick="window.confirmVaccine('${v.id}')">
                     <span class="material-icons" style="font-size: 16px;">check</span>
                 </button>
                 <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103;" onclick="window.cancelVaccine('${v.id}')">
@@ -1300,7 +1300,7 @@ function renderFumigacionesTable(allFumigaciones, page) {
         
         if (currentEstado === 'Programada') {
             const applyBtnF = isPastOrToday ? `
-                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c;" onclick="window.confirmFumigacion('${f.id}')">
+                <button title="Aplicar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff;" onclick="window.confirmFumigacion('${f.id}')">
                     <span class="material-icons" style="font-size: 16px;">check</span>
                 </button>
                 <button title="Cancelar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103;" onclick="window.cancelFumigacion('${f.id}')">
@@ -1473,7 +1473,7 @@ function showDayDetailsFumig(day, dayEvents) {
                         iconName = 'schedule';
                         subtitle = 'Fumigación programada';
                         const applyRowF = isPastOrToday ? `
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #e4fd97; color: #2d3e2c; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
+                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
                                 <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
                             </button>
                             <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelFumigacion('${f.id}')">

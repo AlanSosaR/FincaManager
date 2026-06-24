@@ -732,8 +732,8 @@ function initMap() {
       } else if (layerMode === 1) {
         mapInstance.addLayer(satelliteLayer);
         mapInstance.addLayer(labelsLayer);
-        btnLayers.style.background = '#e4fd97';
-        btnLayers.style.color = '#2d3e2c';
+        btnLayers.style.background = '#2d3e2c';
+        btnLayers.style.color = '#ffffff';
         if (layersLabel) layersLabel.textContent = 'Relieve';
       } else {
         mapInstance.addLayer(terrainLayer);

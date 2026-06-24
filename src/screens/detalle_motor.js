@@ -74,7 +74,7 @@ export async function renderDetalleMotor(motorId) {
           <div>
             <span style="font-size: 12px; font-weight: 600; color: #888; display: block; margin-bottom: 8px;">Estado</span>
             <div style="margin-top: 4px;">
-              <span style="background: ${requiresAlert ? '#ffe2db' : '#e4fd97'}; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-block;">
+              <span style="background: ${requiresAlert ? '#ffe2db' : '#2d3e2c'}; color: ${requiresAlert ? '#ff4103' : '#ffffff'}; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; display: inline-block;">
                 ${requiresAlert ? 'Atención' : 'Operativo'}
               </span>
             </div>

@@ -1,10 +1,10 @@
 :root {
   /* Material 3 Palette - Seed: #2d3e2c (Fresh Canopy) */
-  --m3-primary: #e4fd97;
-  --m3-on-primary: #0f1f0f;
+  --m3-primary: #2d3e2c;
+  --m3-on-primary: #ffffff;
   --m3-primary-container: #2d3e2c;
   --m3-on-primary-container: #ffffff;
-  --m3-primary-fixed: #e4fd97;
+  --m3-primary-fixed: #2d3e2c;
   --m3-primary-fixed-dim: #c4e680;
   
   --m3-secondary: #526350;
@@ -196,13 +196,17 @@ body {
 
 .nav-link.active {
   background: var(--primary);
-  color: var(--primary-container) !important;
+  color: #ffffff !important;
   box-shadow: 0 12px 24px rgba(107, 130, 69, 0.25);
   transform: translateX(4px);
 }
 
 .nav-link.active span {
-  color: var(--primary-container) !important;
+  color: #ffffff !important;
+}
+
+.nav-link.active img {
+  filter: brightness(0) invert(1) !important;
 }
 
 .sidebar-footer {
@@ -290,7 +294,7 @@ body {
   position: relative;
 }
 #menu-toggle.m3-icon-btn-tonal {
-  background-color: #e4fd97;
+  background-color: #2d3e2c;
   color: #2d3e2c;
 }
 #menu-toggle.m3-icon-btn-tonal:hover {
@@ -302,7 +306,7 @@ body {
   color: #2d3e2c;
 }
 #sidebar-close.m3-icon-btn-tonal {
-  background-color: #e4fd97;
+  background-color: #2d3e2c;
   color: #2d3e2c;
 }
 #sidebar-close.m3-icon-btn-tonal:hover {
