@@ -11,7 +11,7 @@ export async function renderNuevoAnimal(id) {
           </div>
           <div>
             <div class="da-hero-subtitle" style="margin:0;">${isEdit ? 'Actualizando registro' : 'Nuevo registro de inventario'}</div>
-            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">${isEdit ? 'Editar Información' : 'Registrar Animal'}</h2>
+            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">${isEdit ? 'Editar Animal' : 'Registrar Animal'}</h2>
           </div>
         </div>
 
@@ -163,9 +163,8 @@ export function initNuevoAnimal(id) {
         existingImageUrl = data.image_url;
 
         if (data.image_url) {
-          preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 32px;">`;
-          dropzone.style.borderStyle = 'solid';
-          dropzone.style.borderColor = 'transparent';
+          preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+          dropzone.style.border = 'none';
         }
       }
     });
@@ -195,7 +194,8 @@ export function initNuevoAnimal(id) {
         selectedFile = file;
         const reader = new FileReader();
         reader.onload = (re) => {
-          preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">`;
+          preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
+          dropzone.style.border = 'none';
         };
         reader.readAsDataURL(file);
       }

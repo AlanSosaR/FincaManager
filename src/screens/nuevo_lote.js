@@ -20,6 +20,19 @@ let drawControl = null;
 let existingLotesLayer = null;
 let selectedColor = '#2d3e2c';
 
+// Walking / GPS recording state
+let walkState = 'idle';        // 'idle' | 'searching' | 'recording' | 'paused'
+let watchId = null;
+let walkPoints = [];
+let gpsMarker = null;
+let walkPolygon = null;
+let walkPathLine = null;
+let pointCountSinceLastArea = 0;
+let hasShownDistanceHint = false;
+let walkLastAccuracy = null;
+let walkPanel = null;
+let walkControl = null;
+
 export async function renderNuevoLote(id) {
   let lote = null;
   if (id) {
@@ -514,6 +527,9 @@ function initMap() {
   });
   mapInstance.addControl(drawControl);
 
+  // ── Walking / GPS Recording Control ──
+  createWalkControl();
+
   // ── Toolbar toggle: click button again to close actions pill ──
   let toolActive = false;
   mapInstance.on('draw:drawstart draw:editstart', () => { toolActive = true; });
@@ -709,6 +725,11 @@ function initMap() {
   }
 
   updateScaleBar();
+
+  // Try to restore walking session from localStorage
+  setTimeout(() => {
+    maybeRestoreWalkingSession();
+  }, 500);
 }
 
 function updateScaleBar() {
@@ -780,6 +801,567 @@ function clearAreaDisplay() {
   if (hint) hint.style.display = 'block';
 }
 
+// ── Walking / GPS Recording ────────────────────────────────────
+
+function createWalkControl() {
+  const WalkControl = L.Control.extend({
+    onAdd: function() {
+      const div = L.DomUtil.create('div', 'm3-walk-control');
+      div.innerHTML = `<button id="btn-walk-toggle" class="m3-walk-btn" title="Registrar caminando">
+        <span class="material-icons">directions_walk</span>
+      </button>`;
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    }
+  });
+  walkControl = new WalkControl({ position: 'topleft' });
+  mapInstance.addControl(walkControl);
+
+  setTimeout(() => {
+    const btn = document.getElementById('btn-walk-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      if (walkState === 'idle') {
+        startWalking();
+      } else if (walkState === 'searching' || walkState === 'recording' || walkState === 'paused') {
+        discardWalking();
+      }
+    });
+  }, 300);
+}
+
+function createWalkPanel() {
+  if (walkPanel) return;
+  const container = document.getElementById('lote-map-container');
+  if (!container) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'walk-panel';
+  panel.style.display = 'none';
+  panel.innerHTML = `
+    <div class="walk-grip"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="walk-status-dot idle" id="walk-status-dot"></span>
+        <span id="walk-status-text" style="font-weight:600;font-size:14px;">Listo</span>
+      </div>
+      <span id="walk-area-text" style="font-size:20px;font-weight:800;font-family:Manrope,sans-serif;">0.00 ha</span>
+    </div>
+    <div id="walk-actions-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button id="btn-walk-pause" class="m3-walk-action-btn" style="display:none;">
+        <span class="material-icons" style="font-size:16px;">pause</span> Pausar
+      </button>
+      <button id="btn-walk-resume" class="m3-walk-action-btn primary" style="display:none;">
+        <span class="material-icons" style="font-size:16px;">play_arrow</span> Reanudar
+      </button>
+      <button id="btn-walk-stop" class="m3-walk-action-btn primary" style="display:none;">
+        <span class="material-icons" style="font-size:16px;">stop</span> Detener
+      </button>
+      <button id="btn-walk-discard" class="m3-walk-action-btn danger">
+        <span class="material-icons" style="font-size:16px;">delete</span> Descartar
+      </button>
+    </div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;">
+      Puntos: <span id="walk-points-count">0</span> 
+      <span id="walk-accuracy-display" style="margin-left:12px;">Señal: ±<span id="walk-accuracy-value">--</span>m</span>
+    </div>
+  `;
+  container.appendChild(panel);
+  walkPanel = panel;
+
+  // Wire buttons
+  setTimeout(() => {
+    document.getElementById('btn-walk-pause')?.addEventListener('click', pauseWalking);
+    document.getElementById('btn-walk-resume')?.addEventListener('click', resumeWalking);
+    document.getElementById('btn-walk-stop')?.addEventListener('click', stopWalking);
+    document.getElementById('btn-walk-discard')?.addEventListener('click', discardWalking);
+  }, 100);
+}
+
+function showWalkPanel(state) {
+  if (!walkPanel) createWalkPanel();
+  walkPanel.style.display = 'block';
+  updateWalkPanelUI(state);
+}
+
+function hideWalkPanel() {
+  if (walkPanel) walkPanel.style.display = 'none';
+}
+
+function updateWalkPanelUI(state) {
+  const s = state || walkState;
+  const dot = document.getElementById('walk-status-dot');
+  const text = document.getElementById('walk-status-text');
+  const areaText = document.getElementById('walk-area-text');
+  const pauseBtn = document.getElementById('btn-walk-pause');
+  const resumeBtn = document.getElementById('btn-walk-resume');
+  const stopBtn = document.getElementById('btn-walk-stop');
+  const discardBtn = document.getElementById('btn-walk-discard');
+  const pointsCount = document.getElementById('walk-points-count');
+  const accuracyDisplay = document.getElementById('walk-accuracy-display');
+  const accuracyValue = document.getElementById('walk-accuracy-value');
+
+  if (dot) {
+    dot.className = 'walk-status-dot ' + s;
+  }
+  if (text) {
+    if (s === 'searching') text.textContent = 'Buscando señal GPS...';
+    else if (s === 'recording') text.textContent = 'Grabando recorrido...';
+    else if (s === 'paused') text.textContent = 'Grabación en pausa';
+    else text.textContent = 'Listo';
+  }
+  if (pauseBtn) pauseBtn.style.display = s === 'recording' ? 'flex' : 'none';
+  if (resumeBtn) resumeBtn.style.display = s === 'paused' ? 'flex' : 'none';
+  if (stopBtn) stopBtn.style.display = (s === 'recording' || s === 'paused') ? 'flex' : 'none';
+  if (discardBtn) discardBtn.style.display = s !== 'idle' ? 'flex' : 'none';
+  if (pointsCount) pointsCount.textContent = walkPoints.length;
+  if (accuracyValue) accuracyValue.textContent = walkLastAccuracy !== null ? walkLastAccuracy : '--';
+  if (accuracyDisplay) accuracyDisplay.style.display = walkLastAccuracy !== null ? 'inline' : 'none';
+  if (areaText && walkPoints.length >= 2) {
+    const coords = walkPoints.map(p => [p.lng, p.lat]);
+    coords.push(coords[0]);
+    try {
+      const poly = turf.polygon([coords]);
+      const ha = turf.area(poly) / 10000;
+      areaText.textContent = ha.toFixed(2) + ' ha';
+    } catch (e) {
+      // polygon not valid yet
+    }
+  }
+}
+
+function disableDrawControl() {
+  if (drawControl && mapInstance) {
+    mapInstance.removeControl(drawControl);
+  }
+}
+
+function enableDrawControl() {
+  if (drawControl && mapInstance) {
+    mapInstance.addControl(drawControl);
+  }
+}
+
+function startWalking() {
+  if (walkState !== 'idle') return;
+
+  walkState = 'searching';
+  walkPoints = [];
+  hasShownDistanceHint = false;
+  pointCountSinceLastArea = 0;
+  walkLastAccuracy = null;
+
+  // Update toggle button
+  const toggleBtn = document.getElementById('btn-walk-toggle');
+  if (toggleBtn) {
+    toggleBtn.classList.add('active');
+    toggleBtn.title = 'Descartar grabación';
+  }
+
+  // Block draw controls
+  disableDrawControl();
+
+  showWalkPanel('searching');
+
+  // Show searching overlay
+  const container = document.getElementById('lote-map-container');
+  if (container && !document.getElementById('walk-searching-overlay')) {
+    const overlay = document.createElement('div');
+    overlay.id = 'walk-searching-overlay';
+    overlay.innerHTML = `
+      <div class="spinner"></div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:4px;">Buscando señal GPS</div>
+      <div style="font-size:13px;opacity:0.8;">Camina hacia el primer punto del lote</div>
+    `;
+    container.appendChild(overlay);
+  }
+
+  // Create GPS marker
+  if (!gpsMarker) {
+    gpsMarker = L.circleMarker([0, 0], {
+      radius: 8,
+      color: '#fff',
+      fillColor: '#4285f4',
+      fillOpacity: 1,
+      weight: 3,
+      opacity: 1
+    });
+  }
+
+  // Create tracking polygon
+  if (!walkPolygon) {
+    walkPolygon = L.polygon([], {
+      color: '#ffffff',
+      fillColor: selectedColor,
+      fillOpacity: 0.4,
+      weight: 2,
+      dashArray: null
+    });
+    mapInstance.addLayer(walkPolygon);
+  }
+
+  // Create path line
+  if (!walkPathLine) {
+    walkPathLine = L.polyline([], {
+      color: selectedColor,
+      weight: 3,
+      opacity: 0.8,
+      dashArray: '6, 4'
+    });
+    mapInstance.addLayer(walkPathLine);
+  }
+
+  // Start watching position
+  watchId = navigator.geolocation.watchPosition(
+    onWalkPositionSuccess,
+    onWalkPositionError,
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+  );
+
+  saveWalkingSession();
+}
+
+function onWalkPositionSuccess(pos) {
+  const { latitude, longitude, accuracy } = pos.coords;
+
+  if (walkState === 'searching') {
+    if (accuracy <= 30) {
+      // First valid point - start recording
+      walkState = 'recording';
+      walkPoints = [{ lat: latitude, lng: longitude }];
+      walkLastAccuracy = Math.round(accuracy);
+
+      // Remove searching overlay
+      const overlay = document.getElementById('walk-searching-overlay');
+      if (overlay) overlay.remove();
+
+      // Update marker
+      gpsMarker.setLatLng([latitude, longitude]);
+      if (!mapInstance.hasLayer(gpsMarker)) mapInstance.addLayer(gpsMarker);
+
+      // Initialize polygon with first point (closed)
+      walkPolygon.setLatLngs([[latitude, longitude], [latitude, longitude]]);
+
+      // Initialize path
+      walkPathLine.setLatLngs([[latitude, longitude]]);
+
+      updateWalkPanelUI('recording');
+      saveWalkingSession();
+    }
+    return;
+  }
+
+  if (walkState === 'recording') {
+    // Ignore low accuracy
+    if (accuracy > 30) return;
+
+    walkLastAccuracy = Math.round(accuracy);
+
+    const lastPt = walkPoints[walkPoints.length - 1];
+    const dist = turf.distance(
+      turf.point([lastPt.lng, lastPt.lat]),
+      turf.point([longitude, latitude]),
+      { units: 'meters' }
+    );
+
+    if (dist < 5) {
+      if (!hasShownDistanceHint) {
+        hasShownDistanceHint = true;
+        if (window.Snackbar) {
+          window.Snackbar.show('Camina al menos 5m para registrar el siguiente punto', { type: 'info', duration: 3000 });
+        }
+      }
+      // Still update marker position for smooth feel
+      gpsMarker.setLatLng([latitude, longitude]);
+      return;
+    }
+
+    // Valid new point
+    hasShownDistanceHint = false;
+    walkPoints.push({ lat: latitude, lng: longitude });
+
+    // Update polygon (closed: connect last point to first)
+    const allLatLngs = walkPoints.map(p => [p.lat, p.lng]);
+    allLatLngs.push(allLatLngs[0]);
+    walkPolygon.setLatLngs(allLatLngs);
+
+    // Update path line
+    walkPathLine.setLatLngs(walkPoints.map(p => [p.lat, p.lng]));
+
+    // Move GPS marker
+    gpsMarker.setLatLng([latitude, longitude]);
+
+    // Pan map to follow user
+    mapInstance.panTo([latitude, longitude], { animate: true, duration: 0.3 });
+
+    // Update area every 4 points
+    pointCountSinceLastArea++;
+    if (pointCountSinceLastArea % 4 === 0) {
+      updateWalkPanelUI('recording');
+    } else {
+      // Just update points count and accuracy
+      const pointsEl = document.getElementById('walk-points-count');
+      if (pointsEl) pointsEl.textContent = walkPoints.length;
+      const accEl = document.getElementById('walk-accuracy-value');
+      if (accEl) accEl.textContent = walkLastAccuracy;
+    }
+
+    saveWalkingSession();
+  }
+}
+
+function onWalkPositionError(err) {
+  if (walkState === 'searching' || walkState === 'recording') {
+    const prevState = walkState;
+    pauseWalking(true);
+    if (window.Snackbar) {
+      const msg = err.code === 1
+        ? 'Permiso de ubicación denegado — activa el GPS en tu dispositivo'
+        : 'Señal GPS perdida — puedes reanudar manualmente';
+      window.Snackbar.show(msg, { type: 'error', duration: 5000 });
+    }
+  }
+}
+
+function pauseWalking(silent) {
+  if (walkState !== 'recording' && walkState !== 'searching') return;
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
+  walkState = 'paused';
+
+  if (!silent) {
+    updateWalkPanelUI('paused');
+  } else {
+    updateWalkPanelUI('paused');
+  }
+
+  saveWalkingSession();
+}
+
+function resumeWalking() {
+  if (walkState !== 'paused') return;
+
+  // Remove searching overlay if it somehow exists
+  const overlay = document.getElementById('walk-searching-overlay');
+  if (overlay) overlay.remove();
+
+  walkState = walkPoints.length > 0 ? 'recording' : 'searching';
+
+  watchId = navigator.geolocation.watchPosition(
+    onWalkPositionSuccess,
+    onWalkPositionError,
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 5000 }
+  );
+
+  updateWalkPanelUI(walkState);
+  saveWalkingSession();
+}
+
+function stopWalking() {
+  if (walkState !== 'recording' && walkState !== 'paused') return;
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
+  if (walkPoints.length < 3) {
+    if (window.Snackbar) {
+      window.Snackbar.show('Se necesitan al menos 3 puntos para formar un polígono', { type: 'error' });
+    }
+    discardWalking();
+    return;
+  }
+
+  // Remove tracking layers from map
+  if (walkPolygon && mapInstance.hasLayer(walkPolygon)) mapInstance.removeLayer(walkPolygon);
+  if (walkPathLine && mapInstance.hasLayer(walkPathLine)) mapInstance.removeLayer(walkPathLine);
+  if (gpsMarker && mapInstance.hasLayer(gpsMarker)) mapInstance.removeLayer(gpsMarker);
+
+  // Simplify polygon with turf.simplify
+  const coords = walkPoints.map(p => [p.lng, p.lat]);
+  coords.push(coords[0]);
+  let simplifiedCoords = coords;
+  try {
+    if (typeof turf !== 'undefined' && coords.length > 6) {
+      const simplified = turf.simplify(turf.polygon([coords]), {
+        tolerance: 0.00005,
+        highQuality: true
+      });
+      simplifiedCoords = simplified.geometry.coordinates[0];
+    }
+  } catch (e) {
+    console.warn('Simplify failed, using original points:', e);
+  }
+
+  // Create final polygon (reverse to latlng)
+  const finalLatLngs = simplifiedCoords.map(c => [c[1], c[0]]);
+
+  // Remove last point if it's a duplicate of first (turf.simplify may have added closure)
+  if (finalLatLngs.length > 1) {
+    const first = finalLatLngs[0];
+    const last = finalLatLngs[finalLatLngs.length - 1];
+    if (first[0] === last[0] && first[1] === last[1]) {
+      finalLatLngs.pop();
+    }
+  }
+
+  const poly = L.polygon(finalLatLngs, {
+    color: '#ffffff',
+    fillColor: selectedColor,
+    fillOpacity: 0.5,
+    weight: 2
+  });
+
+  drawnItems.clearLayers();
+  drawnItems.addLayer(poly);
+  applyColorToPolygon(poly, selectedColor);
+  calculateArea(poly);
+
+  // Show color picker and highlight saved color
+  const row = document.getElementById('color-picker-row');
+  if (row) row.style.display = 'flex';
+  document.querySelectorAll('.poly-color-btn').forEach(btn => {
+    btn.style.boxShadow = 'none';
+    if (btn.dataset.color === selectedColor) {
+      btn.style.boxShadow = `0 0 0 2px white, 0 0 0 4px ${selectedColor}`;
+    }
+  });
+
+  mapInstance.fitBounds(poly.getBounds().pad(0.2));
+
+  cleanupWalkingState();
+  enableDrawControl();
+
+  if (window.Snackbar) {
+    window.Snackbar.show('Polígono registrado — puedes ajustar los vértices manualmente', { type: 'success' });
+  }
+}
+
+function discardWalking() {
+  if (walkState === 'idle') return;
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+
+  if (walkPolygon && mapInstance && mapInstance.hasLayer(walkPolygon)) {
+    mapInstance.removeLayer(walkPolygon);
+  }
+  if (walkPathLine && mapInstance && mapInstance.hasLayer(walkPathLine)) {
+    mapInstance.removeLayer(walkPathLine);
+  }
+  if (gpsMarker && mapInstance && mapInstance.hasLayer(gpsMarker)) {
+    mapInstance.removeLayer(gpsMarker);
+  }
+
+  const overlay = document.getElementById('walk-searching-overlay');
+  if (overlay) overlay.remove();
+
+  cleanupWalkingState();
+  enableDrawControl();
+
+  if (window.Snackbar) {
+    window.Snackbar.show('Grabación descartada', { type: 'info' });
+  }
+}
+
+function cleanupWalkingState() {
+  walkState = 'idle';
+  walkPoints = [];
+  pointCountSinceLastArea = 0;
+  hasShownDistanceHint = false;
+  walkLastAccuracy = null;
+
+  hideWalkPanel();
+
+  const toggleBtn = document.getElementById('btn-walk-toggle');
+  if (toggleBtn) {
+    toggleBtn.classList.remove('active');
+    toggleBtn.title = 'Registrar caminando';
+  }
+
+  walkPolygon = null;
+  walkPathLine = null;
+  gpsMarker = null;
+
+  localStorage.removeItem('finca_walking_session');
+}
+
+function saveWalkingSession() {
+  try {
+    localStorage.setItem('finca_walking_session', JSON.stringify({
+      points: walkPoints,
+      state: walkState,
+      color: selectedColor,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    // localStorage full or unavailable
+  }
+}
+
+function maybeRestoreWalkingSession() {
+  try {
+    const saved = localStorage.getItem('finca_walking_session');
+    if (!saved) return;
+    const session = JSON.parse(saved);
+    if (!session.points || session.points.length === 0) {
+      localStorage.removeItem('finca_walking_session');
+      return;
+    }
+    // Only restore sessions less than 10 minutes old
+    if (Date.now() - session.timestamp > 600000) {
+      localStorage.removeItem('finca_walking_session');
+      return;
+    }
+
+    walkPoints = session.points;
+    if (session.color) selectedColor = session.color;
+
+    // Rebuild GPS marker
+    if (walkPoints.length > 0) {
+      const lastPt = walkPoints[walkPoints.length - 1];
+      gpsMarker = L.circleMarker([lastPt.lat, lastPt.lng], {
+        radius: 8, color: '#fff', fillColor: '#4285f4', fillOpacity: 1, weight: 3
+      });
+      mapInstance.addLayer(gpsMarker);
+    }
+
+    // Rebuild tracking polygon
+    const allLatLngs = walkPoints.map(p => [p.lat, p.lng]);
+    allLatLngs.push(allLatLngs[0]);
+    walkPolygon = L.polygon(allLatLngs, {
+      color: '#ffffff', fillColor: selectedColor, fillOpacity: 0.4, weight: 2
+    });
+    mapInstance.addLayer(walkPolygon);
+
+    // Rebuild path line
+    walkPathLine = L.polyline(walkPoints.map(p => [p.lat, p.lng]), {
+      color: selectedColor, weight: 3, opacity: 0.8, dashArray: '6, 4'
+    });
+    mapInstance.addLayer(walkPathLine);
+
+    if (session.state === 'recording' || session.state === 'paused') {
+      walkState = 'paused'; // Start paused so user can decide
+      const toggleBtn = document.getElementById('btn-walk-toggle');
+      if (toggleBtn) toggleBtn.classList.add('active');
+      disableDrawControl();
+      showWalkPanel('paused');
+      if (window.Snackbar) {
+        window.Snackbar.show('Sesión de grabación recuperada — reanuda o descarta', { type: 'info', duration: 5000 });
+      }
+    }
+  } catch (e) {
+    localStorage.removeItem('finca_walking_session');
+  }
+}
+
 export async function setupNuevoLoteListeners() {
   const form = document.getElementById('form-nuevo-lote');
   if (!form) return;
@@ -811,6 +1393,21 @@ export async function setupNuevoLoteListeners() {
 
   // Register cleanup for when we navigate away
   window.__screenCleanup = () => {
+    // Save walking session if active
+    if (walkState !== 'idle') {
+      saveWalkingSession();
+    }
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    // Remove walking layers if any
+    if (walkPolygon && mapInstance?.hasLayer(walkPolygon)) mapInstance.removeLayer(walkPolygon);
+    if (walkPathLine && mapInstance?.hasLayer(walkPathLine)) mapInstance.removeLayer(walkPathLine);
+    if (gpsMarker && mapInstance?.hasLayer(gpsMarker)) mapInstance.removeLayer(gpsMarker);
+    const overlay = document.getElementById('walk-searching-overlay');
+    if (overlay) overlay.remove();
+
     if (drawnItems) {
       drawnItems.eachLayer(l => {
         if (l._glowPolygon && mapInstance?.hasLayer(l._glowPolygon)) {
@@ -824,6 +1421,7 @@ export async function setupNuevoLoteListeners() {
       drawnItems = null;
       drawControl = null;
       existingLotesLayer = null;
+      walkControl = null;
     }
   };
 

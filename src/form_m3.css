@@ -31,6 +31,12 @@
   .m3-grid {
     grid-template-columns: 350px 1fr;
   }
+  .m3-grid > * {
+    min-width: 0;
+  }
+  .m3-asymmetric-section {
+    align-self: stretch;
+  }
 }
 
 /* Sidebar Info Area */
@@ -38,10 +44,13 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  height: 100%;
 }
 
 .m3-photo-placeholder {
-  aspect-ratio: 1;
+  flex: 1;
+  width: 100%;
+  min-height: 350px;
   background: var(--m3-surface-highest);
   border: 4px dashed rgba(130, 128, 121, 0.3);
   border-radius: var(--m3-radius-lg);
@@ -52,6 +61,16 @@
   padding: 32px;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.m3-photo-placeholder:has(img) {
+  padding: 0;
+  border: none;
+  overflow: hidden;
+}
+
+.m3-photo-placeholder:has(img) #photo-preview {
+  display: block;
 }
 
 .m3-photo-placeholder:hover {
@@ -912,4 +931,175 @@
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Walking / GPS Recording Controls ──────────────────────────── */
+.m3-walk-control {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  overflow: hidden;
+  width: 44px;
+  margin-top: 8px;
+}
+
+.m3-walk-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  color: #444;
+  padding: 0;
+}
+
+.m3-walk-btn:hover {
+  background: var(--m3-surface-container-high, #e8e8e8);
+}
+
+.m3-walk-btn.active {
+  background: #ff4103;
+  color: white;
+}
+
+.m3-walk-btn.active:hover {
+  background: #d93702;
+}
+
+.m3-walk-btn .material-icons {
+  font-size: 22px;
+}
+
+/* Walk status panel (bottom overlay inside map) */
+#walk-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1001;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 16px 20px;
+  border-radius: 16px 16px 0 0;
+  color: white;
+  animation: walkPanelIn 0.3s ease-out;
+}
+
+@keyframes walkPanelIn {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.walk-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.walk-status-dot.searching {
+  background: #ffc107;
+  animation: walkPulse 1s infinite;
+}
+
+.walk-status-dot.recording {
+  background: #ff4103;
+  animation: walkPulse 1.2s infinite;
+}
+
+.walk-status-dot.paused {
+  background: #ffc107;
+}
+
+.walk-status-dot.idle {
+  background: #4caf50;
+}
+
+@keyframes walkPulse {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.m3-walk-action-btn {
+  padding: 8px 16px;
+  border-radius: 99px;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Work Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.15);
+  color: white;
+}
+
+.m3-walk-action-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+.m3-walk-action-btn.primary {
+  background: #2d3e2c;
+  color: white;
+}
+
+.m3-walk-action-btn.primary:hover {
+  background: #1f2b1e;
+}
+
+.m3-walk-action-btn.danger {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.8);
+}
+
+.m3-walk-action-btn.danger:hover {
+  background: rgba(255,65,3,0.2);
+  border-color: #ff4103;
+  color: white;
+}
+
+#walk-panel .walk-grip {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.3);
+  margin: -8px auto 12px auto;
+}
+
+/* Searching state overlay */
+#walk-searching-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  animation: fadeIn 0.3s ease-out;
+}
+
+#walk-searching-overlay .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

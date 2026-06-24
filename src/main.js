@@ -41,9 +41,9 @@ function updateNotifUI() {
          onclick="(${n.action ? 'window.__notifAction(\'' + n.id + '\')' : ''})">
       <span class="material-icons" style="font-size:22px;color:var(--m3-primary,#2d3e2c);margin-top:2px;">${n.icon}</span>
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:14px;color:#1a1a1a;">${n.title}</div>
-        <div style="font-size:13px;color:#666;margin-top:2px;">${n.desc}</div>
-        ${n.action ? `<button style="margin-top:8px;background:var(--m3-primary,#2d3e2c);color:#fff;border:none;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">${n.action.label}</button>` : ''}
+        <div style="font-weight:700;font-size:14px;color:#2d3e2c;">${n.title}</div>
+        <div style="font-size:13px;color:#2d3e2c;margin-top:2px;">${n.desc}</div>
+        ${n.action ? `<button style="margin-top:8px;background:var(--m3-primary,#2d3e2c);color:#2d3e2c;border:none;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">${n.action.label}</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -125,11 +125,11 @@ function showInitialPrompt() {
   container.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
       <span class="material-icons" style="font-size:56px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">cloud_download</span>
-      <h2 style="font-size:24px;font-weight:800;font-family:'Manrope',sans-serif;color:#1a1a1a;margin-bottom:8px;">Descargar datos en local</h2>
-      <p style="color:#666;font-size:14px;max-width:360px;margin-bottom:24px;line-height:1.5;">
+      <h2 style="font-size:24px;font-weight:800;font-family:'Manrope',sans-serif;color:#2d3e2c;margin-bottom:8px;">Descargar datos en local</h2>
+      <p style="color:#2d3e2c;font-size:14px;max-width:360px;margin-bottom:24px;line-height:1.5;">
         Para usar la app sin necesidad de internet, descarga tus datos existentes en el dispositivo.
       </p>
-      <button id="btn-start-download" style="background:var(--m3-primary,#2d3e2c);color:#fff;border:none;padding:14px 32px;border-radius:40px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,71,65,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+      <button id="btn-start-download" style="background:var(--m3-primary,#2d3e2c);color:#2d3e2c;border:none;padding:14px 32px;border-radius:40px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,71,65,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
         <span class="material-icons" style="vertical-align:middle;margin-right:8px;">cloud_download</span>
         Descargar ahora
       </button>
@@ -298,12 +298,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const onClick = Array.isArray(backTarget) 
                 ? backTarget.map(s => `'${s}'`).join(', ')
                 : `'${backTarget}'`;
+            const title = screenId === 'nuevo_animal' && args.length > 0 && args[0]
+                ? 'Editar Animal'
+                : screen.title;
             titleElement.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <button onclick="window.navigateTo(${onClick})" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; color: #333; margin-left: -8px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atras">
                         <span class="material-icons">arrow_back</span>
                     </button>
-                    <span>${screen.title}</span>
+                    <span>${title}</span>
                 </div>
             `;
         } else {
