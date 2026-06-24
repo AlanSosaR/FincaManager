@@ -7,7 +7,8 @@ import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
 
-import { initSync, setSyncStatusCallback, isOnline, fullDownload } from './sync.js';
+import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue } from './sync.js';
+import db from './db.js';
 
 const syncIcon = document.getElementById('sync-icon');
 const syncBadge = document.getElementById('sync-badge');
@@ -158,6 +159,45 @@ if (isOnline()) {
 }
 
 syncIcon?.addEventListener('click', toggleNotif);
+
+// ─── Sync infrastructure (registered immediately, always) ────────────────────
+
+window.__syncPending = () => {
+  if (navigator.onLine) {
+    setTimeout(processSyncQueue, 500);
+  }
+};
+
+window.addEventListener('online', () => {
+  updateSyncUI('syncing');
+  setTimeout(async () => {
+    try {
+      await processSyncQueue();
+    } catch (e) {
+      console.warn('online sync error:', e);
+    }
+    updateSyncUI('done');
+  }, 500);
+});
+
+// Periodically check queue size
+let queueCheckInterval;
+async function updateQueueBadge() {
+  try {
+    const count = await db._sync_queue.count();
+    if (count > 0) {
+      syncBadge.style.display = 'flex';
+      syncBadge.textContent = count > 9 ? '9+' : count;
+      syncIcon.textContent = 'sync';
+    }
+  } catch (e) { /* ignore */ }
+}
+if (isOnline()) {
+  updateQueueBadge();
+  queueCheckInterval = setInterval(updateQueueBadge, 10000);
+}
+
+// ─── Screen imports ──────────────────────────────────────────────────────────
 
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';

@@ -1,4 +1,9 @@
 import db from './db.js';
+import { supabaseFetch } from './sync.js';
+
+function isOnline() {
+  return navigator.onLine;
+}
 
 export default class QueryBuilder {
   constructor(tableName) {
@@ -128,6 +133,24 @@ export default class QueryBuilder {
     for (const record of records) {
       if (!record.id) record.id = crypto.randomUUID();
       if (!record.created_at) record.created_at = now;
+
+      if (isOnline()) {
+        try {
+          const body = { ...record };
+          const res = await supabaseFetch(`/rest/v1/${this.tableName}`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+          const serverRecords = await res.json();
+          const serverRecord = Array.isArray(serverRecords) ? serverRecords[0] : serverRecords;
+          await table.put(serverRecord);
+          results.push(serverRecord);
+          continue;
+        } catch (e) {
+          console.warn(`online insert failed for ${this.tableName}, fallback to local:`, e);
+        }
+      }
+
       await table.put(record);
       results.push(record);
       await this._enqueueSync('insert', record.id, record);
@@ -141,13 +164,32 @@ export default class QueryBuilder {
     const eqFilter = this._filters.find(f => f.type === 'eq');
     if (!eqFilter) return { data: null, error: 'update requires eq filter' };
     const existing = await table.where(eqFilter.field).equals(eqFilter.value).first();
-    if (existing) {
-      const updated = { ...existing, ...updateData, updated_at: new Date().toISOString() };
-      await table.put(updated);
-      await this._enqueueSync('update', eqFilter.value, updated);
-      return { data: updated, error: null };
+    if (!existing) return { data: null, error: null };
+
+    const updated = { ...existing, ...updateData, updated_at: new Date().toISOString() };
+
+    if (isOnline()) {
+      try {
+        const body = { ...updated };
+        delete body.id;
+        delete body.created_at;
+        delete body.updated_at;
+        const res = await supabaseFetch(
+          `/rest/v1/${this.tableName}?id=eq.${encodeURIComponent(eqFilter.value)}`,
+          { method: 'PATCH', body: JSON.stringify(body) }
+        );
+        const serverRecords = await res.json();
+        const serverRecord = Array.isArray(serverRecords) ? serverRecords[0] : serverRecords;
+        await table.put({ ...updated, ...serverRecord });
+        return { data: { ...updated, ...serverRecord }, error: null };
+      } catch (e) {
+        console.warn(`online update failed for ${this.tableName}, fallback to local:`, e);
+      }
     }
-    return { data: null, error: null };
+
+    await table.put(updated);
+    await this._enqueueSync('update', eqFilter.value, updated);
+    return { data: updated, error: null };
   }
 
   async _executeDelete() {
@@ -155,7 +197,21 @@ export default class QueryBuilder {
     const eqFilter = this._filters.find(f => f.type === 'eq');
     if (!eqFilter) return { data: null, error: 'delete requires eq filter' };
     const items = await table.where(eqFilter.field).equals(eqFilter.value).toArray();
-    await table.where(eqFilter.field).equals(eqFilter.value).delete();
+
+    if (isOnline()) {
+      try {
+        await supabaseFetch(
+          `/rest/v1/${this.tableName}?id=eq.${encodeURIComponent(eqFilter.value)}`,
+          { method: 'DELETE' }
+        );
+        await table.where(eqFilter.field).equals(eqFilter.value).delete();
+        return { data: items, error: null };
+      } catch (e) {
+        console.warn(`online delete failed for ${this.tableName}, will retry via queue:`, e);
+      }
+    }
+
+    // Offline or online failure: keep local, enqueue for later sync
     for (const item of items) {
       await this._enqueueSync('delete', item.id, null);
     }

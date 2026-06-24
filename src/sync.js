@@ -14,7 +14,7 @@ const SUPABASE_TABLES = [
   'lote_personal', 'personal', 'personal_asistencia',
 ];
 
-async function supabaseFetch(path, options = {}) {
+export async function supabaseFetch(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}${path}`, {
     headers: {
       'apikey': SUPABASE_KEY,
@@ -51,6 +51,15 @@ export async function fullDownload() {
   syncInProgress = true;
   try {
     onSyncStatusChange?.('Descargando datos...');
+    const pendingIds = new Map();
+    const pending = await db._sync_queue.toArray();
+    for (const item of pending) {
+      if (item.action === 'insert') {
+        if (!pendingIds.has(item.table)) pendingIds.set(item.table, new Set());
+        pendingIds.get(item.table).add(item.record_id);
+      }
+    }
+
     for (const tableName of SUPABASE_TABLES) {
       onSyncStatusChange?.(`Descargando ${tableName}...`);
       let allData = [];
@@ -67,7 +76,21 @@ export async function fullDownload() {
         if (data.length < limit) break;
       }
       const dexieTable = db.table(tableName);
-      await dexieTable.clear();
+
+      // Get local IDs for this table
+      const localRecords = await dexieTable.toArray();
+      const localIds = new Set(localRecords.map(r => r.id));
+      const serverIds = new Set(allData.map(r => r.id));
+      const protectIds = pendingIds.get(tableName);
+
+      // Delete records that exist locally but NOT on server AND are not pending sync
+      for (const localId of localIds) {
+        if (!serverIds.has(localId) && (!protectIds || !protectIds.has(localId))) {
+          await dexieTable.delete(localId);
+        }
+      }
+
+      // Upsert server data (preserves local-only pending records)
       if (allData.length) {
         await dexieTable.bulkPut(allData);
       }
@@ -97,26 +120,32 @@ export async function processSyncQueue() {
         const path = `/rest/v1/${item.table}?id=eq.${encodeURIComponent(item.record_id)}`;
         if (item.action === 'delete') {
           await supabaseFetch(path, { method: 'DELETE' });
+          await db.table(item.table).delete(item.record_id);
         } else if (item.action === 'insert') {
           const body = { ...item.data };
-          await supabaseFetch(`/rest/v1/${item.table}`, {
+          const res = await supabaseFetch(`/rest/v1/${item.table}`, {
             method: 'POST',
             body: JSON.stringify(body),
           });
+          const serverRecords = await res.json();
+          const serverRecord = Array.isArray(serverRecords) ? serverRecords[0] : serverRecords;
+          await db.table(item.table).put(serverRecord);
         } else if (item.action === 'update') {
           const body = { ...item.data };
           delete body.id;
           delete body.created_at;
           delete body.updated_at;
-          await supabaseFetch(path, {
+          const res = await supabaseFetch(path, {
             method: 'PATCH',
             body: JSON.stringify(body),
           });
+          const serverRecords = await res.json();
+          const serverRecord = Array.isArray(serverRecords) ? serverRecords[0] : serverRecords;
+          await db.table(item.table).put({ ...item.data, ...serverRecord });
         }
         await db._sync_queue.delete(item.id);
       } catch (err) {
         console.warn(`sync queue item ${item.id} failed:`, err);
-        // If it's a 4xx client error, the request will never succeed — remove it
         if (err.message?.includes('Supabase API 4')) {
           await db._sync_queue.delete(item.id);
         }
@@ -139,22 +168,6 @@ export async function initSync() {
   if (isFirstRun && isOnline()) {
     await fullDownload();
   }
-
-  window.addEventListener('online', async () => {
-    await processSyncQueue();
-    if (!syncInProgress) {
-      const lastSync = await getSyncMeta('last_full_sync');
-      if (lastSync) {
-        await fullDownload();
-      }
-    }
-  });
-
-  window.__syncPending = () => {
-    if (isOnline()) {
-      setTimeout(processSyncQueue, 500);
-    }
-  };
 
   if (isOnline() && !isFirstRun) {
     setTimeout(processSyncQueue, 1000);
