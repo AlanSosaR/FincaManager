@@ -57,6 +57,11 @@ export default class QueryBuilder {
     return this;
   }
 
+  gt(field, value) {
+    this._filters.push({ type: 'gt', field, value });
+    return this;
+  }
+
   neq(field, value) {
     this._filters.push({ type: 'neq', field, value });
     return this;
@@ -196,6 +201,8 @@ export default class QueryBuilder {
         results = results.filter(r => r[filter.field] === filter.value);
       } else if (filter.type === 'neq') {
         results = results.filter(r => r[filter.field] !== filter.value);
+      } else if (filter.type === 'gt') {
+        results = results.filter(r => (r[filter.field] ?? -Infinity) > filter.value);
       } else if (filter.type === 'in') {
         results = results.filter(r => filter.values.includes(r[filter.field]));
       } else if (filter.type === 'ilike') {

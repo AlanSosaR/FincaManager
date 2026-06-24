@@ -181,10 +181,12 @@ export async function renderDashboard(page) {
                     </div>
                   `;
                 }).join('') : `
-                  <div class="m3-col-span-3 m3-p-8 m3-bg-surface-container-low m3-rounded-3xl m3-border-dashed" style="text-align: center; border: 2px dashed rgba(130, 128, 121, 0.2); padding-top: 48px; padding-bottom: 48px;">
-                    <img src="sprouts.png" alt="" style="width: 48px; height: 48px; object-fit: contain; opacity: 0.2;" class="m3-mb-2">
-                    <p class="m3-text-on-surface-variant m3-label-large">No hay lotes registrados aún.</p>
-                    <button onclick="window.navigateTo('nuevo_lote')" class="m3-mt-4 m3-text-primary m3-font-bold m3-bg-none m3-border-none cursor-pointer" style="text-decoration: underline;">Agregar primer lote</button>
+                  <div class="m3-flex m3-flex-col m3-items-center m3-justify-center" style="padding: 64px 24px; background: var(--m3-surface-container-low); border-radius: 32px; text-align: center; grid-column: 1 / -1;">
+                    <div style="width: 80px; height: 80px; border-radius: 24px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                      <img src="sprouts.png" alt="" style="width: 40px; height: 40px; object-fit: contain; opacity: 0.6;">
+                    </div>
+                    <p class="m3-title-medium m3-font-bold m3-text-on-surface" style="margin-bottom: 4px;">No hay lotes registrados</p>
+                    <p class="m3-body-medium m3-text-on-surface-variant" style="margin-bottom: 24px; max-width: 280px;">Crea tu primer lote para comenzar a gestionar tu cafetal</p>
                   </div>
                 `}
               </div>
@@ -199,17 +201,15 @@ export async function renderDashboard(page) {
             <!-- Aplicaciones Recientes Section -->
             <div>
               <h2 class="m3-headline-small m3-font-bold m3-text-on-surface m3-mb-6">Aplicaciones Recientes</h2>
-              <div class="m3-card m3-p-0 m3-overflow-hidden">
+              <div class="m3-card m3-overflow-hidden" style="padding: 0; border: none;">
+                <div style="padding: 20px 24px; background: #e4fd97; border-radius: 28px 28px 0 0; display: flex; align-items: center; gap: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--m3-on-primary);">
+                  <span style="flex: 2;">Tipo & Producto</span>
+                  <span style="flex: 1;">Dosis</span>
+                  <span style="flex: 1.5;">Lote / Fecha</span>
+                  <span style="flex: 1; text-align: right;">Operador</span>
+                </div>
                 <div class="db-table-wrap" style="overflow-x: auto;">
                   <table class="m3-table">
-                    <thead>
-                      <tr>
-                        <th>Tipo & Producto</th>
-                        <th>Dosis</th>
-                        <th>Lote / Fecha</th>
-                        <th style="text-align: right;">Operador</th>
-                      </tr>
-                    </thead>
                     <tbody>
                         ${aplicaciones && aplicaciones.length > 0 ? aplicaciones.map(app => {
                          const isFertilizante = app.tipo === 'Fertilizante';
@@ -244,7 +244,13 @@ export async function renderDashboard(page) {
                         </tr>
                       `}).join('') : `
                         <tr>
-                          <td colspan="4" class="m3-p-8 m3-text-on-surface-variant" style="text-align: center; font-style: italic;">No hay aplicaciones recientes</td>
+                          <td colspan="4" style="text-align: center; padding: 48px 24px;">
+                            <div style="width: 64px; height: 64px; border-radius: 20px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                              <span class="material-symbols-outlined" style="font-size: 32px; color: #6b8245;">eco</span>
+                            </div>
+                            <p class="m3-label-large m3-font-bold m3-text-on-surface" style="margin-bottom: 4px;">Sin aplicaciones recientes</p>
+                            <p class="m3-body-small m3-text-on-surface-variant" style="max-width: 260px; margin: 0 auto;">Las aplicaciones de fertilizantes, podas y tratamientos aparecerán aquí</p>
+                          </td>
                         </tr>
                       `}
                     </tbody>

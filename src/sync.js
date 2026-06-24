@@ -107,6 +107,7 @@ export async function processSyncQueue() {
           const body = { ...item.data };
           delete body.id;
           delete body.created_at;
+          delete body.updated_at;
           await supabaseFetch(path, {
             method: 'PATCH',
             body: JSON.stringify(body),
@@ -115,6 +116,10 @@ export async function processSyncQueue() {
         await db._sync_queue.delete(item.id);
       } catch (err) {
         console.warn(`sync queue item ${item.id} failed:`, err);
+        // If it's a 4xx client error, the request will never succeed — remove it
+        if (err.message?.includes('Supabase API 4')) {
+          await db._sync_queue.delete(item.id);
+        }
       }
     }
 
