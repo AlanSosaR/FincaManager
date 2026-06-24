@@ -242,6 +242,9 @@ function renderFullContent(container, animalId, flag) {
                         ${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? `<div class="da-sell-row"><span>Precio compra</span><strong>$${currentAnimal.precio_compra}</strong></div>` : ''}
                         ${currentAnimal.origen ? `<div class="da-sell-row"><span>Origen</span><strong>${currentAnimal.origen}</strong></div>` : ''}
                     </div>
+                <button class="btn-m3-text" style="margin-top:12px;width:100%;" onclick="window.returnToInventory('${currentAnimal.id}')">
+                    <span class="material-icons" style="font-size:18px;">undo</span> Regresar al inventario
+                </button>
                 </div>
                 </div>` : (sellMode ? `
                 <div class="m3-card-filled">
@@ -502,7 +505,10 @@ function setupEventListeners(animalId, container, sellMode) {
                         '<div class="da-sell-row"><span>Fecha</span><strong>' + new Date(currentAnimal.fecha_venta).toLocaleDateString() + '</strong></div>' +
                         (currentAnimal.comprador ? '<div class="da-sell-row"><span>Comprador</span><strong>' + currentAnimal.comprador + '</strong></div>' : '') +
                         (currentAnimal.peso_venta ? '<div class="da-sell-row"><span>Peso venta</span><strong>' + currentAnimal.peso_venta + ' kg</strong></div>' : '') +
-                    '</div>';
+                    '</div>' +
+                    '<button class="btn-m3-text" style="margin-top:12px;width:100%;" onclick="window.returnToInventory(\'' + currentAnimal.id + '\')">' +
+                        '<span class="material-icons" style="font-size:18px;">undo</span> Regresar al inventario' +
+                    '</button>';
                     parent.replaceChild(card, sellForm);
                 }
 
@@ -523,6 +529,19 @@ function setupEventListeners(animalId, container, sellMode) {
             }
         });
     }
+
+    window.returnToInventory = async (id) => {
+        try {
+            const { error: delErr } = await supabase.from('animal_ventas').delete().eq('animal_id', id);
+            if (delErr) throw delErr;
+            const { error: updateErr } = await supabase.from('ganado').update({ estado: null }).eq('id', id);
+            if (updateErr) throw updateErr;
+            showSnackbar('Animal regresado al inventario');
+            window.location.reload();
+        } catch (err) {
+            showSnackbar(err.message, 'error');
+        }
+    };
 
     function switchTab(target) {
         contents.forEach(c => c.classList.remove('active'));
