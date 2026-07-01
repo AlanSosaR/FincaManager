@@ -15,8 +15,9 @@ export async function renderLogin() {
             <label>Correo electrónico</label>
           </div>
           <div class="m3-field" style="margin-bottom:32px;">
-            <input type="password" id="login-password" placeholder=" " required>
+            <input type="password" id="login-password" placeholder=" " required style="padding-right:48px;">
             <label>Contraseña</label>
+            <span class="material-icons" id="pw-icon" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);cursor:pointer;z-index:2;color:#888;">visibility_off</span>
           </div>
           <div id="login-error" style="color:#ff4103;font-size:13px;margin-bottom:16px;display:none;"></div>
           <button type="submit" class="btn-m3-primary" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:40px;background:#2d3e2c;color:white;border:none;cursor:pointer;font-family:'Work Sans',sans-serif;">
@@ -36,6 +37,16 @@ export function initLogin() {
   const form = document.getElementById('login-form');
   const errorEl = document.getElementById('login-error');
   if (!form) return;
+
+  const pwIcon = document.getElementById('pw-icon');
+  const pwInput = document.getElementById('login-password');
+  if (pwIcon && pwInput) {
+    pwIcon.addEventListener('click', () => {
+      const isPassword = pwInput.type === 'password';
+      pwInput.type = isPassword ? 'text' : 'password';
+      pwIcon.textContent = isPassword ? 'visibility' : 'visibility_off';
+    });
+  }
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
