@@ -1,0 +1,12 @@
+<img src="https://finca-manager.vercel.app/pwa-512x512.svg" alt="Finca Manager" width="80" height="80" style="display:block;margin:0 auto 16px;">
+
+<p style="font-size:16px;text-align:center;">
+  <strong>{{ .Data.invitado_por_nombre }}</strong> te ha invitado a unirte a
+  <strong>{{ .Data.empresa_nombre }}</strong> en Finca Manager.
+</p>
+
+<p style="text-align:center;margin-top:24px;">
+  <a href="{{ .RedirectTo }}" style="display:inline-block;padding:14px 32px;background:#2d3e2c;color:white;border-radius:40px;text-decoration:none;font-weight:700;font-size:15px;">
+    Aceptar invitación
+  </a>
+</p>

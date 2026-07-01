@@ -25,7 +25,6 @@
         return {
           access_token: params.get('access_token'),
           refresh_token: params.get('refresh_token'),
-          expires_in: params.get('expires_in'),
         };
       }
 
@@ -41,58 +40,25 @@
         expires_in: 3600,
       }));
 
-      async function fetchUser() {
+      let inviteToken = '';
+      try {
         const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
           headers: {
             apikey: SUPABASE_KEY,
             Authorization: `Bearer ${access_token}`,
           },
         });
-        if (!res.ok) throw new Error('Failed to get user');
-        return res.json();
-      }
-
-      async function restFetch(path) {
-        const res = await fetch(`${SUPABASE_URL}${path}`, {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${access_token}`,
-            'Content-Type': 'application/json',
-            Prefer: 'return=representation',
-          },
-        });
-        if (!res.ok) { if (res.status === 406) return []; const b = await res.json().catch(() => ({})); throw new Error(b.message || b.error || 'Error'); }
-        return res.headers.get('content-type')?.includes('application/json') ? await res.json() : null;
-      }
-
-      try {
-        const user = await fetchUser();
-        const inviteToken = user?.user_metadata?.invite_token;
-        const empresaId = user?.user_metadata?.empresa_id;
-
-        if (inviteToken) {
-          const inv = await restFetch(`/rest/v1/invitaciones?token=eq.${encodeURIComponent(inviteToken)}&estado=eq.pendiente`);
-          if (inv && inv.length > 0) {
-            await fetch(`${SUPABASE_URL}/rest/v1/usuario_empresas`, {
-              method: 'POST',
-              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ usuario_id: user.id, empresa_id: inv[0].empresa_id, rol: inv[0].rol }),
-            });
-            await fetch(`${SUPABASE_URL}/rest/v1/invitaciones?id=eq.${inv[0].id}`, {
-              method: 'PATCH',
-              headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-              body: JSON.stringify({ estado: 'aceptada' }),
-            });
-            localStorage.setItem('current_empresa_id', inv[0].empresa_id);
-          }
-        } else if (empresaId) {
-          localStorage.setItem('current_empresa_id', empresaId);
+        if (res.ok) {
+          const user = await res.json();
+          inviteToken = user?.user_metadata?.invite_token || '';
         }
       } catch (e) {
         console.error('Callback error:', e);
       }
 
-      window.location.href = '/#dashboard';
+      window.location.href = inviteToken
+        ? `/#register?token=${encodeURIComponent(inviteToken)}`
+        : '/#dashboard';
     })();
   </script>
 </body>

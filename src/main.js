@@ -500,7 +500,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const screen = screens[screenId] || screens.dashboard;
 
         if (screen.noAuth && isAuthenticated()) {
-            return navigate('dashboard');
+            if (screenId === 'register' && args.length > 0 && args[0]) {
+                // Allow authenticated users with invite token
+            } else {
+                return navigate('dashboard');
+            }
         }
 
         if (!screen.noAuth && !isAuthenticated()) {
