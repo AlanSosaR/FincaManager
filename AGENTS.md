@@ -56,15 +56,16 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 ### `auth-callback.html`
 - Ubicación: `public/auth-callback.html`
 - Página estática que captura el redirect post-confirmación de email
-- Guarda sesión en localStorage, busca `user_metadata.invite_token`, procesa la invitación (INSERT `usuario_empresas`, PATCH `invitaciones.estado = 'aceptada'`)
-- Redirige al dashboard
+- Guarda sesión en localStorage, obtiene `invite_token` de `user_metadata`
+- **Redirige a `/#register?token=TOKEN`** en vez de procesar la invitación (para que el usuario vea el formulario con empresa read-only)
 - Verificado que se copia a `dist/` en el build de Vite
 
 ### Pantallas
-- `configuracion.js`: lista miembros, invitaciones, modal de invitar con copiar link / enviar por correo, revocar invitación. Se agregó logging de errores al llamar a la Edge Function.
-- `aceptar_invitacion.js`: maneja `?token=` en URL
-- `perfil.js`: edición inline del nombre de empresa (clic → input → Enter guarda)
-- `register.js`: campo "Nombre de tu finca/empresa" al crear cuenta
+- `configuracion.js`: lista miembros, invitaciones, modal de invitar con copiar link / enviar por correo, revocar invitación. Se agregó logging de errores al llamar a la Edge Function. Invitación inline (toggle al presionar FAB), sin modal ni snackbar.
+- `aceptar_invitacion.js`: maneja `?token=` en URL, invita a registrarse o iniciar sesión
+- `perfil.js`: edición inline del nombre de empresa (clic → input → Enter guarda). Ahora funciona con RLS UPDATE policy.
+- `register.js`: campo "Nombre de tu finca/empresa" al crear cuenta. Cuando hay token de invitación: **read-only** con el nombre de la empresa que invitó. Si el usuario ya está autenticado (vino por email), crea `usuarios` + acepta invitación → dashboard. Si no, `signUp()` normal con token.
+- `main.js`: permite que usuarios autenticados con token accedan a la pantalla register
 
 ### Progreso de Sesiones Anteriores
 - Auth completamente migrado a REST directo (sin `@supabase/supabase-js`)
@@ -74,10 +75,13 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 
 ## Lo Que Falta (Por Fase)
 
-### Fase 1c — Invitaciones Email (BLOQUEADO)
-- [ ] Esperar que se resetee el rate limit de Supabase Auth (~1 hora)
-- [ ] Probar flujo completo: invitar → recibir email → click link → auth-callback → unirse a empresa
-- [ ] Si el rate limit persiste, considerar migrar a Resend/SendGrid como alternativa
+### Fase 1c — Invitaciones Email (COMPLETADO 01/07)
+- [x] Edge Function `send-invite` redeployeada con soporte para usuarios ya registrados
+- [x] `auth-callback.html` redirige a register con token en vez de procesar la invitación
+- [x] `register.js` muestra empresa read-only cuando hay token
+- [x] Logo subido a Supabase Storage
+- [x] `invitado_por_nombre` pasado a la Edge Function
+- [x] Plantilla personalizada en `supabase/templates/invite.html`
 
 ### Fase 2 — Selector de Empresa (COMPLETADO 01/07)
 - [x] Dropdown en el header (`index.html`) con estilo Material 3
@@ -96,6 +100,17 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - [x] **Insert** (ya existía): `query-builder.js` agrega `empresa_id` automáticamente al insertar
 - [x] **RLS Policies** (`supabase/migrations/20250701_empresa_rls.sql`): policies SELECT/INSERT/UPDATE/DELETE para las 17 tablas de negocio, más función helper `is_empresa_member()`
 - [x] Se eliminaron las policies públicas viejas (`Allow public read *`)
+
+### Fase 1d — Flujo Invitación por Email (COMPLETADO 01/07)
+- [x] `auth-callback.html`: ya no procesa la invitación, solo guarda sesión y redirige a `/#register?token=TOKEN`
+- [x] `register.js`: cuando hay token, empresa field se muestra como **read-only** (disabled) con el nombre de la empresa que invitó
+- [x] Usuario autenticado (vino por email): crea `usuarios` + `acceptInvitation()` → redirige al dashboard
+- [x] Usuario no autenticado (link directo): `signUp()` normal con `ensureUserSetup()` y token
+- [x] `main.js`: excepción para `noAuth` — permite register autenticado si hay token
+- [x] RLS UPDATE policy para `empresas` (`20250702_empresa_update_policy.sql`) — ahora editar nombre desde perfil funciona
+- [x] Logo subido a Supabase Storage: `https://udhuizkqnmkhljmezzkd.supabase.co/storage/v1/object/public/logo/pwa-512x512.svg`
+- [x] Edge Function `send-invite` ahora acepta `invitado_por_nombre` en `user_metadata`
+- [ ] **Pendiente**: cambios en Supabase dashboard (Site URL, Redirect URLs, Email Template)
 
 ### Despliegue
 - [ ] Build + deploy a Vercel después de cada cambio relevante
