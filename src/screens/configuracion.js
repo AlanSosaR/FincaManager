@@ -166,6 +166,8 @@ function renderInviteForm(container) {
     submitBtn.textContent = 'Enviando...';
     try {
       const token = await inviteUser(empresaId, email, rol);
+      const inviter = await getUser();
+      const inviterName = inviter?.user_metadata?.nombre || inviter?.email || 'Alguien';
       const inviteLink = `${window.location.origin}${window.location.pathname}#aceptar_invitacion?token=${token}`;
       document.getElementById('invite-form').style.display = 'none';
       document.getElementById('invite-result').style.display = 'block';
@@ -178,7 +180,7 @@ function renderInviteForm(container) {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${getAccessToken()}`,
         },
-        body: JSON.stringify({ email, empresa_id: empresaId, token }),
+        body: JSON.stringify({ email, empresa_id: empresaId, token, invitado_por_nombre: inviterName }),
       }).then(async (res) => {
         if (!res.ok) {
           const err = await res.text().catch(() => res.statusText);

@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, empresa_id, token } = await req.json();
+    const { email, empresa_id, token, invitado_por_nombre } = await req.json();
 
     if (!email || !empresa_id || !token) {
       return new Response(
@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
         invite_token: token,
         empresa_id,
         empresa_nombre: empresaNombre,
+        invitado_por_nombre: invitado_por_nombre || 'Alguien',
       },
     });
 
