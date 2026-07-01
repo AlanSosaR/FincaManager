@@ -5,6 +5,15 @@ function isOnline() {
   return navigator.onLine;
 }
 
+const BUSINESS_TABLES = new Set([
+  'motores', 'motor_sesiones', 'motor_mantenimientos',
+  'potreros', 'ganado', 'herramientas',
+  'potrero_eventos', 'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
+  'herramienta_mantenimientos',
+  'lotes', 'lote_aplicaciones', 'lote_personal',
+  'personal', 'personal_asistencia',
+]);
+
 export default class QueryBuilder {
   constructor(tableName) {
     this.tableName = tableName;
@@ -22,6 +31,18 @@ export default class QueryBuilder {
     this._deleteMode = false;
     this._rangeFrom = null;
     this._rangeTo = null;
+  }
+
+  _ensureEmpresaFilter() {
+    if (!BUSINESS_TABLES.has(this.tableName)) return;
+    const empresaId = typeof window !== 'undefined' ? window._currentEmpresaId : null;
+    if (!empresaId) return;
+    const alreadyFiltered = this._filters.some(
+      f => f.type === 'eq' && f.field === 'empresa_id'
+    );
+    if (!alreadyFiltered) {
+      this._filters.push({ type: 'eq', field: 'empresa_id', value: empresaId });
+    }
   }
 
   select(columns, options = {}) {
@@ -133,6 +154,9 @@ export default class QueryBuilder {
     for (const record of records) {
       if (!record.id) record.id = crypto.randomUUID();
       if (!record.created_at) record.created_at = now;
+      if (typeof window !== 'undefined' && window._currentEmpresaId && this.tableName !== 'usuarios' && this.tableName !== 'empresas' && this.tableName !== 'usuario_empresas' && this.tableName !== 'invitaciones') {
+        if (!record.empresa_id) record.empresa_id = window._currentEmpresaId;
+      }
 
       if (isOnline()) {
         try {
@@ -246,6 +270,7 @@ export default class QueryBuilder {
   }
 
   async _execute() {
+    this._ensureEmpresaFilter();
     if (this._deleteMode) return this._executeDelete();
     if (this._updateData) return this._executeUpdate();
 

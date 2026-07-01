@@ -46,10 +46,10 @@ class SnackbarSystem {
         <span class="m3-snackbar-text">${current.message}</span>
         <div class="m3-snackbar-actions">
           ${current.confirm ? `
-            <button class="m3-snackbar-btn cancel">${current.cancelText || 'Cancelar'}</button>
+            ${current.cancelText !== false ? `<button class="m3-snackbar-btn cancel">${current.cancelText || 'Cancelar'}</button>` : ''}
             <button class="m3-snackbar-btn confirm">${current.confirmText || 'Confirmar'}</button>
           ` : `
-            <button class="m3-snackbar-btn close">Cerrar</button>
+            <button class="m3-snackbar-btn close">${current.actionText || 'Cerrar'}</button>
           `}
         </div>
       </div>
@@ -72,10 +72,13 @@ class SnackbarSystem {
       };
 
       if (current.confirm) {
-        snackbar.querySelector('.cancel').onclick = () => {
-          if (current.onCancel) current.onCancel();
-          close();
-        };
+        const cancelBtn = snackbar.querySelector('.cancel');
+        if (cancelBtn) {
+          cancelBtn.onclick = () => {
+            if (current.onCancel) current.onCancel();
+            close();
+          };
+        }
         snackbar.querySelector('.confirm').onclick = () => {
           if (current.onConfirm) current.onConfirm();
           close();

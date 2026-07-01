@@ -9,6 +9,7 @@ registerSW({ immediate: true });
 
 import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue } from './sync.js';
 import db from './db.js';
+import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa } from './auth.js';
 
 const syncIcon = document.getElementById('sync-icon');
 const syncBadge = document.getElementById('sync-badge');
@@ -158,21 +159,141 @@ function showInitialPrompt() {
   });
 }
 
-if (isOnline()) {
-  const syncComplete = localStorage.getItem('finca_sync_complete');
-  if (!syncComplete) {
-    addNotif('download', 'cloud_download', 'Descargar datos en local', 'Tus datos estan en la nube. Descargalos para usar la app sin internet.', {
-      label: 'Descargar ahora',
-      handler: () => { fullDownload(); toggleNotif(); }
-    });
-    showInitialPrompt();
-  } else {
-    initSync();
+async function initApp() {
+  if (!isAuthenticated()) {
+    document.addEventListener('DOMContentLoaded', () => {
+      window.navigateTo?.('login');
+    }, { once: true });
+    return;
   }
-} else {
-  addNotif('offline', 'cloud_off', 'Sin conexion', 'No hay internet. Los datos locales estan disponibles.');
-  updateSyncUI('offline');
+
+  loadEmpresaId();
+
+  if (!window._currentEmpresaId) {
+    try {
+      const user = await getUser();
+      if (user?.id) {
+        const data = await restFetch(`/rest/v1/usuario_empresas?usuario_id=eq.${encodeURIComponent(user.id)}&select=empresa_id`);
+        if (data && data.length > 0) {
+          localStorage.setItem('current_empresa_id', data[0].empresa_id);
+          loadEmpresaId();
+        }
+      }
+    } catch (e) {
+      console.warn('empresa recovery failed:', e);
+    }
+  }
+
+  await updateSidebarEmpresaName();
+  await initEmpresaSelector();
+
+  if (isOnline()) {
+    const syncComplete = localStorage.getItem('finca_sync_complete');
+    if (!syncComplete) {
+      addNotif('download', 'cloud_download', 'Descargar datos en local', 'Tus datos estan en la nube. Descargalos para usar la app sin internet.', {
+        label: 'Descargar ahora',
+        handler: () => { fullDownload(); toggleNotif(); }
+      });
+      showInitialPrompt();
+    } else {
+      initSync();
+    }
+    initOnlineSync();
+  } else {
+    addNotif('offline', 'cloud_off', 'Sin conexion', 'No hay internet. Los datos locales estan disponibles.');
+    updateSyncUI('offline');
+  }
 }
+initApp();
+
+// ─── Empresa selector & sidebar name ─────────────────────────────────────────
+
+let _empresaList = [];
+
+async function updateSidebarEmpresaName() {
+  const el = document.getElementById('sidebar-empresa-name');
+  if (!el) return;
+  const empresaId = window._currentEmpresaId;
+  if (!empresaId) { el.textContent = ''; return; }
+  try {
+    const emp = await db.empresas?.get(empresaId);
+    if (emp?.nombre) { el.textContent = emp.nombre; return; }
+  } catch {}
+  const found = _empresaList.find(e => e.id === empresaId);
+  if (found) { el.textContent = found.nombre; return; }
+  try {
+    const data = await restFetch(`/rest/v1/empresas?id=eq.${encodeURIComponent(empresaId)}&select=nombre`);
+    if (data?.[0]?.nombre) { el.textContent = data[0].nombre; return; }
+  } catch {}
+  el.textContent = '';
+}
+
+window.__empresaNombreChanged = function() {
+  updateSidebarEmpresaName();
+};
+
+async function initEmpresaSelector() {
+  const selector = document.getElementById('empresa-selector');
+  const nameEl = document.getElementById('empresa-selector-name');
+  if (!selector || !nameEl) return;
+
+  try {
+    const empresas = await getUserEmpresas();
+    _empresaList = empresas;
+
+    if (empresas.length <= 1) {
+      selector.style.display = 'none';
+      return;
+    }
+
+    const current = empresas.find(e => e.id === window._currentEmpresaId);
+    nameEl.textContent = current?.nombre || 'Seleccionar empresa';
+    selector.style.display = 'inline-flex';
+    await updateSidebarEmpresaName();
+  } catch (e) {
+    console.warn('initEmpresaSelector error:', e);
+    selector.style.display = 'none';
+  }
+}
+
+window.openEmpresaSwitcher = function() {
+  if (!_empresaList.length) return;
+  const overlay = document.getElementById('modal-container');
+  const body = document.getElementById('modal-body');
+  overlay.style.display = 'flex';
+  body.innerHTML = `
+    <div class="m3-card" style="padding:24px;max-width:360px;width:100%;">
+      <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">Seleccionar empresa</h3>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${_empresaList.map(e => `
+          <button class="empresa-switch-btn" data-id="${e.id}" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:16px;background:${e.id === window._currentEmpresaId ? '#2d3e2c' : 'var(--m3-surface-container-low)'};color:${e.id === window._currentEmpresaId ? '#fff' : '#2d3e2c'};border:none;font-weight:600;font-size:14px;cursor:pointer;text-align:left;transition:background .15s;font-family:'Work Sans',sans-serif;"
+            onmouseover="this.style.background='${e.id === window._currentEmpresaId ? '#3a5240' : '#e8e6dd'}'" onmouseout="this.style.background='${e.id === window._currentEmpresaId ? '#2d3e2c' : 'var(--m3-surface-container-low)'}'">
+            <span class="material-icons" style="font-size:20px;">${e.id === window._currentEmpresaId ? 'check_circle' : 'business'}</span>
+            <span style="flex:1;">${e.nombre}</span>
+            <span style="font-size:11px;opacity:.7;text-transform:capitalize;">${e.rol}</span>
+          </button>
+        `).join('')}
+      </div>
+      <button onclick="document.getElementById('modal-container').style.display='none'" style="display:block;width:100%;margin-top:16px;padding:12px;border-radius:12px;background:transparent;border:none;color:#888;font-size:13px;cursor:pointer;">Cancelar</button>
+    </div>
+  `;
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.style.display = 'none'; };
+
+  body.querySelectorAll('.empresa-switch-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      if (id === window._currentEmpresaId) {
+        overlay.style.display = 'none';
+        return;
+      }
+      overlay.style.display = 'none';
+      const nameEl = document.getElementById('empresa-selector-name');
+      if (nameEl) nameEl.textContent = btn.querySelector('span:last-child')?.textContent || '...';
+      document.getElementById('sidebar-empresa-name').textContent = _empresaList.find(e => e.id === id)?.nombre || '';
+      await switchEmpresa(id);
+    });
+  });
+};
 
 syncIcon?.addEventListener('click', toggleNotif);
 
@@ -184,44 +305,47 @@ window.__syncPending = () => {
   }
 };
 
-window.addEventListener('online', () => {
-  updateSyncUI('syncing');
-  setTimeout(async () => {
-    try {
-      await processSyncQueue();
-      await fullDownload();
-      window.clearScreenCache?.();
-    } catch (e) {
-      console.warn('online sync error:', e);
-    }
-    updateSyncUI('done');
-  }, 500);
-});
+syncIcon?.addEventListener('click', toggleNotif);
 
-// Periodically check queue size
-let queueCheckInterval;
-async function updateQueueBadge() {
-  try {
-    const count = await db._sync_queue.count();
-    if (count > 0) {
-      syncBadge.style.display = 'flex';
-      syncBadge.textContent = count > 9 ? '9+' : count;
-      syncIcon.textContent = 'sync';
-    }
-  } catch (e) { /* ignore */ }
-}
-if (isOnline()) {
-  updateQueueBadge();
-  queueCheckInterval = setInterval(updateQueueBadge, 10000);
-  // Silent periodic refresh every 5 minutes
-  setInterval(async () => {
-    if (navigator.onLine) {
+function initOnlineSync() {
+  window.addEventListener('online', () => {
+    if (!isAuthenticated()) return;
+    updateSyncUI('syncing');
+    setTimeout(async () => {
       try {
+        await processSyncQueue();
         await fullDownload();
         window.clearScreenCache?.();
-      } catch (e) { /* silent */ }
-    }
-  }, 300000);
+      } catch (e) {
+        console.warn('online sync error:', e);
+      }
+      updateSyncUI('done');
+    }, 500);
+  });
+
+  let queueCheckInterval;
+  async function updateQueueBadge() {
+    try {
+      const count = await db._sync_queue.count();
+      if (count > 0) {
+        syncBadge.style.display = 'flex';
+        syncBadge.textContent = count > 9 ? '9+' : count;
+        syncIcon.textContent = 'sync';
+      }
+    } catch (e) { /* ignore */ }
+  }
+  if (isOnline()) {
+    updateQueueBadge();
+    queueCheckInterval = setInterval(updateQueueBadge, 10000);
+    setInterval(async () => {
+      if (navigator.onLine) {
+        try {
+          await fullDownload();
+          window.clearScreenCache?.();
+        } catch (e) { /* silent */ }
+      }
+    }, 300000);
+  }
 }
 
 // ─── Screen imports ──────────────────────────────────────────────────────────
@@ -244,6 +368,11 @@ import { renderNuevaActividad, initNuevaActividad } from './screens/nueva_activi
 import { renderNuevoPersonal, initNuevoPersonal } from './screens/nuevo_personal.js';
 import { renderDetallePersonal, initDetallePersonal } from './screens/detalle_personal.js';
 import { renderListaPersonal, initListaPersonal } from './screens/lista_personal.js';
+import { renderLogin, initLogin } from './screens/login.js';
+import { renderRegister, initRegister } from './screens/register.js';
+import { renderPerfil, initPerfil } from './screens/perfil.js';
+import { renderConfiguracion, initConfiguracion } from './screens/configuracion.js';
+import { renderAceptarInvitacion } from './screens/aceptar_invitacion.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -269,7 +398,12 @@ const screens = {
         render: renderNuevaActividad 
     },
     nuevo_personal: { title: 'Nuevo Personal', backTo: 'personal', highlight: 'personal', render: renderNuevoPersonal },
-    detalle_personal: { title: 'Detalle de Personal', backTo: 'personal', render: renderDetallePersonal }
+    detalle_personal: { title: 'Detalle de Personal', backTo: 'personal', render: renderDetallePersonal },
+    login: { title: 'Iniciar Sesión', render: renderLogin, noAuth: true },
+    register: { title: 'Crear Cuenta', render: renderRegister, noAuth: true },
+    perfil: { title: 'Mi Perfil', render: renderPerfil },
+    configuracion: { title: 'Configuración', render: renderConfiguracion },
+    aceptar_invitacion: { title: 'Invitación', render: renderAceptarInvitacion, noAuth: true },
 };
 
 window.navigateTo = function(screenId, ...args) {
@@ -336,6 +470,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'nueva_actividad') initNuevaActividad(...args);
         if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
         if (screenId === 'detalle_personal') initDetallePersonal(...args);
+        if (screenId === 'login')    initLogin();
+        if (screenId === 'register') initRegister();
+        if (screenId === 'perfil')   initPerfil();
+        if (screenId === 'configuracion') initConfiguracion();
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
@@ -360,7 +498,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const screen = screens[screenId] || screens.dashboard;
-        
+
+        if (screen.noAuth && isAuthenticated()) {
+            return navigate('dashboard');
+        }
+
+        if (!screen.noAuth && !isAuthenticated()) {
+            return navigate('login');
+        }
+
+        document.body.classList.toggle('screen-auth', !!screen.noAuth);
+
         if (screen.backTo) {
             const backTarget = typeof screen.backTo === 'function' ? screen.backTo(...args) : screen.backTo;
             const onClick = Array.isArray(backTarget) 
@@ -416,6 +564,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const href = window.location.href;
         const idx = href.indexOf('#');
         const raw = idx >= 0 ? href.slice(idx + 1) : '';
+        const qIdx = raw.indexOf('?');
+        if (qIdx >= 0) {
+            const screenId = raw.slice(0, qIdx);
+            const params = new URLSearchParams(raw.slice(qIdx));
+            const token = params.get('token') || '';
+            return [screenId, token];
+        }
         return raw.split('/').map(decodeURIComponent);
     }
 

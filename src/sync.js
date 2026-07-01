@@ -1,3 +1,4 @@
+import { getAccessToken } from './auth.js';
 import db from './db.js';
 
 let syncInProgress = false;
@@ -12,13 +13,22 @@ const SUPABASE_TABLES = [
   'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
+  'usuarios', 'empresas', 'usuario_empresas', 'invitaciones',
 ];
+
+const BUSINESS_TABLES = new Set([
+  'motores', 'motor_sesiones', 'motor_mantenimientos',
+  'potreros', 'ganado', 'herramientas', 'potrero_eventos',
+  'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
+  'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
+  'lote_personal', 'personal', 'personal_asistencia',
+]);
 
 export async function supabaseFetch(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}${path}`, {
     headers: {
       'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Authorization': `Bearer ${getAccessToken() || SUPABASE_KEY}`,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
       ...options.headers,
@@ -68,9 +78,12 @@ export async function fullDownload() {
       let allData = [];
       let from = 0;
       const limit = 1000;
+      const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
+        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+        : '';
       while (true) {
         const res = await supabaseFetch(
-          `/rest/v1/${tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}`
+          `/rest/v1/${tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
         );
         const data = await res.json();
         if (!data.length) break;

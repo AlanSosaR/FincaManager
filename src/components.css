@@ -771,7 +771,7 @@
 .m3-snackbar-btn {
   background: transparent;
   border: none;
-  color: var(--m3-primary);
+  color: #ffffff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -781,16 +781,16 @@
 }
 
 .m3-snackbar-btn:hover {
-  background: rgba(208, 188, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .m3-snackbar-btn.confirm {
-  background: var(--m3-primary-container);
-  color: #0f1f0f;
+  background: #ffffff;
+  color: #2d3e2c;
 }
 
 .m3-snackbar-btn.confirm:hover {
-  background: #2d3e2c;
+  background: #e0e0e0;
 }
 
 .m3-snackbar-btn.cancel {
@@ -808,6 +808,7 @@
   top: 100%;
   background: #2d3e2c !important;
   border-radius: 16px;
+  overflow: hidden;
   box-shadow: 0 8px 24px rgba(0,0,0,0.15);
   min-width: 160px;
   z-index: 2000;
@@ -3750,10 +3751,9 @@ input:focus, textarea:focus, select:focus {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.da-page-btn:hover:not(.active) {
-  background: #3a5240;
-  color: #ffffff;
-  transform: scale(1.1);
+.da-page-btn:not(.active),
+.da-pagination-circle-btn {
+  opacity: 0.3;
 }
 
 .da-page-btn.active {
