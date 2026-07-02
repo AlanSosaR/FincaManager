@@ -20,7 +20,7 @@ export async function renderPerfil() {
   }
 
   return `
-    <div class="m3-card-filled" style="max-width:600px;margin:0 auto;">
+    <div class="m3-card-filled">
       <div style="text-align:center;">
         <div style="width:80px;height:80px;border-radius:50%;background:#2d3e2c;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
           <span class="material-icons" style="font-size:40px;color:white;">account_circle</span>
@@ -90,11 +90,20 @@ window.editEmpresaNombre = function() {
   if (!nameEl || !row) return;
   const currentName = nameEl.textContent;
   row.onclick = null;
-  nameEl.innerHTML = `<input id="perfil-empresa-input" type="text" value="${currentName.replace(/"/g, '&quot;')}" style="width:100%;border:1px solid #2d3e2c;border-radius:8px;padding:6px 10px;font-size:14px;font-weight:700;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;">`;
+  nameEl.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input id="perfil-empresa-input" type="text" value="${currentName.replace(/"/g, '&quot;')}" style="flex:1;border:1px solid #2d3e2c;border-radius:8px;padding:8px 10px;font-size:14px;font-weight:700;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;">
+      <button id="perfil-empresa-ok" style="background:#2d3e2c;color:white;border:none;border-radius:8px;min-width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+        <span class="material-icons" style="font-size:20px;">check</span>
+      </button>
+    </div>
+  `;
   const input = document.getElementById('perfil-empresa-input');
+  const okBtn = document.getElementById('perfil-empresa-ok');
   if (!input) return;
   input.focus();
   input.select();
+  okBtn?.addEventListener('click', (e) => { e.stopPropagation(); save(); });
   async function save() {
     const newName = input.value.trim();
     if (!newName || newName === currentName) { cancel(); return; }
