@@ -9,7 +9,7 @@ registerSW({ immediate: true });
 
 import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync } from './sync.js';
 import db from './db.js';
-import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa } from './auth.js';
+import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 
 const syncIcon = document.getElementById('sync-icon');
 const syncBadge = document.getElementById('sync-badge');
@@ -372,7 +372,34 @@ window.navigateTo = function(screenId, ...args) {
     document.dispatchEvent(event);
 };
 
+function handleAuthCallback() {
+    const hash = window.location.hash.replace(/^#/, '');
+    if (!hash.includes('access_token=')) return false;
+    const params = new URLSearchParams(hash);
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token') || '';
+    if (!access_token) return false;
+    localStorage.setItem('supabase_session', JSON.stringify({ access_token, refresh_token, expires_in: 3600 }));
+    (async () => {
+        let inviteToken = '';
+        try {
+            const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+                headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${access_token}` },
+            });
+            if (res.ok) {
+                const user = await res.json();
+                inviteToken = user?.user_metadata?.invite_token || '';
+            }
+        } catch (e) { console.error('Auth callback error:', e); }
+        window.location.hash = inviteToken
+            ? `#register?token=${encodeURIComponent(inviteToken)}`
+            : '#dashboard';
+    })();
+    return true;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    if (handleAuthCallback()) return;
     const titleElement = document.getElementById('current-screen-title');
 
     const viewCache = new Map();

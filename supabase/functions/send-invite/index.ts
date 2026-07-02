@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const siteUrl = Deno.env.get("PUBLIC_SITE_URL") || "http://localhost:5173";
 
     const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${siteUrl}/auth-callback.html`,
+      redirectTo: `${siteUrl}`,
       data: {
         invite_token: token,
         empresa_id,
