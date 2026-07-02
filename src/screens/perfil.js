@@ -1,4 +1,4 @@
-import { logout, getUser, isAuthenticated, restFetch } from '../auth.js';
+import { getUser, restFetch } from '../auth.js';
 import db from '../db.js';
 
 export async function renderPerfil() {
@@ -42,11 +42,6 @@ export async function renderPerfil() {
         </div>
       </div>
 
-      <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
-
-        <button id="btn-perfil-logout" style="width:100%;padding:14px;border-radius:40px;background:transparent;color:#ff4103;border:1px solid #ff4103;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
-          <span class="material-icons">logout</span> Cerrar sesión
-        </button>
     </div>
   `;
 }
@@ -103,9 +98,4 @@ window.editEmpresaNombre = function() {
   input.addEventListener('blur', () => save());
 };
 
-export function initPerfil() {
-  document.getElementById('btn-perfil-logout')?.addEventListener('click', async () => {
-    await logout();
-    window.location.reload();
-  });
-}
+

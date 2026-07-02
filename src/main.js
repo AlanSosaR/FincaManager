@@ -329,7 +329,7 @@ import { renderDetallePersonal, initDetallePersonal } from './screens/detalle_pe
 import { renderListaPersonal, initListaPersonal } from './screens/lista_personal.js';
 import { renderLogin, initLogin } from './screens/login.js';
 import { renderRegister, initRegister } from './screens/register.js';
-import { renderPerfil, initPerfil } from './screens/perfil.js';
+import { renderPerfil } from './screens/perfil.js';
 import { renderConfiguracion, initConfiguracion } from './screens/configuracion.js';
 import { renderEquipo, initEquipo } from './screens/equipo.js';
 import { renderAceptarInvitacion } from './screens/aceptar_invitacion.js';
@@ -460,7 +460,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'detalle_personal') initDetallePersonal(...args);
         if (screenId === 'login')    initLogin();
         if (screenId === 'register') initRegister();
-        if (screenId === 'perfil')   initPerfil();
         if (screenId === 'equipo') initEquipo();
         if (screenId === 'configuracion') initConfiguracion();
     }
@@ -645,6 +644,12 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar.classList.remove('open');
         if (overlay) overlay.classList.remove('active');
     }
+
+    document.getElementById('sidebar-logout')?.addEventListener('click', async () => {
+        const { logout } = await import('./auth.js');
+        await logout();
+        window.location.reload();
+    });
 
     if (sidebarCollapse) {
         sidebarCollapse.addEventListener('click', () => {
