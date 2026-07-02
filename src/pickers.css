@@ -16,7 +16,7 @@
 
 .m3-picker-card {
   background: #f0ede4;
-  border-radius: 28px;
+  border-radius: 12px;
   width: 90%;
   max-width: 360px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.15);
@@ -194,7 +194,7 @@
   background: #eeebe1;
   color: #44473e;
   cursor: pointer;
-  border-radius: 100px;
+  border-radius: 12px;
 }
 
 .m3-ampm-btn.active {
@@ -216,7 +216,7 @@
   font-weight: 700;
   border: none;
   background: none;
-  border-radius: 100px;
+  border-radius: 12px;
   cursor: pointer;
   color: #2d3e2c;
 }

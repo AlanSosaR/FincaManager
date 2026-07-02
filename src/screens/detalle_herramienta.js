@@ -38,7 +38,7 @@ export async function renderDetalleHerramienta(toolId) {
       <div class="detail-hero card" style="background: linear-gradient(135deg, ${toolData.color}20 0%, ${toolData.color}40 100%); border-left: 6px solid ${toolData.color};">
         <div class="detail-hero-header" style="justify-content: space-between; width: 100%;">
           <div style="display: flex; align-items: center; gap: 16px;">
-            <div class="detail-hero-icon" style="background: ${toolData.color}; color: white; width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 32px;">
+            <div class="detail-hero-icon" style="background: ${toolData.color}; color: white; width: 64px; height: 64px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px;">
               ${toolData.icon}
             </div>
             <div>

@@ -121,7 +121,7 @@ export async function initNuevaHerramienta(id) {
       
       if (data.image_url) {
         currentImageUrl = data.image_url;
-        preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">`;
+        preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">`;
       }
     } catch (err) {
       console.error('Error al cargar herramienta:', err);
@@ -137,7 +137,7 @@ export async function initNuevaHerramienta(id) {
       selectedFile = file;
       const reader = new FileReader();
       reader.onload = (re) => {
-        preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">`;
+        preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">`;
       };
       reader.readAsDataURL(file);
     }

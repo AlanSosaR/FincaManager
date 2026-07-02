@@ -54,8 +54,8 @@ window.editEmpresaNombre = function() {
   row.onclick = null;
   nameEl.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;">
-      <input id="perfil-empresa-input" type="text" value="${currentName.replace(/"/g, '&quot;')}" style="flex:1;border:1px solid #2d3e2c;border-radius:8px;padding:8px 10px;font-size:14px;font-weight:700;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;">
-      <button id="perfil-empresa-ok" style="background:#2d3e2c;color:white;border:none;border-radius:8px;min-width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+      <input id="perfil-empresa-input" type="text" value="${currentName.replace(/"/g, '&quot;')}" style="flex:1;border:1px solid #2d3e2c;border-radius:12px;padding:8px 10px;font-size:14px;font-weight:700;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;">
+      <button id="perfil-empresa-ok" style="background:#2d3e2c;color:white;border:none;border-radius:12px;min-width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
         <span class="material-icons" style="font-size:20px;">check</span>
       </button>
     </div>

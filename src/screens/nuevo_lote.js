@@ -137,32 +137,32 @@ export async function renderNuevoLote(id) {
           <div style="margin-top: 32px; margin-bottom: 24px;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
               <span class="material-icons" style="color: var(--m3-primary); font-size: 24px;">public</span>
-              <h3 style="font-family: 'Manrope', sans-serif; font-size: 18px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Delimitar Área del Lote</h3>
+              <h3 style="font-family: 'Work Sans', sans-serif; font-size: 18px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Delimitar Área del Lote</h3>
             </div>
 
             <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-bottom: 16px; line-height: 1.5;">
               Dibuja el perímetro de tu lote en el mapa. Usa la barra de búsqueda <span class="material-icons" style="font-size: 14px; vertical-align: middle;">search</span> para encontrar tu finca.
             </p>
 
-            <div id="lote-map-container" style="width: 100%; height: 550px; border-radius: 24px; overflow: hidden; border: 2px solid var(--m3-outline-variant); position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
+            <div id="lote-map-container" style="width: 100%; height: 550px; border-radius: 12px; overflow: hidden; border: 2px solid var(--m3-outline-variant); position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
               <div id="lote-map" style="width: 100%; height: 100%;"></div>
               
               <!-- Scale bar -->
-              <div id="map-scale-bar" style="position: absolute; bottom: 24px; left: 24px; z-index: 1000; background: rgba(0,0,0,0.6); color: white; padding: 4px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; font-family: 'Work Sans', sans-serif;">
+              <div id="map-scale-bar" style="position: absolute; bottom: 24px; left: 24px; z-index: 1000; background: rgba(0,0,0,0.6); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; font-family: 'Work Sans', sans-serif;">
                 <span id="scale-text">400 m</span>
               </div>
               
               <!-- Coordinates display -->
-              <div id="map-coords" style="position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight: 500; font-family: 'Work Sans', monospace; backdrop-filter: blur(8px);">
+              <div id="map-coords" style="position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 12px; font-size: 11px; font-weight: 500; font-family: 'Work Sans', monospace; backdrop-filter: blur(8px);">
                 <span id="coords-text">14°04'57.77"N 86°10'36.26"W</span>
               </div>
 
               <!-- Map overlay buttons - M3 Floating -->
               <div style="position: absolute; top: 16px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px;">
-                <button type="button" id="btn-toggle-layers" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 14px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Cambiar capa">
+                <button type="button" id="btn-toggle-layers" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Cambiar capa">
                   <span class="material-icons" style="font-size: 22px; color: #444;">layers</span>
                 </button>
-                <button type="button" id="btn-locate" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 14px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Mi ubicación">
+                <button type="button" id="btn-locate" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Mi ubicación">
                   <span class="material-icons" style="font-size: 22px; color: #444;">my_location</span>
                 </button>
               </div>
@@ -173,7 +173,7 @@ export async function renderNuevoLote(id) {
             </p>
             
             <!-- Color Picker and Area Badge -->
-            <div id="color-picker-row" style="display: none; margin-top: 16px; padding: 12px 20px; background: white; border-radius: 16px; border: 1px solid var(--m3-outline-variant); align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div id="color-picker-row" style="display: none; margin-top: 16px; padding: 12px 20px; background: white; border-radius: 12px; border: 1px solid var(--m3-outline-variant); align-items: center; gap: 16px; flex-wrap: wrap;">
               <span style="font-size: 13px; font-weight: 700; color: var(--m3-on-surface); font-family: 'Work Sans', sans-serif; display: flex; align-items: center; gap: 6px;">
                 <span class="material-icons" style="font-size: 18px;">palette</span> Color:
               </span>
@@ -191,12 +191,12 @@ export async function renderNuevoLote(id) {
               </div>
             </div>
 
-            <div id="area-info-badge" style="display: none; margin-top: 12px; padding: 16px 24px; background: var(--m3-primary-container); border-radius: 16px; align-items: center; justify-content: space-between;">
+            <div id="area-info-badge" style="display: none; margin-top: 12px; padding: 16px 24px; background: var(--m3-primary-container); border-radius: 12px; align-items: center; justify-content: space-between;">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <span class="material-icons" style="color: var(--m3-on-primary-container); font-size: 28px;">check_circle</span>
                 <div>
                   <p style="font-size: 12px; font-weight: 700; color: var(--m3-on-primary-container); text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Área Calculada</p>
-                  <p id="area-calculated-text" style="font-size: 22px; font-weight: 800; color: var(--m3-on-primary-container); margin: 0; font-family: 'Manrope', sans-serif;">0.00 ha</p>
+                  <p id="area-calculated-text" style="font-size: 22px; font-weight: 800; color: var(--m3-on-primary-container); margin: 0; font-family: 'Work Sans', sans-serif;">0.00 ha</p>
                 </div>
               </div>
               <button type="button" id="btn-clear-drawing" class="btn-m3-text" style="padding: 8px 16px; font-size: 12px;">
@@ -861,7 +861,7 @@ function createWalkPanel() {
         <span class="walk-status-dot idle" id="walk-status-dot"></span>
         <span id="walk-status-text" style="font-weight:600;font-size:14px;color:var(--m3-on-surface);">Listo</span>
       </div>
-      <span id="walk-area-text" style="font-size:20px;font-weight:800;font-family:Manrope,sans-serif;color:var(--m3-on-surface);">0.00 ha</span>
+      <span id="walk-area-text" style="font-size:20px;font-weight:800;font-family:'Work Sans',sans-serif;color:var(--m3-on-surface);">0.00 ha</span>
     </div>
     <div id="walk-actions-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
       <button id="btn-walk-pause" class="m3-walk-action-btn" style="display:none;background:var(--m3-surface-highest);color:var(--m3-on-surface);">

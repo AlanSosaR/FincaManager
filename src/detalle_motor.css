@@ -5,7 +5,7 @@
   --color-accent-green: #2d3e2c;
   --color-dark-brown: #3b0e0a;
   --color-shadow: rgba(0,0,0,0.06);
-  --radius-premium: 32px;
+  --radius-premium: 12px;
 }
 
 .screen-detalle-motor {
@@ -98,14 +98,14 @@
   width: 100%;
   height: 20px;
   background: rgba(0,0,0,0.1);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
 .maint-progress-fill {
   height: 100%;
   background: var(--color-dark-brown);
-  border-radius: 10px;
+  border-radius: 12px;
   transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -114,7 +114,7 @@
   color: white;
   border: none;
   padding: 20px 32px;
-  border-radius: 100px;
+  border-radius: 12px;
   font-weight: 800;
   font-size: 14px;
   display: flex;
@@ -192,7 +192,7 @@
 .badge-status-expressive {
   background: rgba(255,255,255,0.9);
   padding: 8px 16px;
-  border-radius: 100px;
+  border-radius: 12px;
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -266,7 +266,7 @@
   color: white;
   border: none;
   padding: 16px 24px;
-  border-radius: 100px;
+  border-radius: 12px;
   font-weight: 800;
   width: 100%;
   display: flex;
@@ -304,7 +304,7 @@
 .session-icon-box {
   width: 48px; height: 48px;
   background: #f0ede4;
-  border-radius: 14px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -330,7 +330,7 @@
   background: white;
   border: 1.5px solid #eee;
   padding: 16px 24px;
-  border-radius: 100px;
+  border-radius: 12px;
   width: 100%;
   font-family: inherit;
   font-size: 14px;
@@ -453,7 +453,7 @@
 .tl-pill {
   background: #f0ede4;
   padding: 6px 14px;
-  border-radius: 100px;
+  border-radius: 12px;
   font-size: 10.5px;
   font-weight: 800;
   color: #72796f;
@@ -496,7 +496,7 @@
 .m3-input-container {
   background: #f3f4ee;
   border: 1px solid #eee;
-  border-radius: 16px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -526,7 +526,7 @@
 .m3-result-bubble {
   background: #f0ede4;
   border: 2px dashed #c7cec3;
-  border-radius: 20px;
+  border-radius: 12px;
   padding: 20px;
   display: flex;
   justify-content: space-between;
@@ -555,7 +555,7 @@
 .m3-calc-icon-container {
   width: 48px; height: 48px;
   background: white;
-  border-radius: 14px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -569,7 +569,7 @@
   border: none;
   width: 100%;
   padding: 20px;
-  border-radius: 18px;
+  border-radius: 12px;
   font-weight: 800;
   font-size: 16px;
   cursor: pointer;

@@ -26,7 +26,7 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId) 
   return `
     <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-4xl m3-mx-auto m3-font-work-sans">
 
-      <div class="m3-card m3-p-8" style="border-radius: 32px; margin-bottom: 24px;">
+      <div class="m3-card m3-p-8" style="border-radius: 12px; margin-bottom: 24px;">
         <div style="display: flex; align-items: center; gap: 16px;">
           <div style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 28px; background: ${getColor(persona.nombre)}; color: white; flex-shrink: 0;">${persona.iniciales}</div>
           <div style="flex: 1;">
@@ -39,7 +39,7 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId) 
         </div>
       </div>
 
-      <div class="m3-card m3-p-8" style="border-radius: 32px;">
+      <div class="m3-card m3-p-8" style="border-radius: 12px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
           <div style="display: flex; align-items: center; gap: 12px;">
             <button class="cal-nav-btn" onclick="window.__calNavigate(-1)">‹</button>

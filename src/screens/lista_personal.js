@@ -33,7 +33,7 @@ export async function renderListaPersonal() {
           justify-content: space-between;
           padding: 18px 24px;
           background: var(--m3-surface-container-low);
-          border-radius: 20px;
+          border-radius: 12px;
           cursor: pointer;
           transition: background 0.2s, transform 0.15s;
         }
@@ -79,7 +79,7 @@ export async function renderListaPersonal() {
           right: 0;
           z-index: 100;
           background: var(--m3-surface-container-high, #fff);
-          border-radius: 16px;
+          border-radius: 12px;
           box-shadow: 0 4px 20px rgba(0,0,0,0.15);
           padding: 6px;
           min-width: 160px;
@@ -158,8 +158,8 @@ export async function renderListaPersonal() {
                 </div>
               </div>
           `).join('') : `
-            <div class="m3-flex m3-flex-col m3-items-center m3-justify-center" style="padding: 64px 24px; background: var(--m3-surface-container-low); border-radius: 32px; text-align: center;">
-              <div style="width: 80px; height: 80px; border-radius: 24px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+            <div class="m3-flex m3-flex-col m3-items-center m3-justify-center" style="padding: 64px 24px; background: var(--m3-surface-container-low); border-radius: 12px; text-align: center;">
+              <div style="width: 80px; height: 80px; border-radius: 12px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
                 <span class="material-symbols-outlined" style="font-size: 40px; color: #6b8245;">groups</span>
               </div>
               <p class="m3-title-medium m3-font-bold m3-text-on-surface" style="margin-bottom: 4px;">No hay personal registrado</p>

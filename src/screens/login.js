@@ -7,27 +7,27 @@ export async function renderLogin(showForm) {
       <div id="login-info-card" class="login-info-card" style="${showFormDirect ? 'display:none;' : ''}">
         <div class="login-decorative-blob"></div>
 
-        <div class="login-info-content">
-          <div class="login-icon-box">
-            <img src="/pwa-512x512.svg" alt="Finca Manager" class="login-logo">
+          <div class="login-info-content">
+            <div class="login-icon-box">
+              <img src="/pwa-512x512.svg" alt="Finca Manager" class="login-logo">
+            </div>
+            <h1 class="m3-display-medium" style="color:var(--m3-on-surface);margin-bottom:16px;">Finca Manager</h1>
+            <p class="m3-body-large" style="color:var(--m3-on-surface-variant);margin-bottom:24px;max-width:28rem;">
+              Gestiona tu finca agrícola de forma colaborativa, incluso sin conexión. Centraliza tus datos y toma decisiones informadas desde cualquier lugar.
+            </p>
+            <button id="btn-start-app" class="login-empezar-btn desktop-btn">
+              Empezar ahora
+            </button>
           </div>
-          <h1 class="m3-display-medium" style="color:var(--m3-on-surface);margin-bottom:16px;">Finca Manager</h1>
-          <p class="m3-body-large" style="color:var(--m3-on-surface-variant);margin-bottom:24px;max-width:28rem;">
-            Gestiona tu finca agrícola de forma colaborativa, incluso sin conexión. Centraliza tus datos y toma decisiones informadas desde cualquier lugar.
-          </p>
-          <button id="btn-start-app" class="login-empezar-btn">
-            Empezar ahora
-          </button>
-        </div>
 
         <div class="login-features-grid">
           <div class="login-feature-card">
-            <span class="material-symbols-outlined">local_cafe</span>
+            <img src="/planta-de-cafe.png" alt="Cafetal" class="login-feature-icon-img">
             <span class="login-feature-title">Cafetal</span>
             <p class="login-feature-desc">Gestión de lotes, variedades y seguimiento de cosecha.</p>
           </div>
           <div class="login-feature-card">
-            <span class="material-symbols-outlined">pets</span>
+            <img src="/vaca.png" alt="Ganado" class="login-feature-icon-img">
             <span class="login-feature-title">Ganado</span>
             <p class="login-feature-desc">Control individual, trazabilidad y estado de salud.</p>
           </div>
@@ -52,6 +52,10 @@ export async function renderLogin(showForm) {
             <p class="login-feature-desc">Sincronización automática de datos al recuperar la señal.</p>
           </div>
         </div>
+
+        <button class="login-empezar-btn mobile-btn">
+          Empezar ahora
+        </button>
       </div>
 
       <div id="login-form-card" class="m3-card-filled" style="width:100%;max-width:480px;margin:0;${showFormDirect ? '' : 'display:none;'}">
@@ -71,7 +75,7 @@ export async function renderLogin(showForm) {
             <span class="material-icons" id="pw-icon" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);cursor:pointer;z-index:2;color:#888;">visibility_off</span>
           </div>
           <div id="login-error" style="color:#ff4103;font-size:13px;margin-bottom:16px;display:none;"></div>
-          <button type="submit" class="btn-m3-primary" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:40px;background:#2d3e2c;color:white;border:none;cursor:pointer;font-family:'Work Sans',sans-serif;">
+          <button type="submit" class="btn-m3-primary" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;background:#2d3e2c;color:white;border:none;cursor:pointer;font-family:'Work Sans',sans-serif;">
             <span class="material-icons" style="vertical-align:middle;margin-right:8px;">login</span> Entrar
           </button>
         </form>
@@ -80,7 +84,7 @@ export async function renderLogin(showForm) {
           <a href="#" onclick="window.navigateTo('register'); return false;" style="color:#2d3e2c;font-weight:700;font-size:14px;">Regístrate</a>
         </div>
         <div style="text-align:center;margin-top:16px;">
-          <button id="btn-back-info" style="background:transparent;border:none;cursor:pointer;color:#888;font-size:13px;padding:8px 16px;border-radius:8px;">Volver al inicio</button>
+          <button id="btn-back-info" style="background:transparent;border:none;cursor:pointer;color:#888;font-size:13px;padding:8px 16px;border-radius:12px;">Volver al inicio</button>
         </div>
       </div>
     </div>
@@ -88,16 +92,16 @@ export async function renderLogin(showForm) {
 }
 
 export function initLogin() {
-  const startBtn = document.getElementById('btn-start-app');
+  const startBtns = document.querySelectorAll('.login-empezar-btn');
   const backBtn = document.getElementById('btn-back-info');
   const infoCard = document.getElementById('login-info-card');
   const formCard = document.getElementById('login-form-card');
-  if (startBtn && infoCard && formCard) {
-    startBtn.addEventListener('click', () => {
+  startBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
       infoCard.style.display = 'none';
       formCard.style.display = '';
     });
-  }
+  });
   if (backBtn && infoCard && formCard) {
     backBtn.addEventListener('click', () => {
       formCard.style.display = 'none';

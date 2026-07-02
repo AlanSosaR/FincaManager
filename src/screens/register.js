@@ -51,7 +51,7 @@ export async function renderRegister(invitationToken) {
             <label>Nombre de tu finca / empresa</label>
           </div>
           <div id="register-error" style="color:#ff4103;font-size:13px;margin-bottom:16px;display:none;"></div>
-          <button type="submit" class="btn-m3-primary" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:40px;background:#2d3e2c;color:white;border:none;cursor:pointer;font-family:'Work Sans',sans-serif;">
+          <button type="submit" class="btn-m3-primary" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;background:#2d3e2c;color:white;border:none;cursor:pointer;font-family:'Work Sans',sans-serif;">
             <span class="material-icons" style="vertical-align:middle;margin-right:8px;">person_add</span> ${isInvite ? 'Aceptar invitación' : 'Crear cuenta'}
           </button>
         </form>
@@ -60,7 +60,7 @@ export async function renderRegister(invitationToken) {
           <a href="#" onclick="window.navigateTo('login', 'form'); return false;" style="color:#2d3e2c;font-weight:700;font-size:14px;">Inicia sesión</a>
         </div>
         <div style="text-align:center;margin-top:16px;">
-          <button id="btn-back-register-info" onclick="window.navigateTo('login');" style="background:transparent;border:none;cursor:pointer;color:#888;font-size:13px;padding:8px 16px;border-radius:8px;">Volver al inicio</button>
+          <button id="btn-back-register-info" onclick="window.navigateTo('login');" style="background:transparent;border:none;cursor:pointer;color:#888;font-size:13px;padding:8px 16px;border-radius:12px;">Volver al inicio</button>
         </div>
       </div>
     </div>

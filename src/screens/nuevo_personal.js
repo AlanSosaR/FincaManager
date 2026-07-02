@@ -21,12 +21,12 @@ export async function renderNuevoPersonal(personalId, returnScreen, returnId) {
     <div class="m3-form-screen">
       <div class="m3-form-card">
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-          <div class="da-stat-icon" style="width: 48px; height: 48px; border-radius: 16px; background: rgba(69,87,67,0.1); color: #6b8245; font-size: 24px;">
+          <div class="da-stat-icon" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(69,87,67,0.1); color: #6b8245; font-size: 24px;">
             <span class="material-icons">groups</span>
           </div>
           <div>
             <div class="da-hero-subtitle" style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--m3-on-surface-variant); letter-spacing: 0.5px;">${subtitle}</div>
-            <h2 class="da-hero-title" style="margin: 0; font-size: 24px; font-family: 'Manrope', sans-serif; color: var(--m3-on-surface); font-weight: 800;">${title}</h2>
+            <h2 class="da-hero-title" style="margin: 0; font-size: 24px; font-family: 'Work Sans', sans-serif; color: var(--m3-on-surface); font-weight: 800;">${title}</h2>
           </div>
         </div>
 
@@ -50,10 +50,10 @@ export async function renderNuevoPersonal(personalId, returnScreen, returnId) {
           </div>
 
           <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0; display: flex; justify-content: flex-end; gap: 12px;">
-            <button type="button" class="da-action-btn secondary" onclick="${backAction}" style="padding: 12px 24px; border-radius: 9999px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
+            <button type="button" class="da-action-btn secondary" onclick="${backAction}" style="padding: 12px 24px; border-radius: 12px; background: transparent; border: 1px solid var(--m3-outline); color: var(--m3-primary); font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif;">
               Cancelar
             </button>
-            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 9999px; background: #2d3e2c; border: none; color: white; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(45,62,44,0.4); font-family: 'Work Sans', sans-serif;">
+            <button type="submit" class="da-action-btn primary" style="padding: 12px 32px; border-radius: 12px; background: #2d3e2c; border: none; color: white; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(45,62,44,0.4); font-family: 'Work Sans', sans-serif;">
               <span class="material-symbols-outlined" style="font-size: 20px;">save</span>
               <span>${btnLabel}</span>
             </button>

@@ -65,9 +65,9 @@ export async function renderDetalleLote(id) {
             <div class="m3-flex m3-items-center m3-gap-2 m3-text-on-surface-variant m3-label-medium m3-font-bold m3-mb-3" style="padding-left: 4px;">
               <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;"> ${lote.area_ha || 0} Hectáreas
             </div>
-            <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' class="m3-card m3-p-8" style="border-radius: 32px; height: 180px; overflow: hidden;"></div>
+            <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' class="m3-card m3-p-8" style="border-radius: 12px; height: 180px; overflow: hidden;"></div>
             <!-- Personal Asignado -->
-            <div class="m3-card m3-p-6" style="border-radius: 32px; margin-top: 24px; overflow: hidden;">
+            <div class="m3-card m3-p-6" style="border-radius: 12px; margin-top: 24px; overflow: hidden;">
               <h3 class="m3-title-large m3-font-bold m3-mb-6 m3-flex m3-items-center m3-gap-2" style="white-space: nowrap;">
                 <span class="material-symbols-outlined m3-text-primary">groups</span>
                 Personal Asignado
@@ -76,7 +76,7 @@ export async function renderDetalleLote(id) {
 
               <div class="m3-flex m3-flex-col" style="gap: 14px;" id="personal-list">
                 ${asignados.length > 0 ? asignados.map(p => `
-                <div class="m3-flex m3-items-center m3-justify-between" style="cursor: pointer; padding: 14px 18px; background: var(--m3-surface-container-low); border-radius: 18px; transition: background 0.2s;" onclick="window.navigateTo('detalle_personal', '${p.id}', 'detalle_lote', '${id}')" onmouseover="this.style.background='var(--m3-surface-container-highest)'" onmouseout="this.style.background='var(--m3-surface-container-low)'">
+                <div class="m3-flex m3-items-center m3-justify-between" style="cursor: pointer; padding: 14px 18px; background: var(--m3-surface-container-low); border-radius: 12px; transition: background 0.2s;" onclick="window.navigateTo('detalle_personal', '${p.id}', 'detalle_lote', '${id}')" onmouseover="this.style.background='var(--m3-surface-container-highest)'" onmouseout="this.style.background='var(--m3-surface-container-low)'">
                   <div class="m3-flex m3-items-center" style="gap: 14px;">
                     <div class="m3-rounded-full m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 14px; width: 42px; height: 42px; background: ${getAvatarColor(p.nombre)}; color: white; flex-shrink: 0;">${p.iniciales || getInitiales(p.nombre)}</div>
                     <div>
@@ -90,7 +90,7 @@ export async function renderDetalleLote(id) {
                   </div>
                 </div>
                 `).join('') : `
-                <div class="m3-p-8 m3-text-center m3-text-on-surface-variant m3-label-medium" style="background: var(--m3-surface-container-low); border-radius: 18px;">
+                <div class="m3-p-8 m3-text-center m3-text-on-surface-variant m3-label-medium" style="background: var(--m3-surface-container-low); border-radius: 12px;">
                   <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.35;">group_off</span>
                   Sin personal asignado
                 </div>
@@ -100,14 +100,14 @@ export async function renderDetalleLote(id) {
               <!-- Assign personnel -->
               <div style="margin-top: 32px;">
                 <div class="m3-field" style="margin-bottom: 12px;">
-                  <select id="select-asignar-personal" style="width: 100%; box-sizing: border-box; padding: 14px 20px; border-radius: 9999px; border: 1.5px solid var(--m3-outline); background: var(--m3-surface-container-low); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--m3-on-surface); cursor: pointer; outline: none; appearance: none;">
+                  <select id="select-asignar-personal" style="width: 100%; box-sizing: border-box; padding: 14px 20px; border-radius: 12px; border: 1.5px solid var(--m3-outline); background: var(--m3-surface-container-low); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--m3-on-surface); cursor: pointer; outline: none; appearance: none;">
                     <option value="" disabled selected>Seleccionar persona</option>
                     ${disponibles.map(p => `
                       <option value="${p.id}">${p.nombre}${p.rol ? ' — ' + p.rol : ''}</option>
                     `).join('')}
                   </select>
                 </div>
-                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="width: 100%; justify-content: center; box-sizing: border-box; padding: 14px 32px; border-radius: 9999px; border: none; background: #2d3e2c; color: white; font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; box-shadow: 0 4px 12px rgba(45,62,44,0.4);">
+                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="width: 100%; justify-content: center; box-sizing: border-box; padding: 14px 32px; border-radius: 12px; border: none; background: #2d3e2c; color: white; font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; box-shadow: 0 4px 12px rgba(45,62,44,0.4);">
                   <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
                   Agregar
                 </button>
@@ -118,7 +118,7 @@ export async function renderDetalleLote(id) {
           <div class="m3-flex m3-flex-col m3-gap-8 dl-main-col" style="margin-top: 8px; grid-column: 1;">
 
             <!-- Fertilización Section -->
-            <div class="m3-card m3-p-8" style="border-radius: 32px;">
+            <div class="m3-card m3-p-8" style="border-radius: 12px;">
               <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
                 <div class="m3-flex m3-items-center m3-gap-4">
                   <img src="fertilizante.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
@@ -162,7 +162,7 @@ export async function renderDetalleLote(id) {
             </div>
 
             <!-- Otras Aplicaciones Section -->
-            <div class="m3-card m3-p-8" style="border-radius: 32px;">
+            <div class="m3-card m3-p-8" style="border-radius: 12px;">
               <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
                 <div class="m3-flex m3-items-center m3-gap-4">
                   <img src="tijeras-de-podar.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">

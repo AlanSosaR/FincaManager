@@ -34,7 +34,7 @@ export async function renderDetalleMotor(motorId) {
 
   return `
       <!-- Main Detail Card (GitHub/Vercel Design) -->
-      <div class="card" style="background: white; border-radius: 32px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); margin-bottom: 32px; position: relative;">
+      <div class="card" style="background: white; border-radius: 12px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); margin-bottom: 32px; position: relative;">
         
         <!-- Header: Image + Title + Edit Icon -->
         <div class="motor-detail-header">
@@ -87,8 +87,8 @@ export async function renderDetalleMotor(motorId) {
             <span style="font-size: 12px; font-weight: 700; color: #666;">Vida útil del aceite</span>
             <span style="font-size: 12px; font-weight: 800; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'};">${pct}%</span>
           </div>
-          <div style="height: 8px; background: #eee; border-radius: 4px; overflow: hidden; position: relative;">
-            <div style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; border-radius: 4px; transition: width 1s ease-out;"></div>
+          <div style="height: 8px; background: #eee; border-radius: 12px; overflow: hidden; position: relative;">
+            <div style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; border-radius: 12px; transition: width 1s ease-out;"></div>
           </div>
         </div>
 
@@ -107,7 +107,7 @@ export async function renderDetalleMotor(motorId) {
         <div class="section">
           
           <!-- Timer Card -->
-          <div class="card" style="padding: 32px; margin-bottom: 24px; text-align: center; background: white; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 20px rgba(0,0,0,0.03); border-radius: 32px;">
+          <div class="card" style="padding: 32px; margin-bottom: 24px; text-align: center; background: white; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 4px 20px rgba(0,0,0,0.03); border-radius: 12px;">
             <div style="display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; color: #888;">
               <span class="material-icons" style="font-size: 18px;">timer</span>
               <span style="font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;">Control de Sesión</span>
@@ -146,7 +146,7 @@ export async function renderDetalleMotor(motorId) {
           <!-- Manual Entry Card -->
           <div class="card" style="padding: 24px;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-              <div style="background: var(--secondary-container); color: var(--on-secondary-container); width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+              <div style="background: var(--secondary-container); color: var(--on-secondary-container); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                 <span class="material-icons">edit_calendar</span>
               </div>
               <h3 style="margin: 0; font-size: 18px;">Registro Manual</h3>
@@ -172,7 +172,7 @@ export async function renderDetalleMotor(motorId) {
                 </div>
               </div>
 
-              <div style="background: var(--surface-variant); padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; border: 1px dashed #ccc;">
+              <div style="background: var(--surface-variant); padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px dashed #ccc;">
                 <div style="display: flex; flex-direction: column;">
                   <span style="font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase;">Duración Calculada</span>
                   <span id="calc-manual-result" style="font-size: 18px; font-weight: 900; color: var(--primary-container);">4h 00m</span>
@@ -214,7 +214,7 @@ export async function renderDetalleMotor(motorId) {
                    <span style="font-size: 14px; font-weight: 900; color: #444;">${s.total_horas || 0}H</span>
                 </div>
               </div>
-            `).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 20px; border: 1px dashed #ccc;">No hay sesiones registradas.</p>'}
+            `).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">No hay sesiones registradas.</p>'}
           </div>
 
           <div class="section-title">
@@ -244,7 +244,7 @@ export async function renderDetalleMotor(motorId) {
                   </button>
                 </div>
               </div>
-            `).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 20px; border: 1px dashed #ccc;">Sin mantenimientos registrados.</p>'}
+            `).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">Sin mantenimientos registrados.</p>'}
           </div>
 
         </div>

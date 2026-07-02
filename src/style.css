@@ -37,14 +37,14 @@
 
   /* Expressive Tokens */
   --m3-radius-none: 0;
-  --m3-radius-xs: 4px;
-  --m3-radius-sm: 8px;
+  --m3-radius-xs: 12px;
+  --m3-radius-sm: 12px;
   --m3-radius-md: 12px;
-  --m3-radius-lg: 16px;
-  --m3-radius-xl: 24px;
-  --m3-radius-2xl: 32px;
-  --m3-radius-3xl: 48px;
-  --m3-radius-full: 9999px;
+  --m3-radius-lg: 12px;
+  --m3-radius-xl: 12px;
+  --m3-radius-2xl: 12px;
+  --m3-radius-3xl: 12px;
+  --m3-radius-full: 12px;
 
   /* Legacy aliases for existing code */
   --primary: var(--m3-primary);
@@ -260,7 +260,7 @@ body.screen-auth #app .main-content {
 .nav-link.header-main.active img {
   outline: 2px solid #ffffff;
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 12px;
   filter: none !important;
 }
 
@@ -310,7 +310,7 @@ body.screen-auth #app .main-content {
   justify-content: center;
   padding: 16px 8px;
   gap: 0;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .sidebar.collapsed .nav-link span {
@@ -640,7 +640,7 @@ body.screen-auth #app .main-content {
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: 16px;
+  border-radius: 12px;
   border: none;
   cursor: pointer;
   overflow: hidden;
@@ -671,7 +671,7 @@ body.screen-auth #app .main-content {
 /* Hover — expressive spring scale + more rounded */
 .m3-icon-btn-tonal:hover {
   background-color: var(--m3-surface-container);
-  border-radius: 20px;
+  border-radius: 12px;
   transform: scale(1.08);
   box-shadow: 0 4px 12px rgba(0,0,0,0.10);
 }
@@ -679,13 +679,13 @@ body.screen-auth #app .main-content {
 /* ── M3 Expressive Utility Classes ─────────────────────────────────────────── */
 
 /* Typography */
-.m3-display-large { font-family: 'Manrope', sans-serif; font-size: 57px; font-weight: 800; line-height: 64px; letter-spacing: -0.25px; }
-.m3-display-medium { font-family: 'Manrope', sans-serif; font-size: 45px; font-weight: 800; line-height: 52px; }
-.m3-display-small { font-family: 'Manrope', sans-serif; font-size: 36px; font-weight: 800; line-height: 44px; }
+.m3-display-large { font-family: 'Work Sans', sans-serif; font-size: 57px; font-weight: 800; line-height: 64px; letter-spacing: -0.25px; }
+.m3-display-medium { font-family: 'Work Sans', sans-serif; font-size: 45px; font-weight: 800; line-height: 52px; }
+.m3-display-small { font-family: 'Work Sans', sans-serif; font-size: 36px; font-weight: 800; line-height: 44px; }
 
-.m3-headline-large { font-family: 'Manrope', sans-serif; font-size: 32px; font-weight: 700; line-height: 40px; }
-.m3-headline-medium { font-family: 'Manrope', sans-serif; font-size: 28px; font-weight: 700; line-height: 36px; }
-.m3-headline-small { font-family: 'Manrope', sans-serif; font-size: 24px; font-weight: 700; line-height: 32px; }
+.m3-headline-large { font-family: 'Work Sans', sans-serif; font-size: 32px; font-weight: 700; line-height: 40px; }
+.m3-headline-medium { font-family: 'Work Sans', sans-serif; font-size: 28px; font-weight: 700; line-height: 36px; }
+.m3-headline-small { font-family: 'Work Sans', sans-serif; font-size: 24px; font-weight: 700; line-height: 32px; }
 
 .m3-title-large { font-family: 'Work Sans', sans-serif; font-size: 22px; font-weight: 700; line-height: 28px; }
 .m3-title-medium { font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 700; line-height: 24px; letter-spacing: 0.15px; }
@@ -795,13 +795,13 @@ body.screen-auth #app .main-content {
   background-color: var(--m3-primary);
   color: var(--m3-on-primary);
   padding: 16px 24px;
-  border-radius: 28px;
+  border-radius: 12px;
   border: none;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   z-index: 100;
   transition: var(--transition);
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Work Sans', sans-serif;
   font-weight: 700;
   text-decoration: none;
 }
@@ -822,7 +822,7 @@ body.screen-auth #app .main-content {
   justify-content: center;
   padding: 12px 24px;
   border-radius: var(--m3-radius-full);
-  font-family: 'Manrope', sans-serif;
+  font-family: 'Work Sans', sans-serif;
   font-weight: 700;
   cursor: pointer;
   transition: var(--transition);
@@ -861,7 +861,7 @@ body.screen-auth #app .main-content {
 }
 
 /* More Typography & Helpers */
-.m3-font-manrope { font-family: 'Manrope', sans-serif; }
+.m3-font-manrope { font-family: 'Work Sans', sans-serif; }
 .m3-font-work-sans { font-family: 'Work Sans', sans-serif; }
 .m3-font-bold { font-weight: 700; }
 .m3-font-extrabold { font-weight: 800; }
@@ -936,7 +936,7 @@ body.screen-auth #app .main-content {
 .m3-icon-btn-tonal:active {
   transform: scale(0.94);
   background-color: var(--m3-surface);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
   transition: transform 0.1s ease, border-radius 0.1s ease;
 }
@@ -1010,6 +1010,13 @@ body.screen-auth #app .main-content {
   }
 }
 
+.login-empezar-btn.mobile-btn { display: none; }
+
+@media (max-width: 767px) {
+  .login-empezar-btn.desktop-btn { display: none !important; }
+  .login-empezar-btn.mobile-btn { display: flex; }
+}
+
 .login-icon-box {
   width: 64px;
   height: 64px;
@@ -1037,7 +1044,7 @@ body.screen-auth #app .main-content {
 }
 
 .login-feature-card {
-  background: var(--m3-surface);
+  background: #fff9fa;
   border: 1px solid var(--m3-primary-fixed-dim);
   border-radius: var(--m3-radius-md);
   padding: 16px;
@@ -1052,14 +1059,34 @@ body.screen-auth #app .main-content {
 }
 
 .login-feature-card:hover {
-  background: var(--m3-surface-container);
+  background: #2d3e2c;
   transform: translateY(-2px);
+}
+
+.login-feature-card:hover .login-feature-title,
+.login-feature-card:hover .login-feature-desc {
+  color: #ffffff;
+}
+
+.login-feature-card:hover .material-symbols-outlined {
+  color: #ffffff;
+}
+
+.login-feature-card:hover .login-feature-icon-img {
+  filter: brightness(0) invert(1);
 }
 
 .login-feature-card .material-symbols-outlined {
   font-size: 30px;
   color: var(--m3-secondary);
   margin-bottom: 8px;
+}
+
+.login-feature-card .login-feature-icon-img {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 8px;
+  object-fit: contain;
 }
 
 .login-feature-title {
@@ -1085,7 +1112,7 @@ body.screen-auth #app .main-content {
 }
 
 .login-feature-card.highlighted .material-symbols-outlined {
-  color: var(--m3-on-primary-container);
+  color: #ff4103;
 }
 
 .login-feature-card.highlighted .login-feature-title {
@@ -1115,14 +1142,14 @@ body.screen-auth #app .main-content {
   width: 100%;
 }
 
-@media (min-width: 768px) {
-  .login-empezar-btn {
-    width: auto;
-  }
-}
-
 .login-empezar-btn:hover {
   background: var(--m3-secondary);
   box-shadow: 0 8px 24px rgba(15, 82, 56, 0.3);
   transform: translateY(-4px);
+}
+
+@media (min-width: 768px) {
+  .login-empezar-btn {
+    width: auto;
+  }
 }

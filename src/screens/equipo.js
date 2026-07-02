@@ -37,7 +37,7 @@ export async function renderEquipo() {
                 <div style="font-weight:600;font-size:14px;color:#2d3e2c;">${inv.email}</div>
                 <div style="font-size:12px;color:#888;">${inv.rol} · Pendiente</div>
               </div>
-              <button class="btn-revoke-invitation" data-id="${inv.id}" style="background:transparent;color:#ff4103;border:1px solid #ff4103;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Revocar</button>
+              <button class="btn-revoke-invitation" data-id="${inv.id}" style="background:transparent;color:#ff4103;border:1px solid #ff4103;padding:6px 14px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;">Revocar</button>
             </div>
           `).join('')}
         </div>
@@ -65,7 +65,7 @@ function renderMemberRow(m, currentUserId) {
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <span class="m3-badge" style="background:${roleColors[m.rol] || '#888'};color:white;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">${m.rol}</span>
+        <span class="m3-badge" style="background:${roleColors[m.rol] || '#888'};color:white;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;">${m.rol}</span>
         ${!isSelf && !m._isReadonly ? `
           <div class="member-actions" style="position:relative;">
             <button class="btn-member-menu" data-userid="${m.id}" style="background:transparent;border:none;cursor:pointer;padding:4px;border-radius:50%;color:#666;">
@@ -115,7 +115,7 @@ function toggleInviteInline() {
 function renderInviteForm(container) {
   const empresaId = window._currentEmpresaId;
   container.innerHTML = `
-    <div style="padding:20px;background:#f9fbf9;border-radius:16px;border:1px solid #e0e8e0;">
+    <div style="padding:20px;background:#f9fbf9;border-radius:12px;border:1px solid #e0e8e0;">
       <h4 style="font-size:14px;font-weight:700;color:#2d3e2c;margin:0 0 16px;">Nuevo miembro</h4>
       <form id="invite-form">
         <div class="m3-field" style="margin-bottom:16px;">
@@ -130,8 +130,8 @@ function renderInviteForm(container) {
           </select>
         </div>
         <div style="display:flex;gap:12px;">
-          <button type="button" id="invite-cancel-inline" style="flex:1;padding:12px;border-radius:40px;background:transparent;border:1px solid #ccc;color:#666;font-weight:600;cursor:pointer;">Cancelar</button>
-          <button type="submit" id="invite-submit" style="flex:1;padding:12px;border-radius:40px;background:#2d3e2c;color:white;border:none;font-weight:700;cursor:pointer;">Invitar</button>
+          <button type="button" id="invite-cancel-inline" style="flex:1;padding:12px;border-radius:12px;background:transparent;border:1px solid #ccc;color:#666;font-weight:600;cursor:pointer;">Cancelar</button>
+          <button type="submit" id="invite-submit" style="flex:1;padding:12px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;cursor:pointer;">Invitar</button>
         </div>
       </form>
       <div id="invite-result" style="display:none;margin-top:16px;padding:16px;background:#eaf5ea;border-radius:12px;border:1px solid #c8e6c9;">
@@ -141,10 +141,10 @@ function renderInviteForm(container) {
         </div>
         <p style="font-size:12px;color:#555;margin-bottom:12px;line-height:1.4;">Comparte este enlace con la persona que quieres invitar.</p>
         <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <input type="text" id="invite-link" readonly style="flex:1;padding:10px 12px;border:1px solid #ccc;border-radius:10px;font-size:11px;background:white;color:#333;" value="">
-          <button onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value)" style="padding:10px 16px;border-radius:10px;background:#2d3e2c;color:white;border:none;font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap;">Copiar</button>
+          <input type="text" id="invite-link" readonly style="flex:1;padding:10px 12px;border:1px solid #ccc;border-radius:12px;font-size:11px;background:white;color:#333;" value="">
+          <button onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value)" style="padding:10px 16px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap;">Copiar</button>
         </div>
-        <a id="invite-email-btn" href="#" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border-radius:40px;background:white;border:1px solid #2d3e2c;color:#2d3e2c;font-weight:600;font-size:12px;cursor:pointer;text-decoration:none;box-sizing:border-box;">
+        <a id="invite-email-btn" href="#" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border-radius:12px;background:white;border:1px solid #2d3e2c;color:#2d3e2c;font-weight:600;font-size:12px;cursor:pointer;text-decoration:none;box-sizing:border-box;">
           <span class="material-icons" style="font-size:16px;">mail</span> Enviar por correo
         </a>
       </div>

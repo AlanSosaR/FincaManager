@@ -49,7 +49,7 @@ export async function renderNuevoPotrero(id) {
               <div class="m3-field">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <input type="number" step="0.01" name="area" placeholder=" " style="flex: 1;">
-                  <select name="area_unidad" style="width: auto; border: none; background: #f0f0f0; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: 700; color: #6b8245;">
+                  <select name="area_unidad" style="width: auto; border: none; background: #f0f0f0; border-radius: 12px; padding: 4px 8px; font-size: 12px; font-weight: 700; color: #6b8245;">
                     <option value="ha">ha</option>
                     <option value="m2">m²</option>
                     <option value="mz">mz</option>
@@ -141,7 +141,7 @@ export function initNuevoPotrero(id) {
         existingImageUrl = data.image_url;
 
         if (data.image_url) {
-          preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">`;
+          preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">`;
         }
       }
     });
@@ -162,7 +162,7 @@ export function initNuevoPotrero(id) {
         selectedFile = file;
         const reader = new FileReader();
         reader.onload = (re) => {
-          preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">`;
+          preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">`;
         };
         reader.readAsDataURL(file);
       }

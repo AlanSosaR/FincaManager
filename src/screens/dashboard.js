@@ -86,7 +86,7 @@ export async function renderDashboard(page) {
           .db-title { font-size: 22px !important; }
           .db-stats-wrap { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
           .db-stat-row { flex-wrap: wrap !important; gap: 6px !important; width: 100% !important; }
-          .db-stat-row > div { width: 100% !important; padding: 12px 16px !important; background: var(--m3-surface-container-highest) !important; border-radius: 16px !important; }
+          .db-stat-row > div { width: 100% !important; padding: 12px 16px !important; background: var(--m3-surface-container-highest) !important; border-radius: 12px !important; }
           .db-stat-row .m3-title-medium { font-size: 16px !important; }
           .db-stat-row .m3-label-medium { font-size: 12px !important; }
           .db-table-wrap { overflow-x: auto !important; }
@@ -181,8 +181,8 @@ export async function renderDashboard(page) {
                     </div>
                   `;
                 }).join('') : `
-                  <div class="m3-flex m3-flex-col m3-items-center m3-justify-center" style="padding: 64px 24px; background: var(--m3-surface-container-low); border-radius: 32px; text-align: center; grid-column: 1 / -1;">
-                    <div style="width: 80px; height: 80px; border-radius: 24px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+                  <div class="m3-flex m3-flex-col m3-items-center m3-justify-center" style="padding: 64px 24px; background: var(--m3-surface-container-low); border-radius: 12px; text-align: center; grid-column: 1 / -1;">
+                    <div style="width: 80px; height: 80px; border-radius: 12px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
                       <img src="sprouts.png" alt="" style="width: 40px; height: 40px; object-fit: contain; opacity: 0.6;">
                     </div>
                     <p class="m3-title-medium m3-font-bold m3-text-on-surface" style="margin-bottom: 4px;">No hay lotes registrados</p>
@@ -245,7 +245,7 @@ export async function renderDashboard(page) {
                       `}).join('') : `
                         <tr>
                           <td colspan="4" style="text-align: center; padding: 48px 24px;">
-                            <div style="width: 64px; height: 64px; border-radius: 20px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                            <div style="width: 64px; height: 64px; border-radius: 12px; background: rgba(69,87,67,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
                               <span class="material-symbols-outlined" style="font-size: 32px; color: #6b8245;">eco</span>
                             </div>
                             <p class="m3-label-large m3-font-bold m3-text-on-surface" style="margin-bottom: 4px;">Sin aplicaciones recientes</p>

@@ -45,7 +45,7 @@ function updateNotifUI() {
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:14px;color:#2d3e2c;">${n.title}</div>
         <div style="font-size:13px;color:#2d3e2c;margin-top:2px;">${n.desc}</div>
-        ${n.action ? `<button style="margin-top:8px;background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">${n.action.label}</button>` : ''}
+        ${n.action ? `<button style="margin-top:8px;background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:6px 16px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;">${n.action.label}</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -81,7 +81,7 @@ function showDownloadBanner(msg, progress) {
     container.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
         <span class="material-icons" style="font-size:56px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">check_circle</span>
-        <h2 style="font-size:24px;font-weight:800;font-family:'Manrope',sans-serif;color:#2d3e2c;margin-bottom:8px;">Todo listo</h2>
+        <h2 style="font-size:24px;font-weight:800;font-family:'Work Sans',sans-serif;color:#2d3e2c;margin-bottom:8px;">Todo listo</h2>
         <p style="color:#666;font-size:14px;max-width:360px;line-height:1.5;">Los datos se descargaron correctamente. Ya puedes usar la app sin conexión.</p>
       </div>
     `;
@@ -91,10 +91,10 @@ function showDownloadBanner(msg, progress) {
   container.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
       <span class="material-icons animate-spin" style="font-size:48px;color:var(--m3-primary,#2d3e2c);margin-bottom:24px;">sync</span>
-      <h2 style="font-size:22px;font-weight:700;font-family:'Manrope',sans-serif;color:#1a1a1a;margin-bottom:8px;">${msg}</h2>
+      <h2 style="font-size:22px;font-weight:700;font-family:'Work Sans',sans-serif;color:#1a1a1a;margin-bottom:8px;">${msg}</h2>
       <p style="color:#666;font-size:14px;max-width:320px;margin-bottom:24px;">Esto puede tomar unos segundos dependiendo de tu conexion.</p>
-      <div style="width:100%;max-width:320px;height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;">
-        <div style="width:${bar}%;height:100%;background:#2d3e2c;border-radius:4px;transition:width 0.3s ease;"></div>
+      <div style="width:100%;max-width:320px;height:8px;background:#e0e0e0;border-radius:12px;overflow:hidden;">
+        <div style="width:${bar}%;height:100%;background:#2d3e2c;border-radius:12px;transition:width 0.3s ease;"></div>
       </div>
       <p style="color:#888;font-size:13px;margin-top:8px;">${bar}%</p>
     </div>
@@ -121,11 +121,11 @@ function showInitialPrompt() {
   container.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
       <span class="material-icons" style="font-size:56px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">cloud_download</span>
-      <h2 style="font-size:24px;font-weight:800;font-family:'Manrope',sans-serif;color:#2d3e2c;margin-bottom:8px;">Descargar datos en local</h2>
+      <h2 style="font-size:24px;font-weight:800;font-family:'Work Sans',sans-serif;color:#2d3e2c;margin-bottom:8px;">Descargar datos en local</h2>
       <p style="color:#2d3e2c;font-size:14px;max-width:360px;margin-bottom:24px;line-height:1.5;">
         Para usar la app sin necesidad de internet, descarga tus datos existentes en el dispositivo.
       </p>
-      <button id="btn-start-download" style="background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:14px 32px;border-radius:40px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,71,65,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+      <button id="btn-start-download" style="background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:14px 32px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,71,65,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
         <span class="material-icons" style="vertical-align:middle;margin-right:8px;">cloud_download</span>
         Descargar ahora
       </button>
@@ -238,7 +238,7 @@ window.openEmpresaSwitcher = function() {
       <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">Seleccionar empresa</h3>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${_empresaList.map(e => `
-          <button class="empresa-switch-btn" data-id="${e.id}" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:16px;background:${e.id === window._currentEmpresaId ? '#2d3e2c' : 'var(--m3-surface-container-low)'};color:${e.id === window._currentEmpresaId ? '#fff' : '#2d3e2c'};border:none;font-weight:600;font-size:14px;cursor:pointer;text-align:left;transition:background .15s;font-family:'Work Sans',sans-serif;"
+          <button class="empresa-switch-btn" data-id="${e.id}" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:12px;background:${e.id === window._currentEmpresaId ? '#2d3e2c' : 'var(--m3-surface-container-low)'};color:${e.id === window._currentEmpresaId ? '#fff' : '#2d3e2c'};border:none;font-weight:600;font-size:14px;cursor:pointer;text-align:left;transition:background .15s;font-family:'Work Sans',sans-serif;"
             onmouseover="this.style.background='${e.id === window._currentEmpresaId ? '#3a5240' : '#e8e6dd'}'" onmouseout="this.style.background='${e.id === window._currentEmpresaId ? '#2d3e2c' : 'var(--m3-surface-container-low)'}'">
             <span class="material-icons" style="font-size:20px;">${e.id === window._currentEmpresaId ? 'check_circle' : 'business'}</span>
             <span style="flex:1;">${e.nombre}</span>
