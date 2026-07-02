@@ -10,6 +10,33 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Auth/DB: llamadas REST directas a Supabase (`authFetch`, `restFetch`, `restInsert`), NO usar `@supabase/supabase-js` ni QueryBuilder.
 - Proyecto Supabase: `udhuizkqnmkhljmezzkd`.
 
+## Lo Completado (03/07)
+
+### Diseño del Login y Landing Page
+- Feature cards con iconos PNG (Cafetal: `planta-de-cafe.png`, Ganado: `vaca.png`) y Material Icons (Personal: `groups`, Motores: `settings_suggest`, Potreros: `landscape`, Sin Conexión: `wifi_off`)
+- Colores: fondo tarjeta `#fff9fa`, borde `#2d3e2c`, hover fondo `#2d3e2c` con texto/iconos blancos
+- Tarjeta "Sin Conexión" destacada con fondo `#2d3e2c` e icono `wifi_off` en `#ff4103`
+- Botón "Empezar" dentro del contenido en PC; en mobile se mueve al final debajo de las tarjetas (dos botones con show/hide por media query)
+
+### Tipografía
+- Eliminado Manrope del proyecto — todo el sistema ahora usa **Work Sans** como tipografía única
+- Reemplazados 20 usos de Manrope en CSS + inline en JS
+
+### Border-radius
+- Estandarizado todo el sistema a **12px** (~350+ cambios):
+  - Variables CSS (`--m3-radius-*`) cambiadas de 4px/8px/16px/24px/32px/48px/9999px → 12px
+  - `--radius-premium` (detalle_motor.css) de 32px → 12px
+  - Todos los valores literales en CSS y JS inline → 12px
+  - No se tocaron `border-radius: 50%` (círculos, avatares, dots)
+
+### Sidebar (`index.html`)
+- Iconos sincronizados con login: Cafetal `local_cafe`, Ganado `pets`, Motores `settings_suggest`
+- Nuevo item "Sin Conexión" con icono `wifi_off` entre Potreros y Equipo
+- PNGs (`planta-de-cafe.png`, `vaca.png`) se mantienen en sidebar con CSS existente (24x24, grayscale filter)
+
+### Commit
+- `6a5ff12` — 29 archivos, +317/-285 líneas
+
 ## Lo Completado (02/07)
 
 ### Sidebar
