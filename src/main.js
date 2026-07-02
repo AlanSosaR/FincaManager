@@ -138,12 +138,7 @@ function showInitialPrompt() {
 }
 
 async function initApp() {
-  if (!isAuthenticated()) {
-    document.addEventListener('DOMContentLoaded', () => {
-      window.navigateTo?.('login');
-    }, { once: true });
-    return;
-  }
+  if (!isAuthenticated()) return;
 
   loadEmpresaId();
 
