@@ -636,6 +636,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function toggleSidebar() {
         const isOpen = sidebar.classList.toggle('open');
         if (overlay) overlay.classList.toggle('active', isOpen);
+        if (isOpen && window.innerWidth <= 1024) {
+            sidebar.classList.remove('collapsed');
+        }
     }
 
     function closeSidebar() {
