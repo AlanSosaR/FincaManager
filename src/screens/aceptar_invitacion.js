@@ -6,6 +6,9 @@ let _token = '';
 
 export async function renderAceptarInvitacion(token) {
   _token = token;
+  const fromEmail = sessionStorage.getItem('finca_from_invite_email') === '1';
+  sessionStorage.removeItem('finca_from_invite_email');
+
   const info = await validateInvitation(token);
   if (!info) {
     return `
@@ -21,7 +24,7 @@ export async function renderAceptarInvitacion(token) {
   _empresaNombre = info.empresaNombre;
   _empresaId = info.empresaId;
 
-  if (isAuthenticated()) {
+  if (isAuthenticated() && !fromEmail) {
     const user = await getUser();
     if (user) {
       try {
@@ -42,7 +45,7 @@ export async function renderAceptarInvitacion(token) {
           Fuiste invitado a colaborar en <strong style="color:#2d3e2c;">${info.empresaNombre}</strong> como <strong style="color:#2d3e2c;text-transform:capitalize;">${info.rol}</strong>.
         </p>
         <button onclick="window.navigateTo('register','${token}')" style="display:block;width:100%;padding:14px;border-radius:40px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:12px;">
-          Crear cuenta y aceptar
+          Aceptar
         </button>
         <button onclick="window.navigateTo('login','${token}')" style="display:block;width:100%;padding:14px;border-radius:40px;background:transparent;border:1px solid #ccc;color:#2d3e2c;font-weight:600;font-size:15px;cursor:pointer;">
           Ya tengo cuenta — Iniciar sesión

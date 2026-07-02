@@ -391,8 +391,9 @@ function handleAuthCallback() {
                 inviteToken = user?.user_metadata?.invite_token || '';
             }
         } catch (e) { console.error('Auth callback error:', e); }
+        if (inviteToken) sessionStorage.setItem('finca_from_invite_email', '1');
         window.location.hash = inviteToken
-            ? `#register?token=${encodeURIComponent(inviteToken)}`
+            ? `#aceptar_invitacion?token=${encodeURIComponent(inviteToken)}`
             : '#dashboard';
     })();
     return true;
@@ -489,6 +490,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (screen.noAuth && isAuthenticated()) {
             if (screenId === 'register' && args.length > 0 && args[0]) {
+                // Allow authenticated users with invite token
+            } else if (screenId === 'aceptar_invitacion' && args.length > 0 && args[0]) {
                 // Allow authenticated users with invite token
             } else {
                 return navigate('dashboard');

@@ -184,6 +184,8 @@ function renderInviteForm(container) {
         if (!res.ok) {
           const err = await res.text().catch(() => res.statusText);
           console.error('Send invite failed:', res.status, err);
+        } else {
+          window.Snackbar.show('Invitación enviada por correo');
         }
       }).catch((err) => {
         console.error('Send invite error:', err);
