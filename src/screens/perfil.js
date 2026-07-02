@@ -20,8 +20,8 @@ export async function renderPerfil() {
   }
 
   return `
-    <div style="max-width:600px;margin:0 auto;padding:24px;">
-      <div class="m3-card" style="padding:32px;text-align:center;margin-bottom:24px;">
+    <div class="m3-card-filled" style="max-width:600px;margin:0 auto;">
+      <div style="text-align:center;">
         <div style="width:80px;height:80px;border-radius:50%;background:#2d3e2c;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
           <span class="material-icons" style="font-size:40px;color:white;">account_circle</span>
         </div>
@@ -29,7 +29,9 @@ export async function renderPerfil() {
         <p style="color:#666;font-size:14px;margin-top:4px;">${email}</p>
       </div>
 
-      <div class="m3-card" style="padding:24px;margin-bottom:24px;">
+      <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
+
+      <div>
         <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">Empresa</h3>
         <div id="perfil-empresa-row" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--m3-surface-container-low);border-radius:12px;cursor:pointer;" onclick="window.editEmpresaNombre()">
           <span class="material-icons" style="color:#2d3e2c;">business</span>
@@ -41,27 +43,31 @@ export async function renderPerfil() {
         </div>
       </div>
 
-      <div class="m3-card" style="padding:24px;margin-bottom:24px;">
+      <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
+
+      <div>
         <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">Información del sistema</h3>
         <div style="display:grid;gap:12px;">
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
             <span style="color:#666;">Aplicación</span>
             <span style="font-weight:600;color:#2d3e2c;">Finca Manager</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
             <span style="color:#666;">Versión</span>
             <span style="font-weight:600;color:#2d3e2c;">1.0.0</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
             <span style="color:#666;">Navegador</span>
             <span style="font-weight:600;color:#2d3e2c;">${navigator.userAgent.substring(0, 40)}...</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;">
             <span style="color:#666;">Estado</span>
             <span style="font-weight:600;color:${navigator.onLine ? '#2d3e2c' : '#ff4103'};">${navigator.onLine ? 'En línea' : 'Sin conexión'}</span>
           </div>
         </div>
       </div>
+
+      <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
 
       <div style="display:grid;gap:12px;">
         <button id="btn-perfil-download" class="btn-m3-primary" style="width:100%;padding:14px;border-radius:40px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
