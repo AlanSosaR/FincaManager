@@ -52,7 +52,7 @@ export async function renderEquipo() {
 
 function renderMemberRow(m, currentUserId) {
   const isSelf = m.id === currentUserId;
-  const roleColors = { propietario: '#2d3e2c', admin: '#1565c0', visor: '#888' };
+  const roleColors = { propietario: '#2d3e2c', admin: '#1565c0', visitante: '#888' };
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--m3-surface-container-low);border-radius:12px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:12px;min-width:0;">
@@ -122,10 +122,11 @@ function renderInviteForm(container) {
           <input type="email" id="invite-email" placeholder=" " required>
           <label>Correo electrónico</label>
         </div>
-        <div class="m3-field" style="margin-bottom:16px;">
-          <select id="invite-rol" style="width:100%;padding:16px 12px 8px;border:1px solid #ccc;border-radius:12px;font-family:'Work Sans',sans-serif;font-size:14px;background:white;">
-            <option value="admin">Admin</option>
-            <option value="visor" selected>Visor</option>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:13px;font-weight:600;color:#666;margin-bottom:6px;">Tipo de acceso</label>
+          <select id="invite-rol" style="width:100%;padding:12px;border:1px solid #ccc;border-radius:12px;font-family:'Work Sans',sans-serif;font-size:14px;background:white;">
+            <option value="admin">Administrador</option>
+            <option value="visitante" selected>Visitante</option>
           </select>
         </div>
         <div style="display:flex;gap:12px;">
