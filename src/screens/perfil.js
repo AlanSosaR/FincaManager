@@ -1,6 +1,5 @@
 import { logout, getUser, isAuthenticated, restFetch } from '../auth.js';
 import db from '../db.js';
-import { fullDownload } from '../sync.js';
 
 export async function renderPerfil() {
   const user = await getUser();
@@ -20,7 +19,7 @@ export async function renderPerfil() {
   }
 
   return `
-    <div class="m3-card-filled">
+    <div class="m3-card-filled" style="margin-bottom:80px;">
       <div style="text-align:center;">
         <div style="width:80px;height:80px;border-radius:50%;background:#2d3e2c;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
           <span class="material-icons" style="font-size:40px;color:white;">account_circle</span>
@@ -45,41 +44,9 @@ export async function renderPerfil() {
 
       <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
 
-      <div>
-        <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">Información del sistema</h3>
-        <div style="display:grid;gap:12px;">
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
-            <span style="color:#666;">Aplicación</span>
-            <span style="font-weight:600;color:#2d3e2c;">Finca Manager</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
-            <span style="color:#666;">Versión</span>
-            <span style="font-weight:600;color:#2d3e2c;">1.0.0</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
-            <span style="color:#666;">Navegador</span>
-            <span style="font-weight:600;color:#2d3e2c;">${navigator.userAgent.substring(0, 40)}...</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;">
-            <span style="color:#666;">Estado</span>
-            <span style="font-weight:600;color:${navigator.onLine ? '#2d3e2c' : '#ff4103'};">${navigator.onLine ? 'En línea' : 'Sin conexión'}</span>
-          </div>
-        </div>
-      </div>
-
-      <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
-
-      <div style="display:grid;gap:12px;">
-        <button id="btn-perfil-download" class="btn-m3-primary" style="width:100%;padding:14px;border-radius:40px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
-          <span class="material-icons">cloud_download</span> Descargar datos
-        </button>
-        <button id="btn-perfil-clear-cache" class="btn-m3-tonal" style="width:100%;padding:14px;border-radius:40px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
-          <span class="material-icons">cleaning_services</span> Limpiar caché
-        </button>
         <button id="btn-perfil-logout" style="width:100%;padding:14px;border-radius:40px;background:transparent;color:#ff4103;border:1px solid #ff4103;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
           <span class="material-icons">logout</span> Cerrar sesión
         </button>
-      </div>
     </div>
   `;
 }
@@ -137,22 +104,6 @@ window.editEmpresaNombre = function() {
 };
 
 export function initPerfil() {
-  document.getElementById('btn-perfil-download')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btn-perfil-download');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Descargando...';
-    try {
-      await fullDownload();
-    } catch (e) { console.error(e); }
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons">cloud_download</span> Descargar datos';
-  });
-
-  document.getElementById('btn-perfil-clear-cache')?.addEventListener('click', () => {
-    window.clearScreenCache?.();
-    if (window.Snackbar) window.Snackbar.show('Caché limpiado');
-  });
-
   document.getElementById('btn-perfil-logout')?.addEventListener('click', async () => {
     await logout();
     window.location.reload();

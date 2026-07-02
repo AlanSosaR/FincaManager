@@ -336,6 +336,7 @@ import { renderLogin, initLogin } from './screens/login.js';
 import { renderRegister, initRegister } from './screens/register.js';
 import { renderPerfil, initPerfil } from './screens/perfil.js';
 import { renderConfiguracion, initConfiguracion } from './screens/configuracion.js';
+import { renderEquipo, initEquipo } from './screens/equipo.js';
 import { renderAceptarInvitacion } from './screens/aceptar_invitacion.js';
 import { showModal } from './modals.js';
 
@@ -366,6 +367,7 @@ const screens = {
     login: { title: 'Iniciar Sesión', render: renderLogin, noAuth: true },
     register: { title: 'Crear Cuenta', render: renderRegister, noAuth: true },
     perfil: { title: 'Mi Perfil', render: renderPerfil },
+    equipo: { title: 'Equipo', render: renderEquipo },
     configuracion: { title: 'Configuración', render: renderConfiguracion },
     aceptar_invitacion: { title: 'Invitación', render: renderAceptarInvitacion, noAuth: true },
 };
@@ -437,6 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'login')    initLogin();
         if (screenId === 'register') initRegister();
         if (screenId === 'perfil')   initPerfil();
+        if (screenId === 'equipo') initEquipo();
         if (screenId === 'configuracion') initConfiguracion();
     }
 

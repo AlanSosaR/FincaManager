@@ -61,9 +61,10 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Verificado que se copia a `dist/` en el build de Vite
 
 ### Pantallas
-- `configuracion.js`: lista miembros, invitaciones, modal de invitar con copiar link / enviar por correo, revocar invitación. Se agregó logging de errores al llamar a la Edge Function. Invitación inline (toggle al presionar FAB), sin modal ni snackbar.
+- `equipo.js` (nuevo 02/07): miembros, invitaciones, inline invite form, FAB (portado desde configuracion.js). Título "Equipo".
+- `configuracion.js`: info del sistema (app, versión, navegador, estado), descargar datos, limpiar caché (portado desde perfil.js). Sin miembros/invitaciones.
+- `perfil.js`: avatar, nombre de empresa editable inline, cerrar sesión. Sin info del sistema, sin descargar/caché.
 - `aceptar_invitacion.js`: maneja `?token=` en URL, invita a registrarse o iniciar sesión
-- `perfil.js`: edición inline del nombre de empresa (clic → input → Enter guarda). Ahora funciona con RLS UPDATE policy.
 - `register.js`: campo "Nombre de tu finca/empresa" al crear cuenta. Cuando hay token de invitación: **read-only** con el nombre de la empresa que invitó. Si el usuario ya está autenticado (vino por email), crea `usuarios` + acepta invitación → dashboard. Si no, `signUp()` normal con token.
 - `main.js`: permite que usuarios autenticados con token accedan a la pantalla register
 
