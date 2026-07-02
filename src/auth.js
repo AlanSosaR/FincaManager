@@ -41,6 +41,9 @@ async function restFetch(path, options = {}) {
     const msg = body?.message || body?.error || `REST error ${res.status}`;
     throw new Error(msg);
   }
+  if (options.method === 'PATCH' && (!body || (Array.isArray(body) && body.length === 0))) {
+    throw new Error('El servidor rechazó la actualización (posiblemente por permisos)');
+  }
   return body;
 }
 

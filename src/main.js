@@ -7,7 +7,7 @@ import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
 
-import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue } from './sync.js';
+import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync } from './sync.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa } from './auth.js';
 
@@ -72,23 +72,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-function updateSyncUI(state) {
-  if (!syncIcon || !syncBadge) return;
-  if (state === 'syncing') {
-    syncIcon.textContent = 'sync';
-    syncIcon.classList.add('animate-spin');
-  } else if (state === 'done') {
-    syncIcon.textContent = 'notifications';
-    syncIcon.classList.remove('animate-spin');
-  } else if (state === 'offline') {
-    syncIcon.textContent = 'cloud_off';
-    syncIcon.classList.remove('animate-spin');
-  } else {
-    syncIcon.textContent = 'notifications';
-    syncIcon.classList.remove('animate-spin');
-  }
-}
-
 const container = document.getElementById('screen-container');
 let syncStarted = false;
 
@@ -121,16 +104,11 @@ function showDownloadBanner(msg, progress) {
 setSyncStatusCallback((msg, progress) => {
   if (msg && !syncStarted) {
     syncStarted = true;
-    updateSyncUI('syncing');
-    addNotif('download', 'sync', 'Descargando datos...', msg === 'Descargando datos...' ? 'Descargando datos para usar la app sin internet...' : msg);
     showDownloadBanner(msg, progress);
   } else if (msg && syncStarted) {
     showDownloadBanner(msg, progress);
   } else if (msg === null && syncStarted) {
     syncStarted = false;
-    updateSyncUI('done');
-    removeNotif('download');
-    addNotif('download_ok', 'check_circle', 'Datos descargados', 'Ya puedes usar la app sin conexion.');
     localStorage.setItem('finca_sync_complete', 'true');
     window.clearScreenCache?.();
     showDownloadBanner(null, 100);
@@ -201,7 +179,6 @@ async function initApp() {
     initOnlineSync();
   } else {
     addNotif('offline', 'cloud_off', 'Sin conexion', 'No hay internet. Los datos locales estan disponibles.');
-    updateSyncUI('offline');
   }
 }
 initApp();
@@ -305,47 +282,34 @@ window.__syncPending = () => {
   }
 };
 
-syncIcon?.addEventListener('click', toggleNotif);
-
 function initOnlineSync() {
-  window.addEventListener('online', () => {
+  if (!isAuthenticated()) return;
+
+  window.addEventListener('online', async () => {
     if (!isAuthenticated()) return;
-    updateSyncUI('syncing');
-    setTimeout(async () => {
-      try {
-        await processSyncQueue();
-        await fullDownload();
-        window.clearScreenCache?.();
-      } catch (e) {
-        console.warn('online sync error:', e);
-      }
-      updateSyncUI('done');
-    }, 500);
+    try {
+      await processSyncQueue(true);
+      await incrementalSync(true);
+    } catch (e) { /* silent */ }
   });
 
-  let queueCheckInterval;
-  async function updateQueueBadge() {
-    try {
-      const count = await db._sync_queue.count();
-      if (count > 0) {
-        syncBadge.style.display = 'flex';
-        syncBadge.textContent = count > 9 ? '9+' : count;
-        syncIcon.textContent = 'sync';
-      }
-    } catch (e) { /* ignore */ }
-  }
-  if (isOnline()) {
-    updateQueueBadge();
-    queueCheckInterval = setInterval(updateQueueBadge, 10000);
-    setInterval(async () => {
-      if (navigator.onLine) {
-        try {
-          await fullDownload();
-          window.clearScreenCache?.();
-        } catch (e) { /* silent */ }
-      }
-    }, 300000);
-  }
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && navigator.onLine && isAuthenticated()) {
+      try {
+        await processSyncQueue(true);
+        await incrementalSync(true);
+      } catch (e) { /* silent */ }
+    }
+  });
+
+  setInterval(async () => {
+    if (navigator.onLine && isAuthenticated()) {
+      try {
+        await processSyncQueue(true);
+        await incrementalSync(true);
+      } catch (e) { /* silent */ }
+    }
+  }, 900000);
 }
 
 // ─── Screen imports ──────────────────────────────────────────────────────────

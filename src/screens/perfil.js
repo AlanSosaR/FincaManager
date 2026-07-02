@@ -12,6 +12,10 @@ export async function renderPerfil() {
     try {
       const emp = await db.empresas?.get(empresaId);
       if (emp) empresaNombre = emp.nombre;
+      else {
+        const data = await restFetch(`/rest/v1/empresas?id=eq.${empresaId}&select=nombre`);
+        if (data?.[0]?.nombre) empresaNombre = data[0].nombre;
+      }
     } catch {}
   }
 
@@ -56,10 +60,6 @@ export async function renderPerfil() {
             <span style="color:#666;">Estado</span>
             <span style="font-weight:600;color:${navigator.onLine ? '#2d3e2c' : '#ff4103'};">${navigator.onLine ? 'En línea' : 'Sin conexión'}</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;">
-            <span style="color:#666;">Sincronización</span>
-            <span style="font-weight:600;color:#2d3e2c;" id="perfil-sync-status">${localStorage.getItem('finca_sync_complete') ? 'Completada' : 'Pendiente'}</span>
-          </div>
         </div>
       </div>
 
@@ -95,11 +95,11 @@ window.editEmpresaNombre = function() {
     const empresaId = localStorage.getItem('current_empresa_id');
     if (!empresaId) { cancel(); return; }
     try {
-      await restFetch(`/rest/v1/empresas?id=eq.${encodeURIComponent(empresaId)}`, {
+      const result = await restFetch(`/rest/v1/empresas?id=eq.${encodeURIComponent(empresaId)}`, {
         method: 'PATCH',
         body: JSON.stringify({ nombre: newName }),
       });
-      await db.empresas?.put({ id: empresaId, nombre: newName });
+      await db.empresas?.put(result?.[0] || { id: empresaId, nombre: newName });
       nameEl.textContent = newName;
       nameEl.style.display = '';
       window.__empresaNombreChanged?.();
@@ -128,7 +128,6 @@ export function initPerfil() {
     btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Descargando...';
     try {
       await fullDownload();
-      document.getElementById('perfil-sync-status').textContent = 'Completada';
     } catch (e) { console.error(e); }
     btn.disabled = false;
     btn.innerHTML = '<span class="material-icons">cloud_download</span> Descargar datos';

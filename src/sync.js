@@ -56,11 +56,11 @@ export function isOnline() {
   return navigator.onLine;
 }
 
-export async function fullDownload() {
+export async function fullDownload(silent = false) {
   if (syncInProgress) return;
   syncInProgress = true;
   try {
-    onSyncStatusChange?.('Descargando datos...', 0);
+    if (!silent) onSyncStatusChange?.('Descargando datos...', 0);
     const pendingIds = new Map();
     const pending = await db._sync_queue.toArray();
     for (const item of pending) {
@@ -74,7 +74,7 @@ export async function fullDownload() {
     for (let i = 0; i < totalTables; i++) {
       const tableName = SUPABASE_TABLES[i];
       const progress = Math.round(((i + 1) / totalTables) * 100);
-      onSyncStatusChange?.(`Descargando ${tableName}...`, progress);
+      if (!silent) onSyncStatusChange?.(`Descargando ${tableName}...`, progress);
       let allData = [];
       let from = 0;
       const limit = 1000;
@@ -113,17 +113,17 @@ export async function fullDownload() {
     }
     await updateSyncMeta('last_full_sync', new Date().toISOString());
     localStorage.setItem('finca_sync_complete', 'true');
-    onSyncStatusChange?.(null, 100);
+    if (!silent) onSyncStatusChange?.(null, 100);
   } catch (err) {
     console.error('fullDownload error:', err);
-    onSyncStatusChange?.('Error de conexión', 0);
-    setTimeout(() => onSyncStatusChange?.(null, 100), 3000);
+    if (!silent) onSyncStatusChange?.('Error de conexión', 0);
+    if (!silent) setTimeout(() => onSyncStatusChange?.(null, 100), 3000);
   } finally {
     syncInProgress = false;
   }
 }
 
-export async function processSyncQueue() {
+export async function processSyncQueue(silent = false) {
   if (syncInProgress) return;
   if (!isOnline()) return;
   syncInProgress = true;
@@ -168,10 +168,10 @@ export async function processSyncQueue() {
       }
     }
 
-    onSyncStatusChange?.(null);
+    if (!silent) onSyncStatusChange?.(null);
   } catch (err) {
     console.error('processSyncQueue error:', err);
-    onSyncStatusChange?.(null);
+    if (!silent) onSyncStatusChange?.(null);
   } finally {
     syncInProgress = false;
   }
@@ -187,5 +187,43 @@ export async function initSync() {
 
   if (isOnline() && !isFirstRun) {
     setTimeout(processSyncQueue, 1000);
+  }
+}
+
+export async function incrementalSync(silent = true) {
+  if (syncInProgress) return;
+  syncInProgress = true;
+  try {
+    if (!silent) onSyncStatusChange?.('Sincronizando...', 0);
+
+    for (const tableName of SUPABASE_TABLES) {
+      const lastSyncKey = `last_incremental_sync_${tableName}`;
+      const lastSync = await getSyncMeta(lastSyncKey) || '1970-01-01T00:00:00Z';
+
+      const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
+        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+        : '';
+
+      const res = await supabaseFetch(
+        `/rest/v1/${tableName}?select=*&updated_at=gt.${encodeURIComponent(lastSync)}${empresaFilter}`
+      );
+      const data = await res.json();
+
+      if (data.length) {
+        await db.table(tableName).bulkPut(data);
+
+        const maxUpdated = data.reduce(
+          (max, row) => (row.updated_at > max ? row.updated_at : max),
+          lastSync
+        );
+        await updateSyncMeta(lastSyncKey, maxUpdated);
+      }
+    }
+
+    if (!silent) onSyncStatusChange?.(null, 100);
+  } catch (err) {
+    console.error('[incrementalSync] error:', err);
+  } finally {
+    syncInProgress = false;
   }
 }
