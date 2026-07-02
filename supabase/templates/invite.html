@@ -5,8 +5,13 @@
   <strong>{{ .Data.empresa_nombre }}</strong> en Finca Manager.
 </p>
 
+<p style="font-size:14px;text-align:center;color:#555;margin-top:16px;">
+  Al aceptar la invitación serás redirigido para crear tu usuario.
+  Con él podrás acceder al sistema y colaborar con la empresa.
+</p>
+
 <p style="text-align:center;margin-top:24px;">
-  <a href="{{ .RedirectTo }}" style="display:inline-block;padding:14px 32px;background:#2d3e2c;color:white;border-radius:40px;text-decoration:none;font-weight:700;font-size:15px;">
+  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 32px;background:#2d3e2c;color:white;border-radius:40px;text-decoration:none;font-weight:700;font-size:15px;">
     Aceptar invitación
   </a>
 </p>

@@ -22,11 +22,11 @@ export async function renderRegister(invitationToken) {
   const empresaDisabled = isInvite ? 'disabled' : '';
 
   return `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:32px;">
-      <div class="m3-card" style="width:100%;max-width:400px;padding:40px;">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:16px;">
+      <div class="m3-card-filled" style="width:100%;max-width:480px;margin:0;">
         <div style="text-align:center;margin-bottom:32px;">
-          <span class="material-icons" style="font-size:48px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">person_add</span>
-          <h1 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;">Crear Cuenta</h1>
+          <img src="/pwa-512x512.svg" alt="Finca Manager" style="width:48px;height:48px;margin-bottom:12px;">
+          <h1 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;">Finca Manager</h1>
           <p class="m3-body-medium" style="color:#666;margin-top:8px;">${isInvite ? 'Has sido invitado a colaborar. Crea tu cuenta para acceder.' : 'Regístrate para gestionar tu finca'}</p>
         </div>
         <form id="register-form">
@@ -57,7 +57,10 @@ export async function renderRegister(invitationToken) {
         </form>
         <div style="text-align:center;margin-top:24px;">
           <span style="color:#666;font-size:14px;">¿Ya tienes cuenta? </span>
-          <a href="#" onclick="window.navigateTo('login'); return false;" style="color:#2d3e2c;font-weight:700;font-size:14px;">Inicia sesión</a>
+          <a href="#" onclick="window.navigateTo('login', 'form'); return false;" style="color:#2d3e2c;font-weight:700;font-size:14px;">Inicia sesión</a>
+        </div>
+        <div style="text-align:center;margin-top:16px;">
+          <button id="btn-back-register-info" onclick="window.navigateTo('login');" style="background:transparent;border:none;cursor:pointer;color:#888;font-size:13px;padding:8px 16px;border-radius:8px;">Volver al inicio</button>
         </div>
       </div>
     </div>
@@ -111,7 +114,8 @@ export function initRegister() {
         await acceptInvitation(_pendingToken, user.id);
         loadEmpresaId();
         _pendingToken = null;
-        window.location.href = '/#dashboard';
+        window.Snackbar.show('Cuenta creada con éxito');
+        setTimeout(() => window.navigateTo('dashboard'), 1200);
       } else {
         const empresaNombre = _empresaNombre || document.getElementById('reg-empresa-nombre')?.value.trim() || 'Mi Finca';
         await signUp(email, password, nombre, _pendingToken, empresaNombre);
@@ -119,7 +123,7 @@ export function initRegister() {
         btn.disabled = false;
         btn.innerHTML = '<span class="material-icons" style="vertical-align:middle;margin-right:8px;">person_add</span> Crear cuenta';
         window.Snackbar.confirm(
-          'Se ha enviado un mensaje a tu correo para activar tu cuenta. Revisa tu bandeja de entrada.',
+          'Se ha enviado un mensaje a tu correo para activar tu cuenta. Revisa tu bandeja de entrada o spam.',
           () => window.navigateTo('login'),
           null,
           { confirmText: 'Aceptar', cancelText: false }

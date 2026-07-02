@@ -1,13 +1,64 @@
-import { login } from '../auth.js';
+import { login, restFetch } from '../auth.js';
 
-export async function renderLogin() {
+export async function renderLogin(showForm) {
+  const showFormDirect = showForm === 'form';
   return `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:32px;">
-      <div class="m3-card" style="width:100%;max-width:400px;padding:40px;">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:16px;">
+      <div id="login-info-card" class="login-info-card" style="${showFormDirect ? 'display:none;' : ''}">
+        <div class="login-decorative-blob"></div>
+
+        <div class="login-info-content">
+          <div class="login-icon-box">
+            <img src="/pwa-512x512.svg" alt="Finca Manager" class="login-logo">
+          </div>
+          <h1 class="m3-display-medium" style="color:var(--m3-on-surface);margin-bottom:16px;">Finca Manager</h1>
+          <p class="m3-body-large" style="color:var(--m3-on-surface-variant);margin-bottom:24px;max-width:28rem;">
+            Gestiona tu finca agrícola de forma colaborativa, incluso sin conexión. Centraliza tus datos y toma decisiones informadas desde cualquier lugar.
+          </p>
+          <button id="btn-start-app" class="login-empezar-btn">
+            Empezar ahora
+          </button>
+        </div>
+
+        <div class="login-features-grid">
+          <div class="login-feature-card">
+            <span class="material-symbols-outlined">local_cafe</span>
+            <span class="login-feature-title">Cafetal</span>
+            <p class="login-feature-desc">Gestión de lotes, variedades y seguimiento de cosecha.</p>
+          </div>
+          <div class="login-feature-card">
+            <span class="material-symbols-outlined">pets</span>
+            <span class="login-feature-title">Ganado</span>
+            <p class="login-feature-desc">Control individual, trazabilidad y estado de salud.</p>
+          </div>
+          <div class="login-feature-card">
+            <span class="material-symbols-outlined">groups</span>
+            <span class="login-feature-title">Personal</span>
+            <p class="login-feature-desc">Administración de jornadas, pagos y tareas específicas.</p>
+          </div>
+          <div class="login-feature-card">
+            <span class="material-symbols-outlined">settings_suggest</span>
+            <span class="login-feature-title">Motores</span>
+            <p class="login-feature-desc">Mantenimiento preventivo y control de horas de uso.</p>
+          </div>
+          <div class="login-feature-card">
+            <span class="material-symbols-outlined">landscape</span>
+            <span class="login-feature-title">Potreros</span>
+            <p class="login-feature-desc">Optimización de pastoreo y rotación inteligente.</p>
+          </div>
+          <div class="login-feature-card highlighted">
+            <span class="material-symbols-outlined">wifi_off</span>
+            <span class="login-feature-title">Sin Conexión</span>
+            <p class="login-feature-desc">Sincronización automática de datos al recuperar la señal.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="login-form-card" class="m3-card-filled" style="width:100%;max-width:480px;margin:0;${showFormDirect ? '' : 'display:none;'}">
         <div style="text-align:center;margin-bottom:32px;">
-          <span class="material-icons" style="font-size:48px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">account_circle</span>
-          <h1 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;">Iniciar Sesión</h1>
-          <p class="m3-body-medium" style="color:#666;margin-top:8px;">Accede a tu cuenta</p>
+          <img src="/pwa-512x512.svg" alt="Finca Manager" style="width:48px;height:48px;margin-bottom:12px;">
+          <h1 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;">Finca Manager</h1>
+          <p class="m3-body-medium" style="color:#666;margin-top:8px;">Inicia sesión para acceder a tu finca</p>
         </div>
         <form id="login-form">
           <div class="m3-field" style="margin-bottom:20px;">
@@ -28,12 +79,32 @@ export async function renderLogin() {
           <span style="color:#666;font-size:14px;">¿No tienes cuenta? </span>
           <a href="#" onclick="window.navigateTo('register'); return false;" style="color:#2d3e2c;font-weight:700;font-size:14px;">Regístrate</a>
         </div>
+        <div style="text-align:center;margin-top:16px;">
+          <button id="btn-back-info" style="background:transparent;border:none;cursor:pointer;color:#888;font-size:13px;padding:8px 16px;border-radius:8px;">Volver al inicio</button>
+        </div>
       </div>
     </div>
   `;
 }
 
 export function initLogin() {
+  const startBtn = document.getElementById('btn-start-app');
+  const backBtn = document.getElementById('btn-back-info');
+  const infoCard = document.getElementById('login-info-card');
+  const formCard = document.getElementById('login-form-card');
+  if (startBtn && infoCard && formCard) {
+    startBtn.addEventListener('click', () => {
+      infoCard.style.display = 'none';
+      formCard.style.display = '';
+    });
+  }
+  if (backBtn && infoCard && formCard) {
+    backBtn.addEventListener('click', () => {
+      formCard.style.display = 'none';
+      infoCard.style.display = '';
+    });
+  }
+
   const form = document.getElementById('login-form');
   const errorEl = document.getElementById('login-error');
   if (!form) return;
@@ -63,7 +134,17 @@ export function initLogin() {
     try {
       const result = await login(email, password);
       if (result?.session) {
-        window.location.reload();
+        const empresaId = localStorage.getItem('current_empresa_id');
+        let empresaNombre = '';
+        if (empresaId) {
+          try {
+            const data = await restFetch(`/rest/v1/empresas?id=eq.${empresaId}&select=nombre`);
+            if (data?.[0]?.nombre) empresaNombre = data[0].nombre;
+          } catch {}
+        }
+        const msg = empresaNombre ? `Has iniciado sesión en ${empresaNombre}` : 'Has iniciado sesión';
+        window.Snackbar.show(msg);
+        setTimeout(() => window.navigateTo('dashboard'), 1200);
       }
     } catch (err) {
       errorEl.textContent = err.message;
