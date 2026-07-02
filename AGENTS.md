@@ -10,18 +10,24 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Auth/DB: llamadas REST directas a Supabase (`authFetch`, `restFetch`, `restInsert`), NO usar `@supabase/supabase-js` ni QueryBuilder.
 - Proyecto Supabase: `udhuizkqnmkhljmezzkd`.
 
-## Lo Completado
+## Lo Completado (02/07)
+
+### Sidebar
+- `toggleSidebar()`: al abrir en mobile (≤1024px) se quita la clase `.collapsed` para mostrar logo + empresa + "Gestión Agrícola"
+- "Cerrar sesión" movido de `perfil.js` al sidebar (`index.html`), dentro de `.nav-links` con separador, con color #ff4103, oculta `.nav-text` al colapsar
+
+### Flujo de Invitación por Email (refinado 02/07)
+- `handleAuthCallback()` en `main.js` redirige a `#aceptar_invitacion?token=X` (antes `#register`)
+- Se usa `sessionStorage` flag `finca_from_invite_email` para distinguir: llegada desde email → muestra tarjeta; usuario ya logueado → auto-accept directo
+- Tarjeta en `aceptar_invitacion.js`: "Has sido invitado a colaborar en **[empresa]**" con botón **"Aceptar"** (antes "Crear cuenta y aceptar")
+- Botón "Aceptar" navega a `register` con token, empresa pre-cargada read-only
+- Snackbar **"Invitación enviada por correo"** en `equipo.js` al enviar invitación exitosamente vía Edge Function
 
 ### Auth (`src/auth.js`)
 - `signUp`, `login`, `logout`, `isAuthenticated`, `getUser`, `getSession`, `getAccessToken`, `tryRefreshSession`
 - `signUp` ahora acepta `empresaNombre` (5to parámetro) para personalizar el nombre de la empresa al registrarse
 - `ensureUserSetup` recibe y usa `empresaNombre` en vez del hardcoded `'Mi Finca'`
 - `restFetch`, `restInsert`, `buildHeaders` — helpers REST directos
-- `inviteUser` — crea invitación y devuelve token
-- `acceptInvitation` — procesa token, inserta `usuario_empresas`
-- `getEmpresaMembers`, `getEmpresaInvitations`, `revokeInvitation`, `updateMemberRole`, `removeMember`
-- `loadEmpresaId` — setea `window._currentEmpresaId` desde localStorage
-- Auto-recuperación de empresa en `main.js`: si falta `current_empresa_id` al iniciar, lo busca vía `restFetch`
 - `inviteUser` — crea invitación y devuelve token
 - `acceptInvitation` — procesa token, inserta `usuario_empresas`
 - `getEmpresaMembers`, `getEmpresaInvitations`, `revokeInvitation`, `updateMemberRole`, `removeMember`
@@ -53,20 +59,16 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Intentos subsiguientes fallaron con `email rate limit exceeded` (rate limit de Supabase Auth)
 - `configuracion.js`: se agregó manejo de errores con `.then().catch()` en el fetch a la Edge Function (antes tenía `try/catch {}` vacío que silenciaba errores)
 
-### `auth-callback.html`
-- Ubicación: `public/auth-callback.html`
-- Página estática que captura el redirect post-confirmación de email
-- Guarda sesión en localStorage, obtiene `invite_token` de `user_metadata`
-- **Redirige a `/#register?token=TOKEN`** en vez de procesar la invitación (para que el usuario vea el formulario con empresa read-only)
-- Verificado que se copia a `dist/` en el build de Vite
+### `auth-callback` (eliminado)
+- `public/auth-callback.html` eliminado — ahora el auth callback se maneja inline en SPA via `handleAuthCallback()` en `main.js`
 
 ### Pantallas
 - `equipo.js` (nuevo 02/07): miembros, invitaciones, inline invite form, FAB (portado desde configuracion.js). Título "Equipo".
 - `configuracion.js`: info del sistema (app, versión, navegador, estado), descargar datos, limpiar caché (portado desde perfil.js). Sin miembros/invitaciones.
-- `perfil.js`: avatar, nombre de empresa editable inline, cerrar sesión. Sin info del sistema, sin descargar/caché.
-- `aceptar_invitacion.js`: maneja `?token=` en URL, invita a registrarse o iniciar sesión
+- `perfil.js`: avatar, nombre de empresa editable inline, cerrar sesión. Sin info del sistema, sin descargar/caché, sin logout.
+- `aceptar_invitacion.js`: maneja `?token=` en URL, cuando se llega desde email muestra tarjeta con "[empresa]" y botón "Aceptar" que va a register con empresa pre-cargada. Usuarios ya logueados auto-aceptan directo.
 - `register.js`: campo "Nombre de tu finca/empresa" al crear cuenta. Cuando hay token de invitación: **read-only** con el nombre de la empresa que invitó. Si el usuario ya está autenticado (vino por email), crea `usuarios` + acepta invitación → dashboard. Si no, `signUp()` normal con token.
-- `main.js`: permite que usuarios autenticados con token accedan a la pantalla register
+- `main.js`: permite que usuarios autenticados con token accedan a `register` y `aceptar_invitacion`. Redirige a `#aceptar_invitacion?token=X` desde `handleAuthCallback()`.
 
 ### Progreso de Sesiones Anteriores
 - Auth completamente migrado a REST directo (sin `@supabase/supabase-js`)
@@ -111,6 +113,8 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - [x] RLS UPDATE policy para `empresas` (`20250702_empresa_update_policy.sql`) — ahora editar nombre desde perfil funciona
 - [x] Logo subido a Supabase Storage: `https://udhuizkqnmkhljmezzkd.supabase.co/storage/v1/object/public/logo/pwa-512x512.svg`
 - [x] Edge Function `send-invite` ahora acepta `invitado_por_nombre` en `user_metadata`
+- [x] `handleAuthCallback()` redirige a `#aceptar_invitacion?token=X` con tarjeta "Has sido invitado" + botón "Aceptar"
+- [x] `sessionStorage` flag `finca_from_invite_email` distingue email invite vs auto-accept directo
 - [ ] **Pendiente**: cambios en Supabase dashboard (Site URL, Redirect URLs, Email Template)
 
 ### Despliegue
