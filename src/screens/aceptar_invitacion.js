@@ -1,4 +1,4 @@
-import { validateInvitation, acceptInvitation, isAuthenticated, getUser } from '../auth.js';
+import { validateInvitation, acceptInvitation, isAuthenticated, getUser, getUserEmpresas, restFetch } from '../auth.js';
 
 let _empresaNombre = '';
 let _empresaId = '';
@@ -14,6 +14,19 @@ window.handleAceptarInvitacionDirect = async function(token) {
   try {
     const user = await getUser();
     if (!user) throw new Error('No se pudo obtener tu sesión de usuario.');
+
+    // Verificar si ya es miembro de la empresa antes de intentar insertar
+    const empresas = await getUserEmpresas();
+    const yaMiembro = (empresas || []).some(emp => emp.id === _empresaId);
+    if (yaMiembro) {
+      window.Snackbar.show('Ya eres miembro de esta empresa');
+      setTimeout(() => {
+        window.location.hash = '#dashboard';
+        window.location.reload();
+      }, 1200);
+      return;
+    }
+
     await acceptInvitation(token, user.id);
     window.Snackbar.show('Invitación aceptada con éxito');
     setTimeout(() => {
@@ -52,10 +65,23 @@ export async function renderAceptarInvitacion(token) {
   _empresaId = info.empresaId;
 
   const user = isAuthenticated() ? await getUser() : null;
-  const isUserLoggedIn = !!user;
+  
+  // Verificar si tiene un registro completo en la tabla 'usuarios'
+  let hasUserRecord = false;
+  if (user) {
+    try {
+      const res = await restFetch(`/rest/v1/usuarios?id=eq.${encodeURIComponent(user.id)}`);
+      hasUserRecord = res && res.length > 0;
+    } catch (e) {
+      console.warn('Error checking user record:', e);
+    }
+  }
+
+  // Solo se permite la aceptación directa si el usuario tiene sesión activa AND existe su registro de usuario
+  const isDirectAcceptAllowed = !!user && hasUserRecord;
 
   // Botón principal
-  const buttonHtml = isUserLoggedIn
+  const buttonHtml = isDirectAcceptAllowed
     ? `<button id="btn-aceptar-invitacion" onclick="window.handleAceptarInvitacionDirect('${token}')" style="display:block;width:100%;padding:14px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:12px;font-family:'Work Sans',sans-serif;">
          Aceptar invitación
        </button>`
@@ -64,7 +90,7 @@ export async function renderAceptarInvitacion(token) {
        </button>`;
 
   // Enlace o información secundaria
-  const secondaryHtml = isUserLoggedIn
+  const secondaryHtml = !!user
     ? `<div style="color:#666;font-size:13px;margin-top:16px;text-align:center;font-family:'Work Sans',sans-serif;">
          Conectado como <strong style="color:#2d3e2c;">${user.email}</strong>
        </div>`
