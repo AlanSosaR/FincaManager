@@ -378,28 +378,32 @@ body.screen-auth #app .main-content {
   position: relative;
 }
 #menu-toggle.m3-icon-btn-tonal {
-  background-color: #2d3e2c;
-  color: #ffffff;
+  background-color: transparent;
+  box-shadow: none;
 }
 #menu-toggle.m3-icon-btn-tonal:hover {
-  background-color: #3a5240;
-  color: #ffffff;
+  background-color: transparent;
+  box-shadow: none;
+  transform: scale(1.05);
 }
 #menu-toggle.m3-icon-btn-tonal:active {
-  background-color: #3a5240;
-  color: #ffffff;
+  background-color: transparent;
+  box-shadow: none;
+  transform: scale(0.95);
 }
 #sidebar-close.m3-icon-btn-tonal {
-  background-color: #2d3e2c;
-  color: #ffffff;
+  background-color: transparent;
+  box-shadow: none;
 }
 #sidebar-close.m3-icon-btn-tonal:hover {
-  background-color: #3a5240;
-  color: #ffffff;
+  background-color: transparent;
+  box-shadow: none;
+  transform: scale(1.05);
 }
 #sidebar-close.m3-icon-btn-tonal:active {
-  background-color: #a3b94a;
-  color: #2d3e2c;
+  background-color: transparent;
+  box-shadow: none;
+  transform: scale(0.95);
 }
 
 #current-screen-title {
