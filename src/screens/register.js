@@ -39,12 +39,14 @@ export async function renderRegister(invitationToken) {
             <label>Correo electrónico</label>
           </div>
           <div class="m3-field" style="margin-bottom:20px;">
-            <input type="password" id="reg-password" placeholder=" " required minlength="6">
+            <input type="password" id="reg-password" placeholder=" " required minlength="6" style="padding-right:48px;">
             <label>Contraseña (mín. 6 caracteres)</label>
+            <span class="material-icons" id="pw-icon-reg" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);cursor:pointer;z-index:2;color:#888;">visibility_off</span>
           </div>
           <div class="m3-field" style="margin-bottom:20px;">
-            <input type="password" id="reg-confirm" placeholder=" " required>
+            <input type="password" id="reg-confirm" placeholder=" " required style="padding-right:48px;">
             <label>Confirmar contraseña</label>
+            <span class="material-icons" id="pw-icon-confirm" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);cursor:pointer;z-index:2;color:#888;">visibility_off</span>
           </div>
           <div class="m3-field" style="margin-bottom:32px;" id="reg-empresa-field">
             <input type="text" id="reg-empresa-nombre" placeholder=" " value="${empresaValue}" required ${empresaDisabled}>
@@ -71,6 +73,26 @@ export function initRegister() {
   const form = document.getElementById('register-form');
   const errorEl = document.getElementById('register-error');
   if (!form) return;
+
+  const pwIconReg = document.getElementById('pw-icon-reg');
+  const pwInputReg = document.getElementById('reg-password');
+  if (pwIconReg && pwInputReg) {
+    pwIconReg.addEventListener('click', () => {
+      const isPassword = pwInputReg.type === 'password';
+      pwInputReg.type = isPassword ? 'text' : 'password';
+      pwIconReg.textContent = isPassword ? 'visibility' : 'visibility_off';
+    });
+  }
+
+  const pwIconConfirm = document.getElementById('pw-icon-confirm');
+  const pwInputConfirm = document.getElementById('reg-confirm');
+  if (pwIconConfirm && pwInputConfirm) {
+    pwIconConfirm.addEventListener('click', () => {
+      const isPassword = pwInputConfirm.type === 'password';
+      pwInputConfirm.type = isPassword ? 'text' : 'password';
+      pwIconConfirm.textContent = isPassword ? 'visibility' : 'visibility_off';
+    });
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
