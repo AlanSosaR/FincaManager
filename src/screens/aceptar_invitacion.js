@@ -1,12 +1,39 @@
-import { validateInvitation, acceptInvitation, signUp, isAuthenticated, getUser } from '../auth.js';
+import { validateInvitation, acceptInvitation, isAuthenticated, getUser } from '../auth.js';
 
 let _empresaNombre = '';
 let _empresaId = '';
 let _token = '';
 
+// Función global para aceptar la invitación directamente cuando el usuario ya está autenticado
+window.handleAceptarInvitacionDirect = async function(token) {
+  const btn = document.getElementById('btn-aceptar-invitacion');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined animate-spin" style="vertical-align:middle;margin-right:8px;">sync</span>Procesando...';
+  }
+  try {
+    const user = await getUser();
+    if (!user) throw new Error('No se pudo obtener tu sesión de usuario.');
+    await acceptInvitation(token, user.id);
+    window.Snackbar.show('Invitación aceptada con éxito');
+    setTimeout(() => {
+      // Recargar la aplicación para que se aplique la nueva empresa activa
+      window.location.hash = '#dashboard';
+      window.location.reload();
+    }, 1200);
+  } catch (e) {
+    window.Snackbar.show(`Error al aceptar invitación: ${e.message}`);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = 'Aceptar invitación';
+    }
+  }
+};
+
 export async function renderAceptarInvitacion(token) {
   _token = token;
-  const fromEmail = sessionStorage.getItem('finca_from_invite_email') === '1';
+  
+  // Consumir y limpiar bandera de email
   sessionStorage.removeItem('finca_from_invite_email');
 
   const info = await validateInvitation(token);
@@ -24,17 +51,26 @@ export async function renderAceptarInvitacion(token) {
   _empresaNombre = info.empresaNombre;
   _empresaId = info.empresaId;
 
-  if (isAuthenticated() && !fromEmail) {
-    const user = await getUser();
-    if (user) {
-      try {
-        await acceptInvitation(token, user.id);
-        window.location.reload();
-      } catch (e) {
-        return `<div style="padding:24px;color:red;">Error: ${e.message}</div>`;
-      }
-    }
-  }
+  const user = isAuthenticated() ? await getUser() : null;
+  const isUserLoggedIn = !!user;
+
+  // Botón principal
+  const buttonHtml = isUserLoggedIn
+    ? `<button id="btn-aceptar-invitacion" onclick="window.handleAceptarInvitacionDirect('${token}')" style="display:block;width:100%;padding:14px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:12px;font-family:'Work Sans',sans-serif;">
+         Aceptar invitación
+       </button>`
+    : `<button onclick="window.navigateTo('register','${token}')" style="display:block;width:100%;padding:14px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:12px;font-family:'Work Sans',sans-serif;">
+         Aceptar
+       </button>`;
+
+  // Enlace o información secundaria
+  const secondaryHtml = isUserLoggedIn
+    ? `<div style="color:#666;font-size:13px;margin-top:16px;text-align:center;font-family:'Work Sans',sans-serif;">
+         Conectado como <strong style="color:#2d3e2c;">${user.email}</strong>
+       </div>`
+    : `<button onclick="window.navigateTo('login','${token}')" style="display:block;width:100%;padding:14px;border-radius:12px;background:transparent;border:1px solid #ccc;color:#2d3e2c;font-weight:600;font-size:15px;cursor:pointer;font-family:'Work Sans',sans-serif;">
+         Ya tengo cuenta — Iniciar sesión
+       </button>`;
 
   return `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:32px;">
@@ -44,13 +80,10 @@ export async function renderAceptarInvitacion(token) {
         <p style="color:#666;font-size:14px;margin-bottom:24px;line-height:1.5;">
           Fuiste invitado a colaborar en <strong style="color:#2d3e2c;">${info.empresaNombre}</strong> como <strong style="color:#2d3e2c;text-transform:capitalize;">${info.rol}</strong>.
         </p>
-        <button onclick="window.navigateTo('register','${token}')" style="display:block;width:100%;padding:14px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:12px;">
-          Aceptar
-        </button>
-        <button onclick="window.navigateTo('login','${token}')" style="display:block;width:100%;padding:14px;border-radius:12px;background:transparent;border:1px solid #ccc;color:#2d3e2c;font-weight:600;font-size:15px;cursor:pointer;">
-          Ya tengo cuenta — Iniciar sesión
-        </button>
+        ${buttonHtml}
+        ${secondaryHtml}
       </div>
     </div>
   `;
 }
+

@@ -400,7 +400,7 @@ function handleAuthCallback() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (handleAuthCallback()) return;
+    const isAuthCallback = handleAuthCallback();
     const titleElement = document.getElementById('current-screen-title');
 
     const viewCache = new Map();
@@ -620,10 +620,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const hashParams = getHashParts();
-    const initialScreen = hashParams[0] || 'dashboard';
-    const initArgs = hashParams.slice(1).filter(s => s !== '');
-    navigate(initialScreen, ...initArgs);
+    if (!isAuthCallback) {
+        const hashParams = getHashParts();
+        const initialScreen = hashParams[0] || 'dashboard';
+        const initArgs = hashParams.slice(1).filter(s => s !== '');
+        navigate(initialScreen, ...initArgs);
+    }
 
     const menuToggle = document.getElementById('menu-toggle');
     const sidebarClose = document.getElementById('sidebar-close');
