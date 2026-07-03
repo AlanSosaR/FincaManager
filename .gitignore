@@ -15,3 +15,6 @@ diff.txt
 diff_history.txt
 build_error.txt
 scratch/
+
+.vscode/
+vite.config.js.timestamp-*
