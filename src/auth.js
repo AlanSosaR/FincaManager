@@ -278,7 +278,7 @@ export async function getEmpresaMembers(empresaId) {
 
 export async function getEmpresaInvitations(empresaId) {
   try {
-    return await restFetch(`/rest/v1/invitaciones?empresa_id=eq.${encodeURIComponent(empresaId)}&order=created_at.desc`) || [];
+    return await restFetch(`/rest/v1/invitaciones?empresa_id=eq.${encodeURIComponent(empresaId)}&estado=eq.pendiente&order=created_at.desc`) || [];
   } catch { return []; }
 }
 
