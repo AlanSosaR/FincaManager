@@ -504,6 +504,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.body.classList.toggle('screen-auth', !!screen.noAuth);
 
+        if (!screen.noAuth && window._currentEmpresaId) {
+            updateSidebarEmpresaName();
+            if (!_empresaList.length) initEmpresaSelector();
+        }
+
         if (screen.backTo) {
             const backTarget = typeof screen.backTo === 'function' ? screen.backTo(...args) : screen.backTo;
             const onClick = Array.isArray(backTarget) 
