@@ -1,4 +1,4 @@
-import { getEmpresaMembers, getEmpresaInvitations, inviteUser, revokeInvitation, getUser, getAccessToken } from '../auth.js';
+import { getEmpresaMembers, getEmpresaInvitations, inviteUser, revokeInvitation, getUser, getAccessToken, updateMemberRole, removeMember } from '../auth.js';
 
 const SUPABASE_URL = 'https://udhuizkqnmkhljmezzkd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkaHVpemtxbm1raGxqbWV6emtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTM2MTYsImV4cCI6MjA5MTIyOTYxNn0.W9bJ1S8A45RUGaulhdVG6UohGmGNxGMjLBsc0Q7voPE';
@@ -68,9 +68,19 @@ function renderMemberRow(m, currentUserId) {
         <span class="m3-badge" style="background:${roleColors[m.rol] || '#888'};color:white;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;">${m.rol}</span>
         ${!isSelf && !m._isReadonly ? `
           <div class="member-actions" style="position:relative;">
-            <button class="btn-member-menu" data-userid="${m.id}" style="background:transparent;border:none;cursor:pointer;padding:4px;border-radius:50%;color:#666;">
+            <button class="btn-member-menu" data-userid="${m.id}" data-rol="${m.rol}" data-nombre="${(m.nombre || m.email).replace(/"/g,'&quot;')}" style="background:transparent;border:none;cursor:pointer;padding:4px;border-radius:50%;color:#666;">
               <span class="material-icons" style="font-size:20px;">more_vert</span>
             </button>
+            <div class="member-menu-dropdown" style="display:none;position:absolute;right:0;top:100%;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:100;min-width:200px;padding:8px 0;margin-top:4px;">
+              <button class="menu-option-role" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;border:none;background:transparent;cursor:pointer;font-size:13px;color:#2d3e2c;text-align:left;font-family:'Work Sans',sans-serif;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='transparent'">
+                <span class="material-icons" style="font-size:18px;color:#1565c0;">manage_accounts</span>
+                <span>Cambiar rol a <strong>${m.rol === 'admin' ? 'visitante' : 'admin'}</strong></span>
+              </button>
+              <button class="menu-option-remove" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;border:none;background:transparent;cursor:pointer;font-size:13px;color:#ff4103;text-align:left;font-family:'Work Sans',sans-serif;" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='transparent'">
+                <span class="material-icons" style="font-size:18px;">person_remove</span>
+                <span>Eliminar miembro</span>
+              </button>
+            </div>
           </div>
         ` : ''}
       </div>
@@ -96,6 +106,67 @@ export function initEquipo() {
       }
     });
   });
+
+  document.querySelectorAll('.btn-member-menu').forEach((btn) => {
+    const dropdown = btn.parentElement.querySelector('.member-menu-dropdown');
+    if (!dropdown) return;
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = dropdown.style.display === 'block';
+      document.querySelectorAll('.member-menu-dropdown').forEach(d => d.style.display = 'none');
+      dropdown.style.display = isOpen ? 'none' : 'block';
+    });
+
+    dropdown.querySelector('.menu-option-role')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      dropdown.style.display = 'none';
+      const userId = btn.dataset.userid;
+      const currentRol = btn.dataset.rol;
+      const nombre = btn.dataset.nombre;
+      const newRol = currentRol === 'admin' ? 'visitante' : 'admin';
+      if (!confirm(`¿Cambiar rol de ${nombre} a "${newRol}"?`)) return;
+      try {
+        await updateMemberRole(window._currentEmpresaId, userId, newRol);
+        btn.dataset.rol = newRol;
+        const badge = btn.closest('div[style*="display:flex"]')?.querySelector('.m3-badge');
+        if (badge) {
+          const roleColors = { propietario: '#2d3e2c', admin: '#1565c0', visitante: '#888' };
+          badge.textContent = newRol;
+          badge.style.background = roleColors[newRol] || '#888';
+        }
+        const label = dropdown.querySelector('.menu-option-role span:last-child');
+        if (label) label.innerHTML = `Cambiar rol a <strong>${newRol === 'admin' ? 'visitante' : 'admin'}</strong>`;
+        window.Snackbar.show(`Rol cambiado a "${newRol}"`);
+      } catch (e) {
+        window.Snackbar.show('Error: ' + e.message, { type: 'error' });
+      }
+    });
+
+    dropdown.querySelector('.menu-option-remove')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      dropdown.style.display = 'none';
+      const userId = btn.dataset.userid;
+      const nombre = btn.dataset.nombre;
+      if (!confirm(`¿Eliminar a ${nombre} de la empresa?`)) return;
+      try {
+        await removeMember(window._currentEmpresaId, userId);
+        btn.closest('div[style*="display:flex"]')?.remove();
+        window.Snackbar.show('Miembro eliminado');
+      } catch (e) {
+        window.Snackbar.show('Error: ' + e.message, { type: 'error' });
+      }
+    });
+  });
+
+  if (!window._memberMenuHandler) {
+    window._memberMenuHandler = true;
+    document.addEventListener('click', (e) => {
+      document.querySelectorAll('.member-menu-dropdown').forEach(d => {
+        if (!d.contains(e.target)) d.style.display = 'none';
+      });
+    });
+  }
 }
 
 let _inviteInlineVisible = false;
