@@ -258,8 +258,6 @@ body.screen-auth #app .main-content {
 }
 
 .nav-link.header-main.active img {
-  outline: 2px solid #ffffff;
-  outline-offset: 2px;
   border-radius: 12px;
   filter: none !important;
 }
@@ -292,6 +290,14 @@ body.screen-auth #app .main-content {
   display: none;
 }
 
+.nav-link.header-main .sidebar-logo {
+  width: 64px;
+  height: 64px;
+}
+#sidebar-empresa-name {
+  white-space: nowrap;
+  font-size: 22px;
+}
 .sidebar.collapsed .sidebar-logo {
   width: 32px;
   height: 32px;
@@ -460,6 +466,9 @@ body.screen-auth #app .main-content {
 
   .sidebar-overlay.active {
     display: block;
+  }
+  .sidebar .sidebar-logo {
+    display: none;
   }
 }
 

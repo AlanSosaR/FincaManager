@@ -94,7 +94,10 @@ export async function renderDashboard(page) {
           .db-table-wrap th, .db-table-wrap td { padding: 8px !important; font-size: 12px !important; }
           .db-section-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
           .db-lotes-grid { grid-template-columns: 1fr !important; }
-        }
+          }
+        .db-table-wrap { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+        .db-table-wrap::-webkit-scrollbar { display: none !important; }
+        .db-table-wrap table tbody tr:last-child td { border-bottom: none !important; }
       </style>
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans db-page">
         <section class="m3-mb-6">
@@ -201,8 +204,8 @@ export async function renderDashboard(page) {
             <!-- Aplicaciones Recientes Section -->
             <div>
               <h2 class="m3-headline-small m3-font-bold m3-text-on-surface m3-mb-6">Aplicaciones Recientes</h2>
-              <div class="m3-card m3-overflow-hidden" style="padding: 0; border: none; border-radius: 0;">
-                <div style="padding: 20px 24px; background: #2d3e2c; border-radius: 0; display: flex; align-items: center; gap: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--m3-on-primary);">
+              <div class="m3-card m3-overflow-hidden" style="padding: 0; border: none; border-radius: 12px;">
+                <div style="padding: 20px 24px; background: #2d3e2c; border-radius: 12px 12px 0 0; display: flex; align-items: center; gap: 16px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--m3-on-primary);">
                   <span style="flex: 2;">Tipo & Producto</span>
                   <span style="flex: 1;">Dosis</span>
                   <span style="flex: 1.5;">Lote / Fecha</span>
