@@ -17,9 +17,7 @@ export async function renderRegister(invitationToken) {
     }
   }
 
-  const empresaValue = _empresaNombre || 'Mi Finca';
   const isInvite = !!_pendingToken;
-  const empresaDisabled = isInvite ? 'disabled' : '';
 
   return `
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:16px;">
@@ -48,10 +46,15 @@ export async function renderRegister(invitationToken) {
             <label>Confirmar contraseña</label>
             <span class="material-icons" id="pw-icon-confirm" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);cursor:pointer;z-index:2;color:#888;">visibility_off</span>
           </div>
+          ${isInvite ? `
           <div class="m3-field" style="margin-bottom:32px;" id="reg-empresa-field">
-            <input type="text" id="reg-empresa-nombre" placeholder=" " value="${empresaValue}" required ${empresaDisabled}>
+            <input type="text" id="reg-empresa-nombre" placeholder=" " value="${_empresaNombre}" required disabled>
+            <label>Empresa</label>
+          </div>` : `
+          <div class="m3-field" style="margin-bottom:32px;" id="reg-empresa-field">
+            <input type="text" id="reg-empresa-nombre" placeholder=" " value="">
             <label>Nombre de tu finca / empresa</label>
-          </div>
+          </div>`}
           <div id="register-error" style="color:#ff4103;font-size:13px;margin-bottom:16px;display:none;"></div>
           <button type="submit" class="btn-m3-primary" style="width:100%;padding:14px;font-size:16px;font-weight:700;border-radius:12px;background:#2d3e2c;color:white;border:none;cursor:pointer;font-family:'Work Sans',sans-serif;">
             <span class="material-icons" style="vertical-align:middle;margin-right:8px;">person_add</span> ${isInvite ? 'Aceptar invitación' : 'Crear cuenta'}
@@ -139,7 +142,7 @@ export function initRegister() {
         window.Snackbar.show('Cuenta creada con éxito');
         setTimeout(() => window.navigateTo('dashboard'), 1200);
       } else {
-        const empresaNombre = _empresaNombre || document.getElementById('reg-empresa-nombre')?.value.trim() || 'Mi Finca';
+        const empresaNombre = document.getElementById('reg-empresa-nombre')?.value.trim() || 'Mi Finca';
         await signUp(email, password, nombre, _pendingToken, empresaNombre);
         _pendingToken = null;
         btn.disabled = false;
