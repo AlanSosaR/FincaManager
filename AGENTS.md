@@ -12,6 +12,26 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 
 ## Lo Completado (03/07)
 
+### Dashboard — Aplicaciones Recientes (rounded corners + fix borde mobile)
+- `dashboard.js`: tarjeta `Aplicaciones Recientes` con `border-radius: 12px`
+- Oculto scrollbar horizontal en `db-table-wrap` en mobile (`scrollbar-width: none`)
+- Eliminado `border-bottom` de la última fila de la tabla para que no se vea línea gris al fondo
+- Commits: `1f3e124`, `90dc9ef`
+
+### Sidebar — Icono hamburguesa reemplazado por logo app
+- `index.html`: `#menu-toggle` y `#sidebar-close` ahora muestran el logo SVG en vez del icono `menu`
+- Logos a 40x40px en mobile
+- `style.css`: `#menu-toggle` y `#sidebar-close` con fondo transparente (sin verde extra detrás del logo)
+- `style.css`: `.sidebar .sidebar-logo` oculto en mobile (evita duplicado con botón menú)
+- `style.css`: `.nav-link.header-main .sidebar-logo` a 64x64px en desktop
+- `style.css`: `#sidebar-empresa-name` con `white-space: nowrap` y `font-size: 22px`
+- Eliminado `outline: 2px solid #ffffff` del logo activo en perfil
+- Commits: `1f3e124`, `90dc9ef`
+
+### SVG Icono — Colores actualizados
+- `public/pwa-512x512.svg`: fondo `#2E7D32`, hoja `#A5D6A7` al 70%, contorno hoja `#2d3e2c` al 30%, venas `#F0F8F0`, engranaje `#1B5E20` con centro y radios `#f0f0e8`
+- Commit: `1f3e124`
+
 ### Iconos de ojo en registro
 - `register.js`: iconos `visibility_off`/`visibility` en campos password y confirm, con toggle de tipo (igual que login)
 - Commit: `c804777`
@@ -161,3 +181,4 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - No usar `withSupabase` middleware — causa problemas con verificación de JWT. Usar `npm:@supabase/supabase-js@2` con `createClient` y service_role key desde `Deno.env`.
 - Configuración de la sesión: `supabase_session` en localStorage, `current_empresa_id` en localStorage.
 - `window._currentEmpresaId` es la empresa activa en memoria.
+- SVG icono: fondo `#2E7D32`, hoja `#A5D6A7` (70%), contorno `#2d3e2c` (30%), venas `#F0F8F0`, engranaje `#1B5E20` con centro/radios `#f0f0e8`.
