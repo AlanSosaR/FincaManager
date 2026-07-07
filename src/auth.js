@@ -166,15 +166,7 @@ export function onAuthChange(callback) {
 }
 
 export function isAuthenticated() {
-  const session = getSession();
-  if (!session?.access_token) return false;
-  try {
-    const payload = JSON.parse(atob(session.access_token.split('.')[1]));
-    if (payload.exp * 1000 > Date.now()) return true;
-    return false;
-  } catch {
-    return false;
-  }
+  return !!getSession()?.access_token;
 }
 
 export function getAccessToken() {
@@ -301,7 +293,59 @@ export async function revokeInvitation(invitationId) {
     headers: buildHeaders(),
   });
   if (!res.ok) {
-    const body = res.headers.get('content-type')?.includes('application/json') ? await res.json().catch(() => ({})) : {};
-    throw new Error(body?.message || body?.error || `Error al eliminar invitación`);
+    const errBody = res.headers.get('content-type')?.includes('application/json') ? await res.json().catch(() => ({})) : {};
+    const msg = errBody?.message || errBody?.error || `Error al eliminar invitación`;
+    throw new Error(msg);
   }
+}
+
+export async function updateProfile({ nombre, email }) {
+  const user = await getUser();
+  if (!user) throw new Error('No autenticado');
+
+  const body = {};
+  if (nombre !== undefined && nombre !== null) {
+    body.data = { nombre };
+  }
+  if (email !== undefined && email !== null) {
+    body.email = email;
+  }
+
+  if (Object.keys(body).length > 0) {
+    await authFetch('/auth/v1/user', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  }
+
+  const dbBody = {};
+  if (nombre !== undefined && nombre !== null) dbBody.nombre = nombre;
+  if (email !== undefined && email !== null) dbBody.email = email;
+  if (Object.keys(dbBody).length > 0) {
+    await restFetch(`/rest/v1/usuarios?id=eq.${encodeURIComponent(user.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dbBody),
+    });
+  }
+}
+
+export async function verifyPassword(password) {
+  const user = await getUser();
+  if (!user?.email) return false;
+  try {
+    await authFetch('/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      body: JSON.stringify({ email: user.email, password }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function updatePassword(newPassword) {
+  await authFetch('/auth/v1/user', {
+    method: 'PUT',
+    body: JSON.stringify({ password: newPassword }),
+  });
 }

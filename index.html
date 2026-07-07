@@ -35,9 +35,9 @@
         <!-- Sidebar/Navigation -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <button id="sidebar-close" class="m3-icon-btn-tonal mobile-only" aria-label="Cerrar menú">
+                <button id="sidebar-close" class="m3-icon-btn-tonal mobile-only" aria-label="Cerrar menú" style="margin-bottom:32px;">
                     <span class="m3-icon-btn-ripple"></span>
-                    <img src="/pwa-512x512.svg" alt="Cerrar menú" style="width: 40px; height: 40px;">
+                    <img src="/pwa-512x512.svg" alt="Cerrar menú" style="width: 48px; height: 48px; display:block;">
                 </button>
                 <a href="#perfil" class="nav-link header-main" data-screen="perfil">
                     <img src="/pwa-512x512.svg" alt="Finca Manager" class="sidebar-logo">
@@ -54,7 +54,6 @@
                 <li><a href="#motores" class="nav-link" data-screen="motores"><span class="material-icons">settings_suggest</span> <span class="nav-text">Motores</span></a></li>
                 <li><a href="#herramientas" class="nav-link" data-screen="herramientas"><span class="material-icons">construction</span> <span class="nav-text">Herramientas</span></a></li>
                 <li><a href="#potreros" class="nav-link" data-screen="potreros"><span class="material-icons">landscape</span> <span class="nav-text">Potreros</span></a></li>
-                <li><a href="#sin_conexion" class="nav-link" data-screen="sin_conexion"><span class="material-icons">wifi_off</span> <span class="nav-text">Sin Conexión</span></a></li>
                 <li><a href="#equipo" class="nav-link" data-screen="equipo"><span class="material-icons">group</span> <span class="nav-text">Equipo</span></a></li>
                 <li><a href="#configuracion" class="nav-link" data-screen="configuracion"><span class="material-icons">settings</span> <span class="nav-text">Configuración</span></a></li>
                 <li style="margin-top:8px;border-top:1px solid var(--m3-outline-variant,#e0e0e0);padding-top:8px;"><button id="sidebar-logout" class="nav-link" style="width:100%;cursor:pointer;border:none;background:transparent;color:#ff4103;text-align:left;display:flex;align-items:center;gap:12px;padding:10px 20px;border-radius:0;font-size:14px;font-weight:500;font-family:'Work Sans',sans-serif;">
@@ -74,9 +73,8 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <header class="top-bar">
-                <button id="menu-toggle" class="menu-toggle m3-icon-btn-tonal" aria-label="Abrir menú">
-                    <span class="m3-icon-btn-ripple"></span>
-                    <img src="/pwa-512x512.svg" alt="Abrir menú" style="width: 40px; height: 40px;">
+                                <button id="menu-toggle" class="menu-toggle" aria-label="Abrir menú">
+                    <img src="/pwa-512x512.svg" alt="Abrir menú" style="width: 48px; height: 48px; display:block;">
                 </button>
                 <h2 id="current-screen-title">Dashboard Cafetal</h2>
                 <span id="empresa-selector" style="display:none;margin:0 12px;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,0.15);font-size:12px;font-weight:600;color:#2d3e2c;cursor:pointer;align-items:center;gap:4px;white-space:nowrap;" onclick="window.openEmpresaSwitcher()">

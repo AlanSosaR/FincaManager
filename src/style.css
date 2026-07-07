@@ -158,6 +158,7 @@ body.screen-auth #app .main-content {
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
+  gap: 36px;
   margin-bottom: 40px;
 }
 
@@ -377,23 +378,18 @@ body.screen-auth #app .main-content {
   z-index: 5000;
   position: relative;
 }
-#menu-toggle.m3-icon-btn-tonal {
-  background-color: transparent;
-  box-shadow: none;
-}
-#menu-toggle.m3-icon-btn-tonal:hover {
-  background-color: transparent;
-  box-shadow: none;
-  transform: scale(1.05);
-}
-#menu-toggle.m3-icon-btn-tonal:active {
-  background-color: transparent;
-  box-shadow: none;
-  transform: scale(0.95);
-}
+
 #sidebar-close.m3-icon-btn-tonal {
   background-color: transparent;
   box-shadow: none;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0;
 }
 #sidebar-close.m3-icon-btn-tonal:hover {
   background-color: transparent;
@@ -428,6 +424,7 @@ body.screen-auth #app .main-content {
     left: calc(-1 * var(--sidebar-width));
     height: 100%;
     z-index: 1300;
+    padding: 8px 24px 32px;
   }
 
   .sidebar.open {
