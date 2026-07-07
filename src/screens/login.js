@@ -83,6 +83,9 @@ export async function renderLogin(showForm) {
           <span style="color:#666;font-size:14px;">¿No tienes cuenta? </span>
           <a href="#" onclick="window.navigateTo('register'); return false;" style="color:#2d3e2c;font-weight:700;font-size:14px;">Regístrate</a>
         </div>
+        <div style="text-align:center;margin-top:12px;">
+          <a href="#" onclick="window.navigateTo('recuperar'); return false;" style="color:#888;font-size:13px;">¿Olvidaste tu contraseña?</a>
+        </div>
         <div style="text-align:center;margin-top:16px;">
           <button id="btn-back-info" style="background:transparent;border:none;cursor:pointer;color:#888;font-size:13px;padding:8px 16px;border-radius:12px;">Volver al inicio</button>
         </div>

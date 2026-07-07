@@ -335,6 +335,8 @@ import { renderPerfil, initPerfil } from './screens/perfil.js';
 import { renderConfiguracion, initConfiguracion } from './screens/configuracion.js';
 import { renderEquipo, initEquipo } from './screens/equipo.js';
 import { renderAceptarInvitacion } from './screens/aceptar_invitacion.js';
+import { renderRecuperar, initRecuperar } from './screens/recuperar.js';
+import { renderRestablecer, initRestablecer } from './screens/restablecer.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -367,6 +369,8 @@ const screens = {
     equipo: { title: 'Equipo', render: renderEquipo },
     configuracion: { title: 'Configuración', render: renderConfiguracion },
     aceptar_invitacion: { title: 'Invitación', render: renderAceptarInvitacion, noAuth: true },
+    recuperar: { title: 'Recuperar Contraseña', render: renderRecuperar, noAuth: true },
+    restablecer: { title: 'Restablecer Contraseña', render: renderRestablecer },
 };
 
 window.navigateTo = function(screenId, ...args) {
@@ -380,8 +384,15 @@ function handleAuthCallback() {
     const params = new URLSearchParams(hash);
     const access_token = params.get('access_token');
     const refresh_token = params.get('refresh_token') || '';
+    const type = params.get('type') || '';
     if (!access_token) return false;
     localStorage.setItem('supabase_session', JSON.stringify({ access_token, refresh_token, expires_in: 3600 }));
+
+    if (type === 'recovery') {
+        window.location.hash = '#restablecer';
+        return true;
+    }
+
     (async () => {
         let inviteToken = '';
         try {
@@ -466,6 +477,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'perfil') initPerfil();
         if (screenId === 'equipo') initEquipo();
         if (screenId === 'configuracion') initConfiguracion();
+        if (screenId === 'recuperar') initRecuperar();
+        if (screenId === 'restablecer') initRestablecer();
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);

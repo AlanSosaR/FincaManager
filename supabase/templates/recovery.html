@@ -1,0 +1,21 @@
+<img src="https://finca-manager.vercel.app/pwa-512x512.svg" alt="Finca Manager" width="80" height="80" style="display:block;margin:0 auto 16px;">
+
+<p style="font-size:18px;text-align:center;font-weight:700;color:#2d3e2c;">
+  Restablece tu contraseña
+</p>
+
+<p style="font-size:14px;text-align:center;color:#555;margin-top:16px;">
+  Recibimos una solicitud para restablecer la contraseña de tu cuenta en
+  <strong>{{ .Data.empresa_nombre }}</strong> en Finca Manager.
+  Haz clic en el botón de abajo para crear una nueva contraseña.
+</p>
+
+<p style="font-size:13px;text-align:center;color:#888;margin-top:12px;">
+  Este enlace tiene una duración limitada. Si no solicitaste este cambio, ignora este mensaje.
+</p>
+
+<p style="text-align:center;margin-top:24px;">
+  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 32px;background:#2d3e2c;color:white;border-radius:40px;text-decoration:none;font-weight:700;font-size:15px;">
+    Restablecer contraseña
+  </a>
+</p>

@@ -349,3 +349,20 @@ export async function updatePassword(newPassword) {
     body: JSON.stringify({ password: newPassword }),
   });
 }
+
+export async function sendRecoveryEmail(email) {
+  let data = {};
+  try {
+    const users = await restFetch(`/rest/v1/usuarios?email=eq.${encodeURIComponent(email)}&select=id`);
+    if (users?.[0]?.id) {
+      const ue = await restFetch(`/rest/v1/usuario_empresas?usuario_id=eq.${encodeURIComponent(users[0].id)}&select=empresas:empresa_id(nombre)&limit=1`);
+      if (ue?.[0]?.empresas?.nombre) {
+        data.empresa_nombre = ue[0].empresas.nombre;
+      }
+    }
+  } catch {}
+  await authFetch('/auth/v1/recover', {
+    method: 'POST',
+    body: JSON.stringify({ email, data }),
+  });
+}

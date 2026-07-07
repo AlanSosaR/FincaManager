@@ -21,14 +21,22 @@ export async function renderPerfil() {
     } catch {}
   }
 
+  let userRole = '';
+  if (empresaId && user?.id) {
+    try {
+      const ue = await restFetch(`/rest/v1/usuario_empresas?empresa_id=eq.${empresaId}&usuario_id=eq.${user.id}&select=rol`);
+      if (ue?.[0]?.rol) userRole = ue[0].rol;
+    } catch {}
+  }
+
   return `
     <div class="m3-card-filled" style="margin-bottom:80px;">
       <div id="perfil-header-click" style="text-align:center;cursor:pointer;">
         <div style="width:80px;height:80px;border-radius:50%;background:#2d3e2c;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
           <span class="material-icons" style="font-size:40px;color:white;">account_circle</span>
         </div>
-        <h1 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;">${nombre}</h1>
-        <p style="color:#666;font-size:14px;margin-top:4px;">${email}</p>
+        <h1 id="perfil-header-name" class="m3-headline-small m3-font-bold" style="color:#2d3e2c;">${nombre}</h1>
+        <p id="perfil-header-email" style="color:#666;font-size:14px;margin-top:4px;">${email}</p>
         <div style="margin-top:4px;color:#888;">
           <span id="perfil-arrow" class="material-icons" style="font-size:20px;transition:transform 0.2s;">expand_more</span>
         </div>
@@ -58,18 +66,25 @@ export async function renderPerfil() {
             <div style="margin-bottom:12px;">
               <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Contraseña actual</label>
               <div style="position:relative;">
-                <input id="pf-password-current" type="password" placeholder="Ingresa tu contraseña actual" style="width:100%;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;padding:10px 36px 10px 12px;font-size:14px;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;box-sizing:border-box;">
-                <span id="pf-pw-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:18px;"></span>
+                <input id="pf-password-current" type="password" placeholder="Ingresa tu contraseña actual" style="width:100%;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;padding:10px 56px 10px 12px;font-size:14px;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;box-sizing:border-box;">
+                <span id="pf-eye-current" class="material-icons pw-eye" style="position:absolute;right:36px;top:50%;transform:translateY(-50%);font-size:20px;cursor:pointer;color:#888;z-index:1;">visibility_off</span>
+                <span id="pf-pw-status" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:18px;z-index:1;"></span>
               </div>
               <div id="pf-pw-msg" style="font-size:12px;margin-top:4px;"></div>
             </div>
             <div style="margin-bottom:12px;">
               <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Nueva contraseña</label>
-              <input id="pf-password-new" type="password" placeholder="Nueva contraseña" style="width:100%;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;padding:10px 12px;font-size:14px;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;box-sizing:border-box;">
+              <div style="position:relative;">
+                <input id="pf-password-new" type="password" placeholder="Nueva contraseña" style="width:100%;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;padding:10px 36px 10px 12px;font-size:14px;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;box-sizing:border-box;">
+                <span id="pf-eye-new" class="material-icons pw-eye" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:20px;cursor:pointer;color:#888;z-index:1;">visibility_off</span>
+              </div>
             </div>
             <div style="margin-bottom:4px;">
               <label style="font-size:13px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Confirmar contraseña</label>
-              <input id="pf-password-confirm" type="password" placeholder="Repite la nueva contraseña" style="width:100%;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;padding:10px 12px;font-size:14px;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;box-sizing:border-box;">
+              <div style="position:relative;">
+                <input id="pf-password-confirm" type="password" placeholder="Repite la nueva contraseña" style="width:100%;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;padding:10px 36px 10px 12px;font-size:14px;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;box-sizing:border-box;">
+                <span id="pf-eye-confirm" class="material-icons pw-eye" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:20px;cursor:pointer;color:#888;z-index:1;">visibility_off</span>
+              </div>
             </div>
           </div>
         </div>
@@ -81,6 +96,7 @@ export async function renderPerfil() {
 
       <div>
         <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">Empresa</h3>
+        ${userRole === 'propietario' ? `
         <div id="perfil-empresa-row" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--m3-surface-container-low);border-radius:12px;cursor:pointer;" onclick="window.editEmpresaNombre()">
           <span class="material-icons" style="color:#2d3e2c;">business</span>
           <div style="flex:1;">
@@ -89,6 +105,15 @@ export async function renderPerfil() {
           </div>
           <span class="material-icons" style="color:#888;font-size:18px;">edit</span>
         </div>
+        ` : `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--m3-surface-container-low);border-radius:12px;">
+          <span class="material-icons" style="color:#2d3e2c;">business</span>
+          <div style="flex:1;">
+            <div id="perfil-empresa-name" style="font-weight:700;color:#2d3e2c;">${empresaNombre}</div>
+            <div style="font-size:12px;color:#888;">Empresa activa</div>
+          </div>
+        </div>
+        `}
       </div>
 
     </div>
@@ -105,6 +130,10 @@ export function initPerfil() {
     formSection.style.display = isOpen ? 'none' : 'block';
     const arrow = document.getElementById('perfil-arrow');
     if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    const headerName = document.getElementById('perfil-header-name');
+    const headerEmail = document.getElementById('perfil-header-email');
+    if (headerName) headerName.style.display = isOpen ? '' : 'none';
+    if (headerEmail) headerEmail.style.display = isOpen ? '' : 'none';
   });
 
   const pwToggle = document.getElementById('pf-password-toggle');
@@ -117,6 +146,16 @@ export function initPerfil() {
     const isOpen = pwSection.style.display !== 'none';
     pwSection.style.display = isOpen ? 'none' : 'block';
     pwArrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+  });
+
+  document.querySelectorAll('.pw-eye').forEach(el => {
+    el.addEventListener('click', () => {
+      const input = el.parentElement.querySelector('input');
+      if (!input) return;
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      el.textContent = isPassword ? 'visibility' : 'visibility_off';
+    });
   });
 
   const pwCurrent = document.getElementById('pf-password-current');
@@ -212,7 +251,30 @@ export function initPerfil() {
       if (pwMsg) pwMsg.textContent = '';
 
     } catch (e) {
-      window.Snackbar?.show('Error: ' + e.message, { type: 'error' });
+      const msg = e.message || '';
+      if (msg.includes('different from the old password')) {
+        window.Snackbar?.show('La nueva contraseña debe ser diferente a la actual', { type: 'error' });
+      } else {
+        window.Snackbar?.show('Error: ' + msg, { type: 'error' });
+      }
     }
   });
+
+  window.editEmpresaNombre = async function() {
+    const currentName = document.getElementById('perfil-empresa-name')?.textContent || 'Mi Finca';
+    const newName = prompt('Nuevo nombre de la empresa:', currentName);
+    if (!newName || newName.trim() === currentName || newName.trim() === '') return;
+    try {
+      const empresaId = localStorage.getItem('current_empresa_id');
+      await restFetch(`/rest/v1/empresas?id=eq.${empresaId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ nombre: newName.trim() })
+      });
+      document.getElementById('perfil-empresa-name').textContent = newName.trim();
+      window.__empresaNombreChanged?.();
+      window.Snackbar?.show('Nombre de empresa actualizado');
+    } catch (e) {
+      window.Snackbar?.show('Error: ' + (e.message || ''), { type: 'error' });
+    }
+  };
 }
