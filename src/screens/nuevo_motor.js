@@ -199,6 +199,7 @@ export async function initNuevoMotor(id) {
       if (isEdit) {
         window.navigateTo('detalle_motor', id);
       } else {
+        window.clearScreenCache?.('motores');
         window.navigateTo('motores');
       }
     } catch (err) {

@@ -225,6 +225,7 @@ export function initNuevoPotrero(id) {
       if (id) {
         window.navigateTo('detalle_potrero', id);
       } else {
+        window.clearScreenCache?.('potreros');
         window.navigateTo('potreros');
       }
     } catch (err) {

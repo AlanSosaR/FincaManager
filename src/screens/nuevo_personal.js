@@ -1,10 +1,11 @@
-import { supabase } from '../supabase.js';
+import { restFetch } from '../auth.js';
+import db from '../db.js';
 
 export async function renderNuevoPersonal(personalId, returnScreen, returnId) {
+  if (personalId === 'null') personalId = null;
   let persona = null;
   if (personalId) {
-    const { data, error } = await supabase.from('personal').select('*').eq('id', personalId).single();
-    if (!error) persona = data;
+    persona = await db.personal.get(personalId);
   }
 
   const isEdit = !!persona;
@@ -65,6 +66,7 @@ export async function renderNuevoPersonal(personalId, returnScreen, returnId) {
 }
 
 export function initNuevoPersonal(personalId, returnScreen, returnId) {
+  if (personalId === 'null') personalId = null;
   const form = document.getElementById('form-nuevo-personal');
   if (!form) return;
 
@@ -80,15 +82,45 @@ export function initNuevoPersonal(personalId, returnScreen, returnId) {
     if (data.pago_diario) data.pago_diario = parseFloat(data.pago_diario);
 
     try {
-      let error;
       if (personalId) {
-        ({ error } = await supabase.from('personal').update(data).eq('id', personalId));
+        try {
+          const patchBody = { ...data };
+          delete patchBody.id;
+          delete patchBody.created_at;
+          delete patchBody.empresa_id;
+          await restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(personalId)}`, {
+            method: 'PATCH',
+            body: JSON.stringify(patchBody),
+          });
+        } catch {}
+        const existing = await db.personal.get(personalId) || {};
+        await db.personal.put({ ...existing, ...data, id: personalId, updated_at: new Date().toISOString() });
+        window.Snackbar.show('Personal actualizado');
       } else {
-        ({ error } = await supabase.from('personal').insert([data]));
-      }
-      if (error) throw error;
+        const record = { ...data };
+        record.id = crypto.randomUUID();
+        record.created_at = new Date().toISOString();
+        if (window._currentEmpresaId) record.empresa_id = window._currentEmpresaId;
 
-      window.Snackbar.show(personalId ? 'Personal actualizado' : 'Personal registrado');
+        try {
+          const serverRecord = await restFetch('/rest/v1/personal', {
+            method: 'POST',
+            body: JSON.stringify(record),
+          });
+          await db.personal.put(serverRecord);
+        } catch {
+          await db.personal.put(record);
+          await db._sync_queue.add({
+            table: 'personal',
+            action: 'insert',
+            record_id: record.id,
+            data: record,
+            timestamp: new Date().toISOString(),
+          });
+          if (window.__syncPending) window.__syncPending();
+        }
+        window.Snackbar.show('Personal registrado');
+      }
 
       const isFromLote = returnScreen === 'detalle_lote';
       if (isFromLote) {

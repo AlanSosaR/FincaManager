@@ -417,11 +417,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleElement = document.getElementById('current-screen-title');
 
     const viewCache = new Map();
-    const NO_CACHE = new Set(['ganado','nuevo_motor','nuevo_animal','nuevo_potrero',
+    const NO_CACHE = new Set(['dashboard','motores','herramientas','potreros',
+                               'ganado','nuevo_motor','nuevo_animal','nuevo_potrero',
                                'detalle_motor','detalle_animal','detalle_potrero',
                                'detalle_herramienta','nuevo_lote','detalle_lote',
-                               'nueva_actividad','nuevo_personal','detalle_personal','personal',
-                               'perfil']);
+                               'nueva_actividad','nuevo_personal','detalle_personal',
+                               'personal','perfil','equipo','configuracion']);
 
     window.clearScreenCache = (screenId) => {
       if (!screenId) { viewCache.clear(); return; }

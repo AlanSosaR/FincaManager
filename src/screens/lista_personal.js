@@ -1,11 +1,13 @@
-import { supabase } from '../supabase.js';
+import { restFetch } from '../auth.js';
 
 function getInitiales(nombre) {
+  if (!nombre) return '??';
   return nombre.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
 }
 
 function getColor(seed) {
   const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2d3e2c', '#2c666e', '#6a1b9a'];
+  if (!seed) return colors[0];
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
@@ -13,12 +15,7 @@ function getColor(seed) {
 
 export async function renderListaPersonal() {
   try {
-    const { data: personal, error } = await supabase
-      .from('personal')
-      .select('*')
-      .order('nombre', { ascending: true });
-
-    if (error) throw error;
+    const personal = await restFetch('/rest/v1/personal?order=nombre.asc&select=*') || [];
 
     return `
       <style>
@@ -169,7 +166,7 @@ export async function renderListaPersonal() {
         </div>
       </div>
 
-      <button onclick="window.navigateTo('nuevo_personal', null, 'personal')" class="m3-fab" style="background: #2d3e2c; color: white;">
+      <button onclick="window.navigateTo('nuevo_personal', '', 'personal')" class="m3-fab" style="background: #2d3e2c; color: white;">
         <span class="material-symbols-outlined">add</span>
         <span>Registrar Personal</span>
       </button>
@@ -191,13 +188,13 @@ export function initListaPersonal() {
 
   window.confirmDeletePersonal = (id, name) => {
     window.Snackbar.confirm(`¿Eliminar a ${name}?`, async () => {
-      const { error } = await supabase.from('personal').delete().eq('id', id);
-      if (error) {
-        window.Snackbar.show('Error: ' + error.message, { type: 'error' });
-      } else {
+      try {
+        await restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
         window.Snackbar.show('Personal eliminado');
         window.clearScreenCache?.('personal');
         window.navigateTo('personal');
+      } catch (err) {
+        window.Snackbar.show('Error: ' + err.message, { type: 'error' });
       }
     });
   };

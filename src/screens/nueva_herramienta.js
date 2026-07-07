@@ -191,6 +191,7 @@ export async function initNuevaHerramienta(id) {
         window.Snackbar.show('Herramienta guardada exitosamente');
       }
 
+      window.clearScreenCache?.('herramientas');
       window.navigateTo('herramientas');
     } catch (err) {
       console.error(err);

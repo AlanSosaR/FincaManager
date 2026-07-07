@@ -167,8 +167,9 @@ export default class QueryBuilder {
           });
           const serverRecords = await res.json();
           const serverRecord = Array.isArray(serverRecords) ? serverRecords[0] : serverRecords;
-          await table.put(serverRecord);
-          results.push(serverRecord);
+          const merged = { ...record, ...serverRecord };
+          await table.put(merged);
+          results.push(merged);
           continue;
         } catch (e) {
           console.warn(`online insert failed for ${this.tableName}, fallback to local:`, e);

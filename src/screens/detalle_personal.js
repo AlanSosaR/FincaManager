@@ -1,4 +1,4 @@
-import { supabase } from '../supabase.js';
+import { restFetch } from '../auth.js';
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DAYS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -9,15 +9,17 @@ function fmtDate(d) {
 }
 
 export async function renderDetallePersonal(personalId, returnScreen, returnId) {
-  const [persona, asistencia] = await Promise.all([
-    supabase.from('personal').select('*').eq('id', personalId).single().then(r => r.data),
-    supabase.from('personal_asistencia').select('*').eq('personal_id', personalId).order('fecha', { ascending: false }).then(r => r.data || [])
+  const [personaArr, asistencia] = await Promise.all([
+    restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(personalId)}&select=*`).catch(() => []),
+    restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(personalId)}&order=fecha.desc&select=*`).catch(() => [])
   ]);
+  const persona = (Array.isArray(personaArr) ? personaArr[0] : personaArr) || null;
 
   if (!persona) return '<div class="m3-p-4" style="color:red;">Personal no encontrado</div>';
 
+  const asisList = Array.isArray(asistencia) ? asistencia : [];
   const asisMap = {};
-  asistencia.forEach(a => { asisMap[a.fecha] = a.estado; });
+  asisList.forEach(a => { asisMap[a.fecha] = a.estado; });
 
   const today = new Date();
   const month = today.getMonth();
@@ -28,14 +30,14 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId) 
 
       <div class="m3-card m3-p-8" style="border-radius: 12px; margin-bottom: 24px;">
         <div style="display: flex; align-items: center; gap: 16px;">
-          <div style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 28px; background: ${getColor(persona.nombre)}; color: white; flex-shrink: 0;">${persona.iniciales}</div>
+          <div style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 28px; background: ${getColor(persona.nombre)}; color: white; flex-shrink: 0;">${persona.iniciales || '?'}</div>
           <div style="flex: 1;">
-            <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="font-size: 28px;">${persona.nombre}</h1>
+            <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="font-size: 28px;">${persona.nombre || 'Sin nombre'}</h1>
             <p class="m3-label-large m3-text-on-surface-variant m3-font-medium">${persona.rol || 'Sin rol'}</p>
           </div>
         </div>
         <div id="cal-summary" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--m3-outline-variant);">
-          ${renderSummary(asistencia, persona.pago_diario)}
+          ${renderSummary(asisList, persona.pago_diario)}
         </div>
       </div>
 
@@ -249,16 +251,13 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
   }
 
   async function refreshCalendar() {
-    const { data: asistencia } = await supabase
-      .from('personal_asistencia')
-      .select('*')
-      .eq('personal_id', _personalId)
-      .order('fecha', { ascending: false });
-
+    const asistencia = await restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(_personalId)}&order=fecha.desc&select=*`).catch(() => []);
+    const asisData = Array.isArray(asistencia) ? asistencia : [];
     const asisMap = {};
-    (asistencia || []).forEach(a => { asisMap[a.fecha] = a.estado; });
+    asisData.forEach(a => { asisMap[a.fecha] = a.estado; });
 
-    const { data: persona } = await supabase.from('personal').select('pago_diario').eq('id', _personalId).single();
+    const personaArr = await restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(_personalId)}&select=pago_diario`).catch(() => []);
+    const persona = (Array.isArray(personaArr) ? personaArr[0] : personaArr) || {};
 
     const calContainer = document.getElementById('cal-container');
     if (calContainer) {
@@ -276,7 +275,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
 
     const summary = document.getElementById('cal-summary');
     if (summary) {
-      summary.innerHTML = renderSummary(asistencia || [], persona?.pago_diario, calDate.getMonth(), calDate.getFullYear(), calDate);
+      summary.innerHTML = renderSummary(asisData, persona?.pago_diario, calDate.getMonth(), calDate.getFullYear(), calDate);
     }
   }
 
@@ -300,35 +299,39 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
   };
 
   window.__calToggleDay = async (dateStr) => {
-    const { data: existente } = await supabase
-      .from('personal_asistencia')
-      .select('*')
-      .eq('personal_id', _personalId)
-      .eq('fecha', dateStr)
-      .maybeSingle();
+    const existentes = await restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(_personalId)}&fecha=eq.${dateStr}&select=*`).catch(() => []);
+    const existente = (Array.isArray(existentes) ? existentes[0] : existentes) || null;
 
     if (existente) {
       const newEstado = existente.estado === 'trabajo' ? 'descanso' : 'trabajo';
-      await supabase.from('personal_asistencia').update({ estado: newEstado }).eq('id', existente.id);
+      await restFetch(`/rest/v1/personal_asistencia?id=eq.${existente.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: newEstado }),
+      });
     } else {
-      await supabase.from('personal_asistencia').insert([{ personal_id: _personalId, fecha: dateStr, estado: 'trabajo' }]);
+      await restFetch('/rest/v1/personal_asistencia', {
+        method: 'POST',
+        body: JSON.stringify({ personal_id: _personalId, fecha: dateStr, estado: 'trabajo' }),
+      });
     }
     refreshCalendar();
   };
 
   window.__calSetDayEstado = async (estado) => {
     const dateStr = fmtDate(calDate);
-    const { data: existente } = await supabase
-      .from('personal_asistencia')
-      .select('*')
-      .eq('personal_id', _personalId)
-      .eq('fecha', dateStr)
-      .maybeSingle();
+    const existentes = await restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(_personalId)}&fecha=eq.${dateStr}&select=*`).catch(() => []);
+    const existente = (Array.isArray(existentes) ? existentes[0] : existentes) || null;
 
     if (existente) {
-      await supabase.from('personal_asistencia').update({ estado }).eq('id', existente.id);
+      await restFetch(`/rest/v1/personal_asistencia?id=eq.${existente.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado }),
+      });
     } else {
-      await supabase.from('personal_asistencia').insert([{ personal_id: _personalId, fecha: dateStr, estado }]);
+      await restFetch('/rest/v1/personal_asistencia', {
+        method: 'POST',
+        body: JSON.stringify({ personal_id: _personalId, fecha: dateStr, estado }),
+      });
     }
     refreshCalendar();
   };
@@ -336,6 +339,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
 
 function getColor(seed) {
   const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2d3e2c', '#2c666e', '#6a1b9a'];
+  if (!seed) return colors[0];
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
