@@ -7,7 +7,7 @@ import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
 
-import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync } from './sync.js';
+import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync, syncTable } from './sync.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 
@@ -306,8 +306,18 @@ function initOnlineSync() {
         await incrementalSync(true);
       } catch (e) { /* silent */ }
     }
-  }, 900000);
+  }, 30000);
 }
+
+const SCREEN_TABLE_MAP = {
+  motores: 'motores', detalle_motor: 'motores', nuevo_motor: 'motores',
+  herramientas: 'herramientas', detalle_herramienta: 'herramientas',
+  potreros: 'potreros', detalle_potrero: 'potreros', nuevo_potrero: 'potreros',
+  ganado: 'ganado', detalle_animal: 'ganado', nuevo_animal: 'ganado',
+  lotes: 'lotes', detalle_lote: 'lotes', nuevo_lote: 'lotes',
+  nueva_actividad: 'lote_aplicaciones',
+  personal: 'personal', detalle_personal: 'personal', nuevo_personal: 'personal',
+};
 
 // ─── Screen imports ──────────────────────────────────────────────────────────
 
@@ -526,6 +536,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!screen.noAuth && window._currentEmpresaId) {
             updateSidebarEmpresaName();
             if (!_empresaList.length) initEmpresaSelector();
+        }
+
+        const tableToSync = SCREEN_TABLE_MAP[screenId];
+        if (tableToSync && navigator.onLine && isAuthenticated()) {
+            await syncTable(tableToSync).catch(() => {});
         }
 
         if (screen.backTo) {

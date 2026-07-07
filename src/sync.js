@@ -191,40 +191,45 @@ export async function initSync() {
   }
 }
 
-export async function incrementalSync(silent = true) {
-  if (syncInProgress) return;
-  syncInProgress = true;
+export async function syncTable(tableName) {
+  if (!isOnline()) return;
+  if (!SUPABASE_TABLES.includes(tableName)) return;
   try {
-    if (!silent) onSyncStatusChange?.('Sincronizando...', 0);
-
-    for (const tableName of SUPABASE_TABLES) {
-      const lastSyncKey = `last_incremental_sync_${tableName}`;
-      const lastSync = await getSyncMeta(lastSyncKey) || '1970-01-01T00:00:00Z';
-
-      const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
-        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
-        : '';
-
+    const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
+      ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+      : '';
+    let allData = [];
+    let from = 0;
+    const limit = 1000;
+    while (true) {
       const res = await supabaseFetch(
-        `/rest/v1/${tableName}?select=*&updated_at=gt.${encodeURIComponent(lastSync)}${empresaFilter}`
+        `/rest/v1/${tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
       );
       const data = await res.json();
-
-      if (data.length) {
-        await db.table(tableName).bulkPut(data);
-
-        const maxUpdated = data.reduce(
-          (max, row) => (row.updated_at > max ? row.updated_at : max),
-          lastSync
-        );
-        await updateSyncMeta(lastSyncKey, maxUpdated);
+      if (!data.length) break;
+      allData = allData.concat(data);
+      from += limit;
+      if (data.length < limit) break;
+    }
+    const dexieTable = db.table(tableName);
+    const localRecords = await dexieTable.toArray();
+    const localIds = new Set(localRecords.map(r => r.id));
+    const serverIds = new Set(allData.map(r => r.id));
+    for (const localId of localIds) {
+      if (!serverIds.has(localId)) {
+        await dexieTable.delete(localId);
       }
     }
-
-    if (!silent) onSyncStatusChange?.(null, 100);
+    if (allData.length) {
+      await dexieTable.bulkPut(allData);
+    }
   } catch (err) {
-    console.error('[incrementalSync] error:', err);
-  } finally {
-    syncInProgress = false;
+    console.warn(`syncTable: error en ${tableName}`, err);
   }
+}
+
+export async function incrementalSync(silent = true) {
+  if (!isOnline()) return;
+  const tables = [...BUSINESS_TABLES];
+  await Promise.all(tables.map(t => syncTable(t)));
 }
