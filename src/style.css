@@ -1028,10 +1028,6 @@ body.screen-auth #app .main-content {
 }
 
 .login-icon-box {
-  width: 64px;
-  height: 64px;
-  background: var(--m3-primary-container);
-  border-radius: var(--m3-radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1039,8 +1035,8 @@ body.screen-auth #app .main-content {
 }
 
 .login-icon-box .login-logo {
-  width: 44px;
-  height: 44px;
+  width: 80px;
+  height: 80px;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
 }
 

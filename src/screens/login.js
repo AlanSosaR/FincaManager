@@ -60,7 +60,7 @@ export async function renderLogin(showForm) {
 
       <div id="login-form-card" class="m3-card-filled" style="width:100%;max-width:480px;margin:0;${showFormDirect ? '' : 'display:none;'}">
         <div style="text-align:center;margin-bottom:32px;">
-          <img src="/pwa-512x512.svg" alt="Finca Manager" style="width:48px;height:48px;margin-bottom:12px;">
+          <img src="/pwa-512x512.svg" alt="Finca Manager" style="width:64px;height:64px;margin-bottom:12px;">
           <h1 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;">Finca Manager</h1>
           <p class="m3-body-medium" style="color:#666;margin-top:8px;">Inicia sesión para acceder a tu finca</p>
         </div>

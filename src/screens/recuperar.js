@@ -20,7 +20,7 @@ export function renderRecuperar() {
           </button>
         </form>
         <div style="text-align:center;margin-top:24px;">
-          <a href="#" onclick="window.navigateTo('login'); return false;" style="color:#2d3e2c;font-weight:600;font-size:14px;">Volver a iniciar sesión</a>
+          <a href="#" onclick="window.navigateTo('login', 'form'); return false;" style="color:#2d3e2c;font-weight:600;font-size:14px;">Volver a iniciar sesión</a>
         </div>
       </div>
     </div>
@@ -46,8 +46,12 @@ export function initRecuperar() {
     errorEl.style.display = 'none';
     try {
       await sendRecoveryEmail(email);
-      window.Snackbar?.show('Se enviará un enlace de cambio de contraseña a tu correo. El enlace tiene una duración limitada.');
-      window.navigateTo('login');
+      window.Snackbar?.confirm(
+        'Se enviará un enlace de cambio de contraseña a tu correo. El enlace tiene una duración limitada.',
+        () => window.navigateTo('login', 'form'),
+        null,
+        { confirmText: 'Aceptar', cancelText: false }
+      );
     } catch (err) {
       errorEl.textContent = err.message || 'Error al enviar el correo';
       errorEl.style.display = 'block';
