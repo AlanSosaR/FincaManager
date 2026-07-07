@@ -75,40 +75,41 @@ export async function fullDownload(silent = false) {
       const tableName = SUPABASE_TABLES[i];
       const progress = Math.round(((i + 1) / totalTables) * 100);
       if (!silent) onSyncStatusChange?.(`Descargando ${tableName}...`, progress);
-      let allData = [];
-      let from = 0;
-      const limit = 1000;
-      const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
-        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
-        : '';
-      while (true) {
-        const res = await supabaseFetch(
-          `/rest/v1/${tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
-        );
-        const data = await res.json();
-        if (!data.length) break;
-        allData = allData.concat(data);
-        from += limit;
-        if (data.length < limit) break;
-      }
-      const dexieTable = db.table(tableName);
-
-      // Get local IDs for this table
-      const localRecords = await dexieTable.toArray();
-      const localIds = new Set(localRecords.map(r => r.id));
-      const serverIds = new Set(allData.map(r => r.id));
-      const protectIds = pendingIds.get(tableName);
-
-      // Delete records that exist locally but NOT on server AND are not pending sync
-      for (const localId of localIds) {
-        if (!serverIds.has(localId) && (!protectIds || !protectIds.has(localId))) {
-          await dexieTable.delete(localId);
+      try {
+        let allData = [];
+        let from = 0;
+        const limit = 1000;
+        const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
+          ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+          : '';
+        while (true) {
+          const res = await supabaseFetch(
+            `/rest/v1/${tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
+          );
+          const data = await res.json();
+          if (!data.length) break;
+          allData = allData.concat(data);
+          from += limit;
+          if (data.length < limit) break;
         }
-      }
+        const dexieTable = db.table(tableName);
 
-      // Upsert server data (preserves local-only pending records)
-      if (allData.length) {
-        await dexieTable.bulkPut(allData);
+        const localRecords = await dexieTable.toArray();
+        const localIds = new Set(localRecords.map(r => r.id));
+        const serverIds = new Set(allData.map(r => r.id));
+        const protectIds = pendingIds.get(tableName);
+
+        for (const localId of localIds) {
+          if (!serverIds.has(localId) && (!protectIds || !protectIds.has(localId))) {
+            await dexieTable.delete(localId);
+          }
+        }
+
+        if (allData.length) {
+          await dexieTable.bulkPut(allData);
+        }
+      } catch (tableErr) {
+        console.warn(`fullDownload: error en tabla ${tableName}, continuando...`, tableErr);
       }
     }
     await updateSyncMeta('last_full_sync', new Date().toISOString());
@@ -116,8 +117,8 @@ export async function fullDownload(silent = false) {
     if (!silent) onSyncStatusChange?.(null, 100);
   } catch (err) {
     console.error('fullDownload error:', err);
-    if (!silent) onSyncStatusChange?.('Error de conexión', 0);
-    if (!silent) setTimeout(() => onSyncStatusChange?.(null, 100), 3000);
+    if (!silent) onSyncStatusChange?.('Finalizando...', 90);
+    if (!silent) setTimeout(() => onSyncStatusChange?.(null, 100), 2000);
   } finally {
     syncInProgress = false;
   }
