@@ -306,7 +306,7 @@ function initOnlineSync() {
         await incrementalSync(true);
       } catch (e) { /* silent */ }
     }
-  }, 30000);
+  }, 5000);
 }
 
 const SCREEN_TABLE_MAP = {
