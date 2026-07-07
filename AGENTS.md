@@ -10,6 +10,58 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Auth/DB: llamadas REST directas a Supabase (`authFetch`, `restFetch`, `restInsert`), NO usar `@supabase/supabase-js` ni QueryBuilder.
 - Proyecto Supabase: `udhuizkqnmkhljmezzkd`.
 
+## Lo Completado (07/07)
+
+### Sincronización automática en segundo plano (cada 5s + al navegar)
+- `sync.js`: nueva función `syncTable(tableName)` — descarga UNA tabla desde Supabase y actualiza IndexedDB. Elimina registros locales que ya no existen en servidor.
+- `sync.js`: `incrementalSync()` reescrito — ahora llama `syncTable()` para todas las tablas de negocio en paralelo (ya no usa `updated_at` que no existía en las tablas).
+- `main.js`: al navegar a `#lotes`, `#potreros`, `#motores`, etc., llama `syncTable()` ANTES de renderizar — datos frescos al instante.
+- `main.js`: intervalo de sync reducido de 15 min → **5 segundos**.
+- `main.js`: `visibilitychange` y evento `online` también sincronizan todas las tablas.
+- Todo 100% silencioso: sin banners, spinners ni refrescos visibles.
+- Commits: `b44f231`, `37bb287`
+
+### Lectura directa desde Supabase (restFetch) en detalle_personal y lista_personal
+- `detalle_personal.js`: reemplazó todos los `supabase.from()` (QueryBuilder → IndexedDB) por `restFetch()` (lectura directa desde Supabase REST API). Incluye render inicial, refreshCalendar, toggle y set de asistencia.
+- `lista_personal.js`: mismo cambio — listado y eliminación via `restFetch`.
+- Soluciona que los datos corruptos en IndexedDB (registros sin `nombre`, `rol`, `iniciales`) ya no afectan la visualización.
+- Importa `restFetch` de `auth.js` ya no `supabase` de `../supabase.js`.
+- Commits: `a59875e`
+
+### Prevención de datos corruptos en QueryBuilder
+- `query-builder.js:170`: `_executeInsert()` ahora guarda `{ ...record, ...serverRecord }` (fusión de datos originales del formulario con respuesta del servidor). Así aunque Supabase devuelva algo inesperado, no se pierden campos.
+- Commit: `a59875e`
+
+### Guard contra datos incompletos (null safety)
+- `detalle_personal.js` y `lista_personal.js`: `getColor(seed)` — si `seed` es `undefined`, retorna el primer color en vez de fallar con `seed.length`.
+- `lista_personal.js`: `getInitiales(nombre)` — si `nombre` es `undefined`, retorna `'??'`.
+- `detalle_personal.js`: template muestra `persona.nombre || 'Sin nombre'` y `persona.iniciales || '?'` para evitar mostrar "undefined".
+- Commit: `a59875e`
+
+### Fix pantalla de descarga inicial — "Error de conexión" → "Finalizando..."
+- `sync.js`: cada tabla se descarga en un `try/catch` individual; si una falla, continúa con la siguiente.
+- Mensaje de error cambiado de `"Error de conexión"` a `"Finalizando..."` con barra al 90% en vez de 0%.
+- Timeout reducido de 3s a 2s.
+- Commit: `a9c1f03`
+
+### Perfil — Header oculto tras guardar (fix)
+- `perfil.js`: save handler restaura `style.display` del header name/email a `''` después de cerrar el formulario.
+- `window.clearScreenCache?.('perfil')` después de guardar.
+- Edición de nombre de empresa inline (reemplazó `prompt()` por input + Guardar/Cancelar).
+- Commit: `f1503b8`
+
+### Nuevo Personal — reescrito con restFetch + IndexedDB directo
+- `nuevo_personal.js`: submit handler ahora usa `restFetch()` + `db.personal.put()` en vez de QueryBuilder.
+- INSERT: POST a Supabase, almacena respuesta del servidor en IndexedDB; si falla, guarda local y encola sync.
+- UPDATE: PATCH a Supabase, mergea con registro existente antes de `db.personal.put()`.
+- Guard `if (personalId === 'null') personalId = null` en render e init.
+- Commit: `a59875e`
+
+### ClearScreenCache en navegación de formularios a listados
+- `nuevo_motor.js`, `nuevo_potrero.js`, `nueva_herramienta.js`: añadido `window.clearScreenCache?.('motores')` (etc.) antes de `navigateTo()`.
+- `main.js`: agregadas pantallas a `NO_CACHE` para forzar render fresco.
+- Commit: `f1503b8`
+
 ## Lo Completado (03/07)
 
 ### Dashboard — Aplicaciones Recientes (rounded corners + fix borde mobile)
