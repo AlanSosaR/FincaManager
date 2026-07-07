@@ -420,7 +420,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const NO_CACHE = new Set(['ganado','nuevo_motor','nuevo_animal','nuevo_potrero',
                                'detalle_motor','detalle_animal','detalle_potrero',
                                'detalle_herramienta','nuevo_lote','detalle_lote',
-                               'nueva_actividad','nuevo_personal','detalle_personal','personal']);
+                               'nueva_actividad','nuevo_personal','detalle_personal','personal',
+                               'perfil']);
 
     window.clearScreenCache = (screenId) => {
       if (!screenId) { viewCache.clear(); return; }

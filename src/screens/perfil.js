@@ -240,9 +240,11 @@ export function initPerfil() {
       if (pwArrow) pwArrow.style.transform = 'rotate(0deg)';
 
       const headerName = document.querySelector('#perfil-header-click h1');
-      if (headerName) headerName.textContent = nuevoNombre;
+      if (headerName) { headerName.textContent = nuevoNombre; headerName.style.display = ''; }
       const headerEmail = document.querySelector('#perfil-header-click p');
-      if (headerEmail) headerEmail.textContent = nuevoEmail;
+      if (headerEmail) { headerEmail.textContent = nuevoEmail; headerEmail.style.display = ''; }
+
+      window.clearScreenCache?.('perfil');
 
       if (pwCurrent) pwCurrent.value = '';
       if (pwNew) pwNew.value = '';
@@ -260,21 +262,69 @@ export function initPerfil() {
     }
   });
 
-  window.editEmpresaNombre = async function() {
+  window.editEmpresaNombre = function() {
+    const row = document.getElementById('perfil-empresa-row');
     const currentName = document.getElementById('perfil-empresa-name')?.textContent || 'Mi Finca';
-    const newName = prompt('Nuevo nombre de la empresa:', currentName);
-    if (!newName || newName.trim() === currentName || newName.trim() === '') return;
-    try {
-      const empresaId = localStorage.getItem('current_empresa_id');
-      await restFetch(`/rest/v1/empresas?id=eq.${empresaId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ nombre: newName.trim() })
-      });
-      document.getElementById('perfil-empresa-name').textContent = newName.trim();
-      window.__empresaNombreChanged?.();
-      window.Snackbar?.show('Nombre de empresa actualizado');
-    } catch (e) {
-      window.Snackbar?.show('Error: ' + (e.message || ''), { type: 'error' });
-    }
+    if (!row) return;
+
+    row.style.cursor = 'default';
+    row.style.flexWrap = 'wrap';
+    row.removeAttribute('onclick');
+    row.innerHTML = `
+      <span class="material-icons" style="color:#2d3e2c;">business</span>
+      <div style="flex:1;min-width:200px;">
+        <input id="perfil-empresa-input" type="text" value="${currentName.replace(/"/g, '&quot;')}" style="width:100%;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;padding:10px 12px;font-size:14px;font-family:'Work Sans',sans-serif;background:white;color:#2d3e2c;outline:none;box-sizing:border-box;">
+      </div>
+      <div style="width:100%;display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+        <button id="perfil-empresa-cancel" style="padding:8px 16px;background:transparent;color:#888;border:1px solid var(--m3-outline-variant,#e0e0e0);border-radius:12px;font-size:13px;font-weight:600;font-family:'Work Sans',sans-serif;cursor:pointer;">Cancelar</button>
+        <button id="perfil-empresa-save" style="padding:8px 16px;background:#2d3e2c;color:white;border:none;border-radius:12px;font-size:13px;font-weight:600;font-family:'Work Sans',sans-serif;cursor:pointer;">Guardar</button>
+      </div>
+    `;
+
+    const input = document.getElementById('perfil-empresa-input');
+    input?.focus();
+    input?.select();
+
+    document.getElementById('perfil-empresa-save')?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const newName = input?.value?.trim();
+      if (!newName || newName === currentName) {
+        window.editEmpresaNombreCancel(currentName);
+        return;
+      }
+      try {
+        const empresaId = localStorage.getItem('current_empresa_id');
+        await restFetch(`/rest/v1/empresas?id=eq.${empresaId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ nombre: newName })
+        });
+        window.editEmpresaNombreCancel(newName);
+        window.__empresaNombreChanged?.();
+        window.Snackbar?.show('Nombre de empresa actualizado');
+      } catch (e) {
+        window.Snackbar?.show('Error: ' + (e.message || ''), { type: 'error' });
+      }
+    });
+
+    document.getElementById('perfil-empresa-cancel')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      window.editEmpresaNombreCancel(currentName);
+    });
+  };
+
+  window.editEmpresaNombreCancel = function(nombre) {
+    const row = document.getElementById('perfil-empresa-row');
+    if (!row) return;
+    row.style.cursor = 'pointer';
+    row.style.flexWrap = '';
+    row.setAttribute('onclick', 'window.editEmpresaNombre()');
+    row.innerHTML = `
+      <span class="material-icons" style="color:#2d3e2c;">business</span>
+      <div style="flex:1;">
+        <div id="perfil-empresa-name" style="font-weight:700;color:#2d3e2c;">${nombre}</div>
+        <div style="font-size:12px;color:#888;">Empresa activa — clic para editar</div>
+      </div>
+      <span class="material-icons" style="color:#888;font-size:18px;">edit</span>
+    `;
   };
 }
