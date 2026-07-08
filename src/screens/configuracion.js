@@ -1,7 +1,7 @@
 import { logout, getUser } from '../auth.js';
 import db from '../db.js';
 import { fullDownload } from '../sync.js';
-import { createInstance, deleteInstance, getQR, checkConnection, joinGroup } from '../wa.js';
+import { createInstance, deleteInstance, getQR, checkConnection, listGroups, sendWhatsApp } from '../wa.js';
 
 export async function renderConfiguracion() {
   const groupJid = localStorage.getItem('whatsapp_group_jid') || '';
@@ -25,14 +25,14 @@ export async function renderConfiguracion() {
           <button id="btn-wa-connect" class="btn-m3-primary" style="width:100%;padding:14px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
             <span class="material-icons">qr_code_scanner</span> Conectar WhatsApp
           </button>
-          <button id="btn-wa-join-group" class="btn-m3-tonal" style="width:100%;padding:14px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
-            <span class="material-icons">group_add</span> Unirse al grupo
+          <button id="btn-wa-list-groups" class="btn-m3-tonal" style="width:100%;padding:14px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span class="material-icons">group</span> Buscar grupos
           </button>
         </div>
         <div style="margin-top:12px;">
           <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">ID del Grupo de WhatsApp</label>
           <input type="text" id="wa-group-jid" value="${groupJid}" placeholder="Ej: 50399999999-123456@g.us" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--m3-outline-variant,#e0e0e0);font-size:14px;font-family:'Work Sans',sans-serif;">
-          <p style="font-size:12px;color:#999;margin-top:4px;">Se llena automáticamente al unirse al grupo</p>
+          <p style="font-size:12px;color:#999;margin-top:4px;">Click en "Buscar grupos" para seleccionar el grupo de WhatsApp</p>
         </div>
       </div>
 
@@ -129,32 +129,54 @@ export function initConfiguracion() {
     btn.innerHTML = '<span class="material-icons">qr_code_scanner</span> Conectar WhatsApp';
   });
 
-  document.getElementById('btn-wa-join-group')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btn-wa-join-group');
+  document.getElementById('btn-wa-list-groups')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-wa-list-groups');
     btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Uniendo...';
+    btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Buscando...';
 
     try {
-      const result = await joinGroup('JET2ESGPwDBCFWTFdDWLIe');
-      if (result?.id) {
-        document.getElementById('wa-group-jid').value = result.id;
-        if (window.Snackbar) window.Snackbar.show('Unido al grupo correctamente ✓');
-      } else {
-        const jid = localStorage.getItem('whatsapp_group_jid');
-        if (jid) {
-          document.getElementById('wa-group-jid').value = jid;
-          if (window.Snackbar) window.Snackbar.show('Grupo configurado ✓');
-        } else {
-          if (window.Snackbar) window.Snackbar.show('No se pudo unir al grupo. Verifica que WhatsApp esté conectado.', 'error');
-        }
+      const groups = await listGroups();
+      if (!groups || groups.length === 0) {
+        if (window.Snackbar) window.Snackbar.show('No se encontraron grupos. ¿WhatsApp está conectado?', 'error');
+        return;
       }
+
+      const overlay = document.getElementById('modal-container');
+      const body = document.getElementById('modal-body');
+      overlay.style.display = 'flex';
+      body.innerHTML = `
+        <div class="m3-card" style="padding:24px;max-width:400px;width:100%;">
+          <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">Seleccionar grupo</h3>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;">
+            ${groups.map(g => `
+              <button class="wa-group-select-btn" data-jid="${g.remoteJid}" style="display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:12px;background:var(--m3-surface-container-low);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;text-align:left;font-family:'Work Sans',sans-serif;">
+                <span class="material-icons" style="font-size:20px;">group</span>
+                <span style="flex:1;">${g.pushName || g.remoteJid}</span>
+              </button>
+            `).join('')}
+          </div>
+          <button onclick="document.getElementById('modal-container').style.display='none'" style="display:block;width:100%;margin-top:16px;padding:12px;border-radius:12px;background:transparent;border:none;color:#888;font-size:13px;cursor:pointer;">Cancelar</button>
+        </div>
+      `;
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.style.display = 'none'; };
+
+      body.querySelectorAll('.wa-group-select-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const jid = btn.dataset.jid;
+          const name = btn.querySelector('span:last-child')?.textContent || jid;
+          localStorage.setItem('whatsapp_group_jid', jid);
+          document.getElementById('wa-group-jid').value = jid;
+          overlay.style.display = 'none';
+          if (window.Snackbar) window.Snackbar.show(`Grupo seleccionado: ${name} ✓`);
+        });
+      });
     } catch (e) {
       console.error(e);
-      if (window.Snackbar) window.Snackbar.show('Error al unirse al grupo', 'error');
+      if (window.Snackbar) window.Snackbar.show('Error al buscar grupos: ' + (e.message || e), 'error');
     }
 
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons">group_add</span> Unirse al grupo';
+    btn.innerHTML = '<span class="material-icons">group</span> Buscar grupos';
   });
 
   document.getElementById('wa-group-jid')?.addEventListener('change', (e) => {

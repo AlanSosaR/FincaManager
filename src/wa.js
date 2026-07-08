@@ -68,6 +68,16 @@ export async function checkConnection() {
   }
 }
 
+export async function listGroups() {
+  const name = getInstanceName();
+  const res = await waFetch(`chat/findChats/${name}`, {
+    method: 'POST',
+    body: '{}',
+  });
+  const allChats = await res.json();
+  return (allChats || []).filter(c => c.remoteJid?.endsWith('@g.us'));
+}
+
 export async function joinGroup(inviteCode) {
   const name = getInstanceName();
   const res = await waFetch(`group/join/${name}`, {
