@@ -1,40 +1,22 @@
 import { supabase } from '../supabase.js';
+import { getPaginationFooterHtml } from '../pagination.js';
 
 let currentPotrerosPage = 1;
 let totalPotrerosCount = 0;
+let potreroCounts = {};
 const PAGE_SIZE = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getPaginationFooterHtml() {
+function paginationFooterHtml() {
   const totalPages = Math.ceil(totalPotrerosCount / PAGE_SIZE) || 1;
-  
-  let pagesHtml = '';
-  for (let i = 1; i <= totalPages; i++) {
-    pagesHtml += `
-      <button class="da-page-btn ${i === currentPotrerosPage ? 'active' : ''}" onclick="window.changePotrerosPage(${i})">
-        ${i}
-      </button>
-    `;
-  }
-
-  return `
-    <div class="da-pagination-premium">
-      <button class="da-pagination-circle-btn" id="potreros-prev-btn" ${currentPotrerosPage <= 1 ? 'disabled' : ''} 
-              onclick="if(currentPotrerosPage > 1) window.changePotrerosPage(currentPotrerosPage - 1)">
-        <span class="material-icons">chevron_left</span>
-      </button>
-      
-      <div class="da-pagination-pages">
-        ${pagesHtml}
-      </div>
-
-      <button class="da-pagination-circle-btn" id="potreros-next-btn" ${currentPotrerosPage >= totalPages ? 'disabled' : ''}
-              onclick="if(currentPotrerosPage < ${totalPages}) window.changePotrerosPage(currentPotrerosPage + 1)">
-        <span class="material-icons">chevron_right</span>
-      </button>
-    </div>
-  `;
+  return getPaginationFooterHtml({
+    currentPage: currentPotrerosPage,
+    totalPages,
+    prevId: 'potreros-prev-btn',
+    nextId: 'potreros-next-btn',
+    changeFn: 'changePotrerosPage'
+  });
 }
 
 window.changePotrerosPage = async function(page) {
@@ -66,7 +48,7 @@ window.changePotrerosPage = async function(page) {
     ? `<div class="ganado-empty" style="grid-column: 1 / -1;"><span class="material-icons">landscape</span><p>No hay potreros en esta página.</p></div>`
     : potreros.map(p => renderPotreroRow(p)).join('');
 
-  if (footerContainer) footerContainer.innerHTML = getPaginationFooterHtml();
+  if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
 };
 
 async function changePotrerosPage(page) {
@@ -98,7 +80,7 @@ async function changePotrerosPage(page) {
     ? `<div class="ganado-empty"><span class="material-icons">landscape</span><p>No hay potreros en esta página.</p></div>`
     : potreros.map(p => renderPotreroRow(p)).join('');
 
-  if (footerContainer) footerContainer.innerHTML = getPaginationFooterHtml();
+  if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
 }
 
 // ─── Main render ──────────────────────────────────────────────────────────────
@@ -111,7 +93,7 @@ export async function renderPotreros() {
     { data: allStats, error: statsError }
   ] = await Promise.all([
     supabase.from('potreros').select('*', { count: 'exact', head: true }),
-    supabase.from('potreros').select('status, capacidad, animales_actuales')
+    supabase.from('potreros').select('status, capacidad')
   ]);
 
   totalPotrerosCount = totalCount || 0;
@@ -129,10 +111,16 @@ export async function renderPotreros() {
     return `<div class="screen-potreros"><p>Error cargando datos: ${error.message}</p></div>`;
   }
 
+  potreroCounts = {};
+  const { data: ganadoData } = await supabase.from('ganado').select('potrero_id');
+  for (const a of ganadoData || []) {
+    if (a.potrero_id) potreroCounts[a.potrero_id] = (potreroCounts[a.potrero_id] || 0) + 1;
+  }
+
   const occupiedCount = allStats ? allStats.filter(p => p.status === 'ocupado' || p.status === 'pastoreo').length : 0;
   const restingCount  = allStats ? allStats.filter(p => p.status === 'recuperando' || p.status === 'descanso').length : 0;
   const totalCapacity = allStats ? allStats.reduce((s, p) => s + (parseInt(p.capacidad) || 0), 0) : 0;
-  const currentTotalAnimals = allStats ? allStats.reduce((s, p) => s + (parseInt(p.animales_actuales) || 0), 0) : 0;
+  const currentTotalAnimals = Object.values(potreroCounts).reduce((s, c) => s + c, 0);
   const globalOccupancy = totalCapacity ? Math.round((currentTotalAnimals / totalCapacity) * 100) : 0;
 
   return `
@@ -211,7 +199,7 @@ export async function renderPotreros() {
 
         <!-- Pagination Footer -->
         <div id="potreros-pagination-wrapper">
-          ${getPaginationFooterHtml()}
+          ${paginationFooterHtml()}
         </div>
       </div>
 
@@ -279,7 +267,7 @@ function renderPotreroRow(p) {
   }
 
   const capacity = parseInt(p.capacidad) || 1;
-  const current  = parseInt(p.animales_actuales) || 0;
+  const current  = potreroCounts[p.id] || 0;
   const occupancyPercent = Math.min(Math.round((current / capacity) * 100), 100);
 
   let progressColor = 'var(--primary)';

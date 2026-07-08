@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { restFetch } from '../auth.js';
 
 export async function renderNuevoAnimal(id) {
   const isEdit = !!id;
@@ -149,7 +150,6 @@ export function initNuevoAnimal(id) {
         form.nombre.value = data.nombre || '';
         form.raza.value = data.raza || '';
         form.sexo.value = data.sexo || '';
-        form.peso_actual.value = data.peso_actual || '';
         form.fecha_adquisicion.value = data.fecha_adquisicion || '';
         form.origen.value = data.origen || 'Criollo';
         form.precio_compra.value = data.precio_compra || '';
@@ -253,7 +253,6 @@ export function initNuevoAnimal(id) {
         nombre: data.nombre,
         raza: data.raza,
         sexo: data.sexo,
-        peso_actual: parseFloat(data.peso_actual) || 0,
         peso_unidad: data.peso_unidad || 'kg',
         fecha_adquisicion: fechaFinal,
         origen: data.origen || 'Criollo',
@@ -270,9 +269,36 @@ export function initNuevoAnimal(id) {
 
       if (result.error) throw result.error;
 
+      // Crear/actualizar pesaje en animal_pesajes
+      const newId = result.data?.id || id;
+      const pesoVal = data.peso_actual && parseFloat(data.peso_actual);
+      if (newId && pesoVal > 0) {
+        const hoy = new Date().toISOString().split('T')[0];
+        if (id) {
+          // Buscar último pesaje; si el peso cambió, crear uno nuevo
+          const ultimo = await supabase.from('animal_pesajes').select('peso').eq('animal_id', id).order('fecha', { ascending: false }).limit(1);
+          const ultimoPeso = ultimo.data?.[0]?.peso;
+          if (ultimoPeso !== String(pesoVal)) {
+            await supabase.from('animal_pesajes').insert({
+              animal_id: newId,
+              peso: String(pesoVal),
+              fecha: hoy,
+              estado: 'Aplicada'
+            });
+          }
+        } else {
+          await supabase.from('animal_pesajes').insert({
+            animal_id: newId,
+            peso: String(pesoVal),
+            fecha: hoy,
+            estado: 'Aplicada'
+          });
+        }
+      }
+
       window.Snackbar.show(id ? 'Cambios guardados exitosamente' : 'Animal registrado exitosamente');
       if (id) {
-        window.navigateTo('detalle_animal', id);
+        window.navigateTo('detalle_animal', newId || id);
       } else {
         window.navigateTo('ganado');
       }

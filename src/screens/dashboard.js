@@ -1,34 +1,19 @@
 import { supabase } from '../supabase.js';
+import { getPaginationFooterHtml } from '../pagination.js';
 
 const LOTES_PAGE_SIZE = 4;
 let currentLotesPage = 1;
 let allLotes = [];
 
-function getPaginationFooterHtml() {
+function paginationFooterHtml() {
   const totalPages = Math.ceil(allLotes.length / LOTES_PAGE_SIZE) || 1;
-  let pagesHtml = '';
-  for (let i = 1; i <= totalPages; i++) {
-    pagesHtml += `
-      <button class="da-page-btn ${i === currentLotesPage ? 'active' : ''}" onclick="window.changeLotesPage(${i})">
-        ${i}
-      </button>
-    `;
-  }
-  return `
-    <div class="da-pagination-premium">
-      <button class="da-pagination-circle-btn" id="lotes-prev-btn" ${currentLotesPage <= 1 ? 'disabled' : ''}
-              onclick="if(currentLotesPage > 1) window.changeLotesPage(currentLotesPage - 1)">
-        <span class="material-icons">chevron_left</span>
-      </button>
-      <div class="da-pagination-pages">
-        ${pagesHtml}
-      </div>
-      <button class="da-pagination-circle-btn" id="lotes-next-btn" ${currentLotesPage >= totalPages ? 'disabled' : ''}
-              onclick="if(currentLotesPage < ${totalPages}) window.changeLotesPage(currentLotesPage + 1)">
-        <span class="material-icons">chevron_right</span>
-      </button>
-    </div>
-  `;
+  return getPaginationFooterHtml({
+    currentPage: currentLotesPage,
+    totalPages,
+    prevId: 'lotes-prev-btn',
+    nextId: 'lotes-next-btn',
+    changeFn: 'changeLotesPage'
+  });
 }
 
 window.changeLotesPage = function(page) {
@@ -196,7 +181,7 @@ export async function renderDashboard(page) {
 
               ${allLotes.length > 0 ? `
               <div style="margin-top: 24px;" id="lotes-pagination-wrapper">
-                ${getPaginationFooterHtml()}
+                ${paginationFooterHtml()}
               </div>
               ` : ''}
             </div>

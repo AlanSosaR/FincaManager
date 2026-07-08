@@ -1,9 +1,26 @@
 import { supabase } from '../supabase.js';
+import { restFetch } from '../auth.js';
+import { getPaginationFooterHtml } from '../pagination.js';
 let currentGanadoPage = 1;
 const PAGE_SIZE = 8;
 let currentFilter = 'all';
 let currentSearchQuery = '';
 let totalGanadoCount = 0;
+
+async function fetchLatestPesajes(animalIds) {
+  if (!animalIds.length) return new Map();
+  const ids = animalIds.map(id => encodeURIComponent(id)).join(',');
+  const data = await restFetch(`/rest/v1/animal_pesajes?animal_id=in.(${ids})&order=fecha.desc&select=animal_id,peso,fecha`).catch(() => []);
+  const map = new Map();
+  for (const row of data || []) {
+    if (!map.has(row.animal_id)) {
+      map.set(row.animal_id, { latest: row, previous: null });
+    } else if (map.get(row.animal_id).previous === null) {
+      map.get(row.animal_id).previous = row;
+    }
+  }
+  return map;
+}
 
 export async function renderGanado(page = 1, filter = 'all') {
   currentGanadoPage = page;
@@ -68,6 +85,8 @@ export async function renderGanado(page = 1, filter = 'all') {
   }
 
   totalGanadoCount = filteredCount || 0;
+
+  const pesajesMap = await fetchLatestPesajes(animales?.map(a => a.id) || []);
 
   // Stats for cards
   const hembrasRatio = totalAnimales ? Math.round((hembrasCount / totalAnimales) * 100) : 0;
@@ -171,12 +190,12 @@ export async function renderGanado(page = 1, filter = 'all') {
         </div>
 
         <div class="ganado-list" id="ganado-list-container">
-          ${animales.map(a => renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones)).join('')}
+          ${animales.map(a => renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones, pesajesMap)).join('')}
           ${animales.length === 0 ? '<div class="ganado-empty"><p>No se encontraron animales.</p></div>' : ''}
         </div>
 
         <div id="ganado-pagination-wrapper">
-          ${getPaginationFooterHtml()}
+          ${paginationFooterHtml()}
         </div>
       </div>
 
@@ -190,36 +209,15 @@ export async function renderGanado(page = 1, filter = 'all') {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getPaginationFooterHtml() {
+function paginationFooterHtml() {
   const totalPages = Math.ceil(totalGanadoCount / PAGE_SIZE) || 1;
-  
-  let pagesHtml = '';
-  // Show all pages for now since we expect few, or limit if many
-  for (let i = 1; i <= totalPages; i++) {
-    pagesHtml += `
-      <button class="da-page-btn ${i === currentGanadoPage ? 'active' : ''}" onclick="window.changeGanadoPage(${i})">
-        ${i}
-      </button>
-    `;
-  }
-
-  return `
-    <div class="da-pagination-premium">
-      <button class="da-pagination-circle-btn" id="ganado-prev-btn" ${currentGanadoPage <= 1 ? 'disabled' : ''} 
-              onclick="if(currentGanadoPage > 1) window.changeGanadoPage(currentGanadoPage - 1)">
-        <span class="material-icons">chevron_left</span>
-      </button>
-      
-      <div class="da-pagination-pages">
-        ${pagesHtml}
-      </div>
-
-      <button class="da-pagination-circle-btn" id="ganado-next-btn" ${currentGanadoPage >= totalPages ? 'disabled' : ''}
-              onclick="if(currentGanadoPage < ${totalPages}) window.changeGanadoPage(currentGanadoPage + 1)">
-        <span class="material-icons">chevron_right</span>
-      </button>
-    </div>
-  `;
+  return getPaginationFooterHtml({
+    currentPage: currentGanadoPage,
+    totalPages,
+    prevId: 'ganado-prev-btn',
+    nextId: 'ganado-next-btn',
+    changeFn: 'changeGanadoPage'
+  });
 }
 
 window.changeGanadoPage = async function(page) {
@@ -274,15 +272,18 @@ window.changeGanadoPage = async function(page) {
   }
 
   totalGanadoCount = count || 0;
+
+  const pesajesMap = await fetchLatestPesajes(animales.map(a => a.id));
+
   listContainer.innerHTML = animales.length === 0
     ? '<div class="ganado-empty"><p>No se encontraron animales.</p></div>'
-    : animales.map(a => renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones)).join('');
+    : animales.map(a => renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones, pesajesMap)).join('');
 
-  if (footerContainer) footerContainer.innerHTML = getPaginationFooterHtml();
+  if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
 }
 
 
-function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
+function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones, pesajesMap = new Map()) {
   const isSold = a.estado === 'Vendido';
   const pendingVacuna = setVacunas.has(a.id);
   const pendingPesaje = setPesajes.has(a.id);
@@ -297,7 +298,48 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
 
   const seed = encodeURIComponent(a.id || a.nombre || 'animal');
   const imageUrl = a.image_url || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${seed}&backgroundColor=f0ebe3&radius=16`;
-  const shortId = a.id && a.id.startsWith('#') ? a.id : `#${String(a.id).substring(0, 3).toUpperCase()}`;
+
+  // Pesaje trend info
+  const pesajeData = pesajesMap.get(a.id);
+  let daysHtml = '';
+  let trendHtml = '';
+  if (pesajeData && pesajeData.latest) {
+    const latestPeso = parseFloat(pesajeData.latest.peso);
+    const prevPeso = pesajeData.previous ? parseFloat(pesajeData.previous.peso) : null;
+    const lastDate = new Date(pesajeData.latest.fecha + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today - lastDate) / (1000 * 60 * 60 * 24));
+
+    let daysText = '';
+    if (diffDays === 0) daysText = 'hoy';
+    else if (diffDays === 1) daysText = 'ayer';
+    else daysText = `hace ${diffDays} días`;
+
+    daysHtml = `<p class="ganado-days-line">${daysText}</p>`;
+
+    if (!isNaN(latestPeso)) {
+      let arrow = '→';
+      let arrowClass = 'same';
+      let changeText = '±0';
+      if (prevPeso !== null && !isNaN(prevPeso)) {
+        const change = latestPeso - prevPeso;
+        if (change > 0) {
+          arrow = '↑';
+          arrowClass = 'up';
+          changeText = `+${change.toFixed(1)}`;
+        } else if (change < 0) {
+          arrow = '↓';
+          arrowClass = 'down';
+          changeText = `${change.toFixed(1)}`;
+        }
+      }
+      trendHtml = `<span class="ganado-trend-body"><span class="ganado-trend-arrow ${arrowClass}">${arrow}</span> <span class="ganado-trend-change ${arrowClass}">${changeText} kg</span></span>`;
+    }
+  }
+
+  const pesoActual = pesajeData?.latest?.peso ?? a.peso_actual ?? 0;
+  const trendInfo = trendHtml ? `<div class="ganado-trend-info">${trendHtml}</div>` : '';
 
   return `
     <div class="ganado-row ${isSold ? 'ganado-row-sold' : ''}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
@@ -307,14 +349,18 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones) {
       </div>
       <div class="ganado-row-content">
         <div class="ganado-col-group">
-          <p class="ganado-col-label">${(a.raza || 'BOVINO').toUpperCase()}</p>
+          <p class="ganado-col-label"><span class="material-icons ganado-sex-icon ${a.sexo === 'Macho' ? 'macho' : 'hembra'}">${a.sexo === 'Macho' ? 'male' : 'female'}</span> ${(a.raza || 'BOVINO').toUpperCase()}</p>
           <p class="ganado-col-value">${a.nombre || 'Sin nombre'}</p>
+          ${daysHtml}
           ${isSold ? '<p class="ganado-col-sold-tag">Vendido</p>' : ''}
         </div>
         <div style="margin-left: auto; display: flex; align-items: center; gap: 16px; position: relative;">
-          <div class="ganado-col-weight">
-            <span class="ganado-col-weight-value">${a.peso_actual || 0}</span>
-            <span class="ganado-col-weight-unit">${a.peso_unidad || 'kg'}</span>
+          <div style="display: flex; flex-direction: column; align-items: flex-end;">
+            <div class="ganado-col-weight">
+              <span class="ganado-col-weight-value">${pesoActual}</span>
+              <span class="ganado-col-weight-unit">${a.peso_unidad || 'kg'}</span>
+            </div>
+            ${trendInfo}
           </div>
           ${!isSold ? `<button class="ganado-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)">
             <span class="material-icons">more_vert</span>

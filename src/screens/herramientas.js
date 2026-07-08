@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { getPaginationFooterHtml } from '../pagination.js';
 
 let currentToolsPage = 1;
 let totalToolsCount = 0;
@@ -6,35 +7,15 @@ const PAGE_SIZE = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getPaginationFooterHtml() {
+function paginationFooterHtml() {
   const totalPages = Math.ceil(totalToolsCount / PAGE_SIZE) || 1;
-  
-  let pagesHtml = '';
-  for (let i = 1; i <= totalPages; i++) {
-    pagesHtml += `
-      <button class="da-page-btn ${i === currentToolsPage ? 'active' : ''}" onclick="window.changeToolsPage(${i})">
-        ${i}
-      </button>
-    `;
-  }
-
-  return `
-    <div class="da-pagination-premium">
-      <button class="da-pagination-circle-btn" id="tools-prev-btn" ${currentToolsPage <= 1 ? 'disabled' : ''} 
-              onclick="if(currentToolsPage > 1) window.changeToolsPage(currentToolsPage - 1)">
-        <span class="material-icons">chevron_left</span>
-      </button>
-      
-      <div class="da-pagination-pages">
-        ${pagesHtml}
-      </div>
-
-      <button class="da-pagination-circle-btn" id="tools-next-btn" ${currentToolsPage >= totalPages ? 'disabled' : ''}
-              onclick="if(currentToolsPage < ${totalPages}) window.changeToolsPage(currentToolsPage + 1)">
-        <span class="material-icons">chevron_right</span>
-      </button>
-    </div>
-  `;
+  return getPaginationFooterHtml({
+    currentPage: currentToolsPage,
+    totalPages,
+    prevId: 'tools-prev-btn',
+    nextId: 'tools-next-btn',
+    changeFn: 'changeToolsPage'
+  });
 }
 
 window.changeToolsPage = async function(page) {
@@ -66,7 +47,7 @@ window.changeToolsPage = async function(page) {
     ? `<div class="ganado-empty" style="grid-column: 1 / -1;"><span class="material-icons">construction</span><p>No hay herramientas en esta página.</p></div>`
     : tools.map(t => renderToolRow(t)).join('');
 
-  if (footerContainer) footerContainer.innerHTML = getPaginationFooterHtml();
+  if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
 };
 
 async function changeToolsPage(page) {
@@ -98,7 +79,7 @@ async function changeToolsPage(page) {
     ? `<div class="ganado-empty"><span class="material-icons">construction</span><p>No hay herramientas en esta página.</p></div>`
     : tools.map(t => renderToolRow(t)).join('');
 
-  if (footerContainer) footerContainer.innerHTML = getPaginationFooterHtml();
+  if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
 }
 
 // ─── Main render ──────────────────────────────────────────────────────────────
@@ -204,7 +185,7 @@ export async function renderHerramientas() {
 
         <!-- Pagination Footer -->
         <div id="tools-pagination-wrapper">
-          ${getPaginationFooterHtml()}
+          ${paginationFooterHtml()}
         </div>
       </div>
 

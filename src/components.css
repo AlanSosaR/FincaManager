@@ -1497,6 +1497,14 @@ input:focus, textarea:focus, select:focus {
   background-color: var(--secondary);
 }
 
+.ganado-sex-icon {
+  font-size: 18px !important;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.ganado-sex-icon.hembra { color: #d4838f; }
+.ganado-sex-icon.macho { color: #5b8def; }
+
 /* ---- List header ---- */
 .ganado-list-header {
   display: flex;
@@ -1803,6 +1811,39 @@ input:focus, textarea:focus, select:focus {
   letter-spacing: 1px;
   white-space: nowrap;
 }
+
+.ganado-days-line {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  opacity: 0.65;
+  margin-top: 1px;
+}
+
+.ganado-trend-info {
+  margin-top: 2px;
+}
+
+.ganado-trend-body {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.ganado-trend-arrow {
+  font-size: 13px;
+  font-weight: 700;
+}
+.ganado-trend-arrow.up { color: #4caf50; }
+.ganado-trend-arrow.down { color: #e53935; }
+.ganado-trend-arrow.same { color: #9e9e9e; }
+
+.ganado-trend-change {
+  font-size: 11px;
+  font-weight: 600;
+}
+.ganado-trend-change.up { color: #4caf50; }
+.ganado-trend-change.down { color: #e53935; }
+.ganado-trend-change.same { color: #9e9e9e; }
 
 .ganado-row-badge.sold {
   background: #ffcdd2;
@@ -3224,6 +3265,14 @@ input:focus, textarea:focus, select:focus {
   cursor: default;
 }
 
+.da-cal-day-highlight {
+  background: #E4FD97;
+}
+
+.da-cal-day-pending-highlight {
+  background: #FF4103;
+}
+
 .da-cal-today {
   background: #2d3e2c;
   color: #ffffff;
@@ -3771,6 +3820,17 @@ input:focus, textarea:focus, select:focus {
     width: 38px;
     height: 38px;
   }
+}
+
+.da-page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+  color: var(--on-surface-variant, #888);
+  letter-spacing: 2px;
 }
 
 /* ── M3 Expressive Cards for Dashboard ──────────────────────────────── */

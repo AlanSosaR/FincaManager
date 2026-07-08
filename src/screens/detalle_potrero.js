@@ -17,6 +17,23 @@ export async function renderDetallePotrero(potreroId) {
     .select('*')
     .eq('potrero_id', potreroId);
 
+  let latestPesos = {};
+  if (animales && animales.length > 0) {
+    const animalIds = animales.map(a => a.id);
+    const { data: pesajes } = await supabase
+      .from('animal_pesajes')
+      .select('animal_id, peso')
+      .in('animal_id', animalIds)
+      .order('fecha', { ascending: false });
+    const seen = new Set();
+    for (const p of pesajes || []) {
+      if (!seen.has(p.animal_id)) {
+        seen.add(p.animal_id);
+        latestPesos[p.animal_id] = p.peso;
+      }
+    }
+  }
+
   const { data: bitacora, error: bitacoraError } = await supabase
     .from('potrero_eventos')
     .select('*')
@@ -97,7 +114,7 @@ export async function renderDetallePotrero(potreroId) {
               <div class="animal-card card btn-navigate-animal" data-id="${a.id}" style="padding: 12px 16px; margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
                 <div class="animal-info">
                   <h4 style="font-size: 14px;">${a.nombre || a.raza} <span class="animal-tag-chip">${a.id.split('-').shift()}</span></h4>
-                  <p style="font-size: 12px; margin-bottom: 0;">${a.peso_actual || 0}kg • <span style="color: #4caf50; font-weight: 600;">Saludable</span></p>
+                  <p style="font-size: 12px; margin-bottom: 0;">${latestPesos[a.id] || 0}kg • <span style="color: #4caf50; font-weight: 600;">Saludable</span></p>
                 </div>
                 <span class="material-icons" style="color:#ccc">chevron_right</span>
               </div>

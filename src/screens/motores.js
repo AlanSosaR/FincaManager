@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { getPaginationFooterHtml } from '../pagination.js';
 
 let currentMotorsPage = 1;
 let currentMotorsFilter = 'all';
@@ -8,36 +9,15 @@ const PAGE_SIZE = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getPaginationFooterHtml() {
+function paginationFooterHtml() {
   const totalPages = Math.ceil(totalFilteredCount / PAGE_SIZE) || 1;
-  
-  let pagesHtml = '';
-  // Show all pages if few, or we could limit them. For now all 1-N.
-  for (let i = 1; i <= totalPages; i++) {
-    pagesHtml += `
-      <button class="da-page-btn ${i === currentMotorsPage ? 'active' : ''}" onclick="window.changeMotorsPage(${i})">
-        ${i}
-      </button>
-    `;
-  }
-
-  return `
-    <div class="da-pagination-premium">
-      <button class="da-pagination-circle-btn" id="motors-prev-btn" ${currentMotorsPage <= 1 ? 'disabled' : ''} 
-              onclick="if(currentMotorsPage > 1) window.changeMotorsPage(currentMotorsPage - 1)">
-        <span class="material-icons">chevron_left</span>
-      </button>
-      
-      <div class="da-pagination-pages">
-        ${pagesHtml}
-      </div>
-
-      <button class="da-pagination-circle-btn" id="motors-next-btn" ${currentMotorsPage >= totalPages ? 'disabled' : ''}
-              onclick="if(currentMotorsPage < ${totalPages}) window.changeMotorsPage(currentMotorsPage + 1)">
-        <span class="material-icons">chevron_right</span>
-      </button>
-    </div>
-  `;
+  return getPaginationFooterHtml({
+    currentPage: currentMotorsPage,
+    totalPages,
+    prevId: 'motors-prev-btn',
+    nextId: 'motors-next-btn',
+    changeFn: 'changeMotorsPage'
+  });
 }
 
 window.changeMotorsPage = async function(page) {
@@ -75,7 +55,7 @@ window.changeMotorsPage = async function(page) {
     ? `<div class="ganado-empty" style="grid-column: 1 / -1;"><p>No se encontraron equipos.</p></div>`
     : equipos.map(eq => renderMotorCard(eq)).join('');
 
-  if (footerContainer) footerContainer.innerHTML = getPaginationFooterHtml();
+  if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
 };
 
 const changeMotorsPage = window.changeMotorsPage;
@@ -207,7 +187,7 @@ export async function renderMotores(page = 1, filter = 'all') {
 
         <!-- Pagination Footer -->
         <div id="motors-pagination-wrapper">
-          ${getPaginationFooterHtml()}
+          ${paginationFooterHtml()}
         </div>
       </div>
 
