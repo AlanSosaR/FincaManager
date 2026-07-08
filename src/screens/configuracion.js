@@ -1,7 +1,7 @@
 import { logout, getUser } from '../auth.js';
 import db from '../db.js';
 import { fullDownload } from '../sync.js';
-import { createInstance, getQR, checkConnection, joinGroup } from '../wa.js';
+import { createInstance, deleteInstance, getQR, checkConnection, joinGroup } from '../wa.js';
 
 export async function renderConfiguracion() {
   const groupJid = localStorage.getItem('whatsapp_group_jid') || '';
@@ -76,6 +76,21 @@ export async function renderConfiguracion() {
 
 let waPollInterval = null;
 
+async function connectOrRecreate() {
+  try {
+    await createInstance();
+  } catch (createErr) {
+    if (createErr.message?.includes('already in use')) {
+      console.log('Instancia existe pero puede tener config incorrecta. Recreando...');
+      await deleteInstance();
+      await createInstance();
+    } else {
+      throw createErr;
+    }
+  }
+  return getQR();
+}
+
 export function initConfiguracion() {
   updateWhatsAppStatus();
 
@@ -85,34 +100,25 @@ export function initConfiguracion() {
     btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Conectando...';
 
     try {
-      try {
-        const instanceResult = await createInstance();
-        console.log('Instance create response:', instanceResult);
-      } catch (createErr) {
-        if (createErr.message?.includes('already in use')) {
-          console.log('Instancia ya existe, usando la existente');
-        } else {
-          throw createErr;
-        }
-      }
-
-      const qrData = await getQR();
+      const qrData = await connectOrRecreate();
       console.log('QR response:', qrData);
       const qrArea = document.getElementById('wa-qr-area');
       const qrContainer = document.getElementById('wa-qr-container');
 
-      if (qrData?.qrcode?.base64) {
+      const qrBase64 = qrData?.base64 || qrData?.qrcode?.base64;
+      const qrCode = qrData?.code || qrData?.qrcode?.code;
+      if (qrBase64) {
         qrArea.style.display = 'block';
-        qrContainer.innerHTML = `<img src="${qrData.qrcode.base64}" alt="WhatsApp QR" style="width:256px;height:256px;image-rendering:pixelated;">`;
+        qrContainer.innerHTML = `<img src="${qrBase64}" alt="WhatsApp QR" style="width:256px;height:256px;image-rendering:pixelated;">`;
         startWaPolling();
-      } else if (qrData?.qrcode?.code) {
+      } else if (qrCode) {
         qrArea.style.display = 'block';
-        qrContainer.innerHTML = `<div style="font-size:24px;font-weight:700;color:#2d3e2c;padding:32px;">${qrData.qrcode.code}</div>
-          <p style="font-size:13px;color:#666;">O usa este código de emparejamiento en WhatsApp</p>`;
+        qrContainer.innerHTML = `<div style="font-size:24px;font-weight:700;color:#2d3e2c;padding:48px;word-break:break-all;">${qrCode}</div>
+          <p style="font-size:13px;color:#666;">Usa este código de emparejamiento en WhatsApp > Dispositivos vinculados</p>`;
         startWaPolling();
       } else {
         console.error('QR data inesperada:', JSON.stringify(qrData));
-        if (window.Snackbar) window.Snackbar.show('Error al obtener QR: ' + JSON.stringify(qrData), 'error');
+        if (window.Snackbar) window.Snackbar.show('Error al obtener QR. Revisa la consola (F12).', 'error');
       }
     } catch (e) {
       console.error('Error completo:', e);

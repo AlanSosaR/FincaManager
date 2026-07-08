@@ -45,6 +45,12 @@ export async function createInstance() {
   return res.json();
 }
 
+export async function deleteInstance() {
+  const name = getInstanceName();
+  const res = await waFetch(`instance/delete/${name}`, { method: 'DELETE' });
+  return res.json();
+}
+
 export async function getQR() {
   const name = getInstanceName();
   const res = await waFetch(`instance/connect/${name}`);
