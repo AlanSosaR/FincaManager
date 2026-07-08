@@ -2,6 +2,8 @@ import { supabase } from '../supabase.js';
 import { Chart, registerables } from 'chart.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
+import { sendWhatsApp } from '../wa.js';
+import db from '../db.js';
 
 function getLocalToday() {
     const d = new Date();
@@ -16,6 +18,23 @@ window.confirmVaccine = (vaccineId) => {
             const { error } = await supabase.from('animal_vacunas').update({ estado: 'Aplicada' }).eq('id', vaccineId);
             if (error) throw error;
             showSnackbar('Vacuna confirmada');
+
+            // Notificar por WhatsApp
+            try {
+                const vac = vaccines.find(v => v.id === vaccineId);
+                const animal = currentAnimal;
+                if (vac && animal) {
+                    const empresa = await db.empresas?.get(window._currentEmpresaId);
+                    const empresaName = empresa?.nombre || 'Mi Finca';
+                    const dosis = vac.dosis ? ` (${vac.dosis})` : '';
+                    sendWhatsApp(
+                        `✅ Vacuna Aplicada\nAnimal: ${animal.nombre}\nVacuna: ${vac.nombre}${dosis}\nFecha: ${vac.fecha}\nFinca: ${empresaName}`
+                    );
+                }
+            } catch (waErr) {
+                console.warn('WhatsApp notification failed:', waErr);
+            }
+
             if (currentAnimal) {
                 initDetalleAnimal(currentAnimal.id);
             }
@@ -147,7 +166,7 @@ async function loadAllData(animalId, container, flag) {
             weightChange = 0;
             weightTrend = 'neutral';
         } else {
-            lastWeight = parseFloat(currentAnimal.peso_actual) || 0;
+            lastWeight = 0;
             weightChange = 0;
             weightTrend = 'neutral';
         }
@@ -264,7 +283,7 @@ function renderFullContent(container, animalId, flag) {
                                 <label>Comprador (opcional)</label>
                             </div>
                             <div class="m3-field">
-                                <input type="number" step="0.1" id="sell-peso" value="${currentAnimal.peso_actual || 0}" placeholder=" ">
+                                <input type="number" step="0.1" id="sell-peso" value="0" placeholder=" ">
                                 <label>Peso (kg)</label>
                             </div>
                         </div>
@@ -700,7 +719,6 @@ async function handleAddWeight(animalId) {
                 fecha: formData.get('fecha')
             });
             if (error) throw error;
-            await supabase.from('ganado').update({ peso_actual: pesoVal }).eq('id', animalId);
             showSnackbar('Pesaje registrado');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
@@ -792,7 +810,7 @@ function renderCalendar() {
         const hasPending = dayVaccines.some(v => v.estado === 'Programada');
         
         const dayEl = document.createElement('div');
-        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''}`;
+        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''} ${hasPending ? 'da-cal-day-pending-highlight' : (hasEvent ? 'da-cal-day-highlight' : '')}`;
         let dotsHtml = '';
         if (hasEvent) {
             if (hasPending) {
@@ -1109,7 +1127,6 @@ function showInlineWeightForm(animalId) {
                 fecha: formData.get('fecha')
             });
             if (error) throw error;
-            await supabase.from('ganado').update({ peso_actual: pesoVal }).eq('id', animalId);
             showSnackbar('Pesaje registrado ✓');
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {
@@ -1431,7 +1448,7 @@ function renderCalendarFumig() {
         const hasPending = dayFumigaciones.some(f => f.estado === 'Programada');
         
         const dayEl = document.createElement('div');
-        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''}`;
+        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''} ${hasPending ? 'da-cal-day-pending-highlight' : (hasEvent ? 'da-cal-day-highlight' : '')}`;
         let dotsHtml = '';
         if (hasEvent) {
             if (hasPending) {

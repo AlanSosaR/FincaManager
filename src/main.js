@@ -8,6 +8,7 @@ import { registerSW } from 'virtual:pwa-register';
 registerSW({ immediate: true });
 
 import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync, syncTable } from './sync.js';
+import { checkPendingVaccines } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 
@@ -304,6 +305,7 @@ function initOnlineSync() {
       try {
         await processSyncQueue(true);
         await incrementalSync(true);
+        await checkPendingVaccines();
       } catch (e) { /* silent */ }
     }
   }, 5000);

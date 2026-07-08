@@ -1,0 +1,121 @@
+import db from './db.js';
+
+const EVOLUTION_API = '/api/wa-proxy';
+const NOTIFIED_KEY = 'wa_notified_vaccines';
+
+function getInstanceName() {
+  const empresaId = window._currentEmpresaId || 'default';
+  return `finca_mgr_${empresaId.substring(0, 8)}`;
+}
+
+function getNotifiedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+
+function saveNotifiedSet(set) {
+  localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...set]));
+}
+
+export function markNotified(vaccineId) {
+  const set = getNotifiedSet();
+  set.add(vaccineId);
+  saveNotifiedSet(set);
+}
+
+async function waFetch(path, options = {}) {
+  const res = await fetch(`${EVOLUTION_API}/${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+  });
+  return res;
+}
+
+export async function createInstance() {
+  const name = getInstanceName();
+  const res = await waFetch(`instance/create`, {
+    method: 'POST',
+    body: JSON.stringify({ instanceName: name }),
+  });
+  return res.json();
+}
+
+export async function getQR() {
+  const name = getInstanceName();
+  const res = await waFetch(`instance/connect/${name}`);
+  return res.json();
+}
+
+export async function checkConnection() {
+  const name = getInstanceName();
+  try {
+    const res = await waFetch(`instance/connectionState/${name}`);
+    const data = await res.json();
+    return data?.instance?.state === 'open';
+  } catch {
+    return false;
+  }
+}
+
+export async function joinGroup(inviteCode) {
+  const name = getInstanceName();
+  const res = await waFetch(`group/join/${name}`, {
+    method: 'POST',
+    body: JSON.stringify({ inviteCode }),
+  });
+  const data = await res.json();
+  if (data?.id) {
+    localStorage.setItem('whatsapp_group_jid', data.id);
+  }
+  return data;
+}
+
+export async function sendWhatsApp(mensaje) {
+  const groupJid = localStorage.getItem('whatsapp_group_jid');
+  if (!groupJid) return;
+  const name = getInstanceName();
+  try {
+    await waFetch(`message/sendText/${name}`, {
+      method: 'POST',
+      body: JSON.stringify({ number: groupJid, text: mensaje }),
+    });
+  } catch (e) {
+    console.warn('WhatsApp send failed:', e);
+  }
+}
+
+export async function checkPendingVaccines() {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const vaccines = await db.animal_vacunas
+      .where('fecha')
+      .equals(today)
+      .toArray();
+
+    const pending = vaccines.filter(v => v.estado === 'Programada');
+    if (!pending.length) return;
+
+    const notified = getNotifiedSet();
+    const empresa = await db.empresas?.get(window._currentEmpresaId);
+    const empresaName = empresa?.nombre || 'Mi Finca';
+
+    for (const vac of pending) {
+      if (notified.has(vac.id)) continue;
+
+      let animalName = `Animal #${vac.animal_id?.substring(0, 6) || '?'}`;
+      try {
+        const animal = await db.ganado.get(vac.animal_id);
+        if (animal?.nombre) animalName = animal.nombre;
+      } catch {}
+
+      const dosis = vac.dosis ? ` (${vac.dosis})` : '';
+      await sendWhatsApp(
+        `🔔 RECORDATORIO - Vacuna para Hoy\nAnimal: ${animalName}\nVacuna: ${vac.nombre}${dosis}\nFecha: ${vac.fecha}\nFinca: ${empresaName}`
+      );
+
+      markNotified(vac.id);
+    }
+  } catch (e) {
+    console.warn('checkPendingVaccines error:', e);
+  }
+}

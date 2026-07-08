@@ -100,6 +100,13 @@ export default defineConfig({
     exclude: ['src/screens/detalle_animal'],
   },
   server: {
-    host: true
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://132.145.42.123:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/wa-proxy\//, '/'),
+      },
+    },
   }
 })
