@@ -40,7 +40,7 @@ export async function createInstance() {
   const name = getInstanceName();
   const res = await waFetch(`instance/create`, {
     method: 'POST',
-    body: JSON.stringify({ instanceName: name }),
+    body: JSON.stringify({ instanceName: name, integration: 'WHATSAPP-BAILEYS' }),
   });
   return res.json();
 }
