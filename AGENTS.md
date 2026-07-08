@@ -222,9 +222,29 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - [x] `sessionStorage` flag `finca_from_invite_email` distingue email invite vs auto-accept directo
 - [ ] **Pendiente**: cambios en Supabase dashboard (Site URL, Redirect URLs, Email Template)
 
+## Lo Completado (08/07)
+
+### Integración WhatsApp — Notificaciones de Vacunas
+- `api/wa-proxy.js`: proxy Vercel serverless que reenvía peticiones a Evolution API (`132.145.42.123:8080`) con API key hardcodeada (no expuesta al frontend).
+- `src/wa.js`: módulo helper con funciones:
+  - `createInstance()` — crea instancia en Evolution API
+  - `getQR()` — obtiene QR para escanear con WhatsApp
+  - `checkConnection()` — verifica si la instancia está conectada
+  - `joinGroup(inviteCode)` — une la instancia a un grupo por código de invitación y guarda el JID
+  - `sendWhatsApp(mensaje)` — envía texto al grupo configurado
+  - `checkPendingVaccines()` — cada 5s busca vacunas con `fecha === hoy` y `estado === 'Programada'` y envía recordatorio
+- `src/screens/configuracion.js`: sección "WhatsApp" con botón "Conectar WhatsApp" (QR), "Unirse al grupo" (invite code `JET2ESGPwDBCFWTFdDWLIe`), campo "ID del Grupo de WhatsApp" y estado de conexión en vivo.
+- `src/screens/detalle_animal.jsx`: al confirmar vacuna como "Aplicada", envía WhatsApp al grupo con los datos del animal, vacuna, fecha y finca.
+- `src/main.js`: `checkPendingVaccines()` se ejecuta en el ciclo de sync cada 5s (junto a `processSyncQueue` e `incrementalSync`).
+- `vite.config.js`: proxy `/api/` → `http://132.145.42.123:8080` en modo dev.
+- `vercel.json`: rewrite SPA excluye `/api/*` para que las serverless functions funcionen.
+- `.github/workflows/deploy.yml`: auto-deploy a Vercel en cada push a `main` (requiere secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`).
+- Seguimiento de notificaciones vía localStorage (`wa_notified_vaccines`) — no requiere migración SQL.
+- Commit: `b83c542`
+
 ### Despliegue
-- [ ] Build + deploy a Vercel después de cada cambio relevante
-- [ ] `auth-callback.html` ya está siendo copiado a `dist/`
+- [x] GitHub Actions workflow para auto-deploy a Vercel
+- [ ] Agregar `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` en GitHub Secrets
 
 ## Decisiones Técnicas
 - `restInsert`: función que inserta sin `return=representation` para evitar errores de SELECT policy. Se usa para `empresas`, `usuarios`, `usuario_empresas`.
