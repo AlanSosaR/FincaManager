@@ -24,10 +24,15 @@ export function markNotified(vaccineId) {
 }
 
 async function waFetch(path, options = {}) {
-  const res = await fetch(`${EVOLUTION_API}/${path}`, {
+  const url = `${EVOLUTION_API}/${path}`;
+  const res = await fetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options.headers },
   });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Evolution API ${res.status}: ${text.slice(0, 200)}`);
+  }
   return res;
 }
 

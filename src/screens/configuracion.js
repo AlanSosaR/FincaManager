@@ -85,8 +85,11 @@ export function initConfiguracion() {
     btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Conectando...';
 
     try {
-      await createInstance();
+      const instanceResult = await createInstance();
+      console.log('Instance create response:', instanceResult);
+
       const qrData = await getQR();
+      console.log('QR response:', qrData);
       const qrArea = document.getElementById('wa-qr-area');
       const qrContainer = document.getElementById('wa-qr-container');
 
@@ -100,11 +103,12 @@ export function initConfiguracion() {
           <p style="font-size:13px;color:#666;">O usa este código de emparejamiento en WhatsApp</p>`;
         startWaPolling();
       } else {
-        if (window.Snackbar) window.Snackbar.show('Error al obtener QR. Revisa la consola.', 'error');
+        console.error('QR data inesperada:', JSON.stringify(qrData));
+        if (window.Snackbar) window.Snackbar.show('Error al obtener QR: ' + JSON.stringify(qrData), 'error');
       }
     } catch (e) {
-      console.error(e);
-      if (window.Snackbar) window.Snackbar.show('Error de conexión con WhatsApp', 'error');
+      console.error('Error completo:', e);
+      if (window.Snackbar) window.Snackbar.show('Error: ' + (e.message || e), 'error');
     }
 
     btn.disabled = false;

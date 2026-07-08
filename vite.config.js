@@ -105,6 +105,9 @@ export default defineConfig({
       '/api': {
         target: 'http://132.145.42.123:8080',
         changeOrigin: true,
+        headers: {
+          'apikey': '429683C4C977415CAAFCCE10F7D57E11',
+        },
         rewrite: (path) => path.replace(/^\/api\/wa-proxy\//, '/'),
       },
     },
