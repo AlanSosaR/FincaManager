@@ -85,8 +85,16 @@ export function initConfiguracion() {
     btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Conectando...';
 
     try {
-      const instanceResult = await createInstance();
-      console.log('Instance create response:', instanceResult);
+      try {
+        const instanceResult = await createInstance();
+        console.log('Instance create response:', instanceResult);
+      } catch (createErr) {
+        if (createErr.message?.includes('already in use')) {
+          console.log('Instancia ya existe, usando la existente');
+        } else {
+          throw createErr;
+        }
+      }
 
       const qrData = await getQR();
       console.log('QR response:', qrData);
