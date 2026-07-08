@@ -226,21 +226,26 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 
 ### Integración WhatsApp — Notificaciones de Vacunas
 - `api/wa-proxy.js`: proxy Vercel serverless que reenvía peticiones a Evolution API (`132.145.42.123:8080`) con API key hardcodeada (no expuesta al frontend).
+- `api/wa-proxy.js`: se agregó ruta `/group/join` pero Evolution API responde 404 (endpoint no disponible en v2).
 - `src/wa.js`: módulo helper con funciones:
   - `createInstance()` — crea instancia en Evolution API
+  - `deleteInstance()` — elimina instancia (útil si la config queda corrupta)
   - `getQR()` — obtiene QR para escanear con WhatsApp
   - `checkConnection()` — verifica si la instancia está conectada
-  - `joinGroup(inviteCode)` — une la instancia a un grupo por código de invitación y guarda el JID
+  - `listGroups()` — obtiene lista de grupos donde está el número conectado
   - `sendWhatsApp(mensaje)` — envía texto al grupo configurado
   - `checkPendingVaccines()` — cada 5s busca vacunas con `fecha === hoy` y `estado === 'Programada'` y envía recordatorio
-- `src/screens/configuracion.js`: sección "WhatsApp" con botón "Conectar WhatsApp" (QR), "Unirse al grupo" (invite code `JET2ESGPwDBCFWTFdDWLIe`), campo "ID del Grupo de WhatsApp" y estado de conexión en vivo.
+- `src/screens/configuracion.js`: sección "WhatsApp" con botón "Conectar WhatsApp" (QR), "Buscar grupos" (modal selector de grupos vía `listGroups`), campo "ID del Grupo de WhatsApp" y estado de conexión en vivo.
 - `src/screens/detalle_animal.jsx`: al confirmar vacuna como "Aplicada", envía WhatsApp al grupo con los datos del animal, vacuna, fecha y finca.
 - `src/main.js`: `checkPendingVaccines()` se ejecuta en el ciclo de sync cada 5s (junto a `processSyncQueue` e `incrementalSync`).
-- `vite.config.js`: proxy `/api/` → `http://132.145.42.123:8080` en modo dev.
+- `vite.config.js`: proxy `/api/` → `http://132.145.42.123:8080` en modo dev (inyecta `apikey` header automaticamente).
 - `vercel.json`: rewrite SPA excluye `/api/*` para que las serverless functions funcionen.
 - `.github/workflows/deploy.yml`: auto-deploy a Vercel en cada push a `main` (requiere secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`).
 - Seguimiento de notificaciones vía localStorage (`wa_notified_vaccines`) — no requiere migración SQL.
-- Commit: `b83c542`
+- Grupo **"Finca Manager"** (`120363411244363102@g.us`) creado y conectado — mensaje de prueba enviado y recibido.
+- `/group/join` no disponible en este servidor — se usa `listGroups` y selección manual del grupo desde la app.
+- Instancia: `finca_mgr_6ed00acc`, API key: `429683C4C977415CAAFCCE10F7D57E11`, tipo: `WHATSAPP-BAILEYS`.
+- Commits: `b83c542`, `64b27ab`, `7a261ae`, `698f533`, `8aca824`, `97579bc`
 
 ### Despliegue
 - [x] GitHub Actions workflow para auto-deploy a Vercel
