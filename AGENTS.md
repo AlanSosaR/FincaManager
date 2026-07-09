@@ -12,6 +12,20 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 
 ## Lo Completado (09/07)
 
+### IFCAFE 2026 — Plan de Fertilización (Completado 09/07)
+- `utils/calculadora_dosis.js`: dosis por edad (vasito), plan 5 aplicaciones por zona (A/B), etiquetas, orden del día.
+- `utils/vasito_medidor.js`: SVG vasito (1/4, 1/3, 1/2) con compacto para badges.
+- `nuevo_lote.js`: al crear lote con edad+altura → pre-inserta 5 aplicaciones, envía WhatsApp con resumen del plan.
+- `wa.js`: 4 checkers — checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan.
+- `main.js`: ciclo 5s ejecuta los 4 checkers.
+- `detalle_lote.js`: removido bloque visual del plan IFCAFE, solo enlace "📋 Ver Plan IFCAFE 2026".
+- `dashboard.js`: enlace "📋 Plan IFCAFE 2026" debajo del título.
+- `plan_ifcafe.js` (nuevo): pantalla dedicada con tarjetas expandibles, propósito por aplicación, estado, notificación WhatsApp, botones "Marcar como aplicada" y "Enviar notificación".
+- `auth.js`: restFetch/restInsert ahora agregan automáticamente /rest/v1/ si el path no empieza con /.
+- Migraciones SQL pendientes de aplicar en Supabase dashboard: `20250701_empresa_rls.sql`, `20250702_empresa_update_policy.sql`, `20250703_usuarios_select_member.sql`, `20260708_normalizacion_fase1.sql`, `20260709_normalizacion_fase2.sql`, `20260710_ifcafe_plan.sql`.
+- Se agregó `empresa_id` en inserts de lotes y lote_aplicaciones para cumplir RLS.
+- Fix: initPlanIfcafe() registrado en navigate, guard para empresaId undefined, dosisLabel → dosis.
+
 ### Fix Deploy a Vercel — proxy WhatsApp funcionando en producción
 - `.github/workflows/deploy.yml`: agregadas `VERCEL_ORG_ID` y `VERCEL_PROJECT_ID` como `env:` (no `.vercel/project.json` porque está en `.gitignore`).
 - `vercel.json`: rewrite corregida de `/((?!api/).*)` (causaba 404 en toda ruta `/api`) a dos reglas explícitas: `/api/wa-proxy/(.*)` → serverless function, `/(.*)` → SPA.
@@ -19,7 +33,21 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Secrets agregados en GitHub Actions: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
 - Commits: `750676b`, `81714a7`, `07f521c`, `ea908d7`
 
-### Fix conexión WhatsApp — manejo de errores Evolution API
+### IFCAFE 2026 — Plan de Fertilización (Completado 09/07)
+- `utils/calculadora_dosis.js`: dosis por edad (vasito), plan 5 aplicaciones por zona (A/B), etiquetas, orden del día.
+- `utils/vasito_medidor.js`: SVG vasito (1/4, 1/3, 1/2) con compacto para badges.
+- `nuevo_lote.js`: al crear lote con edad+altura → pre-inserta 5 aplicaciones, envía WhatsApp con resumen del plan.
+- `wa.js`: 4 checkers — checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan.
+- `main.js`: ciclo 5s ejecuta los 4 checkers.
+- `detalle_lote.js`: removido bloque visual del plan IFCAFE, solo enlace "📋 Ver Plan IFCAFE 2026".
+- `dashboard.js`: enlace "📋 Plan IFCAFE 2026" debajo del título.
+- `plan_ifcafe.js` (nuevo): pantalla dedicada con tarjetas expandibles, propósito por aplicación, estado, notificación WhatsApp, botones "Marcar como aplicada" y "Enviar notificación".
+- `auth.js`: restFetch/restInsert ahora agregan automáticamente /rest/v1/ si el path no empieza con /.
+- Migraciones SQL pendientes de aplicar en Supabase dashboard: `20250701_empresa_rls.sql`, `20250702_empresa_update_policy.sql`, `20250703_usuarios_select_member.sql`, `20260708_normalizacion_fase1.sql`, `20260709_normalizacion_fase2.sql`, `20260710_ifcafe_plan.sql`.
+- Se agregó `empresa_id` en inserts de lotes y lote_aplicaciones para cumplir RLS.
+- Fix: initPlanIfcafe() registrado en navigate, guard para empresaId undefined, dosisLabel → dosis.
+
+## Lo Completado (07/07)
 - `wa.js`: `createInstance()` ahora incluye `qrcode: true` en el body.
 - `wa.js`: `deleteInstance()` tolera 404 (instancia no existe) sin lanzar error.
 - `configuracion.js`: `connectOrRecreate()` reintenta con delete + delay 1.5s si falla creación.
