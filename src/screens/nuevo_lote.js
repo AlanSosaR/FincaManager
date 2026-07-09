@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { restFetch, restInsert } from '../auth.js';
 import { sendWhatsApp } from '../wa.js';
 import { getDosisPorEdad, getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
 
@@ -39,8 +40,8 @@ let lastGpsPosition = null;
 export async function renderNuevoLote(id) {
   let lote = null;
   if (id) {
-    const { data, error } = await supabase.from('lotes').select('*').eq('id', id).single();
-    if (!error) lote = data;
+    const lotes = await restFetch(`lotes?id=eq.${id}&select=*`);
+    lote = lotes?.[0] || null;
   }
 
   // Store for map initialization
@@ -1438,8 +1439,9 @@ export async function setupNuevoLoteListeners() {
   let editingLote = window.__currentLoteData;
   if (loteId && (!editingLote || editingLote.id !== loteId)) {
     try {
-      const { data, error } = await supabase.from('lotes').select('*').eq('id', loteId).single();
-      if (!error && data) {
+      const lotes = await restFetch(`lotes?id=eq.${loteId}&select=*`);
+      const data = lotes?.[0];
+      if (data) {
         window.__currentLoteData = data;
         editingLote = data;
         console.log('[nuevo_lote] Re-fetched lote data:', data);
@@ -1591,21 +1593,22 @@ export async function setupNuevoLoteListeners() {
     }
 
     try {
-      let error;
       let newLoteId = null;
       const submitLoteId = loteId || window.__currentLoteData?.id || null;
       if (submitLoteId) {
         console.log('[nuevo_lote] UPDATE - loteId:', submitLoteId);
-        const res = await supabase.from('lotes').update(data).eq('id', submitLoteId);
-        error = res.error;
+        await restFetch(`lotes?id=eq.${submitLoteId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(data)
+        });
+        newLoteId = submitLoteId;
       } else {
         console.log('[nuevo_lote] INSERT - creating new lote');
-        const res = await supabase.from('lotes').insert([data]).select();
-        error = res.error;
-        newLoteId = res.data?.[0]?.id;
+        const inserted = await restInsert('lotes', data);
+        newLoteId = inserted?.id;
       }
       
-      if (error) throw error;
+      if (!newLoteId) throw new Error('No se pudo crear/actualizar el lote');
 
       // Pre-programar aplicaciones IFCAFE solo si es lote nuevo
       if (!submitLoteId && newLoteId) {
@@ -1634,7 +1637,7 @@ export async function setupNuevoLoteListeners() {
           });
 
           for (const app of aplicaciones) {
-            await supabase.from('lote_aplicaciones').insert([app]);
+            await restInsert('lote_aplicaciones', app);
           }
 
           const zonaLabel = getZonaLabel(altura);
