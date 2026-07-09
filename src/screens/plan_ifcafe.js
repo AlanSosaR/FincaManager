@@ -1,13 +1,16 @@
 import { restFetch } from '../auth.js';
 import { getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
 import { dibujarVasitoCompacto } from '../utils/vasito_medidor.js';
+import { sendWhatsApp } from '../wa.js';
 
 function getLocalToday() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function waNotifiedKey(appFecha, loteId) {
+  return `wa_notified_app_${appFecha}_${loteId}`;
+}
 
 export async function renderPlanIfcafe(filterLoteId) {
   let empresaId = window._currentEmpresaId;
@@ -43,6 +46,14 @@ export async function renderPlanIfcafe(filterLoteId) {
       if (!Array.isArray(aplicaciones)) aplicaciones = [];
     } catch (e) { console.warn('No se pudieron cargar aplicaciones:', e); }
 
+    const descripcionProposito = {
+      0: 'Fertilización de fondo para arranque del ciclo productivo',
+      1: 'Estimula la floración y el cuaje del fruto',
+      2: 'Sostén de la carga para el desarrollo del grano',
+      3: 'Previene clorosis y fortalece el follaje',
+      4: 'Llenado y peso del grano antes de cosecha'
+    };
+
     const cards = lotesConPlan.map(lote => {
       const altura = parseInt(lote.altura_msnm) || 0;
       const numPlantas = parseInt(lote.num_plantas) || 0;
@@ -61,7 +72,7 @@ export async function renderPlanIfcafe(filterLoteId) {
         return 'linear-gradient(135deg, #fff8e1, #ffecb3)';
       };
 
-      const planCards = plan.map(item => {
+      const planCards = plan.map((item, idx) => {
         const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
         const realizada = (aplicaciones || []).find(a => {
           if (a.lote_id !== lote.id) return false;
@@ -70,12 +81,16 @@ export async function renderPlanIfcafe(filterLoteId) {
           return a.producto && a.producto.includes(item.producto.substring(0, 8)) && aFecha === pFecha && a.estado === 'Aplicada';
         });
         const estadoLabel = realizada ? 'Realizada' : (matchFecha < getLocalToday() ? 'Atrasada' : 'Pendiente');
-        const borderColor = realizada ? '#2d3e2c' : (matchFecha < getLocalToday() ? '#c62828' : '#f57c00');
         const badgeBg = realizada ? '#2d3e2c' : (matchFecha < getLocalToday() ? '#c62828' : '#f57c00');
         const icono = iconoPorTipo[item.tipo] || 'eco';
+        const purpose = descripcionProposito[idx] || '';
+        const cardId = `ifcafe-card-${lote.id}-${idx}`;
+        const expandId = `ifcafe-expand-${lote.id}-${idx}`;
+        const waSent = localStorage.getItem(waNotifiedKey(matchFecha, lote.id));
+        const appReal = (aplicaciones || []).find(a => a.lote_id === lote.id && a.fecha && a.fecha.startsWith(matchFecha.substring(0, 7)) && a.producto && a.producto.includes(item.producto.substring(0, 8)));
 
         return `
-          <div style="background: white; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1.5px solid #e0e0e0; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;">
+          <div id="${cardId}" style="background: white; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1.5px solid #e0e0e0; overflow: hidden; transition: all 0.2s; cursor: pointer;" onclick="toggleIfcafeCard('${expandId}')">
             <div style="background: ${gradientPorEstado(realizada, matchFecha)}; padding: 20px 20px 16px; border-bottom: 1px solid rgba(0,0,0,0.04);">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -88,12 +103,38 @@ export async function renderPlanIfcafe(filterLoteId) {
                 <span style="font-size: 11px; font-weight: 700; color: white; background: ${badgeBg}; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.3px;">${estadoLabel}</span>
               </div>
             </div>
-            <div style="padding: 16px 20px 20px;">
-              <p style="font-size: 15px; font-weight: 600; color: #2d3e2c; margin: 0 0 6px;">${item.producto}</p>
-              <p style="font-size: 13px; color: #666; margin: 0; line-height: 1.4; font-style: italic;">${item.recomendacion}</p>
-              <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px;">
+            <div style="padding: 16px 20px 12px;">
+              <p style="font-size: 15px; font-weight: 600; color: #2d3e2c; margin: 0 0 4px;">${item.producto}</p>
+              <p style="font-size: 13px; color: #666; margin: 0 0 6px; line-height: 1.4; font-style: italic;">${item.recomendacion}</p>
+              <p style="font-size: 13px; color: #3a6b3a; margin: 0; line-height: 1.3;">🎯 ${proposito}</p>
+              <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px;">
                 <span class="material-symbols-outlined" style="font-size: 14px; color: #888;">calendar_month</span>
                 <span style="font-size: 12px; color: #888;">${matchFecha}</span>
+                <span style="font-size: 11px; color: #aaa; margin-left: auto;">▼ tocar para detalles</span>
+              </div>
+            </div>
+            <div id="${expandId}" style="display: none; border-top: 1px solid #e0e0e0; padding: 16px 20px 20px; background: #fafafa;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: ${appReal?.estado === 'Aplicada' ? '#2d3e2c' : '#888'};">${appReal?.estado === 'Aplicada' ? 'check_circle' : 'radio_button_unchecked'}</span>
+                  <span style="font-size: 13px; font-weight: 600; color: #333;">Estado en sistema:</span>
+                  <span style="font-size: 13px; color: ${appReal?.estado === 'Aplicada' ? '#2d3e2c' : '#888'};">${appReal?.estado || 'No registrada'}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: ${waSent ? '#2d3e2c' : '#888'};">${waSent ? 'notifications_active' : 'notifications_off'}</span>
+                  <span style="font-size: 13px; font-weight: 600; color: #333;">Notificación WhatsApp:</span>
+                  <span style="font-size: 13px; color: ${waSent ? '#2d3e2c' : '#888'};">${waSent || 'No enviada aún'}</span>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                  ${!realizada ? `
+                  <button onclick="event.stopPropagation(); marcarAplicada('${lote.id}', '${matchFecha}', '${item.producto.replace(/'/g, "\\'")}', '${item.tipo}', '${dosisCalc.porAplicacion.vasitoLabel}', '${item.mesLabel}', '${expandId}')" style="background: #2d3e2c; color: white; border: none; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Work Sans', sans-serif;">
+                    ✅ Marcar como aplicada
+                  </button>
+                  ` : ''}
+                  <button onclick="event.stopPropagation(); enviarNotifAhora('${lote.id}', '${lote.nombre.replace(/'/g, "\\'")}', '${matchFecha}', '${item.producto.replace(/'/g, "\\'")}', '${dosisCalc.porAplicacion.vasitoLabel}', '${item.tipo}', '${item.mesLabel}', '${expandId}')" style="background: #f0f7e6; color: #2d3e2c; border: 1.5px solid #2d3e2c; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: 'Work Sans', sans-serif;">
+                    📤 Enviar notificación
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -171,21 +212,9 @@ export async function renderPlanIfcafe(filterLoteId) {
         `}
       </div>
       <style>
-        .plan-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 16px;
-        }
-        @media (min-width: 640px) {
-          .plan-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-        @media (min-width: 1024px) {
-          .plan-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-        }
+        .plan-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        @media (min-width: 640px) { .plan-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1024px) { .plan-grid { grid-template-columns: repeat(3, 1fr); } }
       </style>
     `;
   } catch (err) {
@@ -195,4 +224,50 @@ export async function renderPlanIfcafe(filterLoteId) {
 }
 
 export function initPlanIfcafe() {
+  window.toggleIfcafeCard = function(expandId) {
+    const el = document.getElementById(expandId);
+    if (el) {
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+  };
+
+  window.marcarAplicada = async function(loteId, fecha, producto, tipo, dosis, mesLabel, expandId) {
+    try {
+      const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+      await restFetch('/rest/v1/lote_aplicaciones', {
+        method: 'POST',
+        body: JSON.stringify({
+          lote_id: loteId,
+          fecha,
+          producto,
+          tipo,
+          dosis: dosisLabel,
+          metodo: tipo === 'Suelo' ? 'Al suelo' : 'Foliar',
+          estado: 'Aplicada',
+          operador: '',
+          empresa_id: empresaId
+        })
+      });
+      window.Snackbar?.show('✅ Aplicación marcada como realizada');
+      const expandEl = document.getElementById(expandId);
+      if (expandEl) expandEl.style.display = 'none';
+      window.clearScreenCache?.('plan_ifcafe');
+      window.navigateTo('plan_ifcafe');
+    } catch (err) {
+      window.Snackbar?.show('Error: ' + err.message, { type: 'error' });
+    }
+  };
+
+  window.enviarNotifAhora = async function(loteId, loteNombre, fecha, producto, dosisLabel, tipo, mesLabel, expandId) {
+    try {
+      const msg = `📋 Recordatorio IFCAFE 2026\n\nLote: ${loteNombre}\nMes: ${mesLabel}\nTipo: ${tipo}\nProducto: ${producto}\nDosis: ${dosisLabel}\nFecha: ${fecha}`;
+      await sendWhatsApp(msg);
+      localStorage.setItem(waNotifiedKey(fecha, loteId), new Date().toLocaleString());
+      window.Snackbar?.show('📤 Notificación enviada por WhatsApp');
+      const expandEl = document.getElementById(expandId);
+      if (expandEl) expandEl.style.display = 'none';
+    } catch (err) {
+      window.Snackbar?.show('Error al enviar: ' + err.message, { type: 'error' });
+    }
+  };
 }
