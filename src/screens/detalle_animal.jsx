@@ -1,4 +1,4 @@
-import { restFetch } from '../auth.js';
+import { restFetch, restInsert } from '../auth.js';
 import { Chart, registerables } from 'chart.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
@@ -516,16 +516,17 @@ function setupEventListeners(animalId, container, sellMode) {
             btn.disabled = true;
             btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Guardando...';
             try {
-                const { error: ventaErr } = await supabase.from('animal_ventas').insert({
+                await restInsert('/rest/v1/animal_ventas', {
                     animal_id: animalId,
                     precio_venta: parseFloat(precio),
                     fecha_venta: document.getElementById('sell-fecha').value,
                     comprador: document.getElementById('sell-comprador').value || null,
                     peso_venta: document.getElementById('sell-peso').value ? parseFloat(document.getElementById('sell-peso').value) : null,
                 });
-                if (ventaErr) throw ventaErr;
-                const { error: updateErr } = await supabase.from('ganado').update({ estado: 'Vendido' }).eq('id', animalId);
-                if (updateErr) throw updateErr;
+                await restFetch('/rest/v1/ganado?id=eq.' + animalId, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ estado: 'Vendido' }),
+                });
                 showSnackbar('Venta registrada');
 
                 currentAnimal.estado = 'Vendido';
@@ -575,10 +576,11 @@ function setupEventListeners(animalId, container, sellMode) {
 
     window.returnToInventory = async (id) => {
         try {
-            const { error: delErr } = await supabase.from('animal_ventas').delete().eq('animal_id', id);
-            if (delErr) throw delErr;
-            const { error: updateErr } = await supabase.from('ganado').update({ estado: null }).eq('id', id);
-            if (updateErr) throw updateErr;
+            await restFetch('/rest/v1/animal_ventas?animal_id=eq.' + id, { method: 'DELETE' });
+            await restFetch('/rest/v1/ganado?id=eq.' + id, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: null }),
+            });
             showSnackbar('Animal regresado al inventario');
             window.location.reload();
         } catch (err) {
@@ -653,8 +655,10 @@ async function handleEditPhoto(animalId) {
     document.getElementById('save-photo').onclick = async () => {
         const url = document.getElementById('new-photo-url').value;
         try {
-            const { error } = await supabase.from('ganado').update({ image_url: url }).eq('id', animalId);
-            if (error) throw error;
+            await restFetch('/rest/v1/ganado?id=eq.' + animalId, {
+                method: 'PATCH',
+                body: JSON.stringify({ image_url: url }),
+            });
             showSnackbar('Foto actualizada');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
@@ -700,27 +704,34 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         };
         if (obs) vacData.observaciones = obs;
 
-        closeModal();
-        window.Snackbar.confirm('¿Programar vacuna?', function() {
+        window.Snackbar.confirm('¿Programar vacuna?', async function() {
+            closeModal();
             vacData.estado = 'Aplicada';
-            supabase.from('animal_vacunas').insert(vacData).select().then(function(res) {
-                if (res.error) { showSnackbar(res.error.message, 'error'); return; }
-                var vac = res.data?.[0] || vacData;
+            try {
+                const result = await restFetch('/rest/v1/animal_vacunas', {
+                    method: 'POST',
+                    body: JSON.stringify(vacData),
+                    headers: { 'Prefer': 'return=representation' }
+                });
+                var vac = Array.isArray(result) ? result[0] : (result || vacData);
                 var anim = currentAnimal;
-                if (anim) {
+                if (anim && vac) {
                     sendWhatsApp(
                         '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha
                     );
                     var todayStr = new Date().toISOString().split('T')[0];
                     var noted = JSON.parse(localStorage.getItem('wa_notified_vaccines') || '[]');
-                    localStorage.setItem('wa_notified_vaccines', JSON.stringify([...new Set([...noted, vac.id])]));
+                    var vacId = vac.id || vacData.animal_id + '_' + Date.now();
+                    localStorage.setItem('wa_notified_vaccines', JSON.stringify([...new Set([...noted, vacId])]));
                     var sentKey = 'wa_sent_today_' + todayStr;
                     var sent = JSON.parse(localStorage.getItem(sentKey) || '[]');
-                    localStorage.setItem(sentKey, JSON.stringify([...new Set([...sent, vac.id])]));
+                    localStorage.setItem(sentKey, JSON.stringify([...new Set([...sent, vacId])]));
                 }
                 showSnackbar('Vacuna aplicada');
-                loadAllData(animalId, document.getElementById('da-container'));
-            });
+                await loadAllData(animalId, document.getElementById('da-container'));
+            } catch (err) {
+                showSnackbar(err.message, 'error');
+            }
         });
     };
 }
@@ -749,12 +760,11 @@ async function handleAddWeight(animalId) {
         const formData = new FormData(e.target);
         try {
             const pesoVal = formData.get('peso');
-            const { error } = await supabase.from('animal_pesajes').insert({
+            await restInsert('/rest/v1/animal_pesajes', {
                 animal_id: animalId,
                 peso: pesoVal,
                 fecha: formData.get('fecha')
             });
-            if (error) throw error;
             showSnackbar('Pesaje registrado');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
@@ -798,7 +808,7 @@ async function handleAddFumigacion(animalId, defaultDate = null) {
             const today = getLocalToday();
             const estadoVal = 'Programada';
 
-            const { error } = await supabase.from('animal_fumigaciones').insert({
+            await restInsert('/rest/v1/animal_fumigaciones', {
                 animal_id: animalId,
                 producto: formData.get('producto'),
                 fecha: selectedDate,
@@ -806,7 +816,6 @@ async function handleAddFumigacion(animalId, defaultDate = null) {
                 observaciones: formData.get('observaciones'),
                 estado: estadoVal
             });
-            if (error) throw error;
             showSnackbar('Fumigación registrada');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
@@ -1024,8 +1033,7 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo 
             if (dosis) payload.dosis = dosis;
             const obs = formData.get('observaciones')?.trim();
             if (obs) payload.observaciones = obs;
-            const { error } = await supabase.from('animal_vacunas').insert(payload);
-            if (error) throw error;
+            await restInsert('/rest/v1/animal_vacunas', payload);
 
             showSnackbar(tipo === 'Registrar' ? 'Vacuna registrada ✓' : 'Vacuna programada ✓');
             await loadAllData(animalId, document.getElementById('da-container'));
@@ -1099,8 +1107,7 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = [], tipo = 
             const obs = formData.get('observaciones')?.trim();
             if (obs) payload.observaciones = obs;
 
-            const { error } = await supabase.from('animal_fumigaciones').insert(payload);
-            if (error) throw error;
+            await restInsert('/rest/v1/animal_fumigaciones', payload);
 
             showSnackbar(tipo === 'Registrar' ? 'Fumigación registrada ✓' : 'Fumigación programada ✓');
             await loadAllData(animalId, document.getElementById('da-container'));
@@ -1154,12 +1161,11 @@ function showInlineWeightForm(animalId) {
         const formData = new FormData(e.target);
         try {
             const pesoVal = formData.get('peso');
-            const { error } = await supabase.from('animal_pesajes').insert({
+            await restInsert('/rest/v1/animal_pesajes', {
                 animal_id: animalId,
                 peso: pesoVal,
                 fecha: formData.get('fecha')
             });
-            if (error) throw error;
             showSnackbar('Pesaje registrado ✓');
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {
@@ -1167,6 +1173,8 @@ function showInlineWeightForm(animalId) {
         }
     };
 }
+
+// ─── Inline Fumigacion Form (duplicate for calendar)
 
 function renderVaccinesTable(allVaccines, page) {
     const table = document.getElementById('da-vaccines-table');
@@ -1696,8 +1704,7 @@ async function handleEditVaccine(vaccineId) {
             '¿Eliminar esta vacuna programada?',
             async () => {
                 try {
-                    const { error } = await supabase.from('animal_vacunas').delete().eq('id', vaccineId);
-                    if (error) throw error;
+                    await restFetch('/rest/v1/animal_vacunas?id=eq.' + vaccineId, { method: 'DELETE' });
                     showSnackbar('Vacuna eliminada');
                     await loadAllData(currentAnimal.id, document.getElementById('da-container'));
                 } catch (err) {
@@ -1724,8 +1731,10 @@ async function handleEditVaccine(vaccineId) {
                 estado: newEstado
             };
             
-            const { error } = await supabase.from('animal_vacunas').update(payload).eq('id', vaccineId);
-            if (error) throw error;
+            await restFetch('/rest/v1/animal_vacunas?id=eq.' + vaccineId, {
+                method: 'PATCH',
+                body: JSON.stringify(payload),
+            });
             
             showSnackbar('Vacuna actualizada ✓');
             await loadAllData(currentAnimal.id, document.getElementById('da-container'));
@@ -1790,8 +1799,7 @@ async function handleEditFumigacion(fumigacionId) {
             '¿Eliminar esta fumigación?',
             async () => {
                 try {
-                    const { error } = await supabase.from('animal_fumigaciones').delete().eq('id', fumigacionId);
-                    if (error) throw error;
+                    await restFetch('/rest/v1/animal_fumigaciones?id=eq.' + fumigacionId, { method: 'DELETE' });
                     showSnackbar('Fumigación eliminada');
                     await loadAllData(currentAnimal.id, document.getElementById('da-container'));
                 } catch (err) {
@@ -1818,8 +1826,10 @@ async function handleEditFumigacion(fumigacionId) {
                 estado: newEstado
             };
 
-            const { error } = await supabase.from('animal_fumigaciones').update(payload).eq('id', fumigacionId);
-            if (error) throw error;
+            await restFetch('/rest/v1/animal_fumigaciones?id=eq.' + fumigacionId, {
+                method: 'PATCH',
+                body: JSON.stringify(payload),
+            });
 
             showSnackbar('Fumigación actualizada ✓');
             await loadAllData(currentAnimal.id, document.getElementById('da-container'));

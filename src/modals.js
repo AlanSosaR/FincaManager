@@ -1,13 +1,14 @@
 import { supabase } from './supabase.js';
 
-const modalContainer = document.getElementById('modal-container');
-const modalBody = document.getElementById('modal-body');
-
 export function closeModal() {
-  if (modalContainer) modalContainer.classList.remove('active');
+  const mc = document.getElementById('modal-container');
+  if (mc) mc.classList.remove('active');
 }
 
 export function showModal(titleOrType, contentHTMLOrOnSave) {
+  const modalContainer = document.getElementById('modal-container');
+  const modalBody = document.getElementById('modal-body');
+  if (!modalContainer || !modalBody) return;
   let content = '';
   
   // Backwards compatibility for the old 'type' usage
