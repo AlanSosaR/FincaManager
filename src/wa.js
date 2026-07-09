@@ -141,7 +141,7 @@ export async function checkPendingVaccines() {
       } catch {}
 
       await sendWhatsApp(
-        `🔔 RECORDATORIO - Vacuna para Hoy\nAnimal: ${animalName}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nObservación: ${vac.observacion || 'N/A'}\nFecha: ${vac.fecha}`
+        `🔔 RECORDATORIO - Vacuna para Hoy\nAnimal: ${animalName}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nObservación: ${vac.observaciones || 'N/A'}\nFecha: ${vac.fecha}`
       );
 
       notified.add(vac.id);
