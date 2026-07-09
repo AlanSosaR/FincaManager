@@ -119,7 +119,7 @@ export async function checkPendingVaccines() {
   const sentKey = `${SENT_TODAY_KEY}_${today}`;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
   try {
-    const vaccines = await restFetch(`animal_vacunas?fecha=eq.${today}&select=*`);
+    const vaccines = await restFetch(`/rest/v1/animal_vacunas?fecha=eq.${today}&select=*`);
 
     const pending = vaccines.filter(v => v.estado === 'Programada');
     if (!pending.length) return;
@@ -136,7 +136,7 @@ export async function checkPendingVaccines() {
         if (animal?.nombre) animalName = animal.nombre;
       } catch {}
 
-      const serverVac = await restFetch(`animal_vacunas?id=eq.${vac.id}&select=estado`);
+      const serverVac = await restFetch(`/rest/v1/animal_vacunas?id=eq.${vac.id}&select=estado`);
         if (!serverVac || serverVac.length === 0 || serverVac[0].estado !== 'Programada') {
           notified.add(vac.id);
           alreadySent.add(vac.id);
