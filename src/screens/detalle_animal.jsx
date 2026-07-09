@@ -681,7 +681,7 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         window.Snackbar.confirm(
             'Se programó vacuna ' + vacData.nombre + ' para ' + animNombre + ' el ' + selectedDate,
             async function() {
-                vacData.estado = 'Programada';
+                vacData.estado = 'Aplicada';
                 try {
                     const result = await restFetch('/rest/v1/animal_vacunas', {
                         method: 'POST',
@@ -690,9 +690,11 @@ async function handleAddVaccine(animalId, defaultDate = null) {
                     });
                     var vac = Array.isArray(result) ? result[0] : result;
                     var anim = currentAnimal;
+                    console.log('Aceptar clicked, vac:', vac?.id, 'anim:', anim?.nombre);
+                    console.log('groupJid:', localStorage.getItem('whatsapp_group_jid'));
                     if (anim && vac) {
                         sendWhatsApp(
-                            '📋 Vacuna Programada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
+                            '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
                         );
                     }
                     showSnackbar('Vacuna programada');
@@ -700,9 +702,7 @@ async function handleAddVaccine(animalId, defaultDate = null) {
                 } catch (err) {
                     showSnackbar(err.message, 'error');
                 }
-            },
-            null,
-            { confirmText: 'Aceptar', cancelText: false }
+            }
         );
     };
 }
