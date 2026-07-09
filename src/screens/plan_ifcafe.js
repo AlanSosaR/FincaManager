@@ -7,6 +7,8 @@ function getLocalToday() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
 export async function renderPlanIfcafe(filterLoteId) {
   try {
     const empresaId = window._currentEmpresaId;
@@ -28,7 +30,18 @@ export async function renderPlanIfcafe(filterLoteId) {
       const plan = getPlanIfcafe(altura);
       const zonaLabel = getZonaLabel(altura);
 
-      const planRows = plan.map(item => {
+      const iconoPorTipo = {
+        'Suelo': 'humidity_high',
+        'Foliar': 'spa'
+      };
+
+      const gradientPorEstado = (realizada, matchFecha) => {
+        if (realizada) return 'linear-gradient(135deg, #e8f5e9, #c8e6c9)';
+        if (matchFecha < getLocalToday()) return 'linear-gradient(135deg, #ffebee, #ffcdd2)';
+        return 'linear-gradient(135deg, #fff8e1, #ffecb3)';
+      };
+
+      const planCards = plan.map(item => {
         const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
         const realizada = (aplicaciones || []).find(a => {
           if (a.lote_id !== lote.id) return false;
@@ -36,91 +49,124 @@ export async function renderPlanIfcafe(filterLoteId) {
           const pFecha = matchFecha.substring(0, 7);
           return a.producto && a.producto.includes(item.producto.substring(0, 8)) && aFecha === pFecha && a.estado === 'Aplicada';
         });
-        const estadoIcon = realizada ? '✅' : (matchFecha < getLocalToday() ? '❌' : '⏳');
         const estadoLabel = realizada ? 'Realizada' : (matchFecha < getLocalToday() ? 'Atrasada' : 'Pendiente');
-        const estadoClass = realizada ? 'positive' : (matchFecha < getLocalToday() ? 'negative' : 'pending');
+        const borderColor = realizada ? '#2d3e2c' : (matchFecha < getLocalToday() ? '#c62828' : '#f57c00');
+        const badgeBg = realizada ? '#2d3e2c' : (matchFecha < getLocalToday() ? '#c62828' : '#f57c00');
+        const icono = iconoPorTipo[item.tipo] || 'eco';
+
         return `
-          <div class="m3-flex m3-items-center m3-justify-between m3-p-3 m3-bg-surface-container m3-rounded-xl" style="border-left: 4px solid ${realizada ? '#2d3e2c' : (matchFecha < getLocalToday() ? '#ff4103' : '#f57c00')};">
-            <div class="m3-flex m3-items-center m3-gap-3">
-              <span style="font-size: 20px;">${estadoIcon}</span>
-              <div>
-                <p class="m3-label-medium m3-font-bold m3-text-on-surface">${item.mesLabel} — ${item.tipo}</p>
-                <p class="m3-label-small m3-text-on-surface-variant">${item.producto}</p>
-                <p class="m3-label-small m3-text-on-surface-variant" style="font-style: italic;">${item.recomendacion}</p>
+          <div style="background: white; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1.5px solid #e0e0e0; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;">
+            <div style="background: ${gradientPorEstado(realizada, matchFecha)}; padding: 20px 20px 16px; border-bottom: 1px solid rgba(0,0,0,0.04);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="material-symbols-outlined" style="font-size: 28px; color: #2d3e2c;">${icono}</span>
+                  <div>
+                    <span style="font-size: 16px; font-weight: 700; color: #1a1a1a; letter-spacing: -0.3px;">${item.mesLabel}</span>
+                    <span style="font-size: 12px; font-weight: 600; color: #5a5a5a; margin-left: 6px; text-transform: uppercase;">${item.tipo}</span>
+                  </div>
+                </div>
+                <span style="font-size: 11px; font-weight: 700; color: white; background: ${badgeBg}; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.3px;">${estadoLabel}</span>
               </div>
             </div>
-            <span class="m3-label-small m3-font-bold m3-px-3 m3-py-1 m3-rounded-full da-variation-pill ${estadoClass}">${estadoLabel}</span>
+            <div style="padding: 16px 20px 20px;">
+              <p style="font-size: 15px; font-weight: 600; color: #2d3e2c; margin: 0 0 6px;">${item.producto}</p>
+              <p style="font-size: 13px; color: #666; margin: 0; line-height: 1.4; font-style: italic;">${item.recomendacion}</p>
+              <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px;">
+                <span class="material-symbols-outlined" style="font-size: 14px; color: #888;">calendar_month</span>
+                <span style="font-size: 12px; color: #888;">${matchFecha}</span>
+              </div>
+            </div>
           </div>
         `;
       }).join('');
 
       return `
-        <div class="m3-card m3-p-6" style="border-radius: 12px; border: 2px solid #2d3e2c;">
-          <div class="m3-flex m3-items-center m3-justify-between m3-mb-4">
-            <div class="m3-flex m3-items-center m3-gap-3">
-              <span class="material-symbols-outlined m3-text-primary" style="font-size: 28px;">eco</span>
-              <h2 class="m3-headline-small m3-font-bold m3-text-on-surface" style="margin:0;">${lote.nombre}</h2>
+        <div style="background: white; border-radius: 20px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 2px solid #e8ede8; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #f0f7e6, #e8f5e9); padding: 24px 24px 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="material-symbols-outlined" style="font-size: 32px; color: #2d3e2c;">eco</span>
+                <h2 style="font-size: 22px; font-weight: 800; color: #1a1a1a; margin: 0; letter-spacing: -0.5px;">${lote.nombre}</h2>
+              </div>
+              <a href="#" onclick="event.preventDefault(); window.navigateTo('detalle_lote', '${lote.id}')" style="font-size: 13px; font-weight: 600; color: #2d3e2c; text-decoration: none; display: flex; align-items: center; gap: 4px; padding: 6px 14px; background: white; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);">
+                Ver lote
+                <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
+              </a>
             </div>
-            <a href="#" onclick="event.preventDefault(); window.navigateTo('detalle_lote', '${lote.id}')" style="font-size: 12px; color: #2d3e2c; text-decoration: underline;">
-              Ver lote
-            </a>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px;">
+              <div style="display: flex; align-items: center; gap: 6px; background: white; padding: 6px 14px; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);">
+                <span style="font-size: 12px; font-weight: 700; color: #5a5a5a; text-transform: uppercase;">Edad</span>
+                <span style="font-size: 13px; font-weight: 600; color: #2d3e2c;">${dosisCalc.label}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; background: white; padding: 6px 14px; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);">
+                <span style="font-size: 12px; font-weight: 700; color: #5a5a5a; text-transform: uppercase;">Dosis</span>
+                <span style="font-size: 13px; font-weight: 600; color: #2d3e2c;">${dosisCalc.porAplicacion.vasitoLabel}</span>
+                ${dibujarVasitoCompacto(dosisCalc.porAplicacion.fraccion)}
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; background: white; padding: 6px 14px; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);">
+                <span style="font-size: 12px; font-weight: 700; color: #5a5a5a; text-transform: uppercase;">Zona</span>
+                <span style="font-size: 13px; font-weight: 600; color: #2d3e2c;">${zonaLabel}</span>
+              </div>
+              ${numPlantas > 0 ? `
+              <div style="display: flex; align-items: center; gap: 6px; background: white; padding: 6px 14px; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);">
+                <span style="font-size: 12px; font-weight: 700; color: #5a5a5a; text-transform: uppercase;">Sacos</span>
+                <span style="font-size: 13px; font-weight: 600; color: #2d3e2c;">${dosisCalc.sacosNecesarios} x apl.</span>
+              </div>` : ''}
+            </div>
           </div>
-
-          <div class="m3-flex m3-gap-4 m3-flex-wrap m3-mb-4">
-            <div class="m3-flex m3-items-center m3-gap-2">
-              <span class="m3-label-small m3-font-bold">Edad:</span>
-              <span class="m3-label-small">${dosisCalc.label}</span>
+          <div style="padding: 24px;">
+            <div class="plan-grid">
+              ${planCards}
             </div>
-            <div class="m3-flex m3-items-center m3-gap-2">
-              <span class="m3-label-small m3-font-bold">🥤 Dosis:</span>
-              <span class="m3-label-small">${dosisCalc.porAplicacion.vasitoLabel}</span>
-              ${dibujarVasitoCompacto(dosisCalc.porAplicacion.fraccion)}
-            </div>
-            <div class="m3-flex m3-items-center m3-gap-2">
-              <span class="m3-label-small m3-font-bold">📍 Zona:</span>
-              <span class="m3-label-small">${zonaLabel}</span>
-            </div>
-          </div>
-
-          ${numPlantas > 0 ? `
-          <div style="margin-bottom: 12px; padding: 8px 12px; background: #f5f5f5; border-radius: 8px;">
-            <span class="m3-label-small m3-text-on-surface-variant">
-              📦 <strong>${dosisCalc.sacosNecesarios}</strong> saco(s) x apl. (${dosisCalc.totalKgPorAplicacion} kg / <strong>${numPlantas.toLocaleString()}</strong> plantas)
-            </span>
-          </div>` : ''}
-
-          <div class="m3-flex m3-flex-col m3-gap-3">
-            ${planRows}
           </div>
         </div>
       `;
     });
 
     return `
-      <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans">
-        <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
+      <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width: 900px; margin: 0 auto;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="margin:0;">📋 Plan IFCAFE 2026</h1>
-            <p class="m3-label-medium m3-text-on-surface-variant m3-mt-1">Plan de fertilización para café según IHCAFE</p>
+            <h1 style="font-size: 28px; font-weight: 800; color: #1a1a1a; margin: 0; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
+              <span>📋</span> Plan IFCAFE 2026
+            </h1>
+            <p style="font-size: 14px; color: #666; margin: 4px 0 0;">Plan de fertilización para café según IHCAFE</p>
           </div>
-          <button onclick="window.navigateTo('dashboard')" class="m3-bg-none m3-border-none m3-cursor-pointer m3-flex m3-items-center m3-gap-1 m3-label-medium m3-font-bold m3-text-primary" style="padding: 8px 16px; border-radius: 8px; background: #f0f7e6;">
+          <button onclick="window.navigateTo('dashboard')" style="background: #f0f7e6; border: none; padding: 10px 20px; border-radius: 12px; color: #2d3e2c; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: 'Work Sans', sans-serif;">
             <span class="material-symbols-outlined" style="font-size: 18px;">arrow_back</span>
             Volver
           </button>
         </div>
 
         ${lotesConPlan.length === 0 ? `
-        <div class="m3-card m3-p-8 m3-flex m3-flex-col m3-items-center m3-gap-4" style="border-radius: 12px;">
-          <span class="material-symbols-outlined" style="font-size: 48px; color: #aaa;">eco</span>
-          <p class="m3-label-large m3-text-on-surface-variant">No hay lotes con plan IFCAFE</p>
-          <p class="m3-label-small m3-text-on-surface-variant">Crea un lote con edad y altura para generar su plan de fertilización</p>
+        <div style="background: white; border-radius: 20px; padding: 60px 24px; text-align: center; box-shadow: 0 2px 12px rgba(0,0,0,0.04);">
+          <span class="material-symbols-outlined" style="font-size: 56px; color: #ccc;">eco</span>
+          <p style="font-size: 18px; font-weight: 600; color: #666; margin: 16px 0 4px;">No hay lotes con plan IFCAFE</p>
+          <p style="font-size: 14px; color: #999;">Crea un lote con edad y altura para generar su plan de fertilización</p>
         </div>
         ` : `
-        <div class="m3-flex m3-flex-col m3-gap-6">
+        <div style="display: flex; flex-direction: column; gap: 32px;">
           ${cards.join('\n')}
         </div>
         `}
       </div>
+      <style>
+        .plan-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 16px;
+        }
+        @media (min-width: 640px) {
+          .plan-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        @media (min-width: 1024px) {
+          .plan-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+      </style>
     `;
   } catch (err) {
     console.error('Error en plan_ifcafe:', err);
@@ -129,5 +175,4 @@ export async function renderPlanIfcafe(filterLoteId) {
 }
 
 export function initPlanIfcafe() {
-  // No initialization needed
 }
