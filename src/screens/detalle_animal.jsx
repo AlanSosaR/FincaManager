@@ -673,18 +673,9 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         try {
             const selectedDate = formData.get('fecha');
             const today = getLocalToday();
-            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+            const estadoVal = selectedDate >= today ? 'Programada' : 'Programada';
 
-            const { error } = await supabase.from('animal_vacunas').insert({
-                animal_id: animalId,
-                nombre: formData.get('nombre'),
-                fecha: selectedDate,
-                estado: estadoVal
-            });
-
-            if (error) throw error;
-
-            showSnackbar('Vacunación registrada');
+            showSnackbar('Vacuna programada');
             closeModal();
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) { 
@@ -765,7 +756,7 @@ async function handleAddFumigacion(animalId, defaultDate = null) {
         try {
             const selectedDate = formData.get('fecha');
             const today = getLocalToday();
-            const estadoVal = selectedDate >= today ? 'Programada' : 'Aplicada';
+            const estadoVal = 'Programada';
 
             const { error } = await supabase.from('animal_fumigaciones').insert({
                 animal_id: animalId,
@@ -875,17 +866,14 @@ function showDayDetails(day, dayEvents) {
                         iconColor = '#f57c00';
                         iconName = 'schedule';
                         subtitle = 'Vacunación programada';
-                        // Edit button always shown for scheduled
-                        const applyRow = isPastOrToday ? `
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
-                                <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
-                            </button>
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
-                                <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
-                            </button>` : '';
                         actionsHtml = `
                             <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-                                ${applyRow}
+                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
+                                    <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
+                                </button>
+                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
+                                    <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
+                                </button>
                                 <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e; flex: 1;" onclick="window.editVaccine('${v.id}')">
                                     <span class="material-icons" style="font-size: 16px;">edit</span> Editar
                                 </button>
