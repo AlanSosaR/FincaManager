@@ -10,8 +10,11 @@ function getLocalToday() {
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export async function renderPlanIfcafe(filterLoteId) {
+  const empresaId = window._currentEmpresaId;
+  if (!empresaId) {
+    return `<div class="m3-p-4 m3-text-center"><p class="m3-label-medium m3-text-on-surface-variant">Cargando...</p></div>`;
+  }
   try {
-    const empresaId = window._currentEmpresaId;
     let lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*&order=nombre.asc`);
     if (!Array.isArray(lotes)) lotes = [];
 
