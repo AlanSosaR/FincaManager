@@ -19,6 +19,16 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Secrets agregados en GitHub Actions: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
 - Commits: `750676b`, `81714a7`, `07f521c`, `ea908d7`
 
+### Fix conexión WhatsApp — manejo de errores Evolution API
+- `wa.js`: `createInstance()` ahora incluye `qrcode: true` en el body.
+- `wa.js`: `deleteInstance()` tolera 404 (instancia no existe) sin lanzar error.
+- `configuracion.js`: `connectOrRecreate()` reintenta con delete + delay 1.5s si falla creación.
+- `configuracion.js`: unificado connect/disconnect en `handleWaButtonClick()` (un solo botón).
+- `configuracion.js`: `updateWhatsAppStatus()` usa flag `isWaConnected` en vez de onclick inline.
+- `configuracion.js`: grupo ID visible si hay conexión O si ya hay grupo guardado.
+- `configuracion.js`: botón "Buscar grupos" solo visible cuando conectado.
+- Commits: `78276bf`, `10b7957`, `f646f1a`, `bcc48fc`
+
 ## Lo Completado (07/07)
 
 ### Sincronización automática en segundo plano (cada 5s + al navegar)
