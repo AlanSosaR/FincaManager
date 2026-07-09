@@ -77,8 +77,13 @@ export async function renderConfiguracion() {
 let waPollInterval = null;
 
 async function connectOrRecreate() {
-  await deleteInstance();
-  await createInstance();
+  try {
+    await createInstance();
+  } catch (e) {
+    await deleteInstance();
+    await new Promise(r => setTimeout(r, 500));
+    await createInstance();
+  }
   return getQR();
 }
 
