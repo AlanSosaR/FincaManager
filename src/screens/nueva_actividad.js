@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { restFetch, restInsert } from '../auth.js';
 import { sendWhatsApp } from '../wa.js';
 import { getDosisPorEdad, calcularDosis } from '../utils/calculadora_dosis.js';
 import { dibujarVasitoCompacto } from '../utils/vasito_medidor.js';
@@ -24,8 +25,8 @@ export async function renderNuevaActividad(loteId, tipo) {
 
   let personal = [];
   try {
-    const { data } = await supabase.from('personal').select('*').order('nombre', { ascending: true });
-    personal = data || [];
+    const personalData = await restFetch('personal?select=*&order=nombre.asc');
+    personal = personalData || [];
   } catch (error) {
     console.warn('Error fetching personal for nueva_actividad:', error);
     personal = [];
@@ -416,7 +417,8 @@ export function initNuevaActividad(loteId, tipo) {
   if (tipo === 'Fertilizante') {
     (async () => {
       try {
-        const { data: lote } = await supabase.from('lotes').select('edad_categoria, num_plantas').eq('id', loteId).single();
+        const lotes = await restFetch(`lotes?id=eq.${loteId}&select=edad_categoria,num_plantas`);
+        const lote = lotes?.[0];
         if (lote?.edad_categoria) {
           const dosisCalc = calcularDosis(lote.edad_categoria, lote.num_plantas || 0);
           const sugerenciaEl = document.getElementById('ifcafe-sugerencia-dosis');
@@ -530,14 +532,16 @@ export function initNuevaActividad(loteId, tipo) {
     }
 
     try {
-      const { error } = await supabase.from('lote_aplicaciones').insert([data]);
-      if (error) throw error;
+      // Use restInsert for lote_aplicaciones (no .select needed)
+      const insertResult = await restInsert('lote_aplicaciones', data);
+      if (!insertResult) throw new Error('Error al guardar actividad');
 
       // Send WhatsApp notification for fertilizer applications
       if (tipo === 'Fertilizante') {
         try {
-          const { data: lote } = await supabase.from('lotes').select('nombre').eq('id', loteId).single();
-          const msg = `🧪 Aplicación registrada\n\nLote: ${lote?.nombre || '—'}\nProducto: ${data.producto || '—'}\nDosis: ${data.dosis || '—'}\nMétodo: ${data.metodo || '—'}\nOperador: ${data.operador || '—'}`;
+          const lotes = await restFetch(`lotes?id=eq.${loteId}&select=nombre`);
+          const loteNombre = lotes?.[0]?.nombre || '—';
+          const msg = `🧪 Aplicación registrada\n\nLote: ${loteNombre}\nProducto: ${data.producto || '—'}\nDosis: ${data.dosis || '—'}\nMétodo: ${data.metodo || '—'}\nOperador: ${data.operador || '—'}`;
           sendWhatsApp(msg);
         } catch (waErr) {
           console.warn('WhatsApp notification skipped:', waErr);
