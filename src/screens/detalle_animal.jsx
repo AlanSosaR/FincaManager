@@ -1003,6 +1003,18 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo 
             await restInsert('/rest/v1/animal_vacunas', payload);
 
             showSnackbar(tipo === 'Registrar' ? 'Vacuna registrada ✓' : 'Vacuna programada ✓');
+
+            if (tipo === 'Registrar' && currentAnimal) {
+                sendWhatsApp(
+                    '✅ Vacuna Aplicada\nAnimal: ' + currentAnimal.nombre +
+                    '\nVacuna: ' + payload.nombre +
+                    '\nDosis: ' + (payload.dosis || 'N/A') +
+                    '\nObservación: ' + (payload.observaciones || 'N/A') +
+                    '\nFecha: ' + payload.fecha +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+            }
+
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {
             console.error(err);
