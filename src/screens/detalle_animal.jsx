@@ -663,6 +663,9 @@ async function handleAddVaccine(animalId, defaultDate = null) {
     
     document.getElementById('form-add-vaccine').onsubmit = function(e) {
         e.preventDefault();
+        console.log('=== GUARDAR CLICKED ===');
+        console.log('snackbar-container:', document.getElementById('snackbar-container'));
+        console.log('modal-container active:', document.getElementById('modal-container')?.classList.contains('active'));
         var form = e.target;
         var formData = new FormData(form);
         var selectedDate = formData.get('fecha');
@@ -678,9 +681,12 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         if (obs) vacData.observaciones = obs;
 
         closeModal();
+        console.log('closeModal done, modal active:', document.getElementById('modal-container')?.classList.contains('active'));
+        console.log('Calling Snackbar.confirm...');
         window.Snackbar.confirm(
             'Se programó vacuna ' + vacData.nombre + ' para ' + animNombre + ' el ' + selectedDate,
             async function() {
+                console.log('=== CONFIRMAR CLICKED ===');
                 vacData.estado = 'Aplicada';
                 try {
                     const result = await restFetch('/rest/v1/animal_vacunas', {
@@ -690,14 +696,16 @@ async function handleAddVaccine(animalId, defaultDate = null) {
                     });
                     var vac = Array.isArray(result) ? result[0] : result;
                     var anim = currentAnimal;
-                    console.log('Aceptar clicked, vac:', vac?.id, 'anim:', anim?.nombre);
                     console.log('groupJid:', localStorage.getItem('whatsapp_group_jid'));
+                    console.log('instanceName:', localStorage.getItem('wa_instance_name'));
                     if (anim && vac) {
+                        console.log('Sending WhatsApp...');
                         sendWhatsApp(
                             '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
                         );
+                        console.log('WhatsApp send called');
                     }
-                    showSnackbar('Vacuna programada');
+                    showSnackbar('Vacuna aplicada');
                     await loadAllData(animalId, document.getElementById('da-container'));
                 } catch (err) {
                     showSnackbar(err.message, 'error');
