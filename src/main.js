@@ -359,6 +359,7 @@ import { renderNuevaActividad, initNuevaActividad } from './screens/nueva_activi
 import { renderNuevoPersonal, initNuevoPersonal } from './screens/nuevo_personal.js';
 import { renderDetallePersonal, initDetallePersonal } from './screens/detalle_personal.js';
 import { renderListaPersonal, initListaPersonal } from './screens/lista_personal.js';
+import { renderPlanIfcafe, initPlanIfcafe } from './screens/plan_ifcafe.js';
 import { renderLogin, initLogin } from './screens/login.js';
 import { renderRegister, initRegister } from './screens/register.js';
 import { renderPerfil, initPerfil } from './screens/perfil.js';
@@ -401,6 +402,7 @@ const screens = {
     aceptar_invitacion: { title: 'Invitación', render: renderAceptarInvitacion, noAuth: true },
     recuperar: { title: 'Recuperar Contraseña', render: renderRecuperar, noAuth: true },
     restablecer: { title: 'Restablecer Contraseña', render: renderRestablecer },
+    plan_ifcafe: { title: 'Plan IFCAFE 2026', backTo: 'dashboard', render: renderPlanIfcafe },
 };
 
 window.navigateTo = function(screenId, ...args) {

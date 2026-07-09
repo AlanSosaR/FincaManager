@@ -93,6 +93,12 @@ export async function renderDashboard(page) {
         <section class="m3-mb-6">
           <div>
             <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-mt-1 m3-font-manrope db-title">Gestión del Cafetal</h1>
+            <div style="margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" style="color: #2d3e2c; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; background: #f0f7e6; border-radius: 8px; transition: all 0.2s;">
+                📋 Plan IFCAFE 2026
+                <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
+              </a>
+            </div>
           </div>
         </section>
 

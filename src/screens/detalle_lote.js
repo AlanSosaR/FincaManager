@@ -1,15 +1,8 @@
 import { supabase } from '../supabase.js';
 import { showModal } from '../modals.js';
-import { getDosisPorEdad, getPlanIfcafe, getZonaLabel, calcularDosis, obtenerOrdenDia } from '../utils/calculadora_dosis.js';
-import { dibujarVasito } from '../utils/vasito_medidor.js';
 
 function getInitiales(nombre) {
   return nombre.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function getLocalToday() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function getAvatarColor(seed) {
@@ -124,87 +117,16 @@ export async function renderDetalleLote(id) {
           <!-- Main Column -->
           <div class="m3-flex m3-flex-col m3-gap-8 dl-main-col" style="margin-top: 8px; grid-column: 1;">
 
-            <!-- Plan IFCAFE 2026 -->
             ${(() => {
               const edadCat = lote.edad_categoria;
-              const altura = parseInt(lote.altura_msnm) || 0;
-              const numPlantas = parseInt(lote.num_plantas) || 0;
               if (!edadCat) return '';
-              const dosisCalc = calcularDosis(edadCat, numPlantas);
-              const plan = getPlanIfcafe(altura);
-              const zonaLabel = getZonaLabel(altura);
-              const aplicacionesProgramadas = (aplicaciones || []).filter(a => a.estado === 'Programada');
-
-              const planRows = plan.map(item => {
-                const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
-                const realizada = aplicacionesProgramadas.find(a => {
-                  const aFecha = a.fecha ? a.fecha.substring(0, 7) : '';
-                  const pFecha = matchFecha.substring(0, 7);
-                  return a.producto && a.producto.includes(item.producto.substring(0, 8)) && aFecha === pFecha;
-                });
-                const estadoIcon = realizada ? '✅' : (matchFecha < getLocalToday() ? '❌' : '⏳');
-                const estadoLabel = realizada ? 'Realizada' : (matchFecha < getLocalToday() ? 'Atrasada' : 'Pendiente');
-                const estadoClass = realizada ? 'positive' : (matchFecha < getLocalToday() ? 'negative' : 'pending');
-                return `
-                  <div class="m3-flex m3-items-center m3-justify-between m3-p-3 m3-bg-surface-container m3-rounded-xl" style="border-left: 4px solid ${realizada ? '#2d3e2c' : (matchFecha < getLocalToday() ? '#ff4103' : '#f57c00')};">
-                    <div class="m3-flex m3-items-center m3-gap-3">
-                      <span style="font-size: 20px;">${estadoIcon}</span>
-                      <div>
-                        <p class="m3-label-medium m3-font-bold m3-text-on-surface">${item.mesLabel} — ${item.tipo}</p>
-                        <p class="m3-label-small m3-text-on-surface-variant">${item.producto}</p>
-                        <p class="m3-label-small m3-text-on-surface-variant" style="font-style: italic;">${item.recomendacion}</p>
-                      </div>
-                    </div>
-                    <span class="m3-label-small m3-font-bold m3-px-3 m3-py-1 m3-rounded-full da-variation-pill ${estadoClass}">${estadoLabel}</span>
-                  </div>
-                `;
-              }).join('');
-
               return `
-            <div class="m3-card m3-p-6" style="border-radius: 12px; border: 2px solid #2d3e2c;">
-              <div class="m3-flex m3-items-center m3-justify-between m3-mb-4">
-                <div class="m3-flex m3-items-center m3-gap-3">
-                  <span class="material-symbols-outlined m3-text-primary" style="font-size: 28px;">eco</span>
-                  <h2 class="m3-headline-small m3-font-bold m3-text-on-surface" style="margin:0;">Plan IFCAFE 2026</h2>
-                </div>
-              </div>
-
-              <div class="m3-flex m3-gap-6 m3-flex-wrap m3-mb-4">
-                <div class="m3-flex m3-items-center m3-gap-2">
-                  <span class="m3-label-medium m3-font-bold">Edad:</span>
-                  <span class="m3-label-medium">${dosisCalc.label}</span>
-                </div>
-                <div class="m3-flex m3-items-center m3-gap-2">
-                  <span class="m3-label-medium m3-font-bold">🥤 Dosis:</span>
-                  <span class="m3-label-medium">${dosisCalc.porAplicacion.vasitoLabel}</span>
-                </div>
-                <div class="m3-flex m3-items-center m3-gap-2">
-                  <span class="m3-label-medium m3-font-bold">📍 Zona:</span>
-                  <span class="m3-label-medium">${zonaLabel}</span>
-                </div>
-              </div>
-
-              <div class="m3-flex m3-items-center m3-gap-6 m3-flex-wrap m3-mb-4" style="justify-content: center;">
-                ${dibujarVasito(dosisCalc.porAplicacion.fraccion, dosisCalc.porAplicacion.vasitoLabel, dosisCalc.porAplicacion.onzas, dosisCalc.porAplicacion.gramos)}
-                <div style="font-size: 13px; color: #555; max-width: 300px; line-height: 1.5; padding: 12px; background: #f0f7e6; border-radius: 12px;">
-                  <strong>🧑‍🌾 Orden del día:</strong><br>
-                  "${obtenerOrdenDia(lote.nombre, plan[0]?.producto || 'fertilizante', dosisCalc, [])}"
-                </div>
-              </div>
-
-              <div class="m3-flex m3-flex-col m3-gap-3" style="margin-top: 12px;">
-                ${planRows}
-              </div>
-
-              ${numPlantas > 0 ? `
-              <div style="margin-top: 12px; padding: 12px; background: #f5f5f5; border-radius: 12px;">
-                <p class="m3-label-small m3-text-on-surface-variant">
-                  📦 <strong>${dosisCalc.sacosNecesarios}</strong> saco(s) por aplicación para <strong>${numPlantas.toLocaleString()}</strong> plantas
-                  (${dosisCalc.totalKgPorAplicacion} kg / ${dosisCalc.totalOnzasPorAplicacion} oz por aplicación)
-                </p>
-              </div>` : ''}
+            <div style="margin-bottom: 8px;">
+              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe', '${lote.id}')" style="color: #2d3e2c; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: #f0f7e6; border-radius: 8px;">
+                📋 Ver Plan IFCAFE 2026
+                <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
+              </a>
             </div>
-            <div style="height: 24px;"></div>
             `;
             })()}
 
