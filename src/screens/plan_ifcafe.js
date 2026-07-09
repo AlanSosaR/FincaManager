@@ -106,7 +106,7 @@ export async function renderPlanIfcafe(filterLoteId) {
             <div style="padding: 16px 20px 12px;">
               <p style="font-size: 15px; font-weight: 600; color: #2d3e2c; margin: 0 0 4px;">${item.producto}</p>
               <p style="font-size: 13px; color: #666; margin: 0 0 6px; line-height: 1.4; font-style: italic;">${item.recomendacion}</p>
-              <p style="font-size: 13px; color: #3a6b3a; margin: 0; line-height: 1.3;">🎯 ${proposito}</p>
+              <p style="font-size: 13px; color: #3a6b3a; margin: 0; line-height: 1.3;">🎯 ${purpose}</p>
               <div style="margin-top: 8px; display: flex; align-items: center; gap: 6px;">
                 <span class="material-symbols-outlined" style="font-size: 14px; color: #888;">calendar_month</span>
                 <span style="font-size: 12px; color: #888;">${matchFecha}</span>
