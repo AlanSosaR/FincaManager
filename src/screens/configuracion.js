@@ -29,7 +29,7 @@ export async function renderConfiguracion() {
             <span class="material-icons">group</span> Buscar grupos
           </button>
         </div>
-        <div style="margin-top:12px;">
+        <div id="wa-group-area" style="margin-top:12px;">
           <label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">ID del Grupo de WhatsApp</label>
           <input type="text" id="wa-group-jid" value="${groupJid}" placeholder="Ej: 50399999999-123456@g.us" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--m3-outline-variant,#e0e0e0);font-size:14px;font-family:'Work Sans',sans-serif;">
           <p style="font-size:12px;color:#999;margin-top:4px;">Click en "Buscar grupos" para seleccionar el grupo de WhatsApp</p>
@@ -91,43 +91,45 @@ async function connectOrRecreate() {
   return getQR();
 }
 
+async function connectHandler() {
+  const btn = document.getElementById('btn-wa-connect');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Conectando...';
+
+  try {
+    const qrData = await connectOrRecreate();
+    console.log('QR response:', qrData);
+    const qrArea = document.getElementById('wa-qr-area');
+    const qrContainer = document.getElementById('wa-qr-container');
+
+    const qrBase64 = qrData?.base64 || qrData?.qrcode?.base64;
+    const qrCode = qrData?.code || qrData?.qrcode?.code;
+    if (qrBase64) {
+      qrArea.style.display = 'block';
+      qrContainer.innerHTML = `<img src="${qrBase64}" alt="WhatsApp QR" style="width:256px;height:256px;image-rendering:pixelated;">`;
+      startWaPolling();
+    } else if (qrCode) {
+      qrArea.style.display = 'block';
+      qrContainer.innerHTML = `<div style="font-size:24px;font-weight:700;color:#2d3e2c;padding:48px;word-break:break-all;">${qrCode}</div>
+        <p style="font-size:13px;color:#666;">Usa este código de emparejamiento en WhatsApp > Dispositivos vinculados</p>`;
+      startWaPolling();
+    } else {
+      console.error('QR data inesperada:', JSON.stringify(qrData));
+      if (window.Snackbar) window.Snackbar.show('Error al obtener QR. Revisa la consola (F12).', 'error');
+    }
+  } catch (e) {
+    console.error('Error completo:', e);
+    if (window.Snackbar) window.Snackbar.show('Error: ' + (e.message || e), 'error');
+  }
+
+  btn.disabled = false;
+  updateWhatsAppStatus();
+}
+
 export function initConfiguracion() {
   updateWhatsAppStatus();
 
-  document.getElementById('btn-wa-connect')?.addEventListener('click', async () => {
-    const btn = document.getElementById('btn-wa-connect');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Conectando...';
-
-    try {
-      const qrData = await connectOrRecreate();
-      console.log('QR response:', qrData);
-      const qrArea = document.getElementById('wa-qr-area');
-      const qrContainer = document.getElementById('wa-qr-container');
-
-      const qrBase64 = qrData?.base64 || qrData?.qrcode?.base64;
-      const qrCode = qrData?.code || qrData?.qrcode?.code;
-      if (qrBase64) {
-        qrArea.style.display = 'block';
-        qrContainer.innerHTML = `<img src="${qrBase64}" alt="WhatsApp QR" style="width:256px;height:256px;image-rendering:pixelated;">`;
-        startWaPolling();
-      } else if (qrCode) {
-        qrArea.style.display = 'block';
-        qrContainer.innerHTML = `<div style="font-size:24px;font-weight:700;color:#2d3e2c;padding:48px;word-break:break-all;">${qrCode}</div>
-          <p style="font-size:13px;color:#666;">Usa este código de emparejamiento en WhatsApp > Dispositivos vinculados</p>`;
-        startWaPolling();
-      } else {
-        console.error('QR data inesperada:', JSON.stringify(qrData));
-        if (window.Snackbar) window.Snackbar.show('Error al obtener QR. Revisa la consola (F12).', 'error');
-      }
-    } catch (e) {
-      console.error('Error completo:', e);
-      if (window.Snackbar) window.Snackbar.show('Error: ' + (e.message || e), 'error');
-    }
-
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons">qr_code_scanner</span> Conectar WhatsApp';
-  });
+  document.getElementById('btn-wa-connect')?.addEventListener('click', connectHandler);
 
   document.getElementById('btn-wa-list-groups')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-wa-list-groups');
@@ -203,11 +205,38 @@ export function initConfiguracion() {
 async function updateWhatsAppStatus() {
   const el = document.getElementById('wa-status-text');
   if (!el) return;
+  const btn = document.getElementById('btn-wa-connect');
+  const groupArea = document.getElementById('wa-group-area');
+  const listBtn = document.getElementById('btn-wa-list-groups');
   try {
     const connected = await checkConnection();
     el.innerHTML = connected
       ? '<span style="color:#2d3e2c;font-weight:600;">✓ Conectado</span>'
       : '<span style="color:#ff4103;">✗ Desconectado</span>';
+    if (connected) {
+      btn.innerHTML = '<span class="material-icons">link_off</span> Desconectar WhatsApp';
+      btn.style.background = '#ff4103';
+      btn.onclick = async () => {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Desconectando...';
+        try {
+          await deleteInstance();
+          if (window.Snackbar) window.Snackbar.show('WhatsApp desconectado');
+          updateWhatsAppStatus();
+        } catch (e) {
+          if (window.Snackbar) window.Snackbar.show('Error: ' + (e.message || e), 'error');
+        }
+        btn.disabled = false;
+      };
+      if (groupArea) groupArea.style.display = 'none';
+      if (listBtn) listBtn.style.display = 'none';
+    } else {
+      btn.innerHTML = '<span class="material-icons">qr_code_scanner</span> Conectar WhatsApp';
+      btn.style.background = '#2d3e2c';
+      btn.onclick = connectHandler;
+      if (groupArea) groupArea.style.display = '';
+      if (listBtn) listBtn.style.display = '';
+    }
   } catch {
     el.textContent = 'No disponible';
   }
