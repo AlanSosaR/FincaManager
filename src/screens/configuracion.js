@@ -22,6 +22,9 @@ export async function renderConfiguracion() {
         <button id="btn-wa-connect" class="btn-m3-primary" style="width:100%;padding:14px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
           <span class="material-icons">qr_code_scanner</span> Conectar WhatsApp
         </button>
+        <button id="btn-wa-test" style="display:none;width:100%;margin-top:8px;padding:14px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;align-items:center;justify-content:center;gap:8px;">
+          <span class="material-icons">send</span> Enviar mensaje de prueba
+        </button>
       </div>
 
       <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
@@ -152,6 +155,16 @@ export function initConfiguracion() {
 
   document.getElementById('btn-wa-connect')?.addEventListener('click', handleWaButtonClick);
 
+  document.getElementById('btn-wa-test')?.addEventListener('click', async () => {
+    const testBtn = document.getElementById('btn-wa-test');
+    testBtn.disabled = true;
+    testBtn.innerHTML = '<span class="material-icons animate-spin">sync</span> Enviando...';
+    await sendWhatsApp('🔔 Mensaje de prueba desde Finca Manager — Conexión WhatsApp funcionando correctamente ✓');
+    testBtn.disabled = false;
+    testBtn.innerHTML = '<span class="material-icons">send</span> Enviar mensaje de prueba';
+    if (window.Snackbar) window.Snackbar.show('Mensaje de prueba enviado ✓');
+  });
+
   document.getElementById('btn-config-download')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-config-download');
     btn.disabled = true;
@@ -188,12 +201,16 @@ async function updateWhatsAppStatus() {
       btn.innerHTML = '<span class="material-icons">link_off</span> Desconectar WhatsApp';
       btn.style.background = '#ff4103';
     }
+    const testBtn = document.getElementById('btn-wa-test');
+    if (testBtn) testBtn.style.display = 'flex';
   } else {
     el.innerHTML = '<span style="color:#ff4103;">✗ Desconectado</span>';
     if (btn) {
       btn.innerHTML = '<span class="material-icons">qr_code_scanner</span> Conectar WhatsApp';
       btn.style.background = '#2d3e2c';
     }
+    const testBtn = document.getElementById('btn-wa-test');
+    if (testBtn) testBtn.style.display = 'none';
   }
 }
 
@@ -207,10 +224,6 @@ function startWaPolling() {
       document.getElementById('wa-qr-area').style.display = 'none';
       localStorage.setItem('wa_connected', 'true');
       autoSelectGroup();
-      if (!localStorage.getItem('wa_test_sent')) {
-        sendWhatsApp('🔔 Mensaje de prueba desde Finca Manager — Conexión WhatsApp funcionando correctamente ✓');
-        localStorage.setItem('wa_test_sent', 'true');
-      }
       if (window.Snackbar) window.Snackbar.show('WhatsApp conectado ✓');
       updateWhatsAppStatus();
     }
