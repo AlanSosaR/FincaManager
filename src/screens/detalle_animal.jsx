@@ -3,6 +3,7 @@ import { Chart, registerables } from 'chart.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
 import { sendWhatsApp } from '../wa.js';
+import { syncTable } from '../sync.js';
 import db from '../db.js';
 
 function getLocalToday() {
@@ -24,16 +25,20 @@ window.confirmVaccine = (vaccineId) => {
                 const vac = vaccines.find(v => v.id === vaccineId);
                 const animal = currentAnimal;
                 if (vac && animal) {
-                    const empresa = await db.empresas?.get(window._currentEmpresaId);
-                    const empresaName = empresa?.nombre || 'Mi Finca';
-                    const dosis = vac.dosis ? ` (${vac.dosis})` : '';
                     sendWhatsApp(
                         `✅ Vacuna Aplicada\nAnimal: ${animal.nombre}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nObservación: ${vac.observaciones || 'N/A'}\nFecha: ${vac.fecha}`
                     );
+                    const today = new Date().toISOString().split('T')[0];
+                    const noted = JSON.parse(localStorage.getItem('wa_notified_vaccines') || '[]');
+                    localStorage.setItem('wa_notified_vaccines', JSON.stringify([...new Set([...noted, vac.id])]));
+                    const sentKey = `wa_sent_today_${today}`;
+                    const sent = JSON.parse(localStorage.getItem(sentKey) || '[]');
+                    localStorage.setItem(sentKey, JSON.stringify([...new Set([...sent, vac.id])]));
                 }
             } catch (waErr) {
                 console.warn('WhatsApp notification failed:', waErr);
             }
+            syncTable('animal_vacunas');
 
             if (currentAnimal) {
                 initDetalleAnimal(currentAnimal.id);

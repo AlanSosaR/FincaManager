@@ -1,4 +1,5 @@
 import db from './db.js';
+import { restFetch } from './auth.js';
 
 const EVOLUTION_API = '/api/wa-proxy';
 const NOTIFIED_KEY = 'wa_notified_vaccines';
@@ -127,8 +128,6 @@ export async function checkPendingVaccines() {
     if (!pending.length) return;
 
     const notified = getNotifiedSet();
-    const empresa = await db.empresas?.get(window._currentEmpresaId);
-    const empresaName = empresa?.nombre || 'Mi Finca';
 
     for (const vac of pending) {
       if (notified.has(vac.id)) continue;
@@ -139,6 +138,13 @@ export async function checkPendingVaccines() {
         const animal = await db.ganado.get(vac.animal_id);
         if (animal?.nombre) animalName = animal.nombre;
       } catch {}
+
+      const serverVac = await restFetch(`animal_vacunas?id=eq.${vac.id}&select=estado`);
+        if (!serverVac || serverVac.length === 0 || serverVac[0].estado !== 'Programada') {
+          notified.add(vac.id);
+          alreadySent.add(vac.id);
+          continue;
+        }
 
       await sendWhatsApp(
         `🔔 RECORDATORIO - Vacuna para Hoy\nAnimal: ${animalName}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nObservación: ${vac.observaciones || 'N/A'}\nFecha: ${vac.fecha}`
