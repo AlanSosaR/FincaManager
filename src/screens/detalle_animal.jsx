@@ -14,37 +14,9 @@ function getLocalToday() {
 Chart.register(...registerables);
 
 /** Generic inline confirmation modal — no dependency on Snackbar.confirm */
-function showConfirmModal(message, onConfirm) {
-    const modalContainer = document.getElementById('modal-container');
-    const modalBody = document.getElementById('modal-body');
-    if (!modalContainer || !modalBody) {
-        // Fallback to native confirm if modal DOM not ready
-        if (window.confirm(message)) onConfirm();
-        return;
-    }
-    modalBody.innerHTML = `
-        <div class="modal-header">
-            <h3>Confirmación</h3>
-            <button class="btn-close" id="confirm-modal-close"><span class="material-icons">close</span></button>
-        </div>
-        <div class="modal-content-body" style="padding:16px 24px 8px">
-            <p style="margin:0 0 20px;font-size:15px;line-height:1.5">${message}</p>
-            <div style="display:flex;gap:12px;justify-content:flex-end;padding-bottom:8px">
-                <button class="m3-btn m3-btn-text" id="confirm-modal-cancel">Cancelar</button>
-                <button class="m3-btn m3-btn-filled" id="confirm-modal-ok" style="background:#2d3e2c;color:#fff">Confirmar</button>
-            </div>
-        </div>
-    `;
-    modalContainer.classList.add('active');
-    const close = () => modalContainer.classList.remove('active');
-    document.getElementById('confirm-modal-close').onclick = close;
-    document.getElementById('confirm-modal-cancel').onclick = close;
-    document.getElementById('confirm-modal-ok').onclick = () => { close(); onConfirm(); };
-    modalContainer.onclick = (e) => { if (e.target === modalContainer) close(); };
-}
 
 window.confirmVaccine = (vaccineId) => {
-    showConfirmModal('¿Confirmar que la vacuna fue aplicada?', async () => {
+    window.Snackbar.confirm('¿Confirmar que la vacuna fue aplicada?', async () => {
         try {
             await restFetch(`/rest/v1/animal_vacunas?id=eq.${vaccineId}`, {
                 method: 'PATCH',
@@ -82,7 +54,7 @@ window.confirmVaccine = (vaccineId) => {
 };
 
 window.cancelVaccine = (vaccineId) => {
-    showConfirmModal('¿Confirmar que la vacuna fue cancelada/no aplicada?', async () => {
+    window.Snackbar.confirm('¿Confirmar que la vacuna fue cancelada/no aplicada?', async () => {
         try {
             await restFetch(`/rest/v1/animal_vacunas?id=eq.${vaccineId}`, {
                 method: 'PATCH',
@@ -99,7 +71,7 @@ window.cancelVaccine = (vaccineId) => {
 };
 
 window.confirmFumigacion = (fumigacionId) => {
-    showConfirmModal('¿Confirmar que la fumigación fue aplicada?', async () => {
+    window.Snackbar.confirm('¿Confirmar que la fumigación fue aplicada?', async () => {
         try {
             await restFetch(`/rest/v1/animal_fumigaciones?id=eq.${fumigacionId}`, {
                 method: 'PATCH',
@@ -116,7 +88,7 @@ window.confirmFumigacion = (fumigacionId) => {
 };
 
 window.cancelFumigacion = (fumigacionId) => {
-    showConfirmModal('¿Confirmar que la fumigación fue cancelada/no aplicada?', async () => {
+    window.Snackbar.confirm('¿Confirmar que la fumigación fue cancelada/no aplicada?', async () => {
         try {
             await restFetch(`/rest/v1/animal_fumigaciones?id=eq.${fumigacionId}`, {
                 method: 'PATCH',
@@ -695,6 +667,7 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         var formData = new FormData(form);
         var selectedDate = formData.get('fecha');
         var obs = formData.get('observaciones')?.trim();
+        var animNombre = currentAnimal ? currentAnimal.nombre : '';
 
         var vacData = {
             animal_id: animalId,
@@ -704,35 +677,22 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         };
         if (obs) vacData.observaciones = obs;
 
-        window.Snackbar.confirm('¿Programar vacuna?', async function() {
-            closeModal();
-            vacData.estado = 'Aplicada';
-            try {
-                const result = await restFetch('/rest/v1/animal_vacunas', {
-                    method: 'POST',
-                    body: JSON.stringify(vacData),
-                    headers: { 'Prefer': 'return=representation' }
-                });
-                var vac = Array.isArray(result) ? result[0] : (result || vacData);
-                var anim = currentAnimal;
-                if (anim && vac) {
-                    sendWhatsApp(
-                        '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha
-                    );
-                    var todayStr = new Date().toISOString().split('T')[0];
-                    var noted = JSON.parse(localStorage.getItem('wa_notified_vaccines') || '[]');
-                    var vacId = vac.id || vacData.animal_id + '_' + Date.now();
-                    localStorage.setItem('wa_notified_vaccines', JSON.stringify([...new Set([...noted, vacId])]));
-                    var sentKey = 'wa_sent_today_' + todayStr;
-                    var sent = JSON.parse(localStorage.getItem(sentKey) || '[]');
-                    localStorage.setItem(sentKey, JSON.stringify([...new Set([...sent, vacId])]));
+        closeModal();
+        window.Snackbar.confirm(
+            'Se programó vacuna ' + vacData.nombre + ' para ' + animNombre + ' el ' + selectedDate,
+            async function() {
+                vacData.estado = 'Programada';
+                try {
+                    await restInsert('/rest/v1/animal_vacunas', vacData);
+                    showSnackbar('Vacuna programada');
+                    await loadAllData(animalId, document.getElementById('da-container'));
+                } catch (err) {
+                    showSnackbar(err.message, 'error');
                 }
-                showSnackbar('Vacuna aplicada');
-                await loadAllData(animalId, document.getElementById('da-container'));
-            } catch (err) {
-                showSnackbar(err.message, 'error');
-            }
-        });
+            },
+            null,
+            { confirmText: 'Aceptar', cancelText: false }
+        );
     };
 }
 
