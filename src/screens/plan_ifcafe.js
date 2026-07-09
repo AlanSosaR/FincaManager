@@ -10,9 +10,26 @@ function getLocalToday() {
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export async function renderPlanIfcafe(filterLoteId) {
-  const empresaId = window._currentEmpresaId;
+  let empresaId = window._currentEmpresaId;
   if (!empresaId) {
-    return `<div class="m3-p-4 m3-text-center"><p class="m3-label-medium m3-text-on-surface-variant">Cargando...</p></div>`;
+    empresaId = localStorage.getItem('current_empresa_id');
+  }
+  if (!empresaId) {
+    try {
+      const user = await (await import('../auth.js')).getUser();
+      if (user?.id) {
+        const data = await (await import('../auth.js')).restFetch(`/rest/v1/usuario_empresas?usuario_id=eq.${encodeURIComponent(user.id)}&select=empresa_id`);
+        if (data && data.length > 0) {
+          empresaId = data[0].empresa_id;
+          localStorage.setItem('current_empresa_id', empresaId);
+        }
+      }
+    } catch (e) {
+      console.warn('empresa recovery in plan_ifcafe failed:', e);
+    }
+  }
+  if (!empresaId) {
+    return `<div class="m3-p-8 m3-text-center"><p class="m3-label-medium m3-text-on-surface-variant">No se encontró la empresa. Ve al Dashboard primero.</p></div>`;
   }
   try {
     let lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*&order=nombre.asc`);
