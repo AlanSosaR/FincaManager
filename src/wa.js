@@ -114,8 +114,13 @@ export async function sendWhatsApp(mensaje) {
   }
 }
 
+function getLocalToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export async function checkPendingVaccines() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalToday();
   const sentKey = `${SENT_TODAY_KEY}_${today}`;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
   try {
