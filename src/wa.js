@@ -119,10 +119,7 @@ export async function checkPendingVaccines() {
   const sentKey = `${SENT_TODAY_KEY}_${today}`;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
   try {
-    const vaccines = await db.animal_vacunas
-      .where('fecha')
-      .equals(today)
-      .toArray();
+    const vaccines = await restFetch(`animal_vacunas?fecha=eq.${today}&select=*`);
 
     const pending = vaccines.filter(v => v.estado === 'Programada');
     if (!pending.length) return;
