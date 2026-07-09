@@ -1608,6 +1608,11 @@ export async function setupNuevoLoteListeners() {
         console.log('[nuevo_lote] INSERT - creating new lote');
         const inserted = await restInsert('/rest/v1/lotes', data);
         newLoteId = inserted?.id;
+        // If restInsert didn't return an id (no Location header), query by name + empresa_id
+        if (!newLoteId && data.nombre) {
+          const busca = await restFetch(`/rest/v1/lotes?nombre=eq.${encodeURIComponent(data.nombre)}&empresa_id=eq.${data.empresa_id}&select=id&order=created_at.desc&limit=1`);
+          newLoteId = busca?.[0]?.id;
+        }
       }
       
       if (!newLoteId) throw new Error('No se pudo crear/actualizar el lote');
