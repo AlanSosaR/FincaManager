@@ -77,17 +77,8 @@ export async function renderConfiguracion() {
 let waPollInterval = null;
 
 async function connectOrRecreate() {
-  try {
-    await createInstance();
-  } catch (createErr) {
-    if (createErr.message?.includes('already in use')) {
-      console.log('Instancia existe pero puede tener config incorrecta. Recreando...');
-      await deleteInstance();
-      await createInstance();
-    } else {
-      throw createErr;
-    }
-  }
+  await deleteInstance();
+  await createInstance();
   return getQR();
 }
 

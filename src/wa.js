@@ -47,8 +47,15 @@ export async function createInstance() {
 
 export async function deleteInstance() {
   const name = getInstanceName();
-  const res = await waFetch(`instance/delete/${name}`, { method: 'DELETE' });
-  return res.json();
+  try {
+    const res = await waFetch(`instance/delete/${name}`, { method: 'DELETE' });
+    return res.json();
+  } catch (e) {
+    if (e.message?.includes('404') || e.message?.includes('instance does not exist')) {
+      return { deleted: true };
+    }
+    throw e;
+  }
 }
 
 export async function getQR() {
