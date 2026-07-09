@@ -1,5 +1,10 @@
 import { supabase } from '../supabase.js';
 import { getPaginationFooterHtml } from '../pagination.js';
+import { calcularDosis } from '../utils/calculadora_dosis.js';
+
+function calcDosis(edadCat, numPlantas) {
+  try { return calcularDosis(edadCat, numPlantas); } catch { return { porAplicacion: { vasitoLabel: 'N/A', onzas: 0, gramos: 0, fraccion: 0 } }; }
+}
 
 const LOTES_PAGE_SIZE = 4;
 let currentLotesPage = 1;
@@ -152,6 +157,18 @@ export async function renderDashboard(page) {
                           </div>
                         </div>
                         <h3 class="m3-exp-card-title">${lote.nombre}</h3>
+                        ${lote.edad_categoria ? (() => {
+                          const dosisCalc = calcDosis(lote.edad_categoria, lote.num_plantas || 0);
+                          return `
+                          <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span class="m3-label-small m3-font-bold m3-px-2 m3-py-1 m3-rounded-full" style="background: #f0f7e6; color: #2d3e2c; font-size: 10px;">
+                              🥤 ${dosisCalc.porAplicacion.vasitoLabel}
+                            </span>
+                            <span class="m3-label-small m3-px-2 m3-py-1 m3-rounded-full" style="background: #fff3e0; color: #e65100; font-size: 10px;">
+                              ${lote.salud_porcentaje || 100}% salud
+                            </span>
+                          </div>`;
+                        })() : ''}
                         <div class="m3-exp-card-details">
                           <div class="m3-exp-detail-item">
                             <img src="sprouts.png" alt="" style="width: 18px; height: 18px; object-fit: contain;">

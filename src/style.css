@@ -1159,3 +1159,22 @@ body.screen-auth #app .main-content {
     width: auto;
   }
 }
+
+.vasito-container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background: #fafafa;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.vasito-svg {
+  display: block;
+}
+
+.vasito-compacto {
+  display: inline-block;
+  vertical-align: middle;
+}

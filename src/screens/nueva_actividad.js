@@ -1,4 +1,7 @@
 import { supabase } from '../supabase.js';
+import { sendWhatsApp } from '../wa.js';
+import { getDosisPorEdad, calcularDosis } from '../utils/calculadora_dosis.js';
+import { dibujarVasitoCompacto } from '../utils/vasito_medidor.js';
 
 const methodOptionsByType = {
   'Fertilizante': ['Al voleo', 'Foliar', 'Fertirriego', 'Enterrado'],
@@ -70,11 +73,21 @@ export async function renderNuevaActividad(loteId, tipo) {
               <label>Nombre del Producto</label>
             </div>
 
-            <!-- 4. Dosis -->
+<!-- 4. Dosis (with IFCAFE suggestion) -->
             <div class="m3-field" id="field-dosis">
               <input type="text" name="dosis" placeholder="${ph.dosis}">
               <label>Dosis</label>
             </div>
+          </div>
+
+          <!-- IFCAFE dosage suggestion bar (only for Fertilizante when lot has edad_categoria) -->
+          <div id="ifcafe-sugerencia-dosis" style="display: none; margin: -12px 0 16px 0; padding: 12px 14px; background: #f0f7e6; border-radius: 12px; border: 1px solid #c8e6c9;">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+              <div style="font-size:13px; font-weight:600; color:#2d3e2c;">💡 Sugerencia IFCAFE 2026</div>
+              <div id="sugerencia-vasito"></div>
+              <div id="sugerencia-texto" style="font-size:12px; color:#4a6b48;"></div>
+            </div>
+          </div>
 
             <!-- 5. Tipo de equipo usado (Conditional for Limpieza - Manual) -->
             <div class="m3-field" id="field-equipo" style="display: none;">
@@ -399,6 +412,28 @@ export function initNuevaActividad(loteId, tipo) {
     if (fechaLabel) fechaLabel.textContent = 'Fecha de Muestreo';
   }
 
+  // IFCAFE sugerencia de dosis (only for Fertilizante)
+  if (tipo === 'Fertilizante') {
+    (async () => {
+      try {
+        const { data: lote } = await supabase.from('lotes').select('edad_categoria, num_plantas').eq('id', loteId).single();
+        if (lote?.edad_categoria) {
+          const dosisCalc = calcularDosis(lote.edad_categoria, lote.num_plantas || 0);
+          const sugerenciaEl = document.getElementById('ifcafe-sugerencia-dosis');
+          const vasitoEl = document.getElementById('sugerencia-vasito');
+          const textoEl = document.getElementById('sugerencia-texto');
+          if (sugerenciaEl && vasitoEl && textoEl) {
+            sugerenciaEl.style.display = 'block';
+            vasitoEl.innerHTML = dibujarVasitoCompacto(dosisCalc.porAplicacion.fraccion);
+            textoEl.textContent = `${dosisCalc.porAplicacion.vasitoLabel} (${dosisCalc.porAplicacion.gramos}g/planta) — ${dosisCalc.totalSacos} sacos para ${lote.num_plantas} plantas`;
+          }
+        }
+      } catch (err) {
+        console.warn('IFCAFE dosage suggestion unavailable:', err);
+      }
+    })();
+  }
+
   // 2. MULTIPLE OPERATORS UX LOGIC
   const listOperadores = [];
   const inputOperador = document.getElementById('operador-input');
@@ -497,6 +532,17 @@ export function initNuevaActividad(loteId, tipo) {
     try {
       const { error } = await supabase.from('lote_aplicaciones').insert([data]);
       if (error) throw error;
+
+      // Send WhatsApp notification for fertilizer applications
+      if (tipo === 'Fertilizante') {
+        try {
+          const { data: lote } = await supabase.from('lotes').select('nombre').eq('id', loteId).single();
+          const msg = `🧪 Aplicación registrada\n\nLote: ${lote?.nombre || '—'}\nProducto: ${data.producto || '—'}\nDosis: ${data.dosis || '—'}\nMétodo: ${data.metodo || '—'}\nOperador: ${data.operador || '—'}`;
+          sendWhatsApp(msg);
+        } catch (waErr) {
+          console.warn('WhatsApp notification skipped:', waErr);
+        }
+      }
 
       window.Snackbar.show('Actividad registrada');
       window.clearScreenCache?.('detalle_lote');
