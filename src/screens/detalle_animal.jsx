@@ -173,30 +173,23 @@ export async function initDetalleAnimal(animalId, flag) {
 
 async function loadAllData(animalId, container, flag) {
     try {
-        const { data: animalData, error: animalError } = await supabase
-            .from('ganado')
-            .select('*, potreros(nombre)')
-            .eq('id', animalId)
-            .single();
+        // Fetch animal with potrero name via join
+        const [animalArr, vaccinesData, weightsData, fumigData, ventaData] = await Promise.all([
+            restFetch(`/rest/v1/ganado?id=eq.${animalId}&select=*,potreros(nombre)&limit=1`),
+            restFetch(`/rest/v1/animal_vacunas?animal_id=eq.${animalId}&order=fecha.desc`),
+            restFetch(`/rest/v1/animal_pesajes?animal_id=eq.${animalId}&order=fecha.asc`),
+            restFetch(`/rest/v1/animal_fumigaciones?animal_id=eq.${animalId}&order=fecha.desc`),
+            restFetch(`/rest/v1/animal_ventas?animal_id=eq.${animalId}&order=fecha_venta.desc&limit=1`),
+        ]);
 
-        if (animalError) throw animalError;
+        const animalData = Array.isArray(animalArr) ? animalArr[0] : animalArr;
+        if (!animalData) throw new Error('Animal no encontrado');
         currentAnimal = animalData;
 
-        const { data: vaccinesData } = await supabase
-            .from('animal_vacunas')
-            .select('*')
-            .eq('animal_id', animalId)
-            .order('fecha', { ascending: false });
-        
-        vaccines = vaccinesData || [];
+        vaccines = Array.isArray(vaccinesData) ? vaccinesData : [];
+        weights  = Array.isArray(weightsData)  ? weightsData  : [];
+        fumigaciones = Array.isArray(fumigData) ? fumigData   : [];
 
-        const { data: weightsData } = await supabase
-            .from('animal_pesajes')
-            .select('*')
-            .eq('animal_id', animalId)
-            .order('fecha', { ascending: true });
-
-        weights = weightsData || [];
         if (weights.length >= 2) {
             const latest = weights[weights.length - 1];
             const previous = weights[weights.length - 2];
@@ -214,26 +207,13 @@ async function loadAllData(animalId, container, flag) {
             weightTrend = 'neutral';
         }
 
-        const { data: fumigData } = await supabase
-            .from('animal_fumigaciones')
-            .select('*')
-            .eq('animal_id', animalId)
-            .order('fecha', { ascending: false });
-        
-        fumigaciones = fumigData || [];
-
-        const { data: ventaData } = await supabase
-            .from('animal_ventas')
-            .select('*')
-            .eq('animal_id', animalId)
-            .order('fecha_venta', { ascending: false })
-            .maybeSingle();
-
-        if (ventaData) {
-            animalData.precio_venta = ventaData.precio_venta;
-            animalData.fecha_venta = ventaData.fecha_venta;
-            animalData.comprador = ventaData.comprador;
-            animalData.peso_venta = ventaData.peso_venta;
+        const ventaArr = Array.isArray(ventaData) ? ventaData : (ventaData ? [ventaData] : []);
+        if (ventaArr.length > 0) {
+            const v = ventaArr[0];
+            animalData.precio_venta = v.precio_venta;
+            animalData.fecha_venta  = v.fecha_venta;
+            animalData.comprador    = v.comprador;
+            animalData.peso_venta   = v.peso_venta;
         }
 
         // Reset pagination when fresh data is loaded
@@ -253,6 +233,7 @@ async function loadAllData(animalId, container, flag) {
         `;
     }
 }
+
 
 function renderFullContent(container, animalId, flag) {
     const isSold = currentAnimal.estado === 'Vendido';
