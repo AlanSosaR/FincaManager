@@ -667,7 +667,6 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         var formData = new FormData(form);
         var selectedDate = formData.get('fecha');
         var obs = formData.get('observaciones')?.trim();
-        var animNombre = currentAnimal ? currentAnimal.nombre : '';
 
         var vacData = {
             animal_id: animalId,
@@ -677,41 +676,28 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         };
         if (obs) vacData.observaciones = obs;
 
-        closeModal();
-        var confirmBox = document.createElement('div');
-        confirmBox.id = 'custom-snackbar-confirm';
-        confirmBox.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10001;background:#313033;color:#f4eff4;border-radius:24px;padding:24px;max-width:600px;width:calc(100% - 48px);box-shadow:0 4px 12px rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.05);display:flex;flex-direction:column;gap:20px;';
-        confirmBox.innerHTML = '<div style="font-size:14px;font-weight:500;line-height:20px;">Se programó vacuna ' + vacData.nombre + ' para ' + animNombre + ' el ' + selectedDate + '</div><div style="display:flex;gap:8px;align-self:flex-end;"><button id="custom-confirm-cancel" style="background:transparent;border:none;color:#f4eff4;font-size:14px;font-weight:600;cursor:pointer;padding:8px 12px;border-radius:8px;">Cancelar</button><button id="custom-confirm-ok" style="background:#d0bcff;border:none;color:#381e72;font-size:14px;font-weight:600;cursor:pointer;padding:8px 12px;border-radius:8px;">Confirmar</button></div>';
+        var today = getLocalToday();
+        var isTodayOrPast = selectedDate <= today;
+        vacData.estado = isTodayOrPast ? 'Aplicada' : 'Programada';
 
-        document.getElementById('snackbar-container').appendChild(confirmBox);
-        document.getElementById('custom-confirm-cancel').onclick = function() { confirmBox.remove(); };
-        document.getElementById('custom-confirm-ok').onclick = async function() {
-            confirmBox.remove();
-            vacData.estado = 'Aplicada';
-            try {
-                const result = await restFetch('/rest/v1/animal_vacunas', {
-                    method: 'POST',
-                    body: JSON.stringify(vacData),
-                    headers: { 'Prefer': 'return=representation' }
-                });
-                var vac = Array.isArray(result) ? result[0] : result;
-                var anim = currentAnimal;
-                if (anim && vac) {
-                    var jid = localStorage.getItem('whatsapp_group_jid');
-                    if (!jid) {
-                        showSnackbar('WhatsApp no configurado. Ve a Configuración → WhatsApp', 'error');
-                    } else {
-                        sendWhatsApp(
-                            '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
-                        );
-                    }
-                }
-                showSnackbar('Vacuna aplicada');
-                await loadAllData(animalId, document.getElementById('da-container'));
-            } catch (err) {
-                showSnackbar(err.message, 'error');
+        closeModal();
+        restFetch('/rest/v1/animal_vacunas', {
+            method: 'POST',
+            body: JSON.stringify(vacData),
+            headers: { 'Prefer': 'return=representation' }
+        }).then(function(result) {
+            var vac = Array.isArray(result) ? result[0] : result;
+            var anim = currentAnimal;
+            if (isTodayOrPast && anim && vac) {
+                sendWhatsApp(
+                    '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
+                );
             }
-        };
+            showSnackbar(isTodayOrPast ? 'Vacuna aplicada' : 'Vacuna programada');
+            loadAllData(animalId, document.getElementById('da-container'));
+        }).catch(function(err) {
+            showSnackbar(err.message, 'error');
+        });
     };
 }
 
