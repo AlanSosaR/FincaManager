@@ -3,6 +3,17 @@ import './components.css';
 import './pickers.css';
 import './detalle_motor.css';
 import './snackbar.js';
+
+// Force-unregister any existing Service Worker so fresh JS is always loaded
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var i = 0; i < registrations.length; i++) {
+            registrations[i].unregister();
+        }
+    });
+    navigator.serviceWorker.register = function() { return Promise.reject('SW disabled'); };
+}
+
 import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
