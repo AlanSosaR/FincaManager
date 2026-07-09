@@ -33,8 +33,9 @@ function buildHeaders(headersOverrides = {}) {
 }
 
 async function restFetch(path, options = {}) {
+  const fullPath = path.startsWith('/') ? path : `/rest/v1/${path}`;
   const headers = buildHeaders({ Prefer: 'return=representation', ...options.headers });
-  const res = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${SUPABASE_URL}${fullPath}`, { ...options, headers });
   const body = res.headers.get('content-type')?.includes('application/json') ? await res.json() : null;
   if (!res.ok) {
     if (res.status === 406) return [];
@@ -48,8 +49,9 @@ async function restFetch(path, options = {}) {
 }
 
 async function restInsert(path, body) {
+  const fullPath = path.startsWith('/') ? path : `/rest/v1/${path}`;
   const headers = buildHeaders();
-  const res = await fetch(`${SUPABASE_URL}${path}`, {
+  const res = await fetch(`${SUPABASE_URL}${fullPath}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),

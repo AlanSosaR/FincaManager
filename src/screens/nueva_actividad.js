@@ -531,9 +531,11 @@ export function initNuevaActividad(loteId, tipo) {
         : JSON.stringify(soilData, null, 2);
     }
 
+    data.empresa_id = window._currentEmpresaId;
+
     try {
       // Use restInsert for lote_aplicaciones (no .select needed)
-      const insertResult = await restInsert('lote_aplicaciones', data);
+      const insertResult = await restInsert('/rest/v1/lote_aplicaciones', data);
       if (!insertResult) throw new Error('Error al guardar actividad');
 
       // Send WhatsApp notification for fertilizer applications

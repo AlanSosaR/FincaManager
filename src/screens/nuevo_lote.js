@@ -1439,7 +1439,7 @@ export async function setupNuevoLoteListeners() {
   let editingLote = window.__currentLoteData;
   if (loteId && (!editingLote || editingLote.id !== loteId)) {
     try {
-      const lotes = await restFetch(`lotes?id=eq.${loteId}&select=*`);
+      const lotes = await restFetch(`/rest/v1/lotes?id=eq.${loteId}&select=*`);
       const data = lotes?.[0];
       if (data) {
         window.__currentLoteData = data;
@@ -1592,19 +1592,21 @@ export async function setupNuevoLoteListeners() {
       });
     }
 
+    data.empresa_id = window._currentEmpresaId;
+
     try {
       let newLoteId = null;
       const submitLoteId = loteId || window.__currentLoteData?.id || null;
       if (submitLoteId) {
         console.log('[nuevo_lote] UPDATE - loteId:', submitLoteId);
-        await restFetch(`lotes?id=eq.${submitLoteId}`, {
+        await restFetch(`/rest/v1/lotes?id=eq.${submitLoteId}`, {
           method: 'PATCH',
           body: JSON.stringify(data)
         });
         newLoteId = submitLoteId;
       } else {
         console.log('[nuevo_lote] INSERT - creating new lote');
-        const inserted = await restInsert('lotes', data);
+        const inserted = await restInsert('/rest/v1/lotes', data);
         newLoteId = inserted?.id;
       }
       
@@ -1637,7 +1639,7 @@ export async function setupNuevoLoteListeners() {
           });
 
           for (const app of aplicaciones) {
-            await restInsert('lote_aplicaciones', app);
+            await restInsert('/rest/v1/lote_aplicaciones', app);
           }
 
           const zonaLabel = getZonaLabel(altura);
