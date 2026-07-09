@@ -78,6 +78,25 @@ window.confirmFumigacion = (fumigacionId) => {
                 body: JSON.stringify({ estado: 'Aplicada' }),
             });
             showSnackbar('Fumigación confirmada');
+
+            const fum = fumigaciones.find(f => f.id === fumigacionId);
+            if (fum && currentAnimal) {
+                sendWhatsApp(
+                    '✅ Fumigación Aplicada\nAnimal: ' + currentAnimal.nombre +
+                    '\nProducto: ' + fum.producto +
+                    '\nDosis: ' + (fum.dosis || 'N/A') +
+                    '\nObservación: ' + (fum.observaciones || 'N/A') +
+                    '\nFecha: ' + fum.fecha +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+                const today = new Date().toISOString().split('T')[0];
+                const noted = JSON.parse(localStorage.getItem('wa_notified_fumigaciones') || '[]');
+                localStorage.setItem('wa_notified_fumigaciones', JSON.stringify([...new Set([...noted, fum.id])]));
+                const sentKey = 'wa_sent_fumig_today_' + today;
+                const sent = JSON.parse(localStorage.getItem(sentKey) || '[]');
+                localStorage.setItem(sentKey, JSON.stringify([...new Set([...sent, fum.id])]));
+            }
+
             if (currentAnimal) {
                 initDetalleAnimal(currentAnimal.id);
             }
@@ -501,6 +520,16 @@ function setupEventListeners(animalId, container, sellMode) {
                 });
                 showSnackbar('Venta registrada');
 
+                if (currentAnimal) {
+                    sendWhatsApp(
+                        '💰 Animal Vendido\nAnimal: ' + currentAnimal.nombre +
+                        '\nPrecio: $' + parseFloat(precio) +
+                        '\nFecha: ' + document.getElementById('sell-fecha').value +
+                        '\nComprador: ' + (document.getElementById('sell-comprador').value || 'N/A') +
+                        '\nFinca: ' + (window._empresaNombre || '')
+                    );
+                }
+
                 currentAnimal.estado = 'Vendido';
                 currentAnimal.precio_venta = parseFloat(precio);
                 currentAnimal.fecha_venta = document.getElementById('sell-fecha').value;
@@ -727,11 +756,22 @@ async function handleAddWeight(animalId) {
         const formData = new FormData(e.target);
         try {
             const pesoVal = formData.get('peso');
+            const fechaPeso = formData.get('fecha');
             await restInsert('/rest/v1/animal_pesajes', {
                 animal_id: animalId,
                 peso: pesoVal,
-                fecha: formData.get('fecha')
+                fecha: fechaPeso
             });
+
+            if (currentAnimal) {
+                sendWhatsApp(
+                    '⚖️ Peso Registrado\nAnimal: ' + currentAnimal.nombre +
+                    '\nPeso: ' + pesoVal + ' ' + (currentAnimal.peso_unidad || 'kg') +
+                    '\nFecha: ' + fechaPeso +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+            }
+
             showSnackbar('Pesaje registrado');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
@@ -773,17 +813,35 @@ async function handleAddFumigacion(animalId, defaultDate = null) {
         try {
             const selectedDate = formData.get('fecha');
             const today = getLocalToday();
-            const estadoVal = 'Programada';
+            const isTodayOrPast = selectedDate <= today;
+            const estadoVal = isTodayOrPast ? 'Aplicada' : 'Programada';
 
-            await restInsert('/rest/v1/animal_fumigaciones', {
-                animal_id: animalId,
-                producto: formData.get('producto'),
-                fecha: selectedDate,
-                dosis: formData.get('dosis'),
-                observaciones: formData.get('observaciones'),
-                estado: estadoVal
+            const result = await restFetch('/rest/v1/animal_fumigaciones', {
+                method: 'POST',
+                body: JSON.stringify({
+                    animal_id: animalId,
+                    producto: formData.get('producto'),
+                    fecha: selectedDate,
+                    dosis: formData.get('dosis'),
+                    observaciones: formData.get('observaciones'),
+                    estado: estadoVal
+                }),
+                headers: { 'Prefer': 'return=representation' }
             });
-            showSnackbar('Fumigación registrada');
+            const fum = Array.isArray(result) ? result[0] : result;
+
+            if (isTodayOrPast && currentAnimal && fum) {
+                sendWhatsApp(
+                    '✅ Fumigación Aplicada\nAnimal: ' + currentAnimal.nombre +
+                    '\nProducto: ' + fum.producto +
+                    '\nDosis: ' + (fum.dosis || 'N/A') +
+                    '\nObservación: ' + (fum.observaciones || 'N/A') +
+                    '\nFecha: ' + fum.fecha +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+            }
+
+            showSnackbar(isTodayOrPast ? 'Fumigación aplicada' : 'Fumigación programada');
             closeModal();
             loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) { showSnackbar(err.message, 'error'); }
@@ -979,47 +1037,54 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo 
         );
     };
 
-    document.getElementById('form-inline-vaccine').onsubmit = async (e) => {
+    document.getElementById('form-inline-vaccine').onsubmit = (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
-        try {
-            const selectedDate = formData.get('fecha');
-            if (tipo === 'Registrar' && selectedDate > getLocalToday()) {
-                showSnackbar('No puedes registrar una vacuna en una fecha futura. Usa "Programar" en su lugar.', 'error');
-                return;
-            }
-            const estadoVal = tipo === 'Registrar' ? 'Aplicada' : 'Programada';
-
-            const payload = {
-                animal_id: animalId,
-                nombre: formData.get('nombre'),
-                fecha: selectedDate,
-                estado: estadoVal
-            };
-            const dosis = formData.get('dosis')?.trim();
-            if (dosis) payload.dosis = dosis;
-            const obs = formData.get('observaciones')?.trim();
-            if (obs) payload.observaciones = obs;
-            await restInsert('/rest/v1/animal_vacunas', payload);
-
-            showSnackbar(tipo === 'Registrar' ? 'Vacuna registrada ✓' : 'Vacuna programada ✓');
-
-            if (tipo === 'Registrar' && currentAnimal) {
-                sendWhatsApp(
-                    '✅ Vacuna Aplicada\nAnimal: ' + currentAnimal.nombre +
-                    '\nVacuna: ' + payload.nombre +
-                    '\nDosis: ' + (payload.dosis || 'N/A') +
-                    '\nObservación: ' + (payload.observaciones || 'N/A') +
-                    '\nFecha: ' + payload.fecha +
-                    '\nFinca: ' + (window._empresaNombre || '')
-                );
-            }
-
-            await loadAllData(animalId, document.getElementById('da-container'));
-        } catch (err) {
-            console.error(err);
-            showSnackbar(err.message, 'error');
+        const selectedDate = formData.get('fecha');
+        if (tipo === 'Registrar' && selectedDate > getLocalToday()) {
+            showSnackbar('No puedes registrar una vacuna en una fecha futura. Usa "Programar" en su lugar.', 'error');
+            return;
         }
+        const estadoVal = tipo === 'Registrar' ? 'Aplicada' : 'Programada';
+
+        const payload = {
+            animal_id: animalId,
+            nombre: formData.get('nombre'),
+            fecha: selectedDate,
+            estado: estadoVal
+        };
+        const dosis = formData.get('dosis')?.trim();
+        if (dosis) payload.dosis = dosis;
+        const obs = formData.get('observaciones')?.trim();
+        if (obs) payload.observaciones = obs;
+
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateStr = new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', dateOptions);
+        const confirmMsg = `¿Deseas ${tipo === 'Registrar' ? 'registrar' : 'programar'} esta vacuna para el ${dateStr}?`;
+
+        window.Snackbar.confirm(confirmMsg, async () => {
+            try {
+                await restInsert('/rest/v1/animal_vacunas', payload);
+
+                showSnackbar(tipo === 'Registrar' ? 'Vacuna registrada ✓' : 'Vacuna programada ✓');
+
+                if (tipo === 'Registrar' && currentAnimal) {
+                    sendWhatsApp(
+                        '✅ Vacuna Aplicada\nAnimal: ' + currentAnimal.nombre +
+                        '\nVacuna: ' + payload.nombre +
+                        '\nDosis: ' + (payload.dosis || 'N/A') +
+                        '\nObservación: ' + (payload.observaciones || 'N/A') +
+                        '\nFecha: ' + payload.fecha +
+                        '\nFinca: ' + (window._empresaNombre || '')
+                    );
+                }
+
+                await loadAllData(animalId, document.getElementById('da-container'));
+            } catch (err) {
+                console.error(err);
+                showSnackbar(err.message, 'error');
+            }
+        }, { confirmLabel: 'Aceptar', cancelLabel: 'Cancelar' });
     };
 }
 
@@ -1064,36 +1129,54 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = [], tipo = 
         showDayDetailsFumig(day, existingEvents);
     };
 
-    document.getElementById('form-inline-fumig').onsubmit = async (e) => {
+    document.getElementById('form-inline-fumig').onsubmit = (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
-        try {
-            const selectedDate = formData.get('fecha');
-            if (tipo === 'Registrar' && selectedDate > getLocalToday()) {
-                showSnackbar('No puedes registrar una fumigación en una fecha futura. Usa "Programar" en su lugar.', 'error');
-                return;
-            }
-            const estadoVal = tipo === 'Registrar' ? 'Aplicada' : 'Programada';
-
-            const payload = {
-                animal_id: animalId,
-                producto: formData.get('producto'),
-                fecha: selectedDate,
-                estado: estadoVal
-            };
-            const dosis = formData.get('dosis')?.trim();
-            if (dosis) payload.dosis = dosis;
-            const obs = formData.get('observaciones')?.trim();
-            if (obs) payload.observaciones = obs;
-
-            await restInsert('/rest/v1/animal_fumigaciones', payload);
-
-            showSnackbar(tipo === 'Registrar' ? 'Fumigación registrada ✓' : 'Fumigación programada ✓');
-            await loadAllData(animalId, document.getElementById('da-container'));
-        } catch (err) {
-            console.error(err);
-            showSnackbar(err.message, 'error');
+        const selectedDate = formData.get('fecha');
+        if (tipo === 'Registrar' && selectedDate > getLocalToday()) {
+            showSnackbar('No puedes registrar una fumigación en una fecha futura. Usa "Programar" en su lugar.', 'error');
+            return;
         }
+        const estadoVal = tipo === 'Registrar' ? 'Aplicada' : 'Programada';
+
+        const payload = {
+            animal_id: animalId,
+            producto: formData.get('producto'),
+            fecha: selectedDate,
+            estado: estadoVal
+        };
+        const dosis = formData.get('dosis')?.trim();
+        if (dosis) payload.dosis = dosis;
+        const obs = formData.get('observaciones')?.trim();
+        if (obs) payload.observaciones = obs;
+
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateStr = new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', dateOptions);
+        const confirmMsg = `¿Deseas ${tipo === 'Registrar' ? 'registrar' : 'programar'} esta fumigación para el ${dateStr}?`;
+
+        window.Snackbar.confirm(confirmMsg, async () => {
+            try {
+                await restInsert('/rest/v1/animal_fumigaciones', payload);
+
+                showSnackbar(tipo === 'Registrar' ? 'Fumigación registrada ✓' : 'Fumigación programada ✓');
+
+                if (tipo === 'Registrar' && currentAnimal) {
+                    sendWhatsApp(
+                        '✅ Fumigación Aplicada\nAnimal: ' + currentAnimal.nombre +
+                        '\nProducto: ' + payload.producto +
+                        '\nDosis: ' + (payload.dosis || 'N/A') +
+                        '\nObservación: ' + (payload.observaciones || 'N/A') +
+                        '\nFecha: ' + payload.fecha +
+                        '\nFinca: ' + (window._empresaNombre || '')
+                    );
+                }
+
+                await loadAllData(animalId, document.getElementById('da-container'));
+            } catch (err) {
+                console.error(err);
+                showSnackbar(err.message, 'error');
+            }
+        }, { confirmLabel: 'Aceptar', cancelLabel: 'Cancelar' });
     };
 }
 
@@ -1140,11 +1223,22 @@ function showInlineWeightForm(animalId) {
         const formData = new FormData(e.target);
         try {
             const pesoVal = formData.get('peso');
+            const fechaPeso = formData.get('fecha');
             await restInsert('/rest/v1/animal_pesajes', {
                 animal_id: animalId,
                 peso: pesoVal,
-                fecha: formData.get('fecha')
+                fecha: fechaPeso
             });
+
+            if (currentAnimal) {
+                sendWhatsApp(
+                    '⚖️ Peso Registrado\nAnimal: ' + currentAnimal.nombre +
+                    '\nPeso: ' + pesoVal + ' ' + (currentAnimal.peso_unidad || 'kg') +
+                    '\nFecha: ' + fechaPeso +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+            }
+
             showSnackbar('Pesaje registrado ✓');
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {

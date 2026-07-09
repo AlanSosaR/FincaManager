@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { restFetch } from '../auth.js';
+import { sendWhatsApp } from '../wa.js';
 
 export async function renderNuevoAnimal(id) {
   const isEdit = !!id;
@@ -297,6 +298,19 @@ export function initNuevoAnimal(id) {
       }
 
       window.Snackbar.show(id ? 'Cambios guardados exitosamente' : 'Animal registrado exitosamente');
+
+      if (!id) {
+        const animalName = data.nombre || 'Nuevo animal';
+        const potreroName = data.potrero_id ? '' : '';
+        sendWhatsApp(
+          '🐄 Nuevo Animal Registrado\nNombre: ' + animalName +
+          '\nIdentificación: ' + (data.caravana || data.arete || 'N/A') +
+          '\nRaza: ' + (data.raza || 'N/A') +
+          '\nCategoría: ' + (data.categoria || 'N/A') +
+          '\nFinca: ' + (window._empresaNombre || '')
+        );
+      }
+
       if (id) {
         window.navigateTo('detalle_animal', newId || id);
       } else {

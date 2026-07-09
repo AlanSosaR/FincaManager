@@ -4,6 +4,8 @@ import { restFetch } from './auth.js';
 const EVOLUTION_API = '/api/wa-proxy';
 const NOTIFIED_KEY = 'wa_notified_vaccines';
 const SENT_TODAY_KEY = 'wa_sent_today';
+const NOTIFIED_FUMIG_KEY = 'wa_notified_fumigaciones';
+const SENT_FUMIG_TODAY_KEY = 'wa_sent_fumig_today';
 
 function getInstanceName() {
   const empresaId = window._currentEmpresaId || 'default';
@@ -160,5 +162,125 @@ export async function checkPendingVaccines() {
     localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
   } catch (e) {
     console.warn('checkPendingVaccines error:', e);
+  }
+}
+
+export async function checkPendingFumigaciones() {
+  const today = getLocalToday();
+  const sentKey = `${SENT_FUMIG_TODAY_KEY}_${today}`;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const fumigaciones = await restFetch(`/rest/v1/animal_fumigaciones?fecha=eq.${today}&select=*`);
+    const pending = fumigaciones.filter(f => f.estado === 'Programada');
+    if (!pending.length) return;
+
+    const notified = getFumigNotifiedSet();
+
+    for (const fum of pending) {
+      if (notified.has(fum.id)) continue;
+      if (alreadySent.has(fum.id)) continue;
+
+      let animalName = `Animal #${fum.animal_id?.substring(0, 6) || '?'}`;
+      try {
+        const animal = await db.ganado.get(fum.animal_id);
+        if (animal?.nombre) animalName = animal.nombre;
+      } catch {}
+
+      const serverFum = await restFetch(`/rest/v1/animal_fumigaciones?id=eq.${fum.id}&select=estado`);
+      if (!serverFum || serverFum.length === 0 || serverFum[0].estado !== 'Programada') {
+        notified.add(fum.id);
+        alreadySent.add(fum.id);
+        continue;
+      }
+
+      await sendWhatsApp(
+        `🔔 RECORDATORIO - Fumigación para Hoy\nAnimal: ${animalName}\nProducto: ${fum.producto}\nDosis: ${fum.dosis || 'N/A'}\nObservación: ${fum.observaciones || 'N/A'}\nFecha: ${fum.fecha}`
+      );
+
+      notified.add(fum.id);
+      alreadySent.add(fum.id);
+    }
+
+    saveFumigNotifiedSet(notified);
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('checkPendingFumigaciones error:', e);
+  }
+}
+
+function getFumigNotifiedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_FUMIG_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+
+function saveFumigNotifiedSet(set) {
+  localStorage.setItem(NOTIFIED_FUMIG_KEY, JSON.stringify([...set]));
+}
+
+export async function checkOverdueVaccines() {
+  const today = getLocalToday();
+  const sentKey = 'wa_overdue_sent_today_' + today;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const pastDate = new Date();
+    pastDate.setDate(pastDate.getDate() - 1);
+    const yesterday = `${pastDate.getFullYear()}-${String(pastDate.getMonth() + 1).padStart(2, '0')}-${String(pastDate.getDate()).padStart(2, '0')}`;
+
+    const vaccines = await restFetch(`/rest/v1/animal_vacunas?fecha=lte.${yesterday}&estado=eq.Programada&select=*`);
+    if (!vaccines || vaccines.length === 0) return;
+
+    for (const vac of vaccines) {
+      if (alreadySent.has(vac.id)) continue;
+
+      let animalName = `Animal #${vac.animal_id?.substring(0, 6) || '?'}`;
+      try {
+        const animal = await db.ganado.get(vac.animal_id);
+        if (animal?.nombre) animalName = animal.nombre;
+      } catch {}
+
+      await sendWhatsApp(
+        `⚠️ Vacuna ATRASADA\nAnimal: ${animalName}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nFecha programada: ${vac.fecha}\nFinca: ${window._empresaNombre || ''}`
+      );
+
+      alreadySent.add(vac.id);
+    }
+
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('checkOverdueVaccines error:', e);
+  }
+}
+
+export async function checkUpcomingVaccines() {
+  const today = getLocalToday();
+  const sentKey = 'wa_upcoming_sent_' + today;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    const vaccines = await restFetch(`/rest/v1/animal_vacunas?fecha=eq.${tomorrowStr}&estado=eq.Programada&select=*`);
+    if (!vaccines || vaccines.length === 0) return;
+
+    for (const vac of vaccines) {
+      if (alreadySent.has(vac.id)) continue;
+
+      let animalName = `Animal #${vac.animal_id?.substring(0, 6) || '?'}`;
+      try {
+        const animal = await db.ganado.get(vac.animal_id);
+        if (animal?.nombre) animalName = animal.nombre;
+      } catch {}
+
+      await sendWhatsApp(
+        `📅 RECORDATORIO - Vacuna para MAÑANA\nAnimal: ${animalName}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nObservación: ${vac.observaciones || 'N/A'}\nFecha: ${tomorrowStr}\nFinca: ${window._empresaNombre || ''}`
+      );
+
+      alreadySent.add(vac.id);
+    }
+
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('checkUpcomingVaccines error:', e);
   }
 }
