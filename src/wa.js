@@ -1,5 +1,6 @@
 import db from './db.js';
 import { restFetch } from './auth.js';
+import { getDosisPorEdad, getPlanIfcafe, getZonaLabel, obtenerOrdenDia } from './utils/calculadora_dosis.js';
 
 const EVOLUTION_API = '/api/wa-proxy';
 const NOTIFIED_KEY = 'wa_notified_vaccines';
@@ -282,5 +283,204 @@ export async function checkUpcomingVaccines() {
     localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
   } catch (e) {
     console.warn('checkUpcomingVaccines error:', e);
+  }
+}
+
+const NOTIFIED_LOTE_KEY = 'wa_notified_lote_apps';
+const SENT_LOTE_TODAY_KEY = 'wa_sent_lote_today';
+
+function getLoteNotifiedSet() {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_LOTE_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+
+function saveLoteNotifiedSet(set) {
+  localStorage.setItem(NOTIFIED_LOTE_KEY, JSON.stringify([...set]));
+}
+
+export async function checkAplicacionesDelMes() {
+  const today = getLocalToday();
+  const sentKey = `${SENT_LOTE_TODAY_KEY}_${today}`;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const apps = await restFetch(`/rest/v1/lote_aplicaciones?fecha=eq.${today}&select=*`);
+    const pending = apps.filter(a => a.estado === 'Programada');
+    if (!pending.length) return;
+
+    const notified = getLoteNotifiedSet();
+
+    for (const app of pending) {
+      if (notified.has(app.id)) continue;
+      if (alreadySent.has(app.id)) continue;
+
+      let loteNombre = `Lote #${app.lote_id?.substring(0, 6) || '?'}`;
+      let numPlantas = 0;
+      let edadCat = null;
+      let operarios = [];
+      try {
+        const lote = await db.lotes.get(app.lote_id);
+        if (lote?.nombre) loteNombre = lote.nombre;
+        if (lote?.num_plantas) numPlantas = lote.num_plantas;
+        if (lote?.edad_categoria) edadCat = lote.edad_categoria;
+      } catch {}
+
+      try {
+        const personalList = await db.lote_personal.where('lote_id').equals(app.lote_id).toArray();
+        for (const p of personalList) {
+          const person = await db.personal.get(p.personal_id);
+          if (person?.nombre) operarios.push(person.nombre);
+        }
+      } catch {}
+
+      const serverApp = await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${app.id}&select=estado`);
+      if (!serverApp || serverApp.length === 0 || serverApp[0].estado !== 'Programada') {
+        notified.add(app.id);
+        alreadySent.add(app.id);
+        continue;
+      }
+
+      const dosisCalc = getDosisPorEdad(edadCat);
+      const orden = obtenerOrdenDia(loteNombre, app.producto, dosisCalc, operarios);
+
+      await sendWhatsApp(
+        `🌱 AVISO DE ABONADA - ${loteNombre}\n\n` +
+        `Producto: ${app.producto}\n` +
+        `🥤 Dosis: ${app.dosis || (dosisCalc?.porAplicacion?.vasitoLabel || 'N/A')} por planta\n` +
+        `📦 Total: ${numPlantas} plantas\n` +
+        (operarios.length > 0 ? `👷 Personal: ${operarios.join(', ')}\n\n` : '\n') +
+        `📋 Orden del día:\n"${orden}"\n\n` +
+        `⚠️ NO aplicar si la tierra está seca.\n` +
+        `Esperá al menos 3 días de lluvia fuerte.`
+      );
+
+      notified.add(app.id);
+      alreadySent.add(app.id);
+    }
+
+    saveLoteNotifiedSet(notified);
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('checkAplicacionesDelMes error:', e);
+  }
+}
+
+export async function checkAnalisisSueloPendiente() {
+  const mesActual = new Date().getMonth() + 1;
+  if (mesActual !== 2 && mesActual !== 3) return;
+
+  const today = getLocalToday();
+  const sentKey = 'wa_suelo_analisis_sent_' + today;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const lotes = await db.lotes.toArray();
+    for (const lote of lotes) {
+      if (alreadySent.has(lote.id)) continue;
+
+      const apps = await restFetch(`/rest/v1/lote_aplicaciones?lote_id=eq.${lote.id}&tipo=eq.An%C3%A1lisis%20de%20Suelo&order=fecha.desc&limit=1`);
+      const ultimoAnalisis = Array.isArray(apps) ? apps[0] : null;
+      if (ultimoAnalisis) {
+        const fechaAnalisis = new Date(ultimoAnalisis.fecha + 'T12:00:00');
+        const mesesDiff = (new Date() - fechaAnalisis) / (1000 * 60 * 60 * 24 * 30);
+        if (mesesDiff < 11) continue;
+      }
+
+      await sendWhatsApp(
+        `📊 Recordatorio IFCAFE\n\nLote: ${lote.nombre}\n⚠️ No tiene análisis de suelo en los últimos 11 meses.\nFebrero/Marzo es el momento ideal para tomar las muestras.\n\nFinca: ${window._empresaNombre || ''}`
+      );
+
+      alreadySent.add(lote.id);
+    }
+
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('checkAnalisisSueloPendiente error:', e);
+  }
+}
+
+export async function checkEnmiendaCal() {
+  const mesActual = new Date().getMonth() + 1;
+  if (mesActual !== 3 && mesActual !== 4) return;
+
+  const today = getLocalToday();
+  const sentKey = 'wa_cal_sent_' + today;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const apps = await restFetch(`/rest/v1/lote_aplicaciones?tipo=eq.An%C3%A1lisis%20de%20Suelo&order=fecha.desc&limit=50`);
+    if (!apps || apps.length === 0) return;
+
+    for (const app of apps) {
+      if (alreadySent.has(app.lote_id)) continue;
+
+      let ph = null;
+      try {
+        const obs = JSON.parse(app.observaciones || '{}');
+        ph = parseFloat(obs.ph) || null;
+      } catch {}
+
+      if (ph !== null && ph < 5.5) {
+        const enmiendas = await restFetch(`/rest/v1/lote_aplicaciones?lote_id=eq.${app.lote_id}&producto=ilike.*cal*&fecha=gte.${today.split('-')[0]}-01-01&limit=1`);
+        const tieneCal = Array.isArray(enmiendas) && enmiendas.length > 0;
+        if (tieneCal) continue;
+
+        let loteNombre = `Lote #${app.lote_id?.substring(0, 6)}`;
+        try {
+          const lote = await db.lotes.get(app.lote_id);
+          if (lote?.nombre) loteNombre = lote.nombre;
+        } catch {}
+
+        await sendWhatsApp(
+          `⚠️ Alerta: Acidez en ${loteNombre}\n\npH detectado: ${ph} — muy ácido\n📍 Aplicar cal agrícola (carbonato de calcio)\n⏳ Respetar 60 días de reposo antes de la 1ra fertilización (Mayo o Junio según zona)\n\nFinca: ${window._empresaNombre || ''}`
+        );
+
+        alreadySent.add(app.lote_id);
+      }
+    }
+
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('checkEnmiendaCal error:', e);
+  }
+}
+
+export async function actualizarSaludPorPlan() {
+  const today = getLocalToday();
+  const sentKey = 'wa_salud_sent_' + today;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const lotes = await db.lotes.toArray();
+    for (const lote of lotes) {
+      if (!lote.edad_categoria) continue;
+
+      const planApps = await restFetch(`/rest/v1/lote_aplicaciones?lote_id=eq.${lote.id}&estado=eq.Programada&fecha=lt.${today}&select=id,fecha`);
+      const atrasadas = Array.isArray(planApps) ? planApps : [];
+      if (atrasadas.length === 0) continue;
+
+      const penalizacion = atrasadas.length * 5;
+      const saludActual = lote.salud_porcentaje || 100;
+      const nuevaSalud = Math.max(0, saludActual - penalizacion);
+
+      if (nuevaSalud < saludActual) {
+        await restFetch(`/rest/v1/lotes?id=eq.${lote.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ salud_porcentaje: nuevaSalud }),
+        });
+
+        if (alreadySent.has(lote.id)) continue;
+
+        await sendWhatsApp(
+          `⚠️ Salud del lote ${lote.nombre} reducida\n\n` +
+          `Motivo: ${atrasadas.length} aplicación(es) del Plan IFCAFE sin realizar\n` +
+          `Salud anterior: ${saludActual}%\n` +
+          `Salud actual: ${nuevaSalud}%\n\n` +
+          `Finca: ${window._empresaNombre || ''}`
+        );
+
+        alreadySent.add(lote.id);
+      }
+    }
+
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('actualizarSaludPorPlan error:', e);
   }
 }

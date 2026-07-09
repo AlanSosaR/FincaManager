@@ -1,4 +1,6 @@
 import { supabase } from '../supabase.js';
+import { sendWhatsApp } from '../wa.js';
+import { getDosisPorEdad, getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
 
 function parseCoordenadasJson(json) {
   try {
@@ -125,6 +127,30 @@ export async function renderNuevoLote(id) {
                 <option value="Orgánico (Humus)" ${selected('tipo_suelo', 'Orgánico (Humus)')}>Orgánico (Humus)</option>
               </select>
               <label>Tipo de Suelo</label>
+            </div>
+          </div>
+
+          <div style="margin-top: 24px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="material-icons" style="color: var(--m3-primary); font-size: 20px;">eco</span>
+              <h3 style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Plan IFCAFE 2026</h3>
+            </div>
+          </div>
+          <div class="m3-grid-2col">
+            <div class="m3-field ${val('edad_categoria') ? 'has-value' : ''}">
+              <select name="edad_categoria" required>
+                <option value="" disabled ${!lote ? 'selected' : ''} hidden></option>
+                <option value="1_anio" ${selected('edad_categoria', '1_anio')}>Café Tiernito (1 año)</option>
+                <option value="2_anios" ${selected('edad_categoria', '2_anios')}>Café Creciendo (2 años)</option>
+                <option value="3_mas" ${selected('edad_categoria', '3_mas')}>Café en Producción (3+ años)</option>
+                <option value="carga_alta" ${selected('edad_categoria', 'carga_alta')}>Café con Carga Muy Alta</option>
+              </select>
+              <label>Edad del cafetal</label>
+            </div>
+
+            <div class="m3-field ${val('altura_msnm') ? 'has-value' : ''}">
+              <input type="number" name="altura_msnm" placeholder=" " value="${val('altura_msnm')}" min="0" max="3000">
+              <label>Altura (msnm)</label>
             </div>
           </div>
 
@@ -1566,6 +1592,7 @@ export async function setupNuevoLoteListeners() {
 
     try {
       let error;
+      let newLoteId = null;
       const submitLoteId = loteId || window.__currentLoteData?.id || null;
       if (submitLoteId) {
         console.log('[nuevo_lote] UPDATE - loteId:', submitLoteId);
@@ -1573,11 +1600,63 @@ export async function setupNuevoLoteListeners() {
         error = res.error;
       } else {
         console.log('[nuevo_lote] INSERT - creating new lote');
-        const res = await supabase.from('lotes').insert([data]);
+        const res = await supabase.from('lotes').insert([data]).select();
         error = res.error;
+        newLoteId = res.data?.[0]?.id;
       }
       
       if (error) throw error;
+
+      // Pre-programar aplicaciones IFCAFE solo si es lote nuevo
+      if (!submitLoteId && newLoteId) {
+        const edadCat = data.edad_categoria;
+        const altura = parseInt(data.altura_msnm) || 0;
+        const numPlantas = parseInt(data.num_plantas) || 0;
+        const dosis = getDosisPorEdad(edadCat);
+        const plan = getPlanIfcafe(altura);
+        const empresaId = window._currentEmpresaId;
+
+        if (edadCat && plan.length > 0) {
+          const aplicaciones = plan.map(item => {
+            var fechaProgramada = new Date(2026, item.mes - 1, 15);
+            return {
+              lote_id: newLoteId,
+              tipo: item.tipo,
+              producto: item.producto,
+              dosis: dosis ? dosis.porAplicacion.vasitoLabel : '',
+              fecha: fechaProgramada.toISOString().split('T')[0],
+              metodo: item.tipo === 'Suelo' ? 'Al suelo' : 'Foliar',
+              notas: item.recomendacion,
+              estado: 'Programada',
+              operador: '',
+              empresa_id: empresaId
+            };
+          });
+
+          for (const app of aplicaciones) {
+            await supabase.from('lote_aplicaciones').insert([app]);
+          }
+
+          const zonaLabel = getZonaLabel(altura);
+          const dosisCalc = calcularDosis(edadCat, numPlantas);
+          const planLines = plan.map(function(item) {
+            return '  ' + item.mesLabel + ' — ' + item.tipo + ': ' + item.producto;
+          }).join('\n');
+
+          if (edadCat && numPlantas > 0) {
+            var msg = '📋 Plan IFCAFE 2026 generado\n\n' +
+              'Lote: ' + data.nombre +
+              '\nEdad: ' + dosisCalc.label +
+              '\n🥤 Dosis: ' + dosisCalc.porAplicacion.vasitoLabel + ' (' + dosisCalc.porAplicacion.onzas + ' oz / ' + dosisCalc.porAplicacion.gramos + 'g)' +
+              '\nPlantas: ' + numPlantas +
+              '\n📦 ' + dosisCalc.sacosNecesarios + ' saco(s) por aplicación' +
+              '\n📍 Zona: ' + zonaLabel +
+              '\n\n📅 5 aplicaciones programadas:\n' + planLines +
+              '\n\nFinca: ' + (window._empresaNombre || '');
+            sendWhatsApp(msg);
+          }
+        }
+      }
 
       // Reload existing lotes layer to show updated data
       if (existingLotesLayer && mapInstance) {

@@ -40,7 +40,7 @@ db.version(3).stores({
   animal_fumigaciones: '&id, empresa_id, animal_id, fecha, created_at',
   animal_ventas: '&id, empresa_id, animal_id, fecha_venta, created_at',
   herramienta_mantenimientos: '&id, empresa_id, herramienta_id, fecha, created_at',
-  lotes: '&id, empresa_id, nombre, created_at',
+  lotes: '&id, empresa_id, nombre, edad_categoria, altura_msnm, created_at',
   lote_aplicaciones: '&id, empresa_id, lote_id, fecha, created_at',
   lote_personal: '&id, empresa_id, lote_id, personal_id, created_at',
   personal: '&id, empresa_id, nombre, created_at',
