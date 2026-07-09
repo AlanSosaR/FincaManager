@@ -506,6 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'nueva_actividad') initNuevaActividad(...args);
         if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
         if (screenId === 'detalle_personal') initDetallePersonal(...args);
+        if (screenId === 'plan_ifcafe') initPlanIfcafe();
         if (screenId === 'login')    initLogin();
         if (screenId === 'register') initRegister();
         if (screenId === 'perfil') initPerfil();

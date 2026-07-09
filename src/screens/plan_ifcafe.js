@@ -241,7 +241,7 @@ export function initPlanIfcafe() {
           fecha,
           producto,
           tipo,
-          dosis: dosisLabel,
+          dosis,
           metodo: tipo === 'Suelo' ? 'Al suelo' : 'Foliar',
           estado: 'Aplicada',
           operador: '',
