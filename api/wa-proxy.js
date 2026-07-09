@@ -1,7 +1,7 @@
 const TARGET = 'http://132.145.42.123:8080';
 const API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const path = (req.url || '').replace(/^\/api\/wa-proxy\//, '').replace(/^\/api\/wa-proxy(\?|$)/, '');
   const qsIndex = path.indexOf('?');
   const cleanPath = qsIndex >= 0 ? path.slice(0, qsIndex) : path;
@@ -29,4 +29,4 @@ module.exports = async function handler(req, res) {
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({ error: err.message }));
   }
-};
+}
