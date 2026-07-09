@@ -10,6 +10,15 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Auth/DB: llamadas REST directas a Supabase (`authFetch`, `restFetch`, `restInsert`), NO usar `@supabase/supabase-js` ni QueryBuilder.
 - Proyecto Supabase: `udhuizkqnmkhljmezzkd`.
 
+## Lo Completado (09/07)
+
+### Fix Deploy a Vercel — proxy WhatsApp funcionando en producción
+- `.github/workflows/deploy.yml`: agregadas `VERCEL_ORG_ID` y `VERCEL_PROJECT_ID` como `env:` (no `.vercel/project.json` porque está en `.gitignore`).
+- `vercel.json`: rewrite corregida de `/((?!api/).*)` (causaba 404 en toda ruta `/api`) a dos reglas explícitas: `/api/wa-proxy/(.*)` → serverless function, `/(.*)` → SPA.
+- `api/wa-proxy.js`: convertido de `module.exports` a `export default` para compatibilidad con ESM (`"type": "module"` en package.json).
+- Secrets agregados en GitHub Actions: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+- Commits: `750676b`, `81714a7`, `07f521c`, `ea908d7`
+
 ## Lo Completado (07/07)
 
 ### Sincronización automática en segundo plano (cada 5s + al navegar)
@@ -249,7 +258,7 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 
 ### Despliegue
 - [x] GitHub Actions workflow para auto-deploy a Vercel
-- [ ] Agregar `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` en GitHub Secrets
+- [x] Secrets configurados en GitHub: `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_uifHxRsDbMUdKGvfT9pm3Xou`), `VERCEL_PROJECT_ID` (`prj_ddYNiSXVX2bABycPB2ZfZlg2oeK0`)
 
 ## Decisiones Técnicas
 - `restInsert`: función que inserta sin `return=representation` para evitar errores de SELECT policy. Se usa para `empresas`, `usuarios`, `usuario_empresas`.
