@@ -715,6 +715,8 @@ async function handleAddVaccine(animalId, defaultDate = null) {
     };
 }
 
+window.handleAddVaccine = handleAddVaccine;
+
 async function handleAddWeight(animalId) {
     showModal('Registrar Pesaje', `
         <form id="form-add-weight" style="display: flex; flex-direction: column; gap: 16px;">
