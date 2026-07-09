@@ -2,6 +2,7 @@ import db from './db.js';
 
 const EVOLUTION_API = '/api/wa-proxy';
 const NOTIFIED_KEY = 'wa_notified_vaccines';
+const SENT_TODAY_KEY = 'wa_sent_today';
 
 function getInstanceName() {
   const empresaId = window._currentEmpresaId || 'default';
@@ -113,8 +114,10 @@ export async function sendWhatsApp(mensaje) {
 }
 
 export async function checkPendingVaccines() {
+  const today = new Date().toISOString().split('T')[0];
+  const sentKey = `${SENT_TODAY_KEY}_${today}`;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
   try {
-    const today = new Date().toISOString().split('T')[0];
     const vaccines = await db.animal_vacunas
       .where('fecha')
       .equals(today)
@@ -129,6 +132,7 @@ export async function checkPendingVaccines() {
 
     for (const vac of pending) {
       if (notified.has(vac.id)) continue;
+      if (alreadySent.has(vac.id)) continue;
 
       let animalName = `Animal #${vac.animal_id?.substring(0, 6) || '?'}`;
       try {
@@ -136,13 +140,16 @@ export async function checkPendingVaccines() {
         if (animal?.nombre) animalName = animal.nombre;
       } catch {}
 
-      const dosis = vac.dosis ? ` (${vac.dosis})` : '';
       await sendWhatsApp(
-        `🔔 RECORDATORIO - Vacuna para Hoy\nAnimal: ${animalName}\nVacuna: ${vac.nombre}${dosis}\nFecha: ${vac.fecha}\nFinca: ${empresaName}`
+        `🔔 RECORDATORIO - Vacuna para Hoy\nAnimal: ${animalName}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nObservación: ${vac.observacion || 'N/A'}\nFecha: ${vac.fecha}`
       );
 
-      markNotified(vac.id);
+      notified.add(vac.id);
+      alreadySent.add(vac.id);
     }
+
+    saveNotifiedSet(notified);
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
   } catch (e) {
     console.warn('checkPendingVaccines error:', e);
   }

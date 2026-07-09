@@ -28,7 +28,7 @@ window.confirmVaccine = (vaccineId) => {
                     const empresaName = empresa?.nombre || 'Mi Finca';
                     const dosis = vac.dosis ? ` (${vac.dosis})` : '';
                     sendWhatsApp(
-                        `✅ Vacuna Aplicada\nAnimal: ${animal.nombre}\nVacuna: ${vac.nombre}${dosis}\nFecha: ${vac.fecha}\nFinca: ${empresaName}`
+                        `✅ Vacuna Aplicada\nAnimal: ${animal.nombre}\nVacuna: ${vac.nombre}\nDosis: ${vac.dosis || 'N/A'}\nObservación: ${vac.observacion || 'N/A'}\nFecha: ${vac.fecha}`
                     );
                 }
             } catch (waErr) {
