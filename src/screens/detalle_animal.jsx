@@ -683,7 +683,18 @@ async function handleAddVaccine(animalId, defaultDate = null) {
             async function() {
                 vacData.estado = 'Programada';
                 try {
-                    await restInsert('/rest/v1/animal_vacunas', vacData);
+                    const result = await restFetch('/rest/v1/animal_vacunas', {
+                        method: 'POST',
+                        body: JSON.stringify(vacData),
+                        headers: { 'Prefer': 'return=representation' }
+                    });
+                    var vac = Array.isArray(result) ? result[0] : result;
+                    var anim = currentAnimal;
+                    if (anim && vac) {
+                        sendWhatsApp(
+                            '📋 Vacuna Programada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
+                        );
+                    }
                     showSnackbar('Vacuna programada');
                     await loadAllData(animalId, document.getElementById('da-container'));
                 } catch (err) {
