@@ -75,57 +75,91 @@ export async function renderConfiguracion() {
 }
 
 let waPollInterval = null;
+let isWaConnected = false;
 
 async function connectOrRecreate() {
   try {
     await createInstance();
   } catch (e) {
-    await deleteInstance();
-    await new Promise(r => setTimeout(r, 500));
+    console.log('Error al crear instancia, intentando recrear...', e);
+    try {
+      await deleteInstance();
+    } catch (deleteErr) {
+      console.warn('Error al borrar instancia (ignorando):', deleteErr);
+    }
+    // Esperar 1.5 segundos para que Evolution API procese la eliminación
+    await new Promise(r => setTimeout(r, 1500));
     await createInstance();
   }
   return getQR();
 }
 
-async function connectHandler() {
+async function handleWaButtonClick() {
   const btn = document.getElementById('btn-wa-connect');
+  if (!btn) return;
   btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Conectando...';
 
-  try {
-    const qrData = await connectOrRecreate();
-    console.log('QR response:', qrData);
-    const qrArea = document.getElementById('wa-qr-area');
-    const qrContainer = document.getElementById('wa-qr-container');
-
-    const qrBase64 = qrData?.base64 || qrData?.qrcode?.base64;
-    const qrCode = qrData?.code || qrData?.qrcode?.code;
-    if (qrBase64) {
-      qrArea.style.display = 'block';
-      qrContainer.innerHTML = `<img src="${qrBase64}" alt="WhatsApp QR" style="width:256px;height:256px;image-rendering:pixelated;">`;
-      startWaPolling();
-    } else if (qrCode) {
-      qrArea.style.display = 'block';
-      qrContainer.innerHTML = `<div style="font-size:24px;font-weight:700;color:#2d3e2c;padding:48px;word-break:break-all;">${qrCode}</div>
-        <p style="font-size:13px;color:#666;">Usa este código de emparejamiento en WhatsApp > Dispositivos vinculados</p>`;
-      startWaPolling();
-    } else {
-      console.error('QR data inesperada:', JSON.stringify(qrData));
-      if (window.Snackbar) window.Snackbar.show('Error al obtener QR. Revisa la consola (F12).', 'error');
+  if (isWaConnected) {
+    btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Desconectando...';
+    try {
+      await deleteInstance();
+      if (window.Snackbar) window.Snackbar.show('WhatsApp desconectado (instancia eliminada) ✓');
+      document.getElementById('wa-qr-area').style.display = 'none';
+      if (waPollInterval) {
+        clearInterval(waPollInterval);
+        waPollInterval = null;
+      }
+      await updateWhatsAppStatus();
+    } catch (e) {
+      if (e.message?.includes('not exist') || e.message?.includes('404')) {
+        if (window.Snackbar) window.Snackbar.show('Ya está desconectado ✓');
+        document.getElementById('wa-qr-area').style.display = 'none';
+        if (waPollInterval) {
+          clearInterval(waPollInterval);
+          waPollInterval = null;
+        }
+        await updateWhatsAppStatus();
+      } else {
+        if (window.Snackbar) window.Snackbar.show('Error al desconectar: ' + (e.message || e), 'error');
+      }
     }
-  } catch (e) {
-    console.error('Error completo:', e);
-    if (window.Snackbar) window.Snackbar.show('Error: ' + (e.message || e), 'error');
+  } else {
+    btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Conectando...';
+    try {
+      const qrData = await connectOrRecreate();
+      console.log('QR response:', qrData);
+      const qrArea = document.getElementById('wa-qr-area');
+      const qrContainer = document.getElementById('wa-qr-container');
+
+      const qrBase64 = qrData?.base64 || qrData?.qrcode?.base64;
+      const qrCode = qrData?.code || qrData?.qrcode?.code;
+      if (qrBase64) {
+        qrArea.style.display = 'block';
+        qrContainer.innerHTML = `<img src="${qrBase64}" alt="WhatsApp QR" style="width:256px;height:256px;image-rendering:pixelated;">`;
+        startWaPolling();
+      } else if (qrCode) {
+        qrArea.style.display = 'block';
+        qrContainer.innerHTML = `<div style="font-size:24px;font-weight:700;color:#2d3e2c;padding:48px;word-break:break-all;">${qrCode}</div>
+          <p style="font-size:13px;color:#666;">Usa este código de emparejamiento en WhatsApp > Dispositivos vinculados</p>`;
+        startWaPolling();
+      } else {
+        console.error('QR data inesperada:', JSON.stringify(qrData));
+        if (window.Snackbar) window.Snackbar.show('Error al obtener QR. Revisa la consola (F12).', 'error');
+      }
+    } catch (e) {
+      console.error('Error completo:', e);
+      if (window.Snackbar) window.Snackbar.show('Error: ' + (e.message || e), 'error');
+    }
   }
 
   btn.disabled = false;
-  updateWhatsAppStatus();
+  await updateWhatsAppStatus();
 }
 
 export function initConfiguracion() {
   updateWhatsAppStatus();
 
-  document.getElementById('btn-wa-connect')?.addEventListener('click', connectHandler);
+  document.getElementById('btn-wa-connect')?.addEventListener('click', handleWaButtonClick);
 
   document.getElementById('btn-wa-list-groups')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-wa-list-groups');
@@ -206,33 +240,22 @@ async function updateWhatsAppStatus() {
   const listBtn = document.getElementById('btn-wa-list-groups');
   try {
     const connected = await checkConnection();
+    isWaConnected = connected;
     el.innerHTML = connected
       ? '<span style="color:#2d3e2c;font-weight:600;">✓ Conectado</span>'
       : '<span style="color:#ff4103;">✗ Desconectado</span>';
-    if (connected) {
-      btn.innerHTML = '<span class="material-icons">link_off</span> Desconectar WhatsApp';
-      btn.style.background = '#ff4103';
-      btn.onclick = async () => {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="material-icons animate-spin">sync</span> Desconectando...';
-        try {
-          await deleteInstance();
-          if (window.Snackbar) window.Snackbar.show('WhatsApp desconectado');
-          updateWhatsAppStatus();
-        } catch (e) {
-          if (window.Snackbar) window.Snackbar.show('Error: ' + (e.message || e), 'error');
-        }
-        btn.disabled = false;
-      };
-      if (groupArea) groupArea.style.display = 'none';
-      if (listBtn) listBtn.style.display = 'none';
-    } else {
-      btn.innerHTML = '<span class="material-icons">qr_code_scanner</span> Conectar WhatsApp';
-      btn.style.background = '#2d3e2c';
-      btn.onclick = connectHandler;
-      if (groupArea) groupArea.style.display = '';
-      if (listBtn) listBtn.style.display = '';
+    if (btn) {
+      if (connected) {
+        btn.innerHTML = '<span class="material-icons">link_off</span> Desconectar WhatsApp';
+        btn.style.background = '#ff4103';
+      } else {
+        btn.innerHTML = '<span class="material-icons">qr_code_scanner</span> Conectar WhatsApp';
+        btn.style.background = '#2d3e2c';
+      }
     }
+    const hasGroup = !!localStorage.getItem('whatsapp_group_jid');
+    if (groupArea) groupArea.style.display = (connected || hasGroup) ? '' : 'none';
+    if (listBtn) listBtn.style.display = connected ? '' : 'none';
   } catch {
     el.textContent = 'No disponible';
   }
