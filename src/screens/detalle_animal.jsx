@@ -686,7 +686,7 @@ async function handleAddVaccine(animalId, defaultDate = null) {
         document.getElementById('snackbar-container').appendChild(confirmBox);
         document.getElementById('custom-confirm-cancel').onclick = function() { confirmBox.remove(); };
         document.getElementById('custom-confirm-ok').onclick = async function() {
-            confirmBtn.remove();
+            confirmBox.remove();
             vacData.estado = 'Aplicada';
             try {
                 const result = await restFetch('/rest/v1/animal_vacunas', {
@@ -697,9 +697,14 @@ async function handleAddVaccine(animalId, defaultDate = null) {
                 var vac = Array.isArray(result) ? result[0] : result;
                 var anim = currentAnimal;
                 if (anim && vac) {
-                    sendWhatsApp(
-                        '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
-                    );
+                    var jid = localStorage.getItem('whatsapp_group_jid');
+                    if (!jid) {
+                        showSnackbar('WhatsApp no configurado. Ve a Configuración → WhatsApp', 'error');
+                    } else {
+                        sendWhatsApp(
+                            '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha + '\nFinca: ' + (window._empresaNombre || '')
+                        );
+                    }
                 }
                 showSnackbar('Vacuna aplicada');
                 await loadAllData(animalId, document.getElementById('da-container'));
