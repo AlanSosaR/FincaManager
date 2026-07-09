@@ -1,4 +1,4 @@
-import { supabase } from '../supabase.js';
+import { restFetch } from '../auth.js';
 import { Chart, registerables } from 'chart.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
@@ -13,11 +13,43 @@ function getLocalToday() {
 
 Chart.register(...registerables);
 
+/** Generic inline confirmation modal — no dependency on Snackbar.confirm */
+function showConfirmModal(message, onConfirm) {
+    const modalContainer = document.getElementById('modal-container');
+    const modalBody = document.getElementById('modal-body');
+    if (!modalContainer || !modalBody) {
+        // Fallback to native confirm if modal DOM not ready
+        if (window.confirm(message)) onConfirm();
+        return;
+    }
+    modalBody.innerHTML = `
+        <div class="modal-header">
+            <h3>Confirmación</h3>
+            <button class="btn-close" id="confirm-modal-close"><span class="material-icons">close</span></button>
+        </div>
+        <div class="modal-content-body" style="padding:16px 24px 8px">
+            <p style="margin:0 0 20px;font-size:15px;line-height:1.5">${message}</p>
+            <div style="display:flex;gap:12px;justify-content:flex-end;padding-bottom:8px">
+                <button class="m3-btn m3-btn-text" id="confirm-modal-cancel">Cancelar</button>
+                <button class="m3-btn m3-btn-filled" id="confirm-modal-ok" style="background:#2d3e2c;color:#fff">Confirmar</button>
+            </div>
+        </div>
+    `;
+    modalContainer.classList.add('active');
+    const close = () => modalContainer.classList.remove('active');
+    document.getElementById('confirm-modal-close').onclick = close;
+    document.getElementById('confirm-modal-cancel').onclick = close;
+    document.getElementById('confirm-modal-ok').onclick = () => { close(); onConfirm(); };
+    modalContainer.onclick = (e) => { if (e.target === modalContainer) close(); };
+}
+
 window.confirmVaccine = (vaccineId) => {
-    window.Snackbar.confirm('¿Confirmar que la vacuna fue aplicada?', async () => {
+    showConfirmModal('¿Confirmar que la vacuna fue aplicada?', async () => {
         try {
-            const { error } = await supabase.from('animal_vacunas').update({ estado: 'Aplicada' }).eq('id', vaccineId);
-            if (error) throw error;
+            await restFetch(`/rest/v1/animal_vacunas?id=eq.${vaccineId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: 'Aplicada' }),
+            });
             showSnackbar('Vacuna confirmada');
 
             // Notificar por WhatsApp
@@ -50,10 +82,12 @@ window.confirmVaccine = (vaccineId) => {
 };
 
 window.cancelVaccine = (vaccineId) => {
-    window.Snackbar.confirm('¿Confirmar que la vacuna fue cancelada/no aplicada?', async () => {
+    showConfirmModal('¿Confirmar que la vacuna fue cancelada/no aplicada?', async () => {
         try {
-            const { error } = await supabase.from('animal_vacunas').update({ estado: 'Cancelada' }).eq('id', vaccineId);
-            if (error) throw error;
+            await restFetch(`/rest/v1/animal_vacunas?id=eq.${vaccineId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: 'Cancelada' }),
+            });
             showSnackbar('Vacuna cancelada');
             if (currentAnimal) {
                 initDetalleAnimal(currentAnimal.id);
@@ -65,10 +99,12 @@ window.cancelVaccine = (vaccineId) => {
 };
 
 window.confirmFumigacion = (fumigacionId) => {
-    window.Snackbar.confirm('¿Confirmar que la fumigación fue aplicada?', async () => {
+    showConfirmModal('¿Confirmar que la fumigación fue aplicada?', async () => {
         try {
-            const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Aplicada' }).eq('id', fumigacionId);
-            if (error) throw error;
+            await restFetch(`/rest/v1/animal_fumigaciones?id=eq.${fumigacionId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: 'Aplicada' }),
+            });
             showSnackbar('Fumigación confirmada');
             if (currentAnimal) {
                 initDetalleAnimal(currentAnimal.id);
@@ -80,10 +116,12 @@ window.confirmFumigacion = (fumigacionId) => {
 };
 
 window.cancelFumigacion = (fumigacionId) => {
-    window.Snackbar.confirm('¿Confirmar que la fumigación fue cancelada/no aplicada?', async () => {
+    showConfirmModal('¿Confirmar que la fumigación fue cancelada/no aplicada?', async () => {
         try {
-            const { error } = await supabase.from('animal_fumigaciones').update({ estado: 'Cancelada' }).eq('id', fumigacionId);
-            if (error) throw error;
+            await restFetch(`/rest/v1/animal_fumigaciones?id=eq.${fumigacionId}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: 'Cancelada' }),
+            });
             showSnackbar('Fumigación cancelada');
             if (currentAnimal) {
                 initDetalleAnimal(currentAnimal.id);
@@ -666,22 +704,43 @@ async function handleAddVaccine(animalId, defaultDate = null) {
 
     document.getElementById('cancel-vaccine').onclick = closeModal;
     
-    document.getElementById('form-add-vaccine').onsubmit = async (e) => {
+    document.getElementById('form-add-vaccine').onsubmit = function(e) {
         e.preventDefault();
-        const formData = new FormData(e.target);
-        
-        try {
-            const selectedDate = formData.get('fecha');
-            const today = getLocalToday();
-            const estadoVal = selectedDate >= today ? 'Programada' : 'Programada';
+        var form = e.target;
+        var formData = new FormData(form);
+        var selectedDate = formData.get('fecha');
+        var obs = formData.get('observaciones')?.trim();
 
-            showSnackbar('Vacuna programada');
-            closeModal();
-            await loadAllData(animalId, document.getElementById('da-container'));
-        } catch (err) { 
-            console.error(err);
-            showSnackbar(err.message, 'error');
-        }
+        var vacData = {
+            animal_id: animalId,
+            nombre: formData.get('nombre'),
+            fecha: selectedDate,
+            dosis: formData.get('dosis'),
+        };
+        if (obs) vacData.observaciones = obs;
+
+        closeModal();
+        window.Snackbar.confirm('¿Programar vacuna?', function() {
+            vacData.estado = 'Aplicada';
+            supabase.from('animal_vacunas').insert(vacData).select().then(function(res) {
+                if (res.error) { showSnackbar(res.error.message, 'error'); return; }
+                var vac = res.data?.[0] || vacData;
+                var anim = currentAnimal;
+                if (anim) {
+                    sendWhatsApp(
+                        '✅ Vacuna Aplicada\nAnimal: ' + anim.nombre + '\nVacuna: ' + vac.nombre + '\nDosis: ' + (vac.dosis || 'N/A') + '\nObservación: ' + (vac.observaciones || 'N/A') + '\nFecha: ' + vac.fecha
+                    );
+                    var todayStr = new Date().toISOString().split('T')[0];
+                    var noted = JSON.parse(localStorage.getItem('wa_notified_vaccines') || '[]');
+                    localStorage.setItem('wa_notified_vaccines', JSON.stringify([...new Set([...noted, vac.id])]));
+                    var sentKey = 'wa_sent_today_' + todayStr;
+                    var sent = JSON.parse(localStorage.getItem(sentKey) || '[]');
+                    localStorage.setItem(sentKey, JSON.stringify([...new Set([...sent, vac.id])]));
+                }
+                showSnackbar('Vacuna aplicada');
+                loadAllData(animalId, document.getElementById('da-container'));
+            });
+        });
     };
 }
 
