@@ -312,6 +312,11 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - `query-builder.js`: `_execute()` ahora ramifica: si hay internet → REST directo (con fallback a IndexedDB si falla); si no → IndexedDB como antes.
 - `main.js`: eliminado `SCREEN_TABLE_MAP` y `syncTable()` en `navigate()` — ya no es necesario porque QueryBuilder lee directo de REST. Navegación más rápida (~0.5–2s por pantalla).
 
+### Plan IFCAFE 2026 — Rediseño con selector de mes
+- `plan_ifcafe.js`: nuevo estado `_ifcafeMonth` (persiste entre renders); al entrar preselecciona el mes actual (Mar-Jul) o "Todas".
+- Nuevo select Material 3 con los 5 meses + "Todas las aplicaciones". Al cambiar, re-renderiza solo ese mes.
+- Badge "X/5 realizadas" en cada lote. Modo "Todas" mantiene grid responsivo; modo mes específico muestra 1 tarjeta.
+
 ## Decisiones Técnicas
 - `restInsert`: función que inserta sin `return=representation` para evitar errores de SELECT policy. Se usa para `empresas`, `usuarios`, `usuario_empresas`.
 - `restFetch`: función genérica con `return=representation`. Se usa para SELECT y para `invitaciones` (tiene SELECT policy abierta).
