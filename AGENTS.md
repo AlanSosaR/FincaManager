@@ -298,6 +298,20 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - [x] GitHub Actions workflow para auto-deploy a Vercel
 - [x] Secrets configurados en GitHub: `VERCEL_TOKEN`, `VERCEL_ORG_ID` (`team_uifHxRsDbMUdKGvfT9pm3Xou`), `VERCEL_PROJECT_ID` (`prj_ddYNiSXVX2bABycPB2ZfZlg2oeK0`)
 
+## Lo Completado (14/07)
+
+### WhatsApp — Pairing Code + Grupo manual + Compartido en Supabase
+- `wa.js`: `createInstance(number)` ahora acepta `number` opcional para pairing code; `connectPairing(phone)` reescrita: borra instancia → crea con `number` → extrae `qrcode.pairingCode` del response → fallback a `GET /connect/{name}`.
+- `auth.js`: `saveWhatsAppConfig()`, `loadWhatsAppConfig()` — config compartida por empresa en tabla `empresa_config`.
+- `configuracion.js`: tabs "Código" + "QR"; botón "Aceptar" para confirmar grupo; botón "Desconectar" visible solo para quien conectó o propietario; al conectar ya no auto-selecciona grupo (el usuario elige manualmente).
+- `supabase/migrations/20260714_empresa_config.sql` — tabla + 3 RLS policies.
+- Fix: servidor Evolution API v2.3.7 no tiene endpoint `connectPairing` — se usa `POST /instance/create` con `number` para obtener `pairingCode` del `qrcode` en la respuesta.
+
+### QueryBuilder — Lectura directa desde Supabase REST cuando hay internet
+- `query-builder.js`: nuevo método `_executeOnline()`: traduce cadena de métodos (`.eq()`, `.order()`, `.range()`, etc.) a parámetros REST y llama `supabaseFetch()`. Lee `content-range` para `count=exact`.
+- `query-builder.js`: `_execute()` ahora ramifica: si hay internet → REST directo (con fallback a IndexedDB si falla); si no → IndexedDB como antes.
+- `main.js`: eliminado `SCREEN_TABLE_MAP` y `syncTable()` en `navigate()` — ya no es necesario porque QueryBuilder lee directo de REST. Navegación más rápida (~0.5–2s por pantalla).
+
 ## Decisiones Técnicas
 - `restInsert`: función que inserta sin `return=representation` para evitar errores de SELECT policy. Se usa para `empresas`, `usuarios`, `usuario_empresas`.
 - `restFetch`: función genérica con `return=representation`. Se usa para SELECT y para `invitaciones` (tiene SELECT policy abierta).

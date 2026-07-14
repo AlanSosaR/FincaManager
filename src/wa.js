@@ -41,11 +41,13 @@ async function waFetch(path, options = {}) {
   return res;
 }
 
-export async function createInstance() {
+export async function createInstance(number) {
   const name = getInstanceName();
+  const body = { instanceName: name, integration: 'WHATSAPP-BAILEYS', qrcode: true };
+  if (number) body.number = number;
   const res = await waFetch(`instance/create`, {
     method: 'POST',
-    body: JSON.stringify({ instanceName: name, integration: 'WHATSAPP-BAILEYS', qrcode: true }),
+    body: JSON.stringify(body),
   });
   return res.json();
 }
@@ -67,6 +69,18 @@ export async function getQR() {
   const name = getInstanceName();
   const res = await waFetch(`instance/connect/${name}`);
   return res.json();
+}
+
+export async function connectPairing(phoneNumber) {
+  await deleteInstance().catch(() => {});
+  const data = await createInstance(phoneNumber);
+  const pairingCode = data?.qrcode?.pairingCode || data?.pairingCode;
+  if (pairingCode) return { pairingCode };
+  const connectData = await getQR();
+  return {
+    pairingCode: connectData?.pairingCode || connectData?.code || null,
+    code: connectData?.code || null,
+  };
 }
 
 export async function checkConnection() {
@@ -104,7 +118,7 @@ export async function joinGroup(inviteCode) {
 }
 
 export async function sendWhatsApp(mensaje) {
-  const groupJid = localStorage.getItem('whatsapp_group_jid');
+  const groupJid = localStorage.getItem('whatsapp_group_jid') || window._empresaWhatsAppConfig?.whatsapp_group_jid;
   if (!groupJid) return;
   const name = getInstanceName();
   try {

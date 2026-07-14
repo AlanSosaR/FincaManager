@@ -270,10 +270,67 @@ export default class QueryBuilder {
     return this;
   }
 
+  _buildRestParams() {
+    const p = new URLSearchParams();
+    p.set('select', this._selectColumns);
+    for (const f of this._filters) {
+      switch (f.type) {
+        case 'eq': p.append(f.field, `eq.${f.value}`); break;
+        case 'neq': p.append(f.field, `neq.${f.value}`); break;
+        case 'gt': p.append(f.field, `gt.${f.value}`); break;
+        case 'in': p.append(f.field, `in.(${f.values.join(',')})`); break;
+        case 'ilike': p.append(f.field, `ilike.${f.pattern}`); break;
+        case 'or': p.append('or', `(${f.filterStr})`); break;
+      }
+    }
+    if (this._orderField) p.append('order', `${this._orderField}.${this._orderDir}`);
+    if (this._rangeFrom != null) {
+      p.append('offset', String(this._rangeFrom));
+      if (this._rangeTo != null) p.append('limit', String(this._rangeTo - this._rangeFrom + 1));
+    }
+    return p;
+  }
+
+  async _executeOnline() {
+    const params = this._buildRestParams();
+    const path = `/rest/v1/${this.tableName}?${params.toString()}`;
+    const headers = {};
+    if (this._count === 'exact') {
+      headers['Prefer'] = 'return=representation,count=exact';
+    }
+    const res = await supabaseFetch(path, { headers });
+    let data = null;
+    let totalCount;
+    if (!this._head) {
+      data = await res.json();
+    }
+    if (this._count === 'exact') {
+      const range = res.headers.get('content-range');
+      if (range) {
+        const m = range.match(/\/(\d+)$/);
+        if (m) totalCount = parseInt(m[1], 10);
+      }
+      if (this._head) return { data: null, count: totalCount || 0, error: null };
+    }
+    if (!data) data = [];
+    if (this._single || this._maybeSingle) {
+      return { data: Array.isArray(data) ? data[0] || null : data, error: null };
+    }
+    return { data, count: this._count ? totalCount : undefined, error: null };
+  }
+
   async _execute() {
     this._ensureEmpresaFilter();
     if (this._deleteMode) return this._executeDelete();
     if (this._updateData) return this._executeUpdate();
+
+    if (isOnline()) {
+      try {
+        return await this._executeOnline();
+      } catch (e) {
+        console.warn(`REST fallback para ${this.tableName}:`, e?.message);
+      }
+    }
 
     const table = db.table(this.tableName);
     let results = await table.toArray();

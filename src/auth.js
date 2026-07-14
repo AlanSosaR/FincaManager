@@ -368,3 +368,32 @@ export async function sendRecoveryEmail(email) {
     body: JSON.stringify({ email, data }),
   });
 }
+
+export async function saveWhatsAppConfig(empresaId, config) {
+  const existing = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}&select=empresa_id`);
+  const payload = { ...config, updated_at: new Date().toISOString() };
+  if (existing && existing.length > 0) {
+    await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  } else {
+    await restInsert('/rest/v1/empresa_config', { empresa_id: empresaId, ...payload });
+  }
+  window._empresaWhatsAppConfig = { ...(window._empresaWhatsAppConfig || {}), ...config };
+}
+
+export async function loadWhatsAppConfig(empresaId) {
+  try {
+    const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}&select=*`);
+    if (data && data.length > 0) {
+      window._empresaWhatsAppConfig = data[0];
+      if (data[0].whatsapp_group_jid) {
+        localStorage.setItem('whatsapp_group_jid', data[0].whatsapp_group_jid);
+      }
+      return data[0];
+    }
+  } catch {}
+  window._empresaWhatsAppConfig = null;
+  return null;
+}
