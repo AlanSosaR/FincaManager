@@ -5,13 +5,11 @@ import { sendWhatsApp } from '../wa.js';
 
 let _ifcafeMonth = null;
 
-const PLAN_MESES = [
-  { mes: 3, label: 'Marzo', icon: 'humidity_high' },
-  { mes: 4, label: 'Abril', icon: 'spa' },
-  { mes: 5, label: 'Mayo', icon: 'humidity_high' },
-  { mes: 6, label: 'Junio', icon: 'spa' },
-  { mes: 7, label: 'Julio', icon: 'humidity_high' },
-];
+const MESES_NOMBRE = {
+  1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+  5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+  9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+};
 
 const descripcionProposito = {
   0: 'Fertilización de fondo para arranque del ciclo productivo',
@@ -30,10 +28,10 @@ function waNotifiedKey(appFecha, loteId) {
   return `wa_notified_app_${appFecha}_${loteId}`;
 }
 
-function getSelectedMes() {
+function getSelectedMes(planMonths) {
   const cur = new Date().getMonth() + 1;
   if (_ifcafeMonth === null) {
-    return (cur >= 3 && cur <= 7) ? cur : 'all';
+    return planMonths.includes(cur) ? cur : 'all';
   }
   return _ifcafeMonth;
 }
@@ -65,15 +63,29 @@ export async function renderPlanIfcafe(filterLoteId) {
     let lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*&order=nombre.asc`);
     if (!Array.isArray(lotes)) lotes = [];
 
-    const lotesConPlan = lotes.filter(l => l.edad_categoria);
+    let lotesConPlan = lotes.filter(l => l.edad_categoria);
+
+    if (filterLoteId && filterLoteId !== 'null') {
+      lotesConPlan = lotesConPlan.filter(l => l.id === filterLoteId);
+    }
+
+    const planMonthsSet = new Set();
+    lotesConPlan.forEach(l => {
+      const p = getPlanIfcafe(parseInt(l.altura_msnm) || 0);
+      p.forEach(item => planMonthsSet.add(item.mes));
+    });
+    const planMonths = [...planMonthsSet].sort((a, b) => a - b);
 
     let aplicaciones = [];
     try {
       aplicaciones = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&select=*`);
       if (!Array.isArray(aplicaciones)) aplicaciones = [];
     } catch (e) { console.warn('No se pudieron cargar aplicaciones:', e); }
+    if (filterLoteId && filterLoteId !== 'null') {
+      aplicaciones = aplicaciones.filter(a => a.lote_id === filterLoteId);
+    }
 
-    const selectedMes = getSelectedMes();
+    const selectedMes = getSelectedMes(planMonths);
 
     const gradientPorEstado = (realizada, matchFecha) => {
       if (realizada) return 'linear-gradient(135deg, #e8f5e9, #c8e6c9)';
@@ -218,9 +230,9 @@ export async function renderPlanIfcafe(filterLoteId) {
 
     const selectOptions = `
       <option value="all">Todas las aplicaciones</option>
-      ${PLAN_MESES.map(m => `
-        <option value="${m.mes}" ${selectedMes === m.mes ? 'selected' : ''}>
-          ${m.label}
+      ${planMonths.map(m => `
+        <option value="${m}" ${selectedMes === m ? 'selected' : ''}>
+          ${MESES_NOMBRE[m] || m}
         </option>
       `).join('')}
     `;
@@ -230,7 +242,7 @@ export async function renderPlanIfcafe(filterLoteId) {
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap;">
           <div>
             <h1 style="font-size:26px;font-weight:800;color:#1a1a1a;margin:0;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;">
-              <span>📋</span> Plan IFCAFE 2026
+              <span>📋</span> Plan IFCAFE 2026${lotesConPlan.length === 1 && filterLoteId && filterLoteId !== 'null' ? ` — ${lotesConPlan[0].nombre}` : ''}
             </h1>
             <p style="font-size:13px;color:#666;margin:4px 0 0;">Plan de fertilización para café según IHCAFE</p>
           </div>
@@ -255,10 +267,9 @@ export async function renderPlanIfcafe(filterLoteId) {
         `}
 
         <div style="margin-top:24px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
-          ${PLAN_MESES.map(m => `
-            <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:#555;background:white;padding:6px 14px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-              <span class="material-symbols-outlined" style="font-size:14px;color:#2d3e2c;">${m.icon}</span>
-              ${m.label}
+          ${planMonths.map(m => `
+            <span style="font-size:12px;color:#555;background:white;padding:6px 14px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+              ${MESES_NOMBRE[m] || m}
             </span>
           `).join('')}
         </div>
