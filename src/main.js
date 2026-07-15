@@ -442,6 +442,7 @@ function handleAuthCallback() {
         window.location.hash = inviteToken
             ? `#aceptar_invitacion?token=${encodeURIComponent(inviteToken)}`
             : '#dashboard';
+        window.location.reload();
     })();
     return true;
 }

@@ -36,7 +36,7 @@ export async function renderDashboard(page) {
       { data: aplicaciones, error: appErr }
     ] = await Promise.all([
       supabase.from('lotes').select('*').order('created_at', { ascending: false }),
-      supabase.from('lote_aplicaciones').select('*, lotes(nombre)').order('fecha', { ascending: false })
+      supabase.from('lote_aplicaciones').select('*, lotes(nombre)').order('fecha', { ascending: false }).range(0, 9)
     ]);
 
     if (lotesErr) throw lotesErr;

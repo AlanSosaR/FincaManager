@@ -28,29 +28,36 @@ export async function renderGanado(page = 1, filter = 'all') {
   const from = (page - 1) * PAGE_SIZE;
   const to = page * PAGE_SIZE - 1;
 
-  // We fetch counts for the summary cards
+  // We fetch counts for the summary cards using fast head:true queries
   const [
     { count: totalAnimales },
     { count: hembrasCount },
     { count: machosCount },
-    { data: vendidos },
-    { data: vacunasPendientes },
-    { data: pesajesPendientes },
-    { data: fumigacionesPendientes }
+    { count: vendidosCount },
+    { count: vacunasCount },
+    { count: pesajesCount },
+    { count: fumigacionesCount }
   ] = await Promise.all([
     supabase.from('ganado').select('*', { count: 'exact', head: true }).neq('estado', 'Vendido'),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).ilike('sexo', 'hembra'),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).ilike('sexo', 'macho'),
-    supabase.from('ganado').select('id').eq('estado', 'Vendido'),
-    supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada'),
-    supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada'),
-    supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada')
+    supabase.from('ganado').select('*', { count: 'exact', head: true }).eq('estado', 'Vendido'),
+    supabase.from('animal_vacunas').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
+    supabase.from('animal_pesajes').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
+    supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Programada')
   ]);
-  const vendidosCount = (vendidos || []).length;
 
-  const setVacunas = new Set((vacunasPendientes || []).map(v => v.animal_id));
-  const setPesajes = new Set((pesajesPendientes || []).map(p => p.animal_id));
-  const setFumigaciones = new Set((fumigacionesPendientes || []).map(f => f.animal_id));
+  let activeFilterIds = [];
+  if (currentFilter === 'vacunas') {
+    const { data } = await supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada');
+    activeFilterIds = (data || []).map(v => v.animal_id);
+  } else if (currentFilter === 'pesajes') {
+    const { data } = await supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada');
+    activeFilterIds = (data || []).map(p => p.animal_id);
+  } else if (currentFilter === 'fumigaciones') {
+    const { data } = await supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada');
+    activeFilterIds = (data || []).map(f => f.animal_id);
+  }
 
   // Build the main query based on filter
   let query = supabase.from('ganado').select('*', { count: 'exact' });
@@ -61,12 +68,8 @@ export async function renderGanado(page = 1, filter = 'all') {
     query = query.ilike('sexo', 'hembra');
   } else if (currentFilter === 'macho') {
     query = query.ilike('sexo', 'macho');
-  } else if (currentFilter === 'vacunas') {
-    query = query.in('id', Array.from(setVacunas));
-  } else if (currentFilter === 'pesajes') {
-    query = query.in('id', Array.from(setPesajes));
-  } else if (currentFilter === 'fumigaciones') {
-    query = query.in('id', Array.from(setFumigaciones));
+  } else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones') {
+    query = query.in('id', activeFilterIds.length ? activeFilterIds : ['00000000-0000-0000-0000-000000000000']);
   } else if (currentFilter === 'vendido') {
     query = query.eq('estado', 'Vendido');
   }
@@ -86,7 +89,18 @@ export async function renderGanado(page = 1, filter = 'all') {
 
   totalGanadoCount = filteredCount || 0;
 
-  const pesajesMap = await fetchLatestPesajes(animales?.map(a => a.id) || []);
+  const visibleAnimalIds = (animales || []).map(a => a.id);
+  const [visVacunas, visPesajes, visFumigaciones] = await Promise.all([
+    visibleAnimalIds.length ? supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada').in('animal_id', visibleAnimalIds) : Promise.resolve({ data: [] }),
+    visibleAnimalIds.length ? supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada').in('animal_id', visibleAnimalIds) : Promise.resolve({ data: [] }),
+    visibleAnimalIds.length ? supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada').in('animal_id', visibleAnimalIds) : Promise.resolve({ data: [] })
+  ]);
+
+  const setVacunas = new Set((visVacunas.data || []).map(v => v.animal_id));
+  const setPesajes = new Set((visPesajes.data || []).map(p => p.animal_id));
+  const setFumigaciones = new Set((visFumigaciones.data || []).map(f => f.animal_id));
+
+  const pesajesMap = await fetchLatestPesajes(visibleAnimalIds);
 
   // Stats for cards
   const hembrasRatio = totalAnimales ? Math.round((hembrasCount / totalAnimales) * 100) : 0;
@@ -143,33 +157,33 @@ export async function renderGanado(page = 1, filter = 'all') {
             </div>
           </div>
 
-          ${setVacunas.size > 0 ? `
+          ${vacunasCount > 0 ? `
           <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'vacunas' ? 'active' : ''}" data-filter="vacunas" style="border-left: 4px solid #f57c00;">
             <div class="ganado-card-header">
               <span class="material-icons" style="font-size:28px; color: #f57c00;">vaccines</span>
               <span class="ganado-card-label" style="color: #f57c00;">Vacunas Pdtes.</span>
             </div>
-            <div class="ganado-card-body"><h3 class="ganado-card-value">${setVacunas.size}</h3></div>
+            <div class="ganado-card-body"><h3 class="ganado-card-value">${vacunasCount}</h3></div>
           </div>
           ` : ''}
 
-          ${setPesajes.size > 0 ? `
+          ${pesajesCount > 0 ? `
           <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'pesajes' ? 'active' : ''}" data-filter="pesajes" style="border-left: 4px solid #e65100;">
             <div class="ganado-card-header">
               <span class="material-icons" style="font-size:28px; color: #e65100;">monitor_weight</span>
               <span class="ganado-card-label" style="color: #e65100;">Pesajes Pdtes.</span>
             </div>
-            <div class="ganado-card-body"><h3 class="ganado-card-value">${setPesajes.size}</h3></div>
+            <div class="ganado-card-body"><h3 class="ganado-card-value">${pesajesCount}</h3></div>
           </div>
           ` : ''}
 
-          ${setFumigaciones.size > 0 ? `
+          ${fumigacionesCount > 0 ? `
           <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" data-filter="fumigaciones" style="border-left: 4px solid #2c666e;">
             <div class="ganado-card-header">
               <span class="material-icons" style="font-size:28px; color: #2c666e;">bug_report</span>
               <span class="ganado-card-label" style="color: #2c666e;">Fumigaciones Pdtes.</span>
             </div>
-            <div class="ganado-card-body"><h3 class="ganado-card-value">${setFumigaciones.size}</h3></div>
+            <div class="ganado-card-body"><h3 class="ganado-card-value">${fumigacionesCount}</h3></div>
           </div>
           ` : ''}
 
@@ -234,28 +248,25 @@ window.changeGanadoPage = async function(page) {
       <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
-  // We need to re-fetch the "pendientes" sets to render rows correctly
-  const [
-    { data: vacunasPendientes },
-    { data: pesajesPendientes },
-    { data: fumigacionesPendientes }
-  ] = await Promise.all([
-    supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada'),
-    supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada'),
-    supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada')
-  ]);
-
-  const setVacunas = new Set((vacunasPendientes || []).map(v => v.animal_id));
-  const setPesajes = new Set((pesajesPendientes || []).map(p => p.animal_id));
-  const setFumigaciones = new Set((fumigacionesPendientes || []).map(f => f.animal_id));
+  let activeFilterIds = [];
+  if (currentFilter === 'vacunas') {
+    const { data } = await supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada');
+    activeFilterIds = (data || []).map(v => v.animal_id);
+  } else if (currentFilter === 'pesajes') {
+    const { data } = await supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada');
+    activeFilterIds = (data || []).map(p => p.animal_id);
+  } else if (currentFilter === 'fumigaciones') {
+    const { data } = await supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada');
+    activeFilterIds = (data || []).map(f => f.animal_id);
+  }
 
   let query = supabase.from('ganado').select('*', { count: 'exact' });
   if (currentFilter === 'all') query = query.neq('estado', 'Vendido');
   else if (currentFilter === 'hembra') query = query.ilike('sexo', 'hembra');
   else if (currentFilter === 'macho') query = query.ilike('sexo', 'macho');
-  else if (currentFilter === 'vacunas') query = query.in('id', Array.from(setVacunas));
-  else if (currentFilter === 'pesajes') query = query.in('id', Array.from(setPesajes));
-  else if (currentFilter === 'fumigaciones') query = query.in('id', Array.from(setFumigaciones));
+  else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones') {
+    query = query.in('id', activeFilterIds.length ? activeFilterIds : ['00000000-0000-0000-0000-000000000000']);
+  }
   else if (currentFilter === 'vendido') query = query.eq('estado', 'Vendido');
 
   if (currentSearchQuery) {
@@ -273,7 +284,18 @@ window.changeGanadoPage = async function(page) {
 
   totalGanadoCount = count || 0;
 
-  const pesajesMap = await fetchLatestPesajes(animales.map(a => a.id));
+  const visibleAnimalIds = (animales || []).map(a => a.id);
+  const [visVacunas, visPesajes, visFumigaciones] = await Promise.all([
+    visibleAnimalIds.length ? supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada').in('animal_id', visibleAnimalIds) : Promise.resolve({ data: [] }),
+    visibleAnimalIds.length ? supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada').in('animal_id', visibleAnimalIds) : Promise.resolve({ data: [] }),
+    visibleAnimalIds.length ? supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada').in('animal_id', visibleAnimalIds) : Promise.resolve({ data: [] })
+  ]);
+
+  const setVacunas = new Set((visVacunas.data || []).map(v => v.animal_id));
+  const setPesajes = new Set((visPesajes.data || []).map(p => p.animal_id));
+  const setFumigaciones = new Set((visFumigaciones.data || []).map(f => f.animal_id));
+
+  const pesajesMap = await fetchLatestPesajes(visibleAnimalIds);
 
   listContainer.innerHTML = animales.length === 0
     ? '<div class="ganado-empty"><p>No se encontraron animales.</p></div>'

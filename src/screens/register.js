@@ -140,7 +140,10 @@ export function initRegister() {
         loadEmpresaId();
         _pendingToken = null;
         window.Snackbar.show('Cuenta creada con éxito');
-        setTimeout(() => window.navigateTo('dashboard'), 1200);
+        setTimeout(() => {
+          window.location.hash = '#dashboard';
+          window.location.reload();
+        }, 1200);
       } else {
         const empresaNombre = document.getElementById('reg-empresa-nombre')?.value.trim() || 'Mi Finca';
         await signUp(email, password, nombre, _pendingToken, empresaNombre);

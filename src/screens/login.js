@@ -151,7 +151,10 @@ export function initLogin() {
         }
         const msg = empresaNombre ? `Has iniciado sesión en ${empresaNombre}` : 'Has iniciado sesión';
         window.Snackbar.show(msg);
-        setTimeout(() => window.navigateTo('dashboard'), 1200);
+        setTimeout(() => {
+          window.location.hash = '#dashboard';
+          window.location.reload();
+        }, 1200);
       }
     } catch (err) {
       errorEl.textContent = err.message;
