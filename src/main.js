@@ -18,7 +18,7 @@ import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
 
-import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync } from './sync.js';
+import { setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync } from './sync.js';
 import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
@@ -174,7 +174,6 @@ async function initApp() {
   await initEmpresaSelector();
 
   if (isOnline()) {
-    initSync();
     initOnlineSync();
     initRealtime();
     addNotif('download', 'cloud_download', 'Descargar para usar sin internet', 'Descarga tus datos para usarlos offline.', {
