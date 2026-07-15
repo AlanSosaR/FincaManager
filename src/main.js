@@ -22,6 +22,7 @@ import { initSync, setSyncStatusCallback, isOnline, fullDownload, processSyncQue
 import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
+import { initRealtime, disconnectRealtime } from './realtime.js';
 
 const syncIcon = document.getElementById('sync-icon');
 const syncBadge = document.getElementById('sync-badge');
@@ -190,6 +191,7 @@ async function initApp() {
       initSync();
     }
     initOnlineSync();
+    initRealtime();
   } else {
     addNotif('offline', 'cloud_off', 'Sin conexion', 'No hay internet. Los datos locales estan disponibles.');
   }
@@ -303,6 +305,7 @@ function initOnlineSync() {
     try {
       await processSyncQueue(true);
       await incrementalSync(true);
+      initRealtime();
     } catch (e) { /* silent */ }
   });
 
@@ -315,11 +318,19 @@ function initOnlineSync() {
     }
   });
 
+  // Queue flush — writes pendientes cada 5s
   setInterval(async () => {
     if (navigator.onLine && isAuthenticated()) {
       try {
         await processSyncQueue(true);
-        await incrementalSync(true);
+      } catch (e) { /* silent */ }
+    }
+  }, 5000);
+
+  // WhatsApp checkers — respaldo periódico cada 60s
+  setInterval(async () => {
+    if (navigator.onLine && isAuthenticated()) {
+      try {
         await checkPendingVaccines();
         await checkPendingFumigaciones();
         await checkOverdueVaccines();
@@ -330,7 +341,16 @@ function initOnlineSync() {
         await actualizarSaludPorPlan();
       } catch (e) { /* silent */ }
     }
-  }, 5000);
+  }, 60000);
+
+  // Full sync safety net — cada 5 minutos
+  setInterval(async () => {
+    if (navigator.onLine && isAuthenticated()) {
+      try {
+        await incrementalSync(true);
+      } catch (e) { /* silent */ }
+    }
+  }, 300000);
 }
 
 // ─── Screen imports ──────────────────────────────────────────────────────────
