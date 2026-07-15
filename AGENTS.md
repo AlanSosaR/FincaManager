@@ -10,6 +10,29 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Auth/DB: llamadas REST directas a Supabase (`authFetch`, `restFetch`, `restInsert`), NO usar `@supabase/supabase-js` ni QueryBuilder.
 - Proyecto Supabase: `udhuizkqnmkhljmezzkd`.
 
+## Lo Completado (15/07)
+
+### Realtime WebSocket — Sincronización en vivo vía Supabase Realtime
+- `src/realtime.js` (nuevo): módulo que crea un cliente WebSocket (`RealtimeClient`) conectado a `wss://udhuizkqnmkhljmezzkd.supabase.co/realtime/v1`.
+- Se suscribe a `postgres_changes` en `public.*` y filtra solo las 17 tablas de negocio (`BUSINESS_TABLES`).
+- Filtra por `empresa_id` del payload para respetar aislamiento multi-empresa.
+- Al recibir un cambio: llama `syncTable(table)` y si es `animal_vacunas`, `animal_fumigaciones` o `lote_aplicaciones` programa check de WhatsApp con 1s de delay.
+- `main.js`: `initRealtime()` se llama al iniciar app y al reconectar (evento `online`).
+- `main.js`: los checkers de WhatsApp se separaron en intervalo propio de 60s (antes compartían el intervalo de sync de 5s). Se agregó `incrementalSync()` como safety net cada 5 min.
+
+### Fix RLS — Eliminación de políticas "Allow public" que bypassaban aislamiento por empresa
+- Se verificó en Supabase que 14 tablas aún tenían políticas "Allow public *" activas junto a las nuevas políticas `is_empresa_member()`, lo que anulaba el aislamiento multi-empresa.
+- Se ejecutaron DROP POLICY para las 52 políticas públicas restantes en: `motores`, `motor_sesiones`, `motor_mantenimientos`, `potreros`, `potrero_eventos`, `herramientas`, `herramienta_mantenimientos`, `animal_pesajes`, `animal_vacunas`, `animal_fumigaciones`, `lote_aplicaciones`, `lote_personal`, `personal`, `personal_asistencia`.
+- Names corregidos: las políticas creadas por Supabase Dashboard usaban nombres cortos (ej. `"Allow public read aplicaciones"`) que no coincidían con los DROP del migration original.
+
+### Fix Realtime Publication — Tablas agregadas a `supabase_realtime`
+- `supabase/migrations/20260715_realtime_publication.sql` (nuevo): migración que agrega las 17 tablas de negocio a la publicación `supabase_realtime` y habilita `REPLICA IDENTITY FULL` en cada una (necesario para que `empresa_id` esté disponible en el WAL).
+- Antes del fix: la publicación existía pero estaba vacía → Postgres no enviaba cambios → Realtime no funcionaba.
+- Commit: `7ee3161`
+
+### opencode.json — MCP Supabase token seguro
+- `SUPABASE_ACCESS_TOKEN` cambiado de hardcodeado a `{env:SUPABASE_ACCESS_TOKEN}` para no exponer el token en git.
+
 ## Lo Completado (09/07)
 
 ### IFCAFE 2026 — Plan de Fertilización (Completado 09/07)

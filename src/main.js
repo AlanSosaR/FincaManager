@@ -115,17 +115,11 @@ function showDownloadBanner(msg, progress) {
 }
 
 setSyncStatusCallback((msg, progress) => {
-  if (msg && !syncStarted) {
-    syncStarted = true;
-    showDownloadBanner(msg, progress);
-  } else if (msg && syncStarted) {
-    showDownloadBanner(msg, progress);
-  } else if (msg === null && syncStarted) {
+  if (msg === null && syncStarted) {
     syncStarted = false;
     localStorage.setItem('finca_sync_complete', 'true');
-    window.clearScreenCache?.();
-    showDownloadBanner(null, 100);
-    setTimeout(() => window.navigateTo?.('dashboard'), 1500);
+  } else if (msg && !syncStarted) {
+    syncStarted = true;
   }
 });
 
@@ -180,20 +174,15 @@ async function initApp() {
   await initEmpresaSelector();
 
   if (isOnline()) {
-    const syncComplete = localStorage.getItem('finca_sync_complete');
-    if (!syncComplete) {
-      addNotif('download', 'cloud_download', 'Descargar datos en local', 'Tus datos estan en la nube. Descargalos para usar la app sin internet.', {
-        label: 'Descargar ahora',
-        handler: () => { fullDownload(); toggleNotif(); }
-      });
-      showInitialPrompt();
-    } else {
-      initSync();
-    }
+    initSync();
     initOnlineSync();
     initRealtime();
+    addNotif('download', 'cloud_download', 'Descargar para usar sin internet', 'Descarga tus datos para usarlos offline.', {
+      label: 'Descargar',
+      handler: () => { fullDownload(); toggleNotif(); }
+    });
   } else {
-    addNotif('offline', 'cloud_off', 'Sin conexion', 'No hay internet. Los datos locales estan disponibles.');
+    addNotif('offline', 'cloud_off', 'Sin conexion', 'Usando datos locales.');
   }
 }
 initApp();

@@ -183,7 +183,7 @@ export async function initSync() {
   const isFirstRun = !syncComplete;
 
   if (isFirstRun && isOnline()) {
-    await fullDownload();
+    await fullDownload(true);
   }
 
   if (isOnline() && !isFirstRun) {
