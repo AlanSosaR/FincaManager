@@ -4,19 +4,14 @@ import './pickers.css';
 import './detalle_motor.css';
 import './snackbar.js';
 
-// Force-unregister any existing Service Worker so fresh JS is always loaded
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (var i = 0; i < registrations.length; i++) {
-            registrations[i].unregister();
-        }
-    });
-    navigator.serviceWorker.register = function() { return Promise.reject('SW disabled'); };
-}
-
 import { registerSW } from 'virtual:pwa-register';
 
-registerSW({ immediate: true });
+let refreshing = false;
+navigator.serviceWorker?.addEventListener('controllerchange', () => {
+  if (!refreshing) { refreshing = true; window.location.reload(); }
+});
+
+registerSW({ immediate: true, onNeedRefresh() { window.location.reload(); } });
 
 import { isOnline, processSyncQueue, incrementalSync } from './sync.js';
 import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan } from './wa.js';
