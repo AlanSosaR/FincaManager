@@ -526,11 +526,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const useCache = !NO_CACHE.has(screenId);
 
         if (useCache && viewCache.has(key)) {
-            await renderAndInit(screenId, args, viewCache.get(key));
+            const cachedHtml = viewCache.get(key);
+            await renderAndInit(screenId, args, cachedHtml);
             screen.render(...args).then(freshHtml => {
                 viewCache.set(key, freshHtml);
                 const currentParts = getHashParts();
-                if (currentParts[0] === screenId) {
+                // Only re-render if the user is still on this screen AND the HTML actually changed
+                if (currentParts[0] === screenId && freshHtml !== cachedHtml) {
                     renderAndInit(screenId, args, freshHtml);
                 }
             }).catch(() => {});
