@@ -26,6 +26,13 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Fix: extraer `headers` de options antes de construir el fetch, igual que en `restFetch()` de auth.js.
 - Fix: mejorar mensaje de error incluyendo body de respuesta para debugging.
 
+### Fix Service Worker — auto-update + cache busting para evitar código JS antiguo
+- `main.js`: reemplazado bloque manual de unregister + reject por `controllerchange` listener que recarga cuando un nuevo SW toma control.
+- `main.js`: `registerSW({ immediate: true, onNeedRefresh() { window.location.reload() } })` — detecta contenido nuevo y recarga al instante.
+- `vite.config.js`: `build.rollupOptions.output` con hashes en nombres de archivo (`[name]-[hash].js`) para que el navegador detecte cambios.
+- `vite.config.js`: `cleanupOutdatedCaches: true` en workbox para eliminar caches viejos automáticamente.
+- Soluciona: tras deploy de nuevo código, el service worker detecta hashes diferentes, hace skipWaiting + clientsClaim, y el controllerchange recarga la página con el código fresco.
+
 ### Eliminación de forced full download al iniciar
 - `main.js`: eliminados `showDownloadBanner()`, `showInitialPrompt()`, notificación "Descargar para usar sin internet".
 - `sync.js`: eliminados `setSyncStatusCallback()`, `onSyncStatusChange`, `initSync()` (código muerto).
