@@ -164,55 +164,95 @@ export async function initDetalleAnimal(animalId, flag) {
 
 async function loadAllData(animalId, container, flag) {
     try {
-        // Fetch animal with potrero name via join
-        const [animalArr, vaccinesData, weightsData, fumigData, ventaData] = await Promise.all([
-            restFetch(`/rest/v1/ganado?id=eq.${animalId}&select=*,potreros(nombre)&limit=1`),
-            restFetch(`/rest/v1/animal_vacunas?animal_id=eq.${animalId}&order=fecha.desc`),
-            restFetch(`/rest/v1/animal_pesajes?animal_id=eq.${animalId}&order=fecha.asc`),
-            restFetch(`/rest/v1/animal_fumigaciones?animal_id=eq.${animalId}&order=fecha.desc`),
-            restFetch(`/rest/v1/animal_ventas?animal_id=eq.${animalId}&order=fecha_venta.desc&limit=1`),
-        ]);
+        let animalData = null;
+        let vaccinesData = [];
+        let weightsData = [];
+        let fumigData = [];
+        let ventaData = [];
 
-        const animalData = Array.isArray(animalArr) ? animalArr[0] : animalArr;
-        if (!animalData) throw new Error('Animal no encontrado');
-        currentAnimal = animalData;
+        // 1. Fast local read from IndexedDB for instant 0ms load
+        try {
+            animalData = await db.ganado.get(animalId);
+            if (animalData) {
+                const [potreroObj, vArr, wArr, fArr, veArr] = await Promise.all([
+                    animalData.potrero_id && db.potreros ? db.potreros.get(animalData.potrero_id).catch(() => null) : null,
+                    db.animal_vacunas ? db.animal_vacunas.where('animal_id').equals(animalId).toArray().catch(() => []) : [],
+                    db.animal_pesajes ? db.animal_pesajes.where('animal_id').equals(animalId).toArray().catch(() => []) : [],
+                    db.animal_fumigaciones ? db.animal_fumigaciones.where('animal_id').equals(animalId).toArray().catch(() => []) : [],
+                    db.animal_ventas ? db.animal_ventas.where('animal_id').equals(animalId).toArray().catch(() => []) : []
+                ]);
 
-        vaccines = Array.isArray(vaccinesData) ? vaccinesData : [];
-        weights  = Array.isArray(weightsData)  ? weightsData  : [];
-        fumigaciones = Array.isArray(fumigData) ? fumigData   : [];
+                if (potreroObj) {
+                    animalData.potreros = potreroObj;
+                }
 
-        if (weights.length >= 2) {
-            const latest = weights[weights.length - 1];
-            const previous = weights[weights.length - 2];
-            lastWeight = parseFloat(latest.peso);
-            const prevW = parseFloat(previous.peso);
-            weightChange = lastWeight - prevW;
-            weightTrend = weightChange > 0 ? 'positive' : (weightChange < 0 ? 'negative' : 'neutral');
-        } else if (weights.length === 1) {
-            lastWeight = parseFloat(weights[0].peso);
-            weightChange = 0;
-            weightTrend = 'neutral';
-        } else {
-            lastWeight = 0;
-            weightChange = 0;
-            weightTrend = 'neutral';
+                vaccinesData = vArr || [];
+                weightsData = wArr || [];
+                fumigData = fArr || [];
+                ventaData = veArr || [];
+
+                weightsData.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+                vaccinesData.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                fumigData.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                ventaData.sort((a, b) => new Date(b.fecha_venta) - new Date(a.fecha_venta));
+
+                if (ventaData.length > 0) {
+                    const v = ventaData[0];
+                    animalData.precio_venta = v.precio_venta;
+                    animalData.fecha_venta  = v.fecha_venta;
+                    animalData.comprador    = v.comprador;
+                    animalData.peso_venta   = v.peso_venta;
+                }
+
+                currentAnimal = animalData;
+                vaccines = vaccinesData;
+                weights = weightsData;
+                fumigaciones = fumigData;
+
+                calculateWeightStats(weightsData);
+
+                // Render INSTANTLY
+                renderFullContent(container, animalId, flag);
+            }
+        } catch (dbErr) {
+            console.warn('IndexedDB read error in detalle_animal:', dbErr);
         }
 
-        const ventaArr = Array.isArray(ventaData) ? ventaData : (ventaData ? [ventaData] : []);
-        if (ventaArr.length > 0) {
-            const v = ventaArr[0];
-            animalData.precio_venta = v.precio_venta;
-            animalData.fecha_venta  = v.fecha_venta;
-            animalData.comprador    = v.comprador;
-            animalData.peso_venta   = v.peso_venta;
+        // 2. Background REST refresh to ensure freshness
+        if (navigator.onLine) {
+            const [animalArr, vRest, wRest, fRest, veRest] = await Promise.all([
+                restFetch(`/rest/v1/ganado?id=eq.${animalId}&select=*,potreros(nombre)&limit=1`).catch(() => null),
+                restFetch(`/rest/v1/animal_vacunas?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
+                restFetch(`/rest/v1/animal_pesajes?animal_id=eq.${animalId}&order=fecha.asc`).catch(() => null),
+                restFetch(`/rest/v1/animal_fumigaciones?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
+                restFetch(`/rest/v1/animal_ventas?animal_id=eq.${animalId}&order=fecha_venta.desc&limit=1`).catch(() => null),
+            ]);
+
+            const freshAnimal = Array.isArray(animalArr) ? animalArr[0] : animalArr;
+            if (freshAnimal) {
+                currentAnimal = freshAnimal;
+                vaccines = Array.isArray(vRest) ? vRest : vaccinesData;
+                weights = Array.isArray(wRest) ? wRest : weightsData;
+                fumigaciones = Array.isArray(fRest) ? fRest : fumigData;
+                const freshVenta = Array.isArray(veRest) ? veRest : ventaData;
+
+                calculateWeightStats(weights);
+                if (freshVenta && freshVenta.length > 0) {
+                    const v = freshVenta[0];
+                    currentAnimal.precio_venta = v.precio_venta;
+                    currentAnimal.fecha_venta  = v.fecha_venta;
+                    currentAnimal.comprador    = v.comprador;
+                    currentAnimal.peso_venta   = v.peso_venta;
+                }
+
+                // Update UI with fresh server data
+                renderFullContent(container, animalId, flag);
+            } else if (!animalData) {
+                throw new Error('Animal no encontrado');
+            }
+        } else if (!animalData) {
+            throw new Error('Animal no encontrado en almacenamiento local');
         }
-
-        // Reset pagination when fresh data is loaded
-        vaccinesPage = 1;
-        weightsPage = 1;
-        fumigPage = 1;
-
-        renderFullContent(container, animalId, flag);
     } catch (err) {
         console.error('Error loading animal data:', err);
         container.innerHTML = `
@@ -222,6 +262,25 @@ async function loadAllData(animalId, container, flag) {
                 <button class="btn-m3-tonal" onclick="window.location.reload()" style="margin-top: 16px;">Reintentar</button>
             </div>
         `;
+    }
+}
+
+function calculateWeightStats(wList) {
+    if (wList.length >= 2) {
+        const latest = wList[wList.length - 1];
+        const previous = wList[wList.length - 2];
+        lastWeight = parseFloat(latest.peso);
+        const prevW = parseFloat(previous.peso);
+        weightChange = lastWeight - prevW;
+        weightTrend = weightChange > 0 ? 'positive' : (weightChange < 0 ? 'negative' : 'neutral');
+    } else if (wList.length === 1) {
+        lastWeight = parseFloat(wList[0].peso);
+        weightChange = 0;
+        weightTrend = 'neutral';
+    } else {
+        lastWeight = 0;
+        weightChange = 0;
+        weightTrend = 'neutral';
     }
 }
 
