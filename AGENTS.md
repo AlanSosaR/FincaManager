@@ -12,6 +12,12 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 
 ## Lo Completado (22/07)
 
+### Fix ERR_INSUFFICIENT_RESOURCES — Deduplicación y Cooldown en syncTable
+- `sync.js`: añadidos `activeSyncPromises` (reutiliza promesas en curso para evitar peticiones duplicadas a la misma tabla) y `lastSyncTime` (cooldown de 15s entre descargas en segundo plano).
+- `sync.js`: `incrementalSync()` procesa tablas en lotes de 3 en paralelo en lugar de 17 simultáneas para no saturar el pool de sockets HTTP del navegador.
+- `query-builder.js`: `_refreshCacheAsync()` delega a `syncTable(this.tableName)` heredando la deduplicación y cooldown.
+- Soluciona: `net::ERR_INSUFFICIENT_RESOURCES` causado por ráfagas de consultas a la API REST de Supabase al navegar o renderizar pantallas.
+
 ### Stale-while-revalidate en QueryBuilder — navegación instantánea sin forced full download
 - `query-builder.js`: `_execute()` ahora implementa cache-first + background REST refresh.
 - Flujo: leer IndexedDB primero → si hay datos, devolver instantáneo → en background disparar `_refreshCacheAsync()` que descarga todas las filas de la tabla y actualiza IndexedDB.

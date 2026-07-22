@@ -167,45 +167,71 @@ export async function processSyncQueue() {
   }
 }
 
-export async function syncTable(tableName) {
+const activeSyncPromises = new Map();
+const lastSyncTime = new Map();
+
+export async function syncTable(tableName, force = false) {
   if (!isOnline()) return;
   if (!SUPABASE_TABLES.includes(tableName)) return;
-  try {
-    const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
-      ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
-      : '';
-    let allData = [];
-    let from = 0;
-    const limit = 1000;
-    while (true) {
-      const res = await supabaseFetch(
-        `/rest/v1/${tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
-      );
-      const data = await res.json();
-      if (!data.length) break;
-      allData = allData.concat(data);
-      from += limit;
-      if (data.length < limit) break;
-    }
-    const dexieTable = db.table(tableName);
-    const localRecords = await dexieTable.toArray();
-    const localIds = new Set(localRecords.map(r => r.id));
-    const serverIds = new Set(allData.map(r => r.id));
-    for (const localId of localIds) {
-      if (!serverIds.has(localId)) {
-        await dexieTable.delete(localId);
-      }
-    }
-    if (allData.length) {
-      await dexieTable.bulkPut(allData);
-    }
-  } catch (err) {
-    console.warn(`syncTable: error en ${tableName}`, err);
+
+  const now = Date.now();
+  const lastTime = lastSyncTime.get(tableName) || 0;
+  if (!force && now - lastTime < 15000) {
+    return;
   }
+
+  if (activeSyncPromises.has(tableName)) {
+    return activeSyncPromises.get(tableName);
+  }
+
+  const promise = (async () => {
+    try {
+      const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
+        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+        : '';
+      let allData = [];
+      let from = 0;
+      const limit = 1000;
+      while (true) {
+        const res = await supabaseFetch(
+          `/rest/v1/${tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
+        );
+        const data = await res.json();
+        if (!data.length) break;
+        allData = allData.concat(data);
+        from += limit;
+        if (data.length < limit) break;
+      }
+      const dexieTable = db.table(tableName);
+      const localRecords = await dexieTable.toArray();
+      const localIds = new Set(localRecords.map(r => r.id));
+      const serverIds = new Set(allData.map(r => r.id));
+      for (const localId of localIds) {
+        if (!serverIds.has(localId)) {
+          await dexieTable.delete(localId);
+        }
+      }
+      if (allData.length) {
+        await dexieTable.bulkPut(allData);
+      }
+      lastSyncTime.set(tableName, Date.now());
+    } catch (err) {
+      console.warn(`syncTable: error en ${tableName}`, err);
+    } finally {
+      activeSyncPromises.delete(tableName);
+    }
+  })();
+
+  activeSyncPromises.set(tableName, promise);
+  return promise;
 }
 
-export async function incrementalSync() {
+export async function incrementalSync(force = false) {
   if (!isOnline()) return;
   const tables = [...BUSINESS_TABLES];
-  await Promise.all(tables.map(t => syncTable(t)));
+  const BATCH_SIZE = 3;
+  for (let i = 0; i < tables.length; i += BATCH_SIZE) {
+    const batch = tables.slice(i, i + BATCH_SIZE);
+    await Promise.all(batch.map(t => syncTable(t, force)));
+  }
 }

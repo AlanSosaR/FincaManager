@@ -1,5 +1,5 @@
 import db from './db.js';
-import { supabaseFetch } from './sync.js';
+import { supabaseFetch, syncTable } from './sync.js';
 
 function isOnline() {
   return navigator.onLine;
@@ -383,34 +383,7 @@ export default class QueryBuilder {
 
   async _refreshCacheAsync() {
     try {
-      const empresaFilter = window._currentEmpresaId
-        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
-        : '';
-      let allData = [];
-      let from = 0;
-      const limit = 1000;
-      while (true) {
-        const res = await supabaseFetch(
-          `/rest/v1/${this.tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
-        );
-        const data = await res.json();
-        if (!data.length) break;
-        allData = allData.concat(data);
-        from += limit;
-        if (data.length < limit) break;
-      }
-      const dexieTable = db.table(this.tableName);
-      const existing = await dexieTable.toArray();
-      const existingIds = new Set(existing.map(r => r.id));
-      const serverIds = new Set(allData.map(r => r.id));
-      for (const id of existingIds) {
-        if (!serverIds.has(id)) {
-          await dexieTable.delete(id);
-        }
-      }
-      if (allData.length) {
-        await dexieTable.bulkPut(allData);
-      }
+      await syncTable(this.tableName);
     } catch (e) {
       console.warn(`_refreshCacheAsync error en ${this.tableName}:`, e);
     }
