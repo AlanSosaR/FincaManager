@@ -218,38 +218,60 @@ async function loadAllData(animalId, container, flag) {
             console.warn('IndexedDB read error in detalle_animal:', dbErr);
         }
 
-        // 2. Background REST refresh to ensure freshness
+        // 2. Background REST refresh — runs truly async so it never blocks the first render
         if (navigator.onLine) {
-            const [animalArr, vRest, wRest, fRest, veRest] = await Promise.all([
-                restFetch(`/rest/v1/ganado?id=eq.${animalId}&select=*,potreros(nombre)&limit=1`).catch(() => null),
-                restFetch(`/rest/v1/animal_vacunas?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
-                restFetch(`/rest/v1/animal_pesajes?animal_id=eq.${animalId}&order=fecha.asc`).catch(() => null),
-                restFetch(`/rest/v1/animal_fumigaciones?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
-                restFetch(`/rest/v1/animal_ventas?animal_id=eq.${animalId}&order=fecha_venta.desc&limit=1`).catch(() => null),
-            ]);
+            const snapshotUpdatedAt = animalData?.updated_at;
+            setTimeout(async () => {
+                // Abort if the user already navigated away
+                if (!document.getElementById('da-container')) return;
+                try {
+                    const [animalArr, vRest, wRest, fRest, veRest] = await Promise.all([
+                        restFetch(`/rest/v1/ganado?id=eq.${animalId}&select=*,potreros(nombre)&limit=1`).catch(() => null),
+                        restFetch(`/rest/v1/animal_vacunas?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
+                        restFetch(`/rest/v1/animal_pesajes?animal_id=eq.${animalId}&order=fecha.asc`).catch(() => null),
+                        restFetch(`/rest/v1/animal_fumigaciones?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
+                        restFetch(`/rest/v1/animal_ventas?animal_id=eq.${animalId}&order=fecha_venta.desc&limit=1`).catch(() => null),
+                    ]);
 
-            const freshAnimal = Array.isArray(animalArr) ? animalArr[0] : animalArr;
-            if (freshAnimal) {
-                currentAnimal = freshAnimal;
-                vaccines = Array.isArray(vRest) ? vRest : vaccinesData;
-                weights = Array.isArray(wRest) ? wRest : weightsData;
-                fumigaciones = Array.isArray(fRest) ? fRest : fumigData;
-                const freshVenta = Array.isArray(veRest) ? veRest : ventaData;
+                    const freshAnimal = Array.isArray(animalArr) ? animalArr[0] : animalArr;
+                    if (!freshAnimal) return;
 
-                calculateWeightStats(weights);
-                if (freshVenta && freshVenta.length > 0) {
-                    const v = freshVenta[0];
-                    currentAnimal.precio_venta = v.precio_venta;
-                    currentAnimal.fecha_venta  = v.fecha_venta;
-                    currentAnimal.comprador    = v.comprador;
-                    currentAnimal.peso_venta   = v.peso_venta;
+                    // Skip re-render if nothing changed (same updated_at from server)
+                    const serverUpdatedAt = freshAnimal.updated_at;
+                    const freshVaccineCount = Array.isArray(vRest) ? vRest.length : vaccinesData.length;
+                    const freshWeightCount  = Array.isArray(wRest) ? wRest.length : weightsData.length;
+                    const freshFumigCount   = Array.isArray(fRest) ? fRest.length : fumigData.length;
+                    const dataUnchanged = serverUpdatedAt === snapshotUpdatedAt
+                        && freshVaccineCount === vaccinesData.length
+                        && freshWeightCount  === weightsData.length
+                        && freshFumigCount   === fumigData.length;
+
+                    if (dataUnchanged) return; // Nothing changed — avoid flicker
+
+                    // Abort again if user navigated away while fetching
+                    if (!document.getElementById('da-container')) return;
+
+                    currentAnimal = freshAnimal;
+                    vaccines = Array.isArray(vRest) ? vRest : vaccinesData;
+                    weights  = Array.isArray(wRest) ? wRest : weightsData;
+                    fumigaciones = Array.isArray(fRest) ? fRest : fumigData;
+                    const freshVenta = Array.isArray(veRest) ? veRest : ventaData;
+
+                    calculateWeightStats(weights);
+                    if (freshVenta && freshVenta.length > 0) {
+                        const v = freshVenta[0];
+                        currentAnimal.precio_venta = v.precio_venta;
+                        currentAnimal.fecha_venta  = v.fecha_venta;
+                        currentAnimal.comprador    = v.comprador;
+                        currentAnimal.peso_venta   = v.peso_venta;
+                    }
+
+                    const containerEl = document.getElementById('da-container');
+                    if (containerEl) renderFullContent(containerEl, animalId, flag);
+                } catch (e) {
+                    // Silent — IndexedDB data already shown
                 }
-
-                // Update UI with fresh server data
-                renderFullContent(container, animalId, flag);
-            } else if (!animalData) {
-                throw new Error('Animal no encontrado');
-            }
+            }, 0);
         } else if (!animalData) {
             throw new Error('Animal no encontrado en almacenamiento local');
         }

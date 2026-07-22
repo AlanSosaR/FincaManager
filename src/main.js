@@ -389,7 +389,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const NO_CACHE = new Set([
         'nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote',
         'nueva_actividad','nuevo_personal','aceptar_invitacion',
-        'recuperar','restablecer'
+        'recuperar','restablecer',
+        // Detail screens: their render() only returns a spinner skeleton;
+        // data is loaded via init(). Caching the spinner causes triple re-renders
+        // (cached HTML → initDetalleX → IndexedDB render → REST render).
+        'detalle_animal','detalle_motor','detalle_potrero',
+        'detalle_herramienta','detalle_lote','detalle_personal'
     ]);
 
     window.clearScreenCache = (screenId) => {
