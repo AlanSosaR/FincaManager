@@ -319,18 +319,7 @@ export default class QueryBuilder {
     return { data, count: this._count ? totalCount : undefined, error: null };
   }
 
-  async _execute() {
-    this._ensureEmpresaFilter();
-    if (this._deleteMode) return this._executeDelete();
-    if (this._updateData) return this._executeUpdate();
-
-    if (isOnline()) {
-      return await this._executeOnline();
-    }
-
-    const table = db.table(this.tableName);
-    let results = await table.toArray();
-
+  _processLocally(results) {
     for (const filter of this._filters) {
       if (filter.type === 'eq') {
         results = results.filter(r => r[filter.field] === filter.value);
@@ -383,10 +372,6 @@ export default class QueryBuilder {
       results = results.slice(this._rangeFrom, this._rangeTo + 1);
     }
 
-    for (const join of this._joins) {
-      results = await this._applyJoin(results, join);
-    }
-
     if (this._count === 'exact' && this._head) {
       return { data: null, count: totalCount, error: null };
     }
@@ -394,6 +379,62 @@ export default class QueryBuilder {
       return { data: results[0] || null, error: null };
     }
     return { data: results, count: this._count ? totalCount : undefined, error: null };
+  }
+
+  async _refreshCacheAsync() {
+    try {
+      const empresaFilter = window._currentEmpresaId
+        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+        : '';
+      let allData = [];
+      let from = 0;
+      const limit = 1000;
+      while (true) {
+        const res = await supabaseFetch(
+          `/rest/v1/${this.tableName}?select=*&order=created_at.asc&limit=${limit}&offset=${from}${empresaFilter}`
+        );
+        const data = await res.json();
+        if (!data.length) break;
+        allData = allData.concat(data);
+        from += limit;
+        if (data.length < limit) break;
+      }
+      const dexieTable = db.table(this.tableName);
+      const existing = await dexieTable.toArray();
+      const existingIds = new Set(existing.map(r => r.id));
+      const serverIds = new Set(allData.map(r => r.id));
+      for (const id of existingIds) {
+        if (!serverIds.has(id)) {
+          await dexieTable.delete(id);
+        }
+      }
+      if (allData.length) {
+        await dexieTable.bulkPut(allData);
+      }
+    } catch (e) {
+      console.warn(`_refreshCacheAsync error en ${this.tableName}:`, e);
+    }
+  }
+
+  async _execute() {
+    this._ensureEmpresaFilter();
+    if (this._deleteMode) return this._executeDelete();
+    if (this._updateData) return this._executeUpdate();
+
+    const table = db.table(this.tableName);
+    const localData = await table.toArray();
+
+    if (isOnline()) {
+      this._refreshCacheAsync();
+
+      if (localData.length > 0) {
+        return this._processLocally(localData);
+      }
+
+      return await this._executeOnline();
+    }
+
+    return this._processLocally(localData);
   }
 
   async _applyJoin(results, join) {
