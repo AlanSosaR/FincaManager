@@ -18,7 +18,7 @@ import { registerSW } from 'virtual:pwa-register';
 
 registerSW({ immediate: true });
 
-import { setSyncStatusCallback, isOnline, fullDownload, processSyncQueue, incrementalSync } from './sync.js';
+import { isOnline, processSyncQueue, incrementalSync } from './sync.js';
 import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
@@ -86,63 +86,6 @@ document.addEventListener('click', (e) => {
 });
 
 const container = document.getElementById('screen-container');
-let syncStarted = false;
-
-function showDownloadBanner(msg, progress) {
-  if (!container) return;
-  if (msg === null) {
-    container.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
-        <span class="material-icons" style="font-size:56px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">check_circle</span>
-        <h2 style="font-size:24px;font-weight:800;font-family:'Work Sans',sans-serif;color:#2d3e2c;margin-bottom:8px;">Todo listo</h2>
-        <p style="color:#666;font-size:14px;max-width:360px;line-height:1.5;">Los datos se descargaron correctamente. Ya puedes usar la app sin conexión.</p>
-      </div>
-    `;
-    return;
-  }
-  const bar = Math.round(progress || 0);
-  container.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
-      <span class="material-icons animate-spin" style="font-size:48px;color:var(--m3-primary,#2d3e2c);margin-bottom:24px;">sync</span>
-      <h2 style="font-size:22px;font-weight:700;font-family:'Work Sans',sans-serif;color:#1a1a1a;margin-bottom:8px;">${msg}</h2>
-      <p style="color:#666;font-size:14px;max-width:320px;margin-bottom:24px;">Esto puede tomar unos segundos dependiendo de tu conexion.</p>
-      <div style="width:100%;max-width:320px;height:8px;background:#e0e0e0;border-radius:12px;overflow:hidden;">
-        <div style="width:${bar}%;height:100%;background:#2d3e2c;border-radius:12px;transition:width 0.3s ease;"></div>
-      </div>
-      <p style="color:#888;font-size:13px;margin-top:8px;">${bar}%</p>
-    </div>
-  `;
-}
-
-setSyncStatusCallback((msg, progress) => {
-  if (msg === null && syncStarted) {
-    syncStarted = false;
-    localStorage.setItem('finca_sync_complete', 'true');
-  } else if (msg && !syncStarted) {
-    syncStarted = true;
-  }
-});
-
-function showInitialPrompt() {
-  if (!container) return;
-  container.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;padding:32px;text-align:center;">
-      <span class="material-icons" style="font-size:56px;color:var(--m3-primary,#2d3e2c);margin-bottom:16px;">cloud_download</span>
-      <h2 style="font-size:24px;font-weight:800;font-family:'Work Sans',sans-serif;color:#2d3e2c;margin-bottom:8px;">Descargar datos en local</h2>
-      <p style="color:#2d3e2c;font-size:14px;max-width:360px;margin-bottom:24px;line-height:1.5;">
-        Para usar la app sin necesidad de internet, descarga tus datos existentes en el dispositivo.
-      </p>
-      <button id="btn-start-download" style="background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:14px 32px;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,71,65,0.3);transition:transform .2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-        <span class="material-icons" style="vertical-align:middle;margin-right:8px;">cloud_download</span>
-        Descargar ahora
-      </button>
-    </div>
-  `;
-  document.getElementById('btn-start-download')?.addEventListener('click', () => {
-    fullDownload();
-    toggleNotif();
-  });
-}
 
 async function initApp() {
   if (!isAuthenticated()) return;
@@ -176,12 +119,8 @@ async function initApp() {
   if (isOnline()) {
     initOnlineSync();
     initRealtime();
-    addNotif('download', 'cloud_download', 'Descargar para usar sin internet', 'Descarga tus datos para usarlos offline.', {
-      label: 'Descargar',
-      handler: () => { fullDownload(); toggleNotif(); }
-    });
   } else {
-    addNotif('offline', 'cloud_off', 'Sin conexion', 'Usando datos locales.');
+    addNotif('offline', 'cloud_off', 'Sin conexion', 'Usando datos locales. Los cambios se sincronizaran cuando recuperes la conexion.');
   }
 }
 initApp();
@@ -291,8 +230,8 @@ function initOnlineSync() {
   window.addEventListener('online', async () => {
     if (!isAuthenticated()) return;
     try {
-      await processSyncQueue(true);
-      await incrementalSync(true);
+      await processSyncQueue();
+      await incrementalSync();
       initRealtime();
     } catch (e) { /* silent */ }
   });
@@ -300,8 +239,8 @@ function initOnlineSync() {
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible' && navigator.onLine && isAuthenticated()) {
       try {
-        await processSyncQueue(true);
-        await incrementalSync(true);
+        await processSyncQueue();
+        await incrementalSync();
       } catch (e) { /* silent */ }
     }
   });
@@ -310,7 +249,7 @@ function initOnlineSync() {
   setInterval(async () => {
     if (navigator.onLine && isAuthenticated()) {
       try {
-        await processSyncQueue(true);
+        await processSyncQueue();
       } catch (e) { /* silent */ }
     }
   }, 5000);
@@ -335,7 +274,7 @@ function initOnlineSync() {
   setInterval(async () => {
     if (navigator.onLine && isAuthenticated()) {
       try {
-        await incrementalSync(true);
+        await incrementalSync();
       } catch (e) { /* silent */ }
     }
   }, 300000);

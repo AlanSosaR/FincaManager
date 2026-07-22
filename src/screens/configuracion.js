@@ -22,8 +22,12 @@ export async function renderConfiguracion() {
   let connectedByName = '';
   if (config?.whatsapp_connected_by && config.whatsapp_connected_by !== currentUserId) {
     try {
-      const u = await db.usuarios?.get(config.whatsapp_connected_by);
-      connectedByName = u?.nombre || '';
+      const data = await restFetch(`/rest/v1/usuarios?id=eq.${encodeURIComponent(config.whatsapp_connected_by)}&select=nombre`).catch(() => null);
+      if (data?.[0]?.nombre) connectedByName = data[0].nombre;
+      else {
+        const u = await db.usuarios?.get(config.whatsapp_connected_by);
+        connectedByName = u?.nombre || '';
+      }
     } catch {}
   }
 

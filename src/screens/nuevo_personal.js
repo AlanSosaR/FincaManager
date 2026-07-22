@@ -5,7 +5,7 @@ export async function renderNuevoPersonal(personalId, returnScreen, returnId) {
   if (personalId === 'null') personalId = null;
   let persona = null;
   if (personalId) {
-    persona = await db.personal.get(personalId);
+    persona = await restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(personalId)}&select=*`).then(r => r?.[0]).catch(() => null);
   }
 
   const isEdit = !!persona;
@@ -83,18 +83,15 @@ export function initNuevoPersonal(personalId, returnScreen, returnId) {
 
     try {
       if (personalId) {
-        try {
-          const patchBody = { ...data };
-          delete patchBody.id;
-          delete patchBody.created_at;
-          delete patchBody.empresa_id;
-          await restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(personalId)}`, {
-            method: 'PATCH',
-            body: JSON.stringify(patchBody),
-          });
-        } catch {}
-        const existing = await db.personal.get(personalId) || {};
-        await db.personal.put({ ...existing, ...data, id: personalId, updated_at: new Date().toISOString() });
+        const patchBody = { ...data };
+        delete patchBody.id;
+        delete patchBody.created_at;
+        delete patchBody.empresa_id;
+        await restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(personalId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patchBody),
+        }).catch(() => {});
+        await db.personal.put({ ...data, id: personalId, updated_at: new Date().toISOString() });
         window.Snackbar.show('Personal actualizado');
       } else {
         const record = { ...data };

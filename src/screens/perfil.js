@@ -12,13 +12,18 @@ export async function renderPerfil() {
   let empresaNombre = 'Mi Finca';
   if (empresaId) {
     try {
-      const emp = await db.empresas?.get(empresaId);
-      if (emp) empresaNombre = emp.nombre;
+      const data = await restFetch(`/rest/v1/empresas?id=eq.${empresaId}&select=nombre`);
+      if (data?.[0]?.nombre) empresaNombre = data[0].nombre;
       else {
-        const data = await restFetch(`/rest/v1/empresas?id=eq.${empresaId}&select=nombre`);
-        if (data?.[0]?.nombre) empresaNombre = data[0].nombre;
+        const emp = await db.empresas?.get(empresaId);
+        if (emp) empresaNombre = emp.nombre;
       }
-    } catch {}
+    } catch {
+      try {
+        const emp = await db.empresas?.get(empresaId);
+        if (emp) empresaNombre = emp.nombre;
+      } catch {}
+    }
   }
 
   let userRole = '';

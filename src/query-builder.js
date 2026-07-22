@@ -325,11 +325,7 @@ export default class QueryBuilder {
     if (this._updateData) return this._executeUpdate();
 
     if (isOnline()) {
-      try {
-        return await this._executeOnline();
-      } catch (e) {
-        console.warn(`REST fallback para ${this.tableName}:`, e?.message);
-      }
+      return await this._executeOnline();
     }
 
     const table = db.table(this.tableName);

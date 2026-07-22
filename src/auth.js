@@ -147,7 +147,6 @@ export async function logout() {
   } catch { /* ignore */ }
   saveSession(null);
   localStorage.removeItem('current_empresa_id');
-  localStorage.removeItem('finca_sync_complete');
 }
 
 export async function getUser() {
@@ -243,7 +242,6 @@ export async function getUserEmpresas() {
 export async function switchEmpresa(empresaId) {
   localStorage.setItem('current_empresa_id', empresaId);
   loadEmpresaId();
-  localStorage.removeItem('finca_sync_complete');
   window.clearScreenCache?.();
   window.navigateTo?.('dashboard');
 }

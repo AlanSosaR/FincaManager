@@ -2,7 +2,6 @@ import { getAccessToken } from './auth.js';
 import db from './db.js';
 
 let syncInProgress = false;
-let onSyncStatusChange = null;
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://udhuizkqnmkhljmezzkd.supabase.co';
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkaHVpemtxbm1raGxqbWV6emtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTM2MTYsImV4cCI6MjA5MTIyOTYxNn0.W9bJ1S8A45RUGaulhdVG6UohGmGNxGMjLBsc0Q7voPE';
@@ -35,12 +34,11 @@ export async function supabaseFetch(path, options = {}) {
     },
     ...options,
   });
-  if (!res.ok) throw new Error(`Supabase API ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Supabase API ${res.status} en ${path}: ${body.slice(0, 200)}`);
+  }
   return res;
-}
-
-export function setSyncStatusCallback(fn) {
-  onSyncStatusChange = fn;
 }
 
 async function updateSyncMeta(key, value) {
@@ -56,11 +54,10 @@ export function isOnline() {
   return navigator.onLine;
 }
 
-export async function fullDownload(silent = false) {
+export async function fullDownload() {
   if (syncInProgress) return;
   syncInProgress = true;
   try {
-    if (!silent) onSyncStatusChange?.('Descargando datos...', 0);
     const pendingIds = new Map();
     const pending = await db._sync_queue.toArray();
     for (const item of pending) {
@@ -70,11 +67,7 @@ export async function fullDownload(silent = false) {
       }
     }
 
-    const totalTables = SUPABASE_TABLES.length;
-    for (let i = 0; i < totalTables; i++) {
-      const tableName = SUPABASE_TABLES[i];
-      const progress = Math.round(((i + 1) / totalTables) * 100);
-      if (!silent) onSyncStatusChange?.(`Descargando ${tableName}...`, progress);
+    for (const tableName of SUPABASE_TABLES) {
       try {
         let allData = [];
         let from = 0;
@@ -113,18 +106,14 @@ export async function fullDownload(silent = false) {
       }
     }
     await updateSyncMeta('last_full_sync', new Date().toISOString());
-    localStorage.setItem('finca_sync_complete', 'true');
-    if (!silent) onSyncStatusChange?.(null, 100);
   } catch (err) {
     console.error('fullDownload error:', err);
-    if (!silent) onSyncStatusChange?.('Finalizando...', 90);
-    if (!silent) setTimeout(() => onSyncStatusChange?.(null, 100), 2000);
   } finally {
     syncInProgress = false;
   }
 }
 
-export async function processSyncQueue(silent = false) {
+export async function processSyncQueue() {
   if (syncInProgress) return;
   if (!isOnline()) return;
   syncInProgress = true;
@@ -169,25 +158,10 @@ export async function processSyncQueue(silent = false) {
       }
     }
 
-    if (!silent) onSyncStatusChange?.(null);
   } catch (err) {
     console.error('processSyncQueue error:', err);
-    if (!silent) onSyncStatusChange?.(null);
   } finally {
     syncInProgress = false;
-  }
-}
-
-export async function initSync() {
-  const syncComplete = localStorage.getItem('finca_sync_complete');
-  const isFirstRun = !syncComplete;
-
-  if (isFirstRun && isOnline()) {
-    await fullDownload(true);
-  }
-
-  if (isOnline() && !isFirstRun) {
-    setTimeout(processSyncQueue, 1000);
   }
 }
 
@@ -228,7 +202,7 @@ export async function syncTable(tableName) {
   }
 }
 
-export async function incrementalSync(silent = true) {
+export async function incrementalSync() {
   if (!isOnline()) return;
   const tables = [...BUSINESS_TABLES];
   await Promise.all(tables.map(t => syncTable(t)));
