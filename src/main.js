@@ -386,12 +386,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleElement = document.getElementById('current-screen-title');
 
     const viewCache = new Map();
-    const NO_CACHE = new Set(['dashboard','motores','herramientas','potreros',
-                               'ganado','nuevo_motor','nuevo_animal','nuevo_potrero',
-                               'detalle_motor','detalle_animal','detalle_potrero',
-                               'detalle_herramienta','nuevo_lote','detalle_lote',
-                               'nueva_actividad','nuevo_personal','detalle_personal',
-                               'personal','perfil','equipo','configuracion']);
+    const NO_CACHE = new Set([
+        'nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote',
+        'nueva_actividad','nuevo_personal','aceptar_invitacion',
+        'recuperar','restablecer'
+    ]);
 
     window.clearScreenCache = (screenId) => {
       if (!screenId) { viewCache.clear(); return; }
@@ -525,9 +524,19 @@ document.addEventListener('DOMContentLoaded', () => {
             await renderAndInit(screenId, args, viewCache.get(key));
             screen.render(...args).then(freshHtml => {
                 viewCache.set(key, freshHtml);
+                const currentParts = getHashParts();
+                if (currentParts[0] === screenId) {
+                    renderAndInit(screenId, args, freshHtml);
+                }
             }).catch(() => {});
         } else {
             try {
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                const screenCfg = screens[screenId];
+                const highlightId = screenCfg?.highlight || (typeof screenCfg?.backTo === 'string' ? screenCfg.backTo : screenId);
+                const activeLink = document.querySelector(`.nav-link[data-screen="${highlightId}"]`);
+                if (activeLink) activeLink.classList.add('active');
+
                 const html = await screen.render(...args);
                 if (useCache) viewCache.set(key, html);
                 await renderAndInit(screenId, args, html);

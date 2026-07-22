@@ -94,10 +94,9 @@ export async function fullDownload() {
         const serverIds = new Set(allData.map(r => r.id));
         const protectIds = pendingIds.get(tableName);
 
-        for (const localId of localIds) {
-          if (!serverIds.has(localId) && (!protectIds || !protectIds.has(localId))) {
-            await dexieTable.delete(localId);
-          }
+        const toDelete = [...localIds].filter(id => !serverIds.has(id) && (!protectIds || !protectIds.has(id)));
+        if (toDelete.length) {
+          await dexieTable.bulkDelete(toDelete);
         }
 
         if (allData.length) {
@@ -206,10 +205,9 @@ export async function syncTable(tableName, force = false) {
       const localRecords = await dexieTable.toArray();
       const localIds = new Set(localRecords.map(r => r.id));
       const serverIds = new Set(allData.map(r => r.id));
-      for (const localId of localIds) {
-        if (!serverIds.has(localId)) {
-          await dexieTable.delete(localId);
-        }
+      const toDelete = [...localIds].filter(id => !serverIds.has(id));
+      if (toDelete.length) {
+        await dexieTable.bulkDelete(toDelete);
       }
       if (allData.length) {
         await dexieTable.bulkPut(allData);
