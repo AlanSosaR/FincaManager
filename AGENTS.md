@@ -10,6 +10,30 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Auth/DB: llamadas REST directas a Supabase (`authFetch`, `restFetch`, `restInsert`), NO usar `@supabase/supabase-js` ni QueryBuilder.
 - Proyecto Supabase: `udhuizkqnmkhljmezzkd`.
 
+## Lo Completado (22/07)
+
+### Stale-while-revalidate en QueryBuilder — navegación instantánea sin forced full download
+- `query-builder.js`: `_execute()` ahora implementa cache-first + background REST refresh.
+- Flujo: leer IndexedDB primero → si hay datos, devolver instantáneo → en background disparar `_refreshCacheAsync()` que descarga todas las filas de la tabla y actualiza IndexedDB.
+- Si IndexedDB está vacío (1ra vez tras borrar caché), espera REST como fallback.
+- `_processLocally(results)`: lógica de filtrado/orden/paginación extraída a método propio, reutilizable desde cache y offline.
+- `_refreshCacheAsync()`: descarga paginada (1000 por página), purga registros locales que ya no existen en servidor, hace `bulkPut()`.
+- Sin forced `fullDownload` al iniciar — el cache se llena naturalmente al navegar entre pantallas.
+- Navegación instantánea desde la 2da vez que visitas una pantalla.
+
+### Fix supabaseFetch — headers sobrescritos por `...options` causaban 401
+- `sync.js`: el spread `...options` en `supabaseFetch()` sobrescribía el objeto `headers` completo, eliminando `apikey` y haciendo que todas las consultas REST via QueryBuilder fallaran con 401.
+- Fix: extraer `headers` de options antes de construir el fetch, igual que en `restFetch()` de auth.js.
+- Fix: mejorar mensaje de error incluyendo body de respuesta para debugging.
+
+### Eliminación de forced full download al iniciar
+- `main.js`: eliminados `showDownloadBanner()`, `showInitialPrompt()`, notificación "Descargar para usar sin internet".
+- `sync.js`: eliminados `setSyncStatusCallback()`, `onSyncStatusChange`, `initSync()` (código muerto).
+- `auth.js`: eliminado `finca_sync_complete` de `logout()` y `switchEmpresa()`.
+- `query-builder.js`: `_execute()` ya no cae silenciosamente a IndexedDB vacío cuando REST falla. Cuando está online, usa REST directamente.
+- `nuevo_personal.js`: `renderNuevoPersonal()` usa `restFetch()` en vez de `db.personal.get()`.
+- `perfil.js`, `configuracion.js`: priorizan REST sobre IndexedDB.
+
 ## Lo Completado (15/07)
 
 ### Realtime WebSocket — Sincronización en vivo vía Supabase Realtime
