@@ -24,16 +24,18 @@ const BUSINESS_TABLES = new Set([
 ]);
 
 export async function supabaseFetch(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}${path}`, {
-    headers: {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${getAccessToken() || SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-      ...options.headers,
-    },
-    ...options,
-  });
+  const apikey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkaHVpemtxbm1raGxqbWV6emtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTM2MTYsImV4cCI6MjA5MTIyOTYxNn0.W9bJ1S8A45RUGaulhdVG6UohGmGNxGMjLBsc0Q7voPE';
+  const session = getAccessToken();
+  const headers = {
+    'apikey': apikey,
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  if (!headers['Prefer']) headers['Prefer'] = 'return=representation';
+  if (session) {
+    headers['Authorization'] = `Bearer ${session}`;
+  }
+  const res = await fetch(`${SUPABASE_URL}${path}`, { method: options.method || 'GET', body: options.body, headers });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Supabase API ${res.status} en ${path}: ${body.slice(0, 200)}`);
