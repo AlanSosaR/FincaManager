@@ -205,7 +205,7 @@ export async function renderGanado(page = 1, filter = 'all') {
               <h3 class="ganado-card-value" id="fumig-veces-value">${vecesFumigadas}</h3>
               <span class="ganado-card-hint" style="display:flex; align-items:center; gap:6px; color:#2c666e; font-size:12px; font-weight:500; margin-top:4px; flex-wrap:wrap;">
                 <span id="fumig-pend-chip" class="fumig-count-chip" style="background:#fff3e0; color:#e65100; border-radius:999px; padding:2px 8px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
-                  <span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pend.
+                  <span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes
                 </span>
                 <span class="ganado-card-title" style="font-size:11px; color:#777;">veces fumigadas</span>
                 <span class="material-icons" style="font-size:15px;">expand_more</span>
@@ -658,7 +658,7 @@ export function initGanado() {
         const vecesValue = document.getElementById('fumig-veces-value');
         if (vecesValue) vecesValue.textContent = String(fumigGroups.size);
         const pendingChip = document.getElementById('fumig-pend-chip');
-        if (pendingChip) pendingChip.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroups.size} pend.`;
+        if (pendingChip) pendingChip.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroups.size} pendientes`;
       })()
     ]);
   };
