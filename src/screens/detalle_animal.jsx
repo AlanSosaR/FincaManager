@@ -476,8 +476,15 @@ function renderFullContent(container, animalId, flag) {
                 </div>
                 <div>
                     <div class="da-stat-label">Fumigaciones</div>
-                    <div class="da-stat-value">${fumigaciones.length}</div>
-                    <div class="da-stat-sub">Tratamientos químicos</div>
+                    <div class="da-stat-value"><span class="material-icons" style="font-size:22px; vertical-align:middle; color:#2c666e;">check_circle</span> ${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length} <small class="da-stat-value-md">aplicada${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length === 1 ? '' : 's'}</small></div>
+                    <div class="da-stat-sub">
+                        ${(() => {
+                            const pend = fumigaciones.filter(f => f.estado === 'Programada').length;
+                            return pend > 0 ? `<span class="da-variation-pill pending">
+                                <span class="material-icons">schedule</span> ${pend} programada${pend > 1 ? 's' : ''}
+                            </span>` : '';
+                        })()}
+                    </div>
                 </div>
             </div>
 
@@ -1596,8 +1603,10 @@ function renderFumigacionesTable(allFumigaciones, page) {
     const table = document.getElementById('da-fumigaciones-table');
     if (!table) return;
 
+    allFumigaciones = (allFumigaciones || []).filter(f => (f.estado || 'Aplicada') !== 'Cancelada');
+
     fumigPage = page || fumigPage;
-    const total = allFumigaciones ? allFumigaciones.length : 0;
+    const total = allFumigaciones.length;
     const totalPages = Math.ceil(total / DA_PAGE_SIZE);
     const from = (fumigPage - 1) * DA_PAGE_SIZE;
     const paged = (allFumigaciones || []).slice(from, from + DA_PAGE_SIZE);
@@ -1719,6 +1728,7 @@ function renderCalendarFumig() {
     }
 
     const monthFumigaciones = fumigaciones.filter(f => {
+        if ((f.estado || 'Aplicada') === 'Cancelada') return false;
         const [y, m, d] = f.fecha.split('-').map(Number);
         return (m - 1) === currentMonthFumig && y === currentYearFumig;
     });
