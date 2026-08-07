@@ -13,6 +13,7 @@ const BUSINESS_TABLES = new Set([
   'herramienta_mantenimientos',
   'lotes', 'lote_aplicaciones', 'lote_personal',
   'personal', 'personal_asistencia',
+  'gastos', 'cultivos',
 ]);
 
 export default class QueryBuilder {

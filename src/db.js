@@ -58,4 +58,12 @@ db.version(4).stores({
   animal_preñez: '&id, empresa_id, animal_id, fecha_monta, created_at',
 });
 
+db.version(5).stores({
+  gastos: '&id, empresa_id, fecha, categoria, created_at',
+});
+
+db.version(6).stores({
+  cultivos: '&id, empresa_id, tipo, lote_id, created_at',
+});
+
 export default db;

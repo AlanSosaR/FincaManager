@@ -282,6 +282,10 @@ import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';
 import { renderHerramientas, initHerramientas } from './screens/herramientas.js';
 import { renderNuevaHerramienta, initNuevaHerramienta } from './screens/nueva_herramienta.js';
+import { renderGastos, initGastos } from './screens/gastos.js';
+import { renderNuevoGasto, initNuevoGasto } from './screens/nuevo_gasto.js';
+import { renderCultivos, initCultivos } from './screens/cultivos.js';
+import { renderNuevoCultivo, initNuevoCultivo } from './screens/nuevo_cultivo.js';
 import { renderGanado, initGanado } from './screens/ganado.js';
 import { renderPotreros, initPotreros } from './screens/potreros.js';
 import { renderDetalleMotor } from './screens/detalle_motor.js';
@@ -312,6 +316,10 @@ const screens = {
     dashboard: { title: 'Dashboard Cafetal', render: renderDashboard },
     motores: { title: 'Lista de Motores', render: renderMotores },
     herramientas: { title: 'Inventario de Herramientas', render: renderHerramientas },
+    gastos: { title: 'Gastos', render: renderGastos },
+    nuevo_gasto: { title: 'Nuevo Gasto', backTo: 'gastos', render: renderNuevoGasto },
+    cultivos: { title: 'Cultivos', render: renderCultivos },
+    nuevo_cultivo: { title: 'Nuevo Cultivo', backTo: 'cultivos', render: renderNuevoCultivo },
     ganado: { title: 'Gestion de Ganado', render: renderGanado },
     potreros: { title: 'Control de Potreros', render: renderPotreros },
     personal: { title: 'Personal', render: renderListaPersonal },
@@ -391,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewCache = new Map();
     const NO_CACHE = new Set([
         'nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote',
-        'nueva_actividad','nuevo_personal','nueva_herramienta','aceptar_invitacion',
+        'nueva_actividad','nuevo_personal','nueva_herramienta','nuevo_gasto','nuevo_cultivo','aceptar_invitacion',
         'recuperar','restablecer',
         // Detail screens: their render() only returns a spinner skeleton;
         // data is loaded via init(). Caching the spinner causes triple re-renders
@@ -435,6 +443,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'nueva_herramienta') initNuevaHerramienta(...args);
         if (screenId === 'motores')      initMotores();
         if (screenId === 'herramientas') initHerramientas();
+        if (screenId === 'gastos') initGastos();
+        if (screenId === 'nuevo_gasto') initNuevoGasto(...args);
+        if (screenId === 'cultivos') initCultivos();
+        if (screenId === 'nuevo_cultivo') initNuevoCultivo(...args);
         if (screenId === 'ganado')       initGanado();
         if (screenId === 'personal')     initListaPersonal();
         if (screenId === 'nuevo_animal') initNuevoAnimal(...args);
@@ -462,7 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
-    const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad','nueva_herramienta']);
+    const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad','nueva_herramienta','nuevo_gasto','nuevo_cultivo']);
 
     async function navigate(screenId, ...args) {
         if (DETAIL_SCREENS.has(screenId) && (!args || args.length === 0 || !args[0])) {
@@ -513,6 +525,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 : `'${backTarget}'`;
             const title = screenId === 'nuevo_animal' && args.length > 0 && args[0]
                 ? 'Editar Animal'
+                : screenId === 'nuevo_gasto' && args.length > 0 && args[0]
+                ? 'Editar Gasto'
+                : screenId === 'nuevo_cultivo' && args.length > 0 && args[0]
+                ? 'Editar Cultivo'
                 : screen.title;
             titleElement.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 8px;">

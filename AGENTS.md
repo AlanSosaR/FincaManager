@@ -31,6 +31,19 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - `dashboard.js` y `detalle_lote.js`: "Aplicaciones Recientes" e histórico excluyen `estado=Programada` (`.neq('estado','Programada')`). `nueva_actividad.js`: las nuevas aplicaciones se guardan con `estado: 'Aplicada'`. `detalle_lote.js`: `window.showAddAplicacionModal` para ver histórico completo.
 - `wa.js`: `actualizarSaludPorPlan()` reescrito — calcula atrasadas desde el plan IFCAFE (vs aplicadas reales vía REST, `estado=eq.Aplicada`) en vez de buscar filas `Programada` vencidas; también lee lotes vía `restFetch` con filtro `empresa_id`.
 
+### Módulo Gastos (nuevo) — Registro transversal de gastos
+- `supabase/migrations/20260807_gastos.sql`: tabla `public.gastos` (fecha, categoria, descripcion, monto NUMERIC CHECK >=0, vínculos opcionales `lote_id`/`animal_id`/`herramienta_id` con ON DELETE SET NULL, empresa_id) + índice `(empresa_id, fecha)` + 4 policies RLS `is_empresa_member()` + publicación `supabase_realtime`. Aplicada vía Management API y verificada.
+- `src/screens/gastos.js` (nuevo): lista con tarjetas resumen (Total del período + cantidad de gastos), chips de desglose por categoría, filtro **Este mes / Mes anterior / Todo**, búsqueda por descripción, paginación, menú editar/eliminar y FAB.
+- `src/screens/nuevo_gasto.js` (nuevo): formulario crear/editar con fecha, categoría (Veterinaria, Insumos Agrícolas, Foliares/Abonos, Maquinaria, Personal, Otro), descripción, monto (>0) y **vínculo dinámico** Lote/Animal/Herramienta (selects cargados de `lotes`/`ganado`/`herramientas`).
+- Cableado: `db.js` v5 (`gastos`), `sync.js`, `query-builder.js` y `realtime.js` en BUSINESS_TABLES; registro en `main.js` (screens, NO_CACHE, FORM_SCREENS, init, título "Editar Gasto"); link "Gastos" en el menú (icono `receipt_long`).
+- Fix QueryBuilder: no soporta `gte`/`lt` → el filtro de período se resuelve **en JS** (`computeGastos()` aplica rango de fechas + búsqueda en memoria).
+
+### Módulo Cultivos (nuevo) — Cultivos genéricos (Café se gestiona en su sección Cafetal)
+- `supabase/migrations/20260807_cultivos.sql`: tabla `public.cultivos` (tipo — Maíz/Fríjol/Cacao/Yuca/Plátano/Otro, `lote_id` opcional, `fecha_siembra`, `area_ha`, `estado_cosecha` En crecimiento|En floración|Madurando|Cosechado, `notas`) + índice `(empresa_id, estado_ cosecha)` + 4 policies RLS + realtime. Aplicada vía Management API y verificada.
+- `src/screens/cultivos.js` (nuevo): lista con tarjetas resumen (Cultivos activos / Área total ha / Cosechados), filtro por estado, búsqueda por tipo, paginación, editar/eliminar y FAB.
+- `src/screens/nuevo_cultivo.js` (nuevo): formulario crear/editar con tipo, lote select opcional, fecha de siembra, área (ha), estado y notas.
+- Cableado: `db.js` v6 (`cultivos`), `sync.js`, `query-builder.js` y `realtime.js` en BUSINESS_TABLES; registro en `main.js` y link "Cultivos" en el menú (icono `agriculture`, entre Potreros y Gastos).
+
 ## Lo Completado (22/07)
 
 ### Fix ERR_INSUFFICIENT_RESOURCES y Optimización de Rendimiento

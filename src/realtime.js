@@ -12,6 +12,7 @@ const BUSINESS_TABLES = new Set([
   'animal_preñez',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
+  'gastos', 'cultivos',
 ])
 
 const WA_TRIGGER_TABLES = new Set(['animal_vacunas', 'animal_fumigaciones', 'lote_aplicaciones', 'animal_preñez'])

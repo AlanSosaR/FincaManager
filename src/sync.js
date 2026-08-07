@@ -13,6 +13,7 @@ const SUPABASE_TABLES = [
   'animal_preñez',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
+  'gastos', 'cultivos',
   'usuarios', 'empresas', 'usuario_empresas', 'invitaciones',
 ];
 
@@ -23,6 +24,7 @@ const BUSINESS_TABLES = new Set([
   'animal_preñez',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
+  'gastos', 'cultivos',
 ]);
 
 export async function supabaseFetch(path, options = {}) {
