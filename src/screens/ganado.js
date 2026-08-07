@@ -41,8 +41,7 @@ export async function renderGanado(page = 1, filter = 'all') {
     { count: vendidosCount },
     { count: vacunasCount },
     { count: pesajesCount },
-    { count: fumigacionesCount },
-    { count: fumigAplicadasCount },
+    fumigaciones,
     { count: preñadasCount }
   ] = await Promise.all([
     supabase.from('ganado').select('*', { count: 'exact', head: true }).neq('estado', 'Vendido'),
@@ -51,10 +50,19 @@ export async function renderGanado(page = 1, filter = 'all') {
     supabase.from('ganado').select('*', { count: 'exact', head: true }).eq('estado', 'Vendido'),
     supabase.from('animal_vacunas').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
     supabase.from('animal_pesajes').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
-    supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
-    supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Aplicada'),
+    supabase.from('animal_fumigaciones').select('fecha,producto,estado').range(0, 4999),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).eq('reproductivo', 'Preñada')
   ]);
+
+  const fumigGroups = new Map();
+  const fumigPendGroups = new Map();
+  for (const f of (fumigaciones.data || [])) {
+    const key = `${f.fecha || ''}\u0000${f.producto || ''}`;
+    fumigGroups.set(key, true);
+    if (f.estado === 'Programada') fumigPendGroups.set(key, true);
+  }
+  const vecesFumigadas = fumigGroups.size;
+  const fumigPendGroupCount = fumigPendGroups.size;
 
   let activeFilterIds = [];
   if (currentFilter === 'vacunas') {
@@ -194,14 +202,12 @@ export async function renderGanado(page = 1, filter = 'all') {
               <span class="ganado-card-label" style="color: #2c666e;">Fumigación</span>
             </div>
             <div class="ganado-card-body">
-              <h3 class="ganado-card-value">${fumigacionesCount}</h3>
+              <h3 class="ganado-card-value" id="fumig-veces-value">${vecesFumigadas}</h3>
               <span class="ganado-card-hint" style="display:flex; align-items:center; gap:6px; color:#2c666e; font-size:12px; font-weight:500; margin-top:4px; flex-wrap:wrap;">
                 <span id="fumig-pend-chip" class="fumig-count-chip" style="background:#fff3e0; color:#e65100; border-radius:999px; padding:2px 8px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
-                  <span class="material-icons" style="font-size:13px;">schedule</span> ${fumigacionesCount} pend.
+                  <span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pend.
                 </span>
-                <span id="fumig-apl-chip" class="fumig-count-chip" style="background:#e0f2f1; color:#2c666e; border-radius:999px; padding:2px 8px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
-                  <span class="material-icons" style="font-size:13px;">check_circle</span> ${fumigAplicadasCount} apl.
-                </span>
+                <span class="ganado-card-title" style="font-size:11px; color:#777;">veces fumigadas</span>
                 <span class="material-icons" style="font-size:15px;">expand_more</span>
               </span>
             </div>
@@ -641,16 +647,18 @@ export function initGanado() {
     await Promise.all([
       loadFumigRecords(),
       (async () => {
-        const [pend, apl] = await Promise.all([
-          supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
-          supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Aplicada')
-        ]);
-        const pendCount = pend.count ?? 0;
-        const aplCount = apl.count ?? 0;
+        const { data } = await supabase.from('animal_fumigaciones').select('fecha,producto,estado').range(0, 4999);
+        const fumigGroups = new Map();
+        const fumigPendGroups = new Map();
+        for (const f of (data || [])) {
+          const key = `${f.fecha || ''}\u0000${f.producto || ''}`;
+          fumigGroups.set(key, true);
+          if (f.estado === 'Programada') fumigPendGroups.set(key, true);
+        }
+        const vecesValue = document.getElementById('fumig-veces-value');
+        if (vecesValue) vecesValue.textContent = String(fumigGroups.size);
         const pendingChip = document.getElementById('fumig-pend-chip');
-        const appliedChip = document.getElementById('fumig-apl-chip');
-        if (pendingChip) pendingChip.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${pendCount} pend.`;
-        if (appliedChip) appliedChip.innerHTML = `<span class="material-icons" style="font-size:13px;">check_circle</span> ${aplCount} apl.`;
+        if (pendingChip) pendingChip.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroups.size} pend.`;
       })()
     ]);
   };
