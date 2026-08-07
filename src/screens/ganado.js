@@ -42,6 +42,7 @@ export async function renderGanado(page = 1, filter = 'all') {
     { count: vacunasCount },
     { count: pesajesCount },
     { count: fumigacionesCount },
+    { count: fumigAplicadasCount },
     { count: preñadasCount }
   ] = await Promise.all([
     supabase.from('ganado').select('*', { count: 'exact', head: true }).neq('estado', 'Vendido'),
@@ -51,6 +52,7 @@ export async function renderGanado(page = 1, filter = 'all') {
     supabase.from('animal_vacunas').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
     supabase.from('animal_pesajes').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
     supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
+    supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Aplicada'),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).eq('reproductivo', 'Preñada')
   ]);
 
@@ -193,8 +195,14 @@ export async function renderGanado(page = 1, filter = 'all') {
             </div>
             <div class="ganado-card-body">
               <h3 class="ganado-card-value">${fumigacionesCount}</h3>
-              <span class="ganado-card-hint" style="display:flex; align-items:center; gap:4px; color:#2c666e; font-size:12px; font-weight:500; margin-top:2px;">
-                <span class="material-icons" style="font-size:15px;">expand_more</span> Aplicar a todos
+              <span class="ganado-card-hint" style="display:flex; align-items:center; gap:6px; color:#2c666e; font-size:12px; font-weight:500; margin-top:4px; flex-wrap:wrap;">
+                <span id="fumig-pend-chip" class="fumig-count-chip" style="background:#fff3e0; color:#e65100; border-radius:999px; padding:2px 8px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
+                  <span class="material-icons" style="font-size:13px;">schedule</span> ${fumigacionesCount} pend.
+                </span>
+                <span id="fumig-apl-chip" class="fumig-count-chip" style="background:#e0f2f1; color:#2c666e; border-radius:999px; padding:2px 8px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
+                  <span class="material-icons" style="font-size:13px;">check_circle</span> ${fumigAplicadasCount} apl.
+                </span>
+                <span class="material-icons" style="font-size:15px;">expand_more</span>
               </span>
             </div>
           </div>
@@ -245,6 +253,19 @@ export async function renderGanado(page = 1, filter = 'all') {
             <div style="display:flex; gap:10px; margin-top:18px; justify-content:flex-end;">
               <button type="button" class="btn-m3-tonal" id="ganado-fumig-cancel">Cancelar</button>
               <button type="button" class="btn-m3-fill" id="ganado-fumig-apply" style="background:#2c666e; color:#fff;">Aplicar a todos</button>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+              <span class="material-icons" style="font-size:18px; color:#2c666e;">list_alt</span>
+              <h4 style="margin:0; color:var(--on-surface,#222); font-size:15px; flex:1;">Registros de fumigación</h4>
+              <button type="button" id="ganado-fumig-refresh" class="m3-icon-btn" title="Actualizar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; justify-content:center; padding:4px;">
+                <span class="material-icons" style="font-size:20px;">refresh</span>
+              </button>
+            </div>
+            <div id="ganado-fumig-records" style="max-height: 320px; overflow-y: auto;">
+              <p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Cargando...</p>
             </div>
           </div>
         </div>
@@ -490,7 +511,14 @@ export function initGanado() {
     card.addEventListener('click', () => {
       if (card.id === 'ganado-fumig-card') {
         const panel = document.getElementById('ganado-fumig-panel');
-        if (panel) panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        if (panel) {
+          const isOpen = panel.style.display === 'block';
+          panel.style.display = isOpen ? 'none' : 'block';
+          if (!isOpen) {
+            if (fumigFecha && !fumigFecha.value) fumigFecha.value = getLocalToday();
+            if (typeof loadFumigRecords === 'function') loadFumigRecords();
+          }
+        }
         return;
       }
       const filter = card.dataset.filter;
@@ -515,6 +543,135 @@ export function initGanado() {
     if (fumigFecha && !fumigFecha.value) fumigFecha.value = getLocalToday();
   };
 
+  const loadFumigRecords = async () => {
+    const recordsBox = document.getElementById('ganado-fumig-records');
+    if (!recordsBox) return;
+    try {
+      recordsBox.innerHTML = '<p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Cargando...</p>';
+      const { data: recs, error } = await supabase.from('animal_fumigaciones')
+        .select('*').order('fecha', { ascending: false }).range(0, 49);
+      if (error) throw error;
+      const list = recs || [];
+      if (!list.length) {
+        recordsBox.innerHTML = '<p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Sin registros de fumigación.</p>';
+        return;
+      }
+      const animalIds = [...new Set(list.map(r => r.animal_id))];
+      const { data: animals } = await supabase.from('ganado').select('id,nombre').in('id', animalIds);
+      const nameMap = new Map((animals || []).map(a => [a.id, a.nombre || 'Animal']));
+
+      recordsBox.innerHTML = list.map(r => {
+        const isAplicada = r.estado === 'Aplicada';
+        const badgeColor = isAplicada ? '#2c666e' : '#e65100';
+        const badgeBg = isAplicada ? '#e0f2f1' : '#fff3e0';
+        return `
+          <div class="ganado-fumig-row" data-id="${r.id}" style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid rgba(0,0,0,0.06); flex-wrap:wrap;">
+            <span class="material-icons" style="font-size:20px; color:${badgeColor};">${isAplicada ? 'check_circle' : 'schedule'}</span>
+            <div style="flex:1; min-width:130px;">
+              <div style="font-size:14px; font-weight:600; color:var(--on-surface,#222);">${nameMap.get(r.animal_id) || 'Sin nombre'}</div>
+              <div style="font-size:12px; color:#777;">${r.producto || '—'} · ${r.fecha || '—'}</div>
+            </div>
+            <span style="background:${badgeBg}; color:${badgeColor}; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700;">${r.estado || '—'}</span>
+            <div style="display:flex; gap:4px;">
+              <button class="fumig-edit-btn" data-id="${r.id}" title="Editar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; padding:4px;">
+                <span class="material-icons" style="font-size:18px;">edit</span>
+              </button>
+              <button class="fumig-del-btn" data-id="${r.id}" title="Eliminar" style="background:none; border:none; cursor:pointer; color:#d32f2f; display:flex; align-items:center; padding:4px;">
+                <span class="material-icons" style="font-size:18px;">delete</span>
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      recordsBox.innerHTML = `<p style="color:#c62828; font-size:13px; text-align:center; padding:12px 0;">Error: ${err.message || err}</p>`;
+    }
+  };
+
+  const renderFumigEditForm = (record, rowEl) => {
+    rowEl.innerHTML = `
+      <div class="m3-field" style="min-width:140px; flex:1 1 160px;">
+        <input type="text" id="fumig-edit-producto" value="${(record.producto || '').replace(/"/g, '&quot;')}" placeholder=" " required>
+        <label>Producto</label>
+      </div>
+      <div class="m3-field" style="min-width:150px; flex:1 1 160px;">
+        <input type="date" id="fumig-edit-fecha" value="${record.fecha || ''}" placeholder=" " required>
+        <label>Fecha</label>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button type="button" class="fumig-save-btn btn-m3-fill" style="background:#2c666e; color:#fff; padding:8px 14px; font-size:13px;">Guardar</button>
+        <button type="button" class="fumig-cancel-btn btn-m3-text" style="padding:8px 12px; font-size:13px;">Cancelar</button>
+      </div>`;
+    rowEl.style.width = '100%';
+    rowEl.style.flexWrap = 'wrap';
+    rowEl.querySelector('.fumig-save-btn').onclick = async () => {
+      const prod = document.getElementById('fumig-edit-producto').value.trim();
+      const fecha = document.getElementById('fumig-edit-fecha').value;
+      if (!prod) { window.Snackbar.show('Indicá el producto', { type: 'error' }); return; }
+      if (!fecha) { window.Snackbar.show('Indicá la fecha', { type: 'error' }); return; }
+      const estado = fecha <= getLocalToday() ? 'Aplicada' : 'Programada';
+      try {
+        const { error } = await supabase.from('animal_fumigaciones').update({ producto: prod, fecha, estado }).eq('id', record.id);
+        if (error) throw error;
+        window.Snackbar.show('Fumigación actualizada ✓');
+        await refreshFumigAll();
+      } catch (err) {
+        window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
+      }
+    };
+    rowEl.querySelector('.fumig-cancel-btn').onclick = () => loadFumigRecords();
+  };
+
+  const refreshFumigAll = async () => {
+    await Promise.all([
+      loadFumigRecords(),
+      (async () => {
+        const [pend, apl] = await Promise.all([
+          supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
+          supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Aplicada')
+        ]);
+        const pendCount = pend.count ?? 0;
+        const aplCount = apl.count ?? 0;
+        const pendingChip = document.getElementById('fumig-pend-chip');
+        const appliedChip = document.getElementById('fumig-apl-chip');
+        if (pendingChip) pendingChip.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${pendCount} pend.`;
+        if (appliedChip) appliedChip.innerHTML = `<span class="material-icons" style="font-size:13px;">check_circle</span> ${aplCount} apl.`;
+      })()
+    ]);
+  };
+
+  const recordsBox = document.getElementById('ganado-fumig-records');
+  if (recordsBox) {
+    recordsBox.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.fumig-edit-btn');
+      const delBtn = e.target.closest('.fumig-del-btn');
+      if (editBtn && !editBtn.disabled) {
+        const id = editBtn.dataset.id;
+        const row = editBtn.closest('.ganado-fumig-row');
+        supabase.from('animal_fumigaciones').select('*').eq('id', id).maybeSingle()
+          .then(({ data }) => {
+            if (!data) return;
+            editBtn.disabled = true;
+            renderFumEditForm(data, editBtn.closest('.ganado-fumig-row'));
+          });
+      } else if (delBtn) {
+        const id = delBtn.dataset.id;
+        window.Snackbar.confirm('¿Eliminar esta fumigación?', async () => {
+          try {
+            const { error } = await supabase.from('animal_fumigaciones').delete().eq('id', id);
+            if (error) throw error;
+            window.Snackbar.show('Fumigación eliminada');
+            await refreshFumigAll();
+          } catch (err) {
+            window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
+          }
+        }, { confirmLabel: 'Eliminar', cancelLabel: 'Cancelar' });
+      }
+    });
+  }
+
+  const refreshBtn = document.getElementById('ganado-fumig-refresh');
+  if (refreshBtn) refreshBtn.onclick = () => loadFumigRecords();
+
   if (applyBtn) applyBtn.onclick = async () => {
     const fecha = fumigFecha ? fumigFecha.value : '';
     const producto = fumigProducto ? fumigProducto.value.trim() : '';
@@ -533,9 +690,9 @@ export function initGanado() {
           if (error) throw error;
         }
         window.Snackbar.show(`Fumigación ${estado.toLowerCase()} para ${rows.length} animales ✓`);
-        closeFumigPanel();
-        window.clearScreenCache?.('ganado');
-        window.navigateTo('ganado', 1, 'all');
+        if (fumigFecha) fumigFecha.value = getLocalToday();
+        if (fumigProducto) fumigProducto.value = '';
+        await refreshFumigAll();
       } catch (err) {
         window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
       }
