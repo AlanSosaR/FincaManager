@@ -12,6 +12,11 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 
 ## Lo Completado (07/08)
 
+### Ganado — Fumigación masiva desde la tarjeta activa (sin modal) (nuevo)
+- `ganado.js`: la tarjeta "Fumigación" ahora SIEMPRE está visible y accionable (antes condicional a `fumigacionesCount > 0`). Al tocarla **expande un panel inline** (no modal) debajo de las tarjetas (`.ganado-fumig-panel`) con campo de **fecha** (por defecto hoy) + **producto**, el contador de animales activos que recibirán la fumigación y botones "Aplicar a todos" / "Cancelar".
+- El botón "Aplicar a todos" en `ganado.js` (cableado como `applyBtn.onclick`): valida fecha/producto, calcula `estado` según fecha (`<= hoy` → `Aplicada`, futura → `Programada`, mismo criterio que `detalle_animal.jsx`), consulta `supabase.from('ganado').select('id').neq('estado','Vendido')`, construye una fila por animal `{animal_id, producto, fecha, estado}` e inserta en `animal_fumigaciones` **en chunks de 100** vía QueryBuilder (que agrega `empresa_id` automáticamente). Confirma con `Snackbar.confirm` antes de aplicar. Luego `clearScreenCache` + `navigateTo('ganado')`.
+- El resto de tarjetas (Total, Hembras, Machos, Vacunas, Pesajes, Preñadas, Vendidos) conserva su comportamiento de filtro.
+
 ### Reproducción Ganadera — Preñez, Parto y Crías (nuevo)
 - Migraciones aplicadas vía Management API (no `supabase db push`): `20260807_reproduccion.sql` (`ALTER ganado ADD madre_id UUID REFERENCES ganado(id) ON DELETE SET NULL` + `reproductivo TEXT DEFAULT 'Vacía'`; tabla `public.animal_preñez` con animal_id FK, empresa_id, fecha_monta, fecha_probable_parto, fecha_parto, num_crias, estado `Preñada`|`Parida`|`Abortada`, RLS + realtime) y `20260807_drop_herramientas_ubicacion.sql` (`DROP COLUMN IF EXISTS ubicacion` de herramientas).
 - **Fix registrar animal**: `nuevo_animal.js` — `madre_id` solo se envía si hay madre seleccionada (antes mandaba `madre_id:null` → PostgREST 400 → fallback silencioso a local/sync queue y nada llegaba a la BD). Fix `.catch()` sobre cadena thenable de QueryBuilder → try/catch.
