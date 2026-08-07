@@ -1,7 +1,7 @@
 import { RealtimeClient } from '@supabase/realtime-js'
 import { SUPABASE_URL, SUPABASE_KEY, getAccessToken } from './auth.js'
 import { syncTable } from './sync.js'
-import { checkPendingVaccines, checkPendingFumigaciones, checkAplicacionesDelMes } from './wa.js'
+import { checkPendingVaccines, checkPendingFumigaciones, checkAplicacionesDelMes, checkPartosProximos } from './wa.js'
 
 const REALTIME_URL = SUPABASE_URL.replace('https://', 'wss://') + '/realtime/v1'
 
@@ -9,11 +9,12 @@ const BUSINESS_TABLES = new Set([
   'motores', 'motor_sesiones', 'motor_mantenimientos',
   'potreros', 'ganado', 'herramientas', 'potrero_eventos',
   'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
+  'animal_preñez',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
 ])
 
-const WA_TRIGGER_TABLES = new Set(['animal_vacunas', 'animal_fumigaciones', 'lote_aplicaciones'])
+const WA_TRIGGER_TABLES = new Set(['animal_vacunas', 'animal_fumigaciones', 'lote_aplicaciones', 'animal_preñez'])
 
 let client = null
 let channel = null
@@ -31,6 +32,9 @@ function scheduleWaCheck() {
     } catch (e) { /* silent */ }
     try {
       await checkAplicacionesDelMes()
+    } catch (e) { /* silent */ }
+    try {
+      await checkPartosProximos()
     } catch (e) { /* silent */ }
   }, 1000)
 }

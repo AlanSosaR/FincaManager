@@ -36,7 +36,8 @@ export async function renderGanado(page = 1, filter = 'all') {
     { count: vendidosCount },
     { count: vacunasCount },
     { count: pesajesCount },
-    { count: fumigacionesCount }
+    { count: fumigacionesCount },
+    { count: preñadasCount }
   ] = await Promise.all([
     supabase.from('ganado').select('*', { count: 'exact', head: true }).neq('estado', 'Vendido'),
     supabase.from('ganado').select('*', { count: 'exact', head: true }).ilike('sexo', 'hembra'),
@@ -44,7 +45,8 @@ export async function renderGanado(page = 1, filter = 'all') {
     supabase.from('ganado').select('*', { count: 'exact', head: true }).eq('estado', 'Vendido'),
     supabase.from('animal_vacunas').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
     supabase.from('animal_pesajes').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
-    supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Programada')
+    supabase.from('animal_fumigaciones').select('*', { count: 'exact', head: true }).eq('estado', 'Programada'),
+    supabase.from('ganado').select('*', { count: 'exact', head: true }).eq('reproductivo', 'Preñada')
   ]);
 
   let activeFilterIds = [];
@@ -70,6 +72,8 @@ export async function renderGanado(page = 1, filter = 'all') {
     query = query.ilike('sexo', 'macho');
   } else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones') {
     query = query.in('id', activeFilterIds.length ? activeFilterIds : ['00000000-0000-0000-0000-000000000000']);
+  } else if (currentFilter === 'preñadas') {
+    query = query.eq('reproductivo', 'Preñada');
   } else if (currentFilter === 'vendido') {
     query = query.eq('estado', 'Vendido');
   }
@@ -187,6 +191,16 @@ export async function renderGanado(page = 1, filter = 'all') {
           </div>
           ` : ''}
 
+          ${preñadasCount > 0 ? `
+          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'preñadas' ? 'active' : ''}" data-filter="preñadas" style="border-left: 4px solid #b26a00;">
+            <div class="ganado-card-header">
+              <img src="/cow.png" alt="Preñadas" style="width:26px; height:26px; object-fit:contain;">
+              <span class="ganado-card-label" style="color: #b26a00;">Preñadas</span>
+            </div>
+            <div class="ganado-card-body"><h3 class="ganado-card-value">${preñadasCount}</h3></div>
+          </div>
+          ` : ''}
+
           ${vendidosCount > 0 ? `
           <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'vendido' ? 'active' : ''}" data-filter="vendido" style="border-left: 4px solid #d32f2f;">
             <div class="ganado-card-header">
@@ -267,6 +281,7 @@ window.changeGanadoPage = async function(page) {
   else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones') {
     query = query.in('id', activeFilterIds.length ? activeFilterIds : ['00000000-0000-0000-0000-000000000000']);
   }
+  else if (currentFilter === 'preñadas') query = query.eq('reproductivo', 'Preñada');
   else if (currentFilter === 'vendido') query = query.eq('estado', 'Vendido');
 
   if (currentSearchQuery) {
@@ -307,6 +322,7 @@ window.changeGanadoPage = async function(page) {
 
 function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones, pesajesMap = new Map()) {
   const isSold = a.estado === 'Vendido';
+  const isPreñada = a.sexo === 'Hembra' && a.reproductivo === 'Preñada';
   const pendingVacuna = setVacunas.has(a.id);
   const pendingPesaje = setPesajes.has(a.id);
   const pendingFumigacion = setFumigaciones.has(a.id);
@@ -375,6 +391,7 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones, pesajesMap 
           <p class="ganado-col-value">${a.nombre || 'Sin nombre'}</p>
           ${daysHtml}
           ${isSold ? '<p class="ganado-col-sold-tag">Vendido</p>' : ''}
+          ${isPreñada ? '<p class="ganado-col-prenada-tag"><img src="/cow.png" style="width:14px; height:14px; object-fit:contain;"> Preñada</p>' : ''}
         </div>
         <div style="margin-left: auto; display: flex; align-items: center; gap: 16px; position: relative;">
           <div style="display: flex; flex-direction: column; align-items: flex-end;">

@@ -14,7 +14,7 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
 registerSW({ immediate: true, onNeedRefresh() { window.location.reload(); } });
 
 import { isOnline, processSyncQueue, incrementalSync } from './sync.js';
-import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan } from './wa.js';
+import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan, checkPartosProximos } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 import { initRealtime, disconnectRealtime } from './realtime.js';
@@ -261,6 +261,7 @@ function initOnlineSync() {
         await checkAnalisisSueloPendiente();
         await checkEnmiendaCal();
         await actualizarSaludPorPlan();
+        await checkPartosProximos();
       } catch (e) { /* silent */ }
     }
   }, 60000);
@@ -280,6 +281,7 @@ function initOnlineSync() {
 import { renderDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';
 import { renderHerramientas, initHerramientas } from './screens/herramientas.js';
+import { renderNuevaHerramienta, initNuevaHerramienta } from './screens/nueva_herramienta.js';
 import { renderGanado, initGanado } from './screens/ganado.js';
 import { renderPotreros, initPotreros } from './screens/potreros.js';
 import { renderDetalleMotor } from './screens/detalle_motor.js';
@@ -316,7 +318,8 @@ const screens = {
     detalle_motor: { title: 'Detalle de Motor', backTo: 'motores', render: renderDetalleMotor },
     detalle_potrero: { title: 'Detalle de Potrero', backTo: 'potreros', render: renderDetallePotrero },
     detalle_animal: { title: 'Detalle de Animal', backTo: 'ganado', render: renderDetalleAnimal },
-    detalle_herramienta: { title: 'Detalle de Tool', backTo: 'herramientas', render: renderDetalleHerramienta },
+    detalle_herramienta: { title: 'Detalle de Herramienta', backTo: 'herramientas', render: renderDetalleHerramienta },
+    nueva_herramienta: { title: 'Nueva Herramienta', backTo: 'herramientas', render: renderNuevaHerramienta },
     nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor },
     nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal },
     nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero },
@@ -388,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewCache = new Map();
     const NO_CACHE = new Set([
         'nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote',
-        'nueva_actividad','nuevo_personal','aceptar_invitacion',
+        'nueva_actividad','nuevo_personal','nueva_herramienta','aceptar_invitacion',
         'recuperar','restablecer',
         // Detail screens: their render() only returns a spinner skeleton;
         // data is loaded via init(). Caching the spinner causes triple re-renders
@@ -429,6 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
             initDetalleMotor(...args);
         }
         if (screenId === 'nuevo_motor')  initNuevoMotor(...args);
+        if (screenId === 'nueva_herramienta') initNuevaHerramienta(...args);
         if (screenId === 'motores')      initMotores();
         if (screenId === 'herramientas') initHerramientas();
         if (screenId === 'ganado')       initGanado();
@@ -458,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
-    const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad']);
+    const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad','nueva_herramienta']);
 
     async function navigate(screenId, ...args) {
         if (DETAIL_SCREENS.has(screenId) && (!args || args.length === 0 || !args[0])) {

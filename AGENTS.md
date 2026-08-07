@@ -10,6 +10,27 @@ Sistema multi-empresa colaborativo con auth, aislamiento por empresa, roles, inv
 - Auth/DB: llamadas REST directas a Supabase (`authFetch`, `restFetch`, `restInsert`), NO usar `@supabase/supabase-js` ni QueryBuilder.
 - Proyecto Supabase: `udhuizkqnmkhljmezzkd`.
 
+## Lo Completado (07/08)
+
+### Reproducción Ganadera — Preñez, Parto y Crías (nuevo)
+- Migraciones aplicadas vía Management API (no `supabase db push`): `20260807_reproduccion.sql` (`ALTER ganado ADD madre_id UUID REFERENCES ganado(id) ON DELETE SET NULL` + `reproductivo TEXT DEFAULT 'Vacía'`; tabla `public.animal_preñez` con animal_id FK, empresa_id, fecha_monta, fecha_probable_parto, fecha_parto, num_crias, estado `Preñada`|`Parida`|`Abortada`, RLS + realtime) y `20260807_drop_herramientas_ubicacion.sql` (`DROP COLUMN IF EXISTS ubicacion` de herramientas).
+- **Fix registrar animal**: `nuevo_animal.js` — `madre_id` solo se envía si hay madre seleccionada (antes mandaba `madre_id:null` → PostgREST 400 → fallback silencioso a local/sync queue y nada llegaba a la BD). Fix `.catch()` sobre cadena thenable de QueryBuilder → try/catch.
+- Offline: `db.js` v4 (`ganado` con `madre_id`, tabla `animal_preñez`); `sync.js`, `query-builder.js` y `realtime.js` incluyen `animal_preñez` en BUSINESS_TABLES y `WA_TRIGGER_TABLES`.
+- `detalle_animal.jsx`: sección Reproducción completa — hero badges ("Preñada" con `/cow.png`, "Hija/o de: [madre]" con `/cria.png`, "Lactando"), tarjeta estadística, pestaña `#da-tab-repro` solo para hembras, formulario de preñez inline (no modal) con cálculo de parto (+283 días), parto con `num_crias` 1/2 (crías heredan raza/peso_unidad de la madre, insertan `madre_id` + pesaje inicial en `animal_pesajes`), aborto, tabla de historial `renderPregnanciesHtml()`. Todos los inserts incluyen `empresa_id: window._currentEmpresaId`.
+- `ganado.js`: 8º count `preñadasCount`, tarjeta "Preñadas" condicional (`/cow.png`, borde `#b26a00`), filtro `preñadas` en `renderGanado` y `changeGanadoPage`, badge `Preñada` en filas. `components.css`: `.ganado-col-prenada-tag`.
+- `wa.js`: `checkPartosProximos()` — lee `animal_preñez` estado `Preñada` con parto entre hoy y +7 días, envía WhatsApp ("¡HOY!"/"mañana"/"en N días"), dedup diario `wa_partos_sent_<hoy>`. `main.js`: import + llamada en el ciclo de 60s.
+
+### Herramientas — Búsqueda, Exportar CSV y refactor de campos
+- `herramientas.js`: buscador inline (toggle Material 3 expandible), exportar inventario a CSV (`exportToolsToCsv`), botón "En Reparación" solo si hay, contador de registros filtrado, `buildToolsQuery()` con `.or(nombre,categoria ilike)`.
+- `nueva_herramienta.js` y `detalle_herramienta.js`: eliminados campos `ubicacion` e `icon`; hero del detalle usa `image_url` si existe (sino emoji). `nueva_herramienta` registrada en `main.js` (screens, NO_CACHE, init, FORM_SCREENS) y título "Detalle de Herramienta" corregido.
+
+### IFCAFE 2026 — Plan calculado al vuelo + vista individual por lote
+- `nuevo_lote.js`: ya NO materializa las 5 aplicaciones en `lote_aplicaciones` al crear lote; el plan se calcula al vuelo desde `calculadora_dosis.js`. Solo envía resumen por WhatsApp.
+- `plan_ifcafe.js`: nueva vista individual `#plan_ifcafe/{loteId}` (`renderLotePlanIfcafe`) con carrusel de aplicaciones (prev/next + segmentos clickeables + `selectIfcafeApp`), sección "Aplicada" y "Siguientes en el plan"; matching por `normalizarProducto(a.producto) === normalizarProducto(item.producto)` en vez de `substring(0,8)`; `marcarAplicada` hace PATCH sobre las filas `Programada` previas (estado→Aplicada, tipo→Fertilizante) y navega a la vista de lote.
+- `calculadora_dosis.js`: helpers nuevos `normalizarProducto()` y `fraccionDesdeDosis()`. `vasito_medidor.js`: `dibujarVasitoCompacto` redimensionado al contenedor.
+- `dashboard.js` y `detalle_lote.js`: "Aplicaciones Recientes" e histórico excluyen `estado=Programada` (`.neq('estado','Programada')`). `nueva_actividad.js`: las nuevas aplicaciones se guardan con `estado: 'Aplicada'`. `detalle_lote.js`: `window.showAddAplicacionModal` para ver histórico completo.
+- `wa.js`: `actualizarSaludPorPlan()` reescrito — calcula atrasadas desde el plan IFCAFE (vs aplicadas reales vía REST, `estado=eq.Aplicada`) en vez de buscar filas `Programada` vencidas; también lee lotes vía `restFetch` con filtro `empresa_id`.
+
 ## Lo Completado (22/07)
 
 ### Fix ERR_INSUFFICIENT_RESOURCES y Optimización de Rendimiento

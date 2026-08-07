@@ -25,16 +25,24 @@ export function dibujarVasito(fraccion, etiqueta, onzas, gramos) {
 }
 
 export function dibujarVasitoCompacto(fraccion) {
-  const fillHeight = fraccion * 40;
-  const lineY = 44 - fraccion * 40;
+  const alturaTotal = 44;
+  const alturaRelleno = alturaTotal * (fraccion || 0);
+  const yInicio = 50 - alturaRelleno;
+  const fill = alturaRelleno > 0
+    ? `<rect x="8" y="${yInicio}" width="24" height="${alturaRelleno}" fill="var(--fill-success, #4caf50)" clip-path="url(#cup)"/>`
+    : '';
 
   return `
     <svg viewBox="0 0 40 55" width="40" height="55" class="vasito-compacto">
-      <polygon points="5,2 35,2 32,44 8,44"
+      <defs>
+        <clipPath id="cup">
+          <polygon points="6,6 34,6 31.5,50 8.5,50"/>
+        </clipPath>
+      </defs>
+      <polygon points="6,6 34,6 31.5,50 8.5,50"
                fill="rgba(230,240,255,0.3)" stroke="#555" stroke-width="1"/>
-      <polygon points="6,${44 - fillHeight} 34,${44 - fillHeight} 32,44 8,44"
-               fill="rgba(46,125,50,0.35)" stroke="none"/>
-      <line x1="6" y1="${lineY}" x2="34" y2="${lineY}"
+      ${fill}
+      <line x1="6" y1="${yInicio}" x2="34" y2="${yInicio}"
             stroke="#ff4103" stroke-width="1.5" stroke-dasharray="2,2"/>
     </svg>
   `;

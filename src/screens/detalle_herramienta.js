@@ -23,12 +23,16 @@ export async function renderDetalleHerramienta(toolId) {
   const toolData = {
     id: tool.id,
     nombre: tool.nombre || 'Sin Nombre',
-    ubicacion: tool.ubicacion || 'Bodega',
     icon: tool.icon || '🛠️',
+    image_url: tool.image_url || '',
     color: tool.color || '#fff',
     categoria: tool.categoria || 'General',
     estado: tool.estado || 'Disponible',
   };
+
+  const heroVisual = toolData.image_url
+    ? `<img src="${toolData.image_url}" alt="${toolData.nombre}" style="width: 100%; height: 100%; object-fit: cover;">`
+    : toolData.icon;
 
 
   return `
@@ -38,15 +42,11 @@ export async function renderDetalleHerramienta(toolId) {
       <div class="detail-hero card" style="background: linear-gradient(135deg, ${toolData.color}20 0%, ${toolData.color}40 100%); border-left: 6px solid ${toolData.color};">
         <div class="detail-hero-header" style="justify-content: space-between; width: 100%;">
           <div style="display: flex; align-items: center; gap: 16px;">
-            <div class="detail-hero-icon" style="background: ${toolData.color}; color: white; width: 64px; height: 64px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px;">
-              ${toolData.icon}
+            <div class="detail-hero-icon" style="background: ${toolData.color}; color: white; width: 64px; height: 64px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px; overflow: hidden;">
+              ${heroVisual}
             </div>
             <div>
               <h2 style="margin: 0;">${toolData.nombre}</h2>
-              <p class="detail-subtitle" style="margin: 4px 0 0 0; opacity: 0.8; display: flex; align-items: center; gap: 4px;">
-                <span class="material-icons" style="font-size: 16px;">location_on</span>
-                ${toolData.ubicacion}
-              </p>
             </div>
           </div>
           <button class="btn-m3-text" onclick="window.navigateTo('nueva_herramienta', '${tool.id}')" style="min-width: 48px; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">

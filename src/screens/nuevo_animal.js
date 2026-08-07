@@ -4,6 +4,22 @@ import { sendWhatsApp } from '../wa.js';
 
 export async function renderNuevoAnimal(id) {
   const isEdit = !!id;
+
+  let hembras = [];
+  try {
+    const { data } = await supabase
+      .from('ganado')
+      .select('id, nombre')
+      .ilike('sexo', 'hembra')
+      .neq('estado', 'Vendido')
+      .order('nombre', { ascending: true });
+    hembras = data || [];
+  } catch { /* silencioso */ }
+
+  const madreOptions = hembras.map(h =>
+    `<option value="${h.id}">${h.nombre}</option>`
+  ).join('');
+
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card">
@@ -110,6 +126,14 @@ export async function renderNuevoAnimal(id) {
                 <input type="number" step="0.01" name="precio_compra" placeholder=" ">
                 <label>Precio de compra ($)</label>
               </div>
+
+              <div class="m3-field" style="margin-top:16px;">
+                <select name="madre_id" id="madre-select">
+                  <option value="">Sin madre / Independiente</option>
+                  ${madreOptions}
+                </select>
+                <label>Madre (para crías nacidas en la finca)</label>
+              </div>
               
               <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0;">
                 <button type="button" class="da-action-btn primary" id="btn-save-animal">
@@ -154,6 +178,7 @@ export function initNuevoAnimal(id) {
         form.fecha_adquisicion.value = data.fecha_adquisicion || '';
         form.origen.value = data.origen || 'Criollo';
         form.precio_compra.value = data.precio_compra || '';
+        if (data.madre_id) form.madre_id.value = data.madre_id;
         if (data.origen === 'Comprado' && precioCompraField) precioCompraField.style.display = 'block';
 
         const { data: pesajes } = await supabase.from('animal_pesajes').select('peso').eq('animal_id', id).order('fecha', { ascending: false });
@@ -260,6 +285,7 @@ export function initNuevoAnimal(id) {
         precio_compra: data.origen === 'Comprado' ? (parseFloat(data.precio_compra) || null) : null,
         image_url: image_url || existingImageUrl
       };
+      if (data.madre_id) animalData.madre_id = data.madre_id;
 
       let result;
       if (id) {

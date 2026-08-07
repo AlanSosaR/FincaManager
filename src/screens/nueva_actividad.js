@@ -532,6 +532,7 @@ export function initNuevaActividad(loteId, tipo) {
     }
 
     data.empresa_id = window._currentEmpresaId;
+    data.estado = 'Aplicada';
 
     try {
       // Use restInsert for lote_aplicaciones (no .select needed)

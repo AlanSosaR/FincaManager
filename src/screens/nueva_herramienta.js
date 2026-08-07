@@ -61,11 +61,6 @@ export async function renderNuevaHerramienta(id) {
 
             <div class="m3-grid-2col" style="margin-bottom: 20px;">
               <div class="m3-field">
-                <input type="text" name="ubicacion" placeholder=" ">
-                <label>Ubicación (Ej. Bodega Principal)</label>
-              </div>
-
-              <div class="m3-field">
                 <select name="estado" required>
                   <option value="Disponible">Disponible</option>
                   <option value="Reparación">En Reparación</option>
@@ -73,11 +68,6 @@ export async function renderNuevaHerramienta(id) {
                 </select>
                 <label>Estado actual</label>
               </div>
-            </div>
-
-            <div class="m3-field" style="margin-bottom: 24px;">
-              <input type="text" name="icon" placeholder=" " value="🛠️">
-              <label>Icono / Emoji</label>
             </div>
 
             <div class="da-form-actions">
@@ -115,9 +105,7 @@ export async function initNuevaHerramienta(id) {
       // Fill form
       form.nombre.value = data.nombre || '';
       form.categoria.value = data.categoria || 'Manual';
-      form.ubicacion.value = data.ubicacion || '';
       form.estado.value = data.estado || 'Disponible';
-      form.icon.value = data.icon || '🛠️';
       
       if (data.image_url) {
         currentImageUrl = data.image_url;
@@ -178,7 +166,8 @@ export async function initNuevaHerramienta(id) {
 
       const toolData = {
         ...formDataObj,
-        image_url
+        image_url,
+        icon: '🛠️'
       };
 
       if (isEdit) {

@@ -1,6 +1,6 @@
 import db from './db.js';
 import { restFetch } from './auth.js';
-import { getDosisPorEdad, getPlanIfcafe, getZonaLabel, obtenerOrdenDia } from './utils/calculadora_dosis.js';
+import { getDosisPorEdad, getPlanIfcafe, obtenerOrdenDia, normalizarProducto } from './utils/calculadora_dosis.js';
 
 const EVOLUTION_API = '/api/wa-proxy';
 const NOTIFIED_KEY = 'wa_notified_vaccines';
@@ -314,61 +314,64 @@ function saveLoteNotifiedSet(set) {
 
 export async function checkAplicacionesDelMes() {
   const today = getLocalToday();
+  const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+  if (!empresaId) return;
   const sentKey = `${SENT_LOTE_TODAY_KEY}_${today}`;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  const notified = getLoteNotifiedSet();
   try {
-    const apps = await restFetch(`/rest/v1/lote_aplicaciones?fecha=eq.${today}&select=*`);
-    const pending = apps.filter(a => a.estado === 'Programada');
-    if (!pending.length) return;
+    const lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*`);
+    const aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
+    if (!Array.isArray(aplicadas)) aplicadas = [];
 
-    const notified = getLoteNotifiedSet();
+    for (const lote of (Array.isArray(lotes) ? lotes : [])) {
+      if (!lote.edad_categoria) continue;
+      const plan = getPlanIfcafe(parseInt(lote.altura_msnm) || 0);
 
-    for (const app of pending) {
-      if (notified.has(app.id)) continue;
-      if (alreadySent.has(app.id)) continue;
+      for (const item of plan) {
+        const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
+        if (matchFecha !== today) continue;
 
-      let loteNombre = `Lote #${app.lote_id?.substring(0, 6) || '?'}`;
-      let numPlantas = 0;
-      let edadCat = null;
-      let operarios = [];
-      try {
-        const lote = await db.lotes.get(app.lote_id);
-        if (lote?.nombre) loteNombre = lote.nombre;
-        if (lote?.num_plantas) numPlantas = lote.num_plantas;
-        if (lote?.edad_categoria) edadCat = lote.edad_categoria;
-      } catch {}
+        const productKey = normalizarProducto(item.producto);
+        const yaHecha = aplicadas.some(a =>
+          a.lote_id === lote.id &&
+          a.producto && normalizarProducto(a.producto) === productKey &&
+          a.fecha && a.fecha.startsWith(matchFecha.substring(0, 7))
+        );
+        if (yaHecha) continue;
 
-      try {
-        const personalList = await db.lote_personal.where('lote_id').equals(app.lote_id).toArray();
-        for (const p of personalList) {
-          const person = await db.personal.get(p.personal_id);
-          if (person?.nombre) operarios.push(person.nombre);
-        }
-      } catch {}
+        const dedupKey = `wa_notif_lote_${lote.id}_${item.mes}_${productKey}`;
+        if (notified.has(dedupKey)) continue;
+        if (alreadySent.has(dedupKey)) continue;
 
-      const serverApp = await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${app.id}&select=estado`);
-      if (!serverApp || serverApp.length === 0 || serverApp[0].estado !== 'Programada') {
-        notified.add(app.id);
-        alreadySent.add(app.id);
-        continue;
+        let numPlantas = lote.num_plantas || 0;
+        let edadCat = lote.edad_categoria;
+        let operarios = [];
+        try {
+          const personalList = await db.lote_personal.where('lote_id').equals(lote.id).toArray();
+          for (const p of personalList) {
+            const person = await db.personal.get(p.personal_id);
+            if (person?.nombre) operarios.push(person.nombre);
+          }
+        } catch {}
+
+        const dosisCalc = getDosisPorEdad(edadCat);
+        const orden = obtenerOrdenDia(lote.nombre || '', item.producto, dosisCalc, operarios);
+
+        await sendWhatsApp(
+          `🌱 AVISO DE ABONADA - ${lote.nombre}\n\n` +
+          `Producto: ${item.producto}\n` +
+          `🥤 Dosis: ${dosisCalc?.porAplicacion?.vasitoLabel || 'N/A'} por planta\n` +
+          `📦 Total: ${numPlantas} plantas\n` +
+          (operarios.length > 0 ? `👷 Personal: ${operarios.join(', ')}\n\n` : '\n') +
+          `📋 Orden del día:\n"${orden}"\n\n` +
+          `⚠️ NO aplicar si la tierra está seca.\n` +
+          `Esperá al menos 3 días de lluvia fuerte.`
+        );
+
+        notified.add(dedupKey);
+        alreadySent.add(dedupKey);
       }
-
-      const dosisCalc = getDosisPorEdad(edadCat);
-      const orden = obtenerOrdenDia(loteNombre, app.producto, dosisCalc, operarios);
-
-      await sendWhatsApp(
-        `🌱 AVISO DE ABONADA - ${loteNombre}\n\n` +
-        `Producto: ${app.producto}\n` +
-        `🥤 Dosis: ${app.dosis || (dosisCalc?.porAplicacion?.vasitoLabel || 'N/A')} por planta\n` +
-        `📦 Total: ${numPlantas} plantas\n` +
-        (operarios.length > 0 ? `👷 Personal: ${operarios.join(', ')}\n\n` : '\n') +
-        `📋 Orden del día:\n"${orden}"\n\n` +
-        `⚠️ NO aplicar si la tierra está seca.\n` +
-        `Esperá al menos 3 días de lluvia fuerte.`
-      );
-
-      notified.add(app.id);
-      alreadySent.add(app.id);
     }
 
     saveLoteNotifiedSet(notified);
@@ -458,15 +461,29 @@ export async function checkEnmiendaCal() {
 
 export async function actualizarSaludPorPlan() {
   const today = getLocalToday();
+  const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+  if (!empresaId) return;
   const sentKey = 'wa_salud_sent_' + today;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
   try {
-    const lotes = await db.lotes.toArray();
-    for (const lote of lotes) {
+    const lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*`);
+    const aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
+    if (!Array.isArray(aplicadas)) aplicadas = [];
+
+    for (const lote of (Array.isArray(lotes) ? lotes : [])) {
       if (!lote.edad_categoria) continue;
 
-      const planApps = await restFetch(`/rest/v1/lote_aplicaciones?lote_id=eq.${lote.id}&estado=eq.Programada&fecha=lt.${today}&select=id,fecha`);
-      const atrasadas = Array.isArray(planApps) ? planApps : [];
+      const plan = getPlanIfcafe(parseInt(lote.altura_msnm) || 0);
+      const atrasadas = plan.filter(item => {
+        const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
+        if (matchFecha >= today) return false;
+        const productKey = normalizarProducto(item.producto);
+        return !aplicadas.some(a =>
+          a.lote_id === lote.id &&
+          a.producto && normalizarProducto(a.producto) === productKey &&
+          a.fecha && a.fecha.startsWith(matchFecha.substring(0, 7))
+        );
+      });
       if (atrasadas.length === 0) continue;
 
       const penalizacion = atrasadas.length * 5;
@@ -496,5 +513,46 @@ export async function actualizarSaludPorPlan() {
     localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
   } catch (e) {
     console.warn('actualizarSaludPorPlan error:', e);
+  }
+}
+
+export async function checkPartosProximos() {
+  const today = getLocalToday();
+  const sentKey = 'wa_partos_sent_' + today;
+  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
+  try {
+    const preñeces = await restFetch(`/rest/v1/animal_preñez?estado=eq.Preñada&select=animal_id,fecha_monta,fecha_probable_parto`);
+    if (!preñeces || preñeces.length === 0) return;
+
+    const hoy = new Date(today + 'T12:00:00');
+    const en7dias = new Date(hoy);
+    en7dias.setDate(en7dias.getDate() + 7);
+
+    for (const preg of preñeces) {
+      if (!preg.fecha_probable_parto) continue;
+      if (alreadySent.has(preg.animal_id)) continue;
+
+      const parto = new Date(preg.fecha_probable_parto + 'T12:00:00');
+      if (parto < hoy || parto > en7dias) continue;
+
+      let animalName = `Animal #${preg.animal_id?.substring(0, 6) || '?'}`;
+      try {
+        const animal = await db.ganado.get(preg.animal_id);
+        if (animal?.nombre) animalName = animal.nombre;
+      } catch {}
+
+      const dias = Math.round((parto - hoy) / (1000 * 60 * 60 * 24));
+      const diasText = dias === 0 ? '¡HOY!' : dias === 1 ? 'mañana' : `en ${dias} días`;
+
+      await sendWhatsApp(
+        `🔔 PARTOS PRÓXIMOS\nMadre: ${animalName}\nFecha estimada de parto: ${preg.fecha_probable_parto}\n${diasText}\nFinca: ${window._empresaNombre || ''}`
+      );
+
+      alreadySent.add(preg.animal_id);
+    }
+
+    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
+  } catch (e) {
+    console.warn('checkPartosProximos error:', e);
   }
 }

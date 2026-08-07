@@ -11,6 +11,12 @@ function getLocalToday() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function addDays(dateStr, days) {
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 Chart.register(...registerables);
 
 /** Generic inline confirmation modal — no dependency on Snackbar.confirm */
@@ -128,6 +134,7 @@ let currentAnimal = null;
 let vaccines = [];
 let weights = [];
 let fumigaciones = [];
+let pregnancies = [];
 let lastWeight = 0;
 let weightChange = 0;
 let weightTrend = 'neutral';
@@ -169,32 +176,41 @@ async function loadAllData(animalId, container, flag) {
         let weightsData = [];
         let fumigData = [];
         let ventaData = [];
+        let pregnanciesData = [];
 
         // 1. Fast local read from IndexedDB for instant 0ms load
         try {
             animalData = await db.ganado.get(animalId);
             if (animalData) {
-                const [potreroObj, vArr, wArr, fArr, veArr] = await Promise.all([
+                const [potreroObj, vArr, wArr, fArr, veArr, pArr] = await Promise.all([
                     animalData.potrero_id && db.potreros ? db.potreros.get(animalData.potrero_id).catch(() => null) : null,
                     db.animal_vacunas ? db.animal_vacunas.where('animal_id').equals(animalId).toArray().catch(() => []) : [],
                     db.animal_pesajes ? db.animal_pesajes.where('animal_id').equals(animalId).toArray().catch(() => []) : [],
                     db.animal_fumigaciones ? db.animal_fumigaciones.where('animal_id').equals(animalId).toArray().catch(() => []) : [],
-                    db.animal_ventas ? db.animal_ventas.where('animal_id').equals(animalId).toArray().catch(() => []) : []
+                    db.animal_ventas ? db.animal_ventas.where('animal_id').equals(animalId).toArray().catch(() => []) : [],
+                    db.animal_preñez ? db.animal_preñez.where('animal_id').equals(animalId).toArray().catch(() => []) : []
                 ]);
 
                 if (potreroObj) {
                     animalData.potreros = potreroObj;
                 }
 
+                if (animalData.madre_id) {
+                    const madre = await db.ganado.get(animalData.madre_id).catch(() => null);
+                    if (madre) animalData.madre = madre;
+                }
+
                 vaccinesData = vArr || [];
                 weightsData = wArr || [];
                 fumigData = fArr || [];
                 ventaData = veArr || [];
+                pregnanciesData = pArr || [];
 
                 weightsData.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
                 vaccinesData.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
                 fumigData.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
                 ventaData.sort((a, b) => new Date(b.fecha_venta) - new Date(a.fecha_venta));
+                pregnanciesData.sort((a, b) => new Date(b.fecha_monta) - new Date(a.fecha_monta));
 
                 if (ventaData.length > 0) {
                     const v = ventaData[0];
@@ -208,6 +224,7 @@ async function loadAllData(animalId, container, flag) {
                 vaccines = vaccinesData;
                 weights = weightsData;
                 fumigaciones = fumigData;
+                pregnancies = pregnanciesData;
 
                 calculateWeightStats(weightsData);
 
@@ -225,12 +242,13 @@ async function loadAllData(animalId, container, flag) {
                 // Abort if the user already navigated away
                 if (!document.getElementById('da-container')) return;
                 try {
-                    const [animalArr, vRest, wRest, fRest, veRest] = await Promise.all([
+                    const [animalArr, vRest, wRest, fRest, veRest, pRest] = await Promise.all([
                         restFetch(`/rest/v1/ganado?id=eq.${animalId}&select=*,potreros(nombre)&limit=1`).catch(() => null),
                         restFetch(`/rest/v1/animal_vacunas?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
                         restFetch(`/rest/v1/animal_pesajes?animal_id=eq.${animalId}&order=fecha.asc`).catch(() => null),
                         restFetch(`/rest/v1/animal_fumigaciones?animal_id=eq.${animalId}&order=fecha.desc`).catch(() => null),
                         restFetch(`/rest/v1/animal_ventas?animal_id=eq.${animalId}&order=fecha_venta.desc&limit=1`).catch(() => null),
+                        restFetch(`/rest/v1/animal_preñez?animal_id=eq.${animalId}&order=fecha_monta.desc`).catch(() => null),
                     ]);
 
                     const freshAnimal = Array.isArray(animalArr) ? animalArr[0] : animalArr;
@@ -241,10 +259,12 @@ async function loadAllData(animalId, container, flag) {
                     const freshVaccineCount = Array.isArray(vRest) ? vRest.length : vaccinesData.length;
                     const freshWeightCount  = Array.isArray(wRest) ? wRest.length : weightsData.length;
                     const freshFumigCount   = Array.isArray(fRest) ? fRest.length : fumigData.length;
+                    const freshPregCount    = Array.isArray(pRest) ? pRest.length : pregnanciesData.length;
                     const dataUnchanged = serverUpdatedAt === snapshotUpdatedAt
                         && freshVaccineCount === vaccinesData.length
                         && freshWeightCount  === weightsData.length
-                        && freshFumigCount   === fumigData.length;
+                        && freshFumigCount   === fumigData.length
+                        && freshPregCount    === pregnanciesData.length;
 
                     if (dataUnchanged) return; // Nothing changed — avoid flicker
 
@@ -256,6 +276,12 @@ async function loadAllData(animalId, container, flag) {
                     weights  = Array.isArray(wRest) ? wRest : weightsData;
                     fumigaciones = Array.isArray(fRest) ? fRest : fumigData;
                     const freshVenta = Array.isArray(veRest) ? veRest : ventaData;
+                    pregnancies = Array.isArray(pRest) ? pRest.sort((a, b) => new Date(b.fecha_monta) - new Date(a.fecha_monta)) : pregnanciesData;
+
+                    if (currentAnimal.madre_id) {
+                        const madre = await db.ganado.get(currentAnimal.madre_id).catch(() => null);
+                        if (madre) currentAnimal.madre = madre;
+                    }
 
                     calculateWeightStats(weights);
                     if (freshVenta && freshVenta.length > 0) {
@@ -310,6 +336,21 @@ function calculateWeightStats(wList) {
 function renderFullContent(container, animalId, flag) {
     const isSold = currentAnimal.estado === 'Vendido';
     const sellMode = flag === 'vender';
+    const activePreg = pregnancies.find(p => p.estado === 'Preñada');
+    let reproBadge = '';
+    if (currentAnimal.sexo === 'Hembra') {
+        if (activePreg && currentAnimal.reproductivo === 'Preñada') {
+            reproBadge = `<div class="da-badge" style="border:1px solid #f0d9a8;background:#fff4e0;color:#b26a00;">
+                <img src="/cow.png" style="width:18px; height:18px; object-fit:contain;">
+                Preñada — Parto: ${new Date(activePreg.fecha_probable_parto + 'T00:00:00').toLocaleDateString()}
+            </div>`;
+        } else if (currentAnimal.reproductivo === 'Lactando') {
+            reproBadge = `<div class="da-badge" style="border:1px solid #d4e8b0;background:#f0f7e6;color:#2d3e2c;">
+                <span class="material-icons">child_care</span>
+                Lactando
+            </div>`;
+        }
+    }
     container.innerHTML = `
 
         <div class="da-hero">
@@ -336,6 +377,12 @@ function renderFullContent(container, animalId, flag) {
                         <span class="material-icons">${currentAnimal.sexo === 'Macho' ? 'male' : 'female'}</span>
                         ${currentAnimal.sexo || 'Sexo N/A'}
                     </div>
+                    ${currentAnimal.madre ? `
+                    <div class="da-badge da-badge-surface">
+                        <img src="/cria.png" style="width:18px; height:18px; object-fit:contain;">
+                        Hija/o de: ${currentAnimal.madre.nombre}
+                    </div>` : ''}
+                    ${reproBadge}
                     <div class="da-badge da-badge-surface">
                         <span class="material-icons">${currentAnimal.origen === 'Comprado' ? 'shopping_cart' : 'eco'}</span>
                         ${currentAnimal.origen || 'Criollo'}${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
@@ -433,6 +480,18 @@ function renderFullContent(container, animalId, flag) {
                     <div class="da-stat-sub">Tratamientos químicos</div>
                 </div>
             </div>
+
+            ${currentAnimal.sexo === 'Hembra' ? `
+            <div class="da-stat-card da-stat-tab" data-tab="repro" style="cursor:pointer;" title="Ver Reproducción">
+                <div class="da-stat-icon" style="background: #fff4e0; color: #b26a00;">
+                    <img src="/cow.png" style="width:26px; height:26px; object-fit:contain;">
+                </div>
+                <div>
+                    <div class="da-stat-label">Reproducción</div>
+                    <div class="da-stat-value">${currentAnimal.reproductivo || 'Vacía'}</div>
+                    <div class="da-stat-sub">${activePreg ? `Parto: ${new Date(activePreg.fecha_probable_parto + 'T00:00:00').toLocaleDateString()}` : pregnancies.length + (pregnancies.length === 1 ? ' gestación registrada' : ' gestaciones registradas')}</div>
+                </div>
+            </div>` : ''}
         </div>
 
         <div class="da-tabs-section">
@@ -549,6 +608,32 @@ function renderFullContent(container, animalId, flag) {
                     </div>
                 </div>
             </div>
+
+            ${currentAnimal.sexo === 'Hembra' ? `
+            <div class="da-tab-content" id="da-tab-repro">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+                    <div>
+                        <h4 style="font-size:18px; font-weight:800; margin:0;">Historial de Reproducción</h4>
+                        <p style="margin:4px 0 0; color:#777; font-size:14px;">Gestaciones, partos y crías de este animal.</p>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        ${!activePreg ? `
+                        <button class="btn-m3-fill" id="da-add-pregnancy">
+                            <span class="material-icons">add</span> Registrar preñez
+                        </button>` : `
+                        <button class="btn-m3-primary" id="da-register-parto">
+                            <span class="material-icons">child_care</span> Registrar parto
+                        </button>
+                        <button class="btn-m3-tonal" id="da-register-abort" style="background:#ffe2db; color:#ff4103;">
+                            <span class="material-icons">block</span> Aborto
+                        </button>`}
+                    </div>
+                </div>
+                <div id="da-pregnancy-inline"></div>
+                <div class="da-table-card" id="da-pregnancies-table">
+                    ${renderPregnanciesHtml()}
+                </div>
+            </div>` : ''}
         </div>
     `;
  
@@ -715,6 +800,11 @@ function setupEventListeners(animalId, container, sellMode) {
 
     // Registration Actions
     document.getElementById('da-add-weight')?.addEventListener('click', () => showInlineWeightForm(animalId));
+
+    // Reproduction Actions
+    document.getElementById('da-add-pregnancy')?.addEventListener('click', () => handleAddPregnancy(animalId));
+    document.getElementById('da-register-parto')?.addEventListener('click', () => handleRegistrarParto(animalId));
+    document.getElementById('da-register-abort')?.addEventListener('click', () => handleAbortPregnancy(animalId));
 }
 
 
@@ -1993,3 +2083,284 @@ async function handleEditFumigacion(fumigacionId) {
     };
 }
 window.editFumigacion = (id) => handleEditFumigacion(id);
+
+// ─── Reproducción ────────────────────────────────────────────────────────────
+
+function renderPregnanciesHtml() {
+    if (!pregnancies || pregnancies.length === 0) {
+        return `<div class="da-empty-state">No hay registros de reproducción</div>`;
+    }
+
+    const rows = pregnancies.map(p => {
+        const fechaMonta = p.fecha_monta ? new Date(p.fecha_monta + 'T00:00:00').toLocaleDateString() : '—';
+        const fechaParto = p.fecha_parto ? new Date(p.fecha_parto + 'T00:00:00').toLocaleDateString() : (p.fecha_probable_parto ? new Date(p.fecha_probable_parto + 'T00:00:00').toLocaleDateString() : '—');
+        let estadoPill = '';
+        if (p.estado === 'Preñada') {
+            estadoPill = `<span class="da-variation-pill pending"><img src="/cow.png" style="width:16px; height:16px; object-fit:contain;"> Preñada</span>`;
+        } else if (p.estado === 'Parida') {
+            estadoPill = `<span class="da-variation-pill positive"><span class="material-icons">check_circle</span> Parida</span>`;
+        } else {
+            estadoPill = `<span class="da-variation-pill negative"><span class="material-icons">block</span> Abortada</span>`;
+        }
+
+        return `
+            <div class="da-table-row">
+                <div class="da-table-cell da-cell-bold" data-label="Estado">${estadoPill}</div>
+                <div class="da-table-cell" data-label="Monta">${fechaMonta}</div>
+                <div class="da-table-cell" data-label="Parto">${fechaParto}</div>
+                <div class="da-table-cell" data-label="Crías">${p.num_crias || '—'}</div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="da-table-header">
+            <div>Estado</div>
+            <div>Fecha Monta</div>
+            <div>Fecha Parto</div>
+            <div>Crías</div>
+        </div>
+        ${rows}
+    `;
+}
+
+function handleAddPregnancy(animalId) {
+    const container = document.getElementById('da-pregnancy-inline');
+    const addBtn = document.getElementById('da-add-pregnancy');
+    if (!container) return;
+    if (addBtn) addBtn.style.display = 'none';
+
+    const today = getLocalToday();
+    container.innerHTML = `
+        <div class="da-inline-form-card" style="border:1px dashed #b7d98a; border-radius:12px; padding:16px; margin-bottom:16px; background:rgba(107,130,69,0.05);">
+            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.05rem; color:#6b8245; display:flex; align-items:center; gap:8px;">
+                <img src="/cow.png" style="width:22px; height:22px; object-fit:contain;"> Registrar Preñez
+            </h3>
+            <form id="form-add-pregnancy" style="display:flex; flex-direction:column; gap:16px;">
+                <div class="m3-field">
+                    <input type="date" name="fecha_monta" id="pregnancy-fecha-monta" value="${today}" placeholder=" " required>
+                    <label>Fecha de Monta</label>
+                </div>
+                <div style="background:#f0f7e6;border:1px dashed #b7d98a;border-radius:12px;padding:12px 16px;color:#4a5d30;font-size:14px;">
+                    <span class="material-icons" style="font-size:18px; vertical-align:-4px; margin-right:4px;">info</span>
+                    Fecha probable de parto estimada: <strong id="pregnancy-fecha-probable">${addDays(today, 283)}</strong> (283 días)
+                </div>
+                <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+                    <button type="button" class="btn-m3-text" id="cancel-inline-pregnancy">Cancelar</button>
+                    <button type="submit" class="btn-m3-fill">Guardar</button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    const fechaMontaInput = document.getElementById('pregnancy-fecha-monta');
+    const fechaProbableEl = document.getElementById('pregnancy-fecha-probable');
+    if (fechaMontaInput && fechaProbableEl) {
+        fechaMontaInput.addEventListener('change', () => {
+            fechaProbableEl.textContent = addDays(fechaMontaInput.value || today, 283);
+        });
+    }
+
+    document.getElementById('cancel-inline-pregnancy').onclick = () => {
+        container.innerHTML = '';
+        if (addBtn) addBtn.style.display = '';
+    };
+
+    document.getElementById('form-add-pregnancy').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const fechaMonta = fd.get('fecha_monta');
+        const btn = document.querySelector('#form-add-pregnancy button[type="submit"]');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Guardando...';
+        try {
+            await restInsert('/rest/v1/animal_preñez', {
+                animal_id: animalId,
+                empresa_id: window._currentEmpresaId,
+                fecha_monta: fechaMonta,
+                fecha_probable_parto: addDays(fechaMonta, 283),
+                estado: 'Preñada'
+            });
+            await restFetch('/rest/v1/ganado?id=eq.' + animalId, {
+                method: 'PATCH',
+                body: JSON.stringify({ reproductivo: 'Preñada' }),
+            });
+            showSnackbar('Preñez registrada');
+
+            if (currentAnimal) {
+                sendWhatsApp(
+                    '🐮 Preñez Registrada\nAnimal: ' + currentAnimal.nombre +
+                    '\nFecha de monta: ' + fechaMonta +
+                    '\nParto estimado: ' + addDays(fechaMonta, 283) +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+            }
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) {
+            btn.disabled = false;
+            btn.innerHTML = 'Guardar';
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+window.handleAddPregnancy = handleAddPregnancy;
+
+function renderPartoCriaFields(count) {
+    let html = '';
+    for (let i = 1; i <= count; i++) {
+        html += `
+            <div style="border:1px solid #eee;border-radius:12px;padding:14px;margin-bottom:12px;background:rgba(0,0,0,0.02);">
+                <p style="margin:0 0 10px;font-weight:800;font-size:14px;color:#6b8245;">Cría ${i}</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="m3-field">
+                        <input type="text" name="cria_nombre_${i}" placeholder=" " autocomplete="off">
+                        <label>Nombre</label>
+                    </div>
+                    <div class="m3-field">
+                        <select name="cria_sexo_${i}">
+                            <option value="Hembra">Hembra</option>
+                            <option value="Macho">Macho</option>
+                        </select>
+                        <label>Sexo</label>
+                    </div>
+                </div>
+                <div class="m3-field" style="margin-top:12px;">
+                    <input type="number" step="0.1" name="cria_peso_${i}" placeholder=" ">
+                    <label>Peso al nacer (${currentAnimal.peso_unidad || 'kg'})</label>
+                </div>
+            </div>`;
+    }
+    return html;
+}
+
+async function handleRegistrarParto(animalId) {
+    const today = getLocalToday();
+    showModal('Registrar Parto', `
+        <form id="form-register-parto" style="display: flex; flex-direction: column; gap: 16px;">
+            <div class="m3-field">
+                <input type="date" name="fecha_parto" value="${today}" placeholder=" " required>
+                <label>Fecha de Parto</label>
+            </div>
+            <div class="m3-field">
+                <select name="num_crias" id="parto-num-crias" required>
+                    <option value="1">1 cría</option>
+                    <option value="2">2 crías (gemelos)</option>
+                </select>
+                <label>Número de crías</label>
+            </div>
+            <div id="parto-crias-fields">
+                ${renderPartoCriaFields(1)}
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                <button type="button" class="btn-m3-tonal" id="cancel-parto">Cancelar</button>
+                <button type="submit" class="btn-m3-fill">Guardar</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('cancel-parto').onclick = closeModal;
+    document.getElementById('parto-num-crias').addEventListener('change', (e) => {
+        const container = document.getElementById('parto-crias-fields');
+        if (container) container.innerHTML = renderPartoCriaFields(parseInt(e.target.value, 10) || 1);
+    });
+
+    document.getElementById('form-register-parto').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const fechaParto = fd.get('fecha_parto');
+        const numCrias = parseInt(fd.get('num_crias'), 10) || 1;
+        const btn = document.querySelector('#form-register-parto button[type="submit"]');
+        btn.disabled = true;
+
+        try {
+            const preg = pregnancies.find(p => p.estado === 'Preñada');
+            if (preg) {
+                await restFetch('/rest/v1/animal_preñez?id=eq.' + preg.id, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ estado: 'Parida', fecha_parto: fechaParto, num_crias: numCrias }),
+                });
+            }
+            await restFetch('/rest/v1/ganado?id=eq.' + animalId, {
+                method: 'PATCH',
+                body: JSON.stringify({ reproductivo: 'Lactando' }),
+            });
+
+            const criasMessages = [];
+            for (let i = 1; i <= numCrias; i++) {
+                const nombre = (fd.get('cria_nombre_' + i) || '').trim();
+                const sexo = fd.get('cria_sexo_' + i) || 'Hembra';
+                const peso = parseFloat(fd.get('cria_peso_' + i));
+
+                const insertData = {
+                    nombre: nombre || `Cría de ${currentAnimal.nombre || 'vaca'} ${i}`,
+                    empresa_id: window._currentEmpresaId,
+                    raza: currentAnimal.raza || null,
+                    sexo: sexo,
+                    origen: 'Criollo',
+                    madre_id: animalId,
+                    peso_unidad: currentAnimal.peso_unidad || 'kg',
+                    fecha_adquisicion: fechaParto,
+                    reproductivo: 'Vacía',
+                };
+                const created = await restInsert('/rest/v1/ganado', insertData);
+                const criaId = created && created.id;
+                if (criaId && peso && peso > 0) {
+                    await restInsert('/rest/v1/animal_pesajes', {
+                        animal_id: criaId,
+                        empresa_id: window._currentEmpresaId,
+                        peso: String(peso),
+                        fecha: fechaParto,
+                        estado: 'Aplicada',
+                    });
+                }
+                criasMessages.push((nombre || insertData.nombre) + ' (' + sexo + ')' + (peso ? ' — ' + peso + ' kg' : ''));
+            }
+
+            closeModal();
+            showSnackbar('Parto registrado');
+
+            if (currentAnimal) {
+                sendWhatsApp(
+                    '🐄 Parto Registrado\nMadre: ' + currentAnimal.nombre +
+                    '\nFecha: ' + fechaParto +
+                    '\nCrías: ' + numCrias + '\n' + criasMessages.join('\n') +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+            }
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) {
+            btn.disabled = false;
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+window.handleRegistrarParto = handleRegistrarParto;
+
+function handleAbortPregnancy(animalId) {
+    const preg = pregnancies.find(p => p.estado === 'Preñada');
+    if (!preg) return;
+    window.Snackbar.confirm('¿Registrar aborto de esta gestación?', async () => {
+        try {
+            await restFetch('/rest/v1/animal_preñez?id=eq.' + preg.id, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: 'Abortada' }),
+            });
+            await restFetch('/rest/v1/ganado?id=eq.' + animalId, {
+                method: 'PATCH',
+                body: JSON.stringify({ reproductivo: 'Vacía' }),
+            });
+            showSnackbar('Aborto registrado');
+            if (currentAnimal) {
+                sendWhatsApp(
+                    '⚠️ Aborto Registrado\nAnimal: ' + currentAnimal.nombre +
+                    '\nFecha monta: ' + (preg.fecha_monta || 'N/A') +
+                    '\nFinca: ' + (window._empresaNombre || '')
+                );
+            }
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) {
+            showSnackbar(err.message, 'error');
+        }
+    }, { confirmLabel: 'Registrar', cancelLabel: 'Cancelar' });
+}
+window.handleAbortPregnancy = handleAbortPregnancy;

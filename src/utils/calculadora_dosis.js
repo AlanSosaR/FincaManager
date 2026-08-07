@@ -45,6 +45,31 @@ export function getDosisPorEdad(edadCategoria) {
   return DOSIS_POR_EDAD[edadCategoria] || DOSIS_POR_EDAD['3_mas'];
 }
 
+export function normalizarProducto(producto) {
+  return String(producto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+export function fraccionDesdeDosis(dosisLabel) {
+  const s = String(dosisLabel || '').toLowerCase();
+  if (!s) return null;
+  if (s.includes('1/4') || s.includes('cuarto')) return 0.25;
+  if (s.includes('1/3') || s.includes('tercio') || s.includes('un poquito menos de medio')) return 0.33;
+  if (s.includes('1/2') || s.includes('medio')) return 0.5;
+  if (s.includes('3/4') || s.includes('tres cuartos')) return 0.75;
+  if (s.includes('lleno') || s.includes('1/1')) return 1;
+  const m = s.match(/(\d+)\s*\/\s*(\d+)/);
+  if (m) {
+    const v = parseInt(m[1], 10) / parseInt(m[2], 10);
+    if (v > 0 && v <= 1) return v;
+  }
+  return null;
+}
+
 export function getPlanIfcafe(alturaMsnm) {
   return (!alturaMsnm || alturaMsnm < 1000) ? PLAN_IFCAFE_ZONA_A : PLAN_IFCAFE_ZONA_B;
 }

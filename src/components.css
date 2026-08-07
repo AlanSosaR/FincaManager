@@ -1526,6 +1526,36 @@ input:focus, textarea:focus, select:focus {
   opacity: 0.6;
 }
 
+.ganado-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(45, 62, 44, 0.25);
+  background: var(--surface);
+  color: #2d3e2c;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Work Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ganado-filter-btn:hover {
+  background: #f0f7e6;
+  border-color: #2d3e2c;
+  transform: translateY(-1px);
+}
+
+.ganado-filter-btn:active {
+  transform: translateY(0);
+}
+
+.ganado-filter-btn .material-icons {
+  font-size: 16px;
+}
+
 /* ---- Filter chips bar ---- */
 .ganado-filters-bar {
   display: flex;
@@ -1800,6 +1830,18 @@ input:focus, textarea:focus, select:focus {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: #d32f2f;
+  margin-top: 2px;
+}
+
+.ganado-col-prenada-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #b26a00;
   margin-top: 2px;
 }
 

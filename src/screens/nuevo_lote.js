@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js';
 import { restFetch, restInsert } from '../auth.js';
 import { sendWhatsApp } from '../wa.js';
-import { getDosisPorEdad, getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
+import { getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
 
 function parseCoordenadasJson(json) {
   try {
@@ -1617,36 +1617,16 @@ export async function setupNuevoLoteListeners() {
       
       if (!newLoteId) throw new Error('No se pudo crear/actualizar el lote');
 
-      // Pre-programar aplicaciones IFCAFE solo si es lote nuevo
+      // El plan IFCAFE ya no se materializa en lote_aplicaciones:
+      // se calcula al vuelo desde calculadora_dosis.js. Solo se envía
+      // el resumen por WhatsApp al crear un lote nuevo.
       if (!submitLoteId && newLoteId) {
         const edadCat = data.edad_categoria;
         const altura = parseInt(data.altura_msnm) || 0;
         const numPlantas = parseInt(data.num_plantas) || 0;
-        const dosis = getDosisPorEdad(edadCat);
         const plan = getPlanIfcafe(altura);
-        const empresaId = window._currentEmpresaId;
 
         if (edadCat && plan.length > 0) {
-          const aplicaciones = plan.map(item => {
-            var fechaProgramada = new Date(2026, item.mes - 1, 15);
-            return {
-              lote_id: newLoteId,
-              tipo: item.tipo,
-              producto: item.producto,
-              dosis: dosis ? dosis.porAplicacion.vasitoLabel : '',
-              fecha: fechaProgramada.toISOString().split('T')[0],
-              metodo: item.tipo === 'Suelo' ? 'Al suelo' : 'Foliar',
-              notas: item.recomendacion,
-              estado: 'Programada',
-              operador: '',
-              empresa_id: empresaId
-            };
-          });
-
-          for (const app of aplicaciones) {
-            await restInsert('/rest/v1/lote_aplicaciones', app);
-          }
-
           const zonaLabel = getZonaLabel(altura);
           const dosisCalc = calcularDosis(edadCat, numPlantas);
           const planLines = plan.map(function(item) {

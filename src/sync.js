@@ -10,6 +10,7 @@ const SUPABASE_TABLES = [
   'motores', 'motor_sesiones', 'motor_mantenimientos',
   'potreros', 'ganado', 'herramientas', 'potrero_eventos',
   'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
+  'animal_preñez',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
   'usuarios', 'empresas', 'usuario_empresas', 'invitaciones',
@@ -19,6 +20,7 @@ const BUSINESS_TABLES = new Set([
   'motores', 'motor_sesiones', 'motor_mantenimientos',
   'potreros', 'ganado', 'herramientas', 'potrero_eventos',
   'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
+  'animal_preñez',
   'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
   'lote_personal', 'personal', 'personal_asistencia',
 ]);

@@ -21,7 +21,7 @@ export async function renderDetalleLote(id) {
       { data: todoPersonal, error: personalErr }
     ] = await Promise.all([
       supabase.from('lotes').select('*').eq('id', id).single(),
-      supabase.from('lote_aplicaciones').select('*').eq('lote_id', id).order('fecha', { ascending: false }),
+      supabase.from('lote_aplicaciones').select('*').eq('lote_id', id).neq('estado', 'Programada').order('fecha', { ascending: false }),
       supabase.from('lote_personal').select('id, personal:personal_id(*)').eq('lote_id', id),
       supabase.from('personal').select('*').order('nombre', { ascending: true })
     ]);
@@ -251,6 +251,38 @@ export async function renderDetalleLote(id) {
 
 export function initDetalleLote(id) {
   window.showModal = showModal;
+
+  window.showAddAplicacionModal = async (loteId) => {
+    const { data: apps, error } = await supabase.from('lote_aplicaciones')
+      .select('*')
+      .eq('lote_id', loteId)
+      .neq('estado', 'Programada')
+      .order('fecha', { ascending: false });
+    if (error) {
+      window.Snackbar?.show('Error: ' + error.message, { type: 'error' });
+      return;
+    }
+    const rows = (apps || []).map(a => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.producto || '—'}</td>
+        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.tipo || '—'}</td>
+        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.dosis || '—'}</td>
+        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.fecha ? new Date(a.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+      </tr>`).join('');
+    const empty = '<tr><td colspan="4" style="text-align:center;padding:28px;color:#666;">Sin aplicaciones registradas</td></tr>';
+    showModal('Histórico completo', `
+      <div style="overflow-x:auto;max-height:60vh;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Work Sans',sans-serif;">
+          <thead>
+            <tr style="text-align:left;color:#555;">
+              <th style="padding:8px;">Producto</th><th style="padding:8px;">Tipo</th><th style="padding:8px;">Dosis</th><th style="padding:8px;">Fecha</th>
+            </tr>
+          </thead>
+          <tbody>${(apps && apps.length > 0) ? rows : empty}</tbody>
+        </table>
+      </div>
+    `);
+  };
 
   window.assignPersonalToLote = async (loteId) => {
     const select = document.getElementById('select-asignar-personal');

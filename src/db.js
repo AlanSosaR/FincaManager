@@ -53,4 +53,9 @@ db.version(3).stores({
   _sync_queue: '++id, table, action, timestamp',
 });
 
+db.version(4).stores({
+  ganado: '&id, empresa_id, nombre, potrero_id, madre_id, created_at',
+  animal_preñez: '&id, empresa_id, animal_id, fecha_monta, created_at',
+});
+
 export default db;
