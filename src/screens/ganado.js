@@ -266,6 +266,9 @@ export async function renderGanado(page = 1, filter = 'all') {
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
               <span class="material-icons" style="font-size:18px; color:#2c666e;">list_alt</span>
               <h4 style="margin:0; color:var(--on-surface,#222); font-size:15px; flex:1;">Registros de fumigación</h4>
+              <button type="button" id="ganado-fumig-apply-all" title="Aplicar todas las programadas" style="display:none; background:#2c666e; color:#fff; border:none; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; align-items:center; gap:4px;">
+                <span class="material-icons" style="font-size:15px;">check_circle</span> Aplicar todas
+              </button>
               <button type="button" id="ganado-fumig-refresh" class="m3-icon-btn" title="Actualizar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; justify-content:center; padding:4px;">
                 <span class="material-icons" style="font-size:20px;">refresh</span>
               </button>
@@ -585,19 +588,35 @@ export function initGanado() {
 
       recordsBox.innerHTML = groups.map(g => {
         const isAplicada = g.estado === 'Aplicada';
-        const badgeColor = isAplicada ? '#2c666e' : '#e65100';
-        const badgeBg = isAplicada ? '#e0f2f1' : '#fff3e0';
+        const hoy = getLocalToday();
+        const esHoy = g.fecha === hoy;
+        const esPasada = g.fecha < hoy;
+        let badgeColor, badgeBg, rowBg, rowBorder, estadoLabel;
+        if (isAplicada) {
+          badgeColor = '#2c666e'; badgeBg = '#e0f2f1'; rowBg = '#f4faf9'; rowBorder = '#2c666e'; estadoLabel = 'Aplicada';
+        } else if (esHoy) {
+          badgeColor = '#2e7d32'; badgeBg = '#e8f5e9'; rowBg = '#eafaf0'; rowBorder = '#2e7d32'; estadoLabel = 'Aplicar hoy';
+        } else if (esPasada) {
+          badgeColor = '#d32f2f'; badgeBg = '#ffebee'; rowBg = '#fff5f5'; rowBorder = '#d32f2f'; estadoLabel = 'Atrasada';
+        } else {
+          badgeColor = '#e65100'; badgeBg = '#fff3e0'; rowBg = '#fffaf3'; rowBorder = '#e65100'; estadoLabel = 'Programada';
+        }
         const prodAttr = encodeURIComponent(g.producto);
         const fechaAttr = encodeURIComponent(g.fecha);
+        const applyBtn = !isAplicada ? `
+              <button class="fumig-apply-btn" data-producto="${prodAttr}" data-fecha="${fechaAttr}" title="Aplicar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; padding:4px;">
+                <span class="material-icons" style="font-size:18px;">check_circle</span>
+              </button>` : '';
         return `
-          <div class="ganado-fumig-row" style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid rgba(0,0,0,0.06); flex-wrap:wrap;">
+          <div class="ganado-fumig-row" style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid rgba(0,0,0,0.06); flex-wrap:wrap; background:${rowBg}; border-left:4px solid ${rowBorder}; border-radius:6px; margin:4px 0;">
             <span class="material-icons" style="font-size:20px; color:${badgeColor};">${isAplicada ? 'check_circle' : 'schedule'}</span>
             <div style="flex:1; min-width:140px;">
               <div style="font-size:14px; font-weight:600; color:var(--on-surface,#222);">${g.producto || '—'}</div>
               <div style="font-size:12px; color:#777;">${g.fecha || '—'} · <strong>${g.count}</strong> ${g.count === 1 ? 'animal' : 'animales'}</div>
             </div>
-            <span style="background:${badgeBg}; color:${badgeColor}; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700;">${g.estado || '—'}</span>
+            <span style="background:${badgeBg}; color:${badgeColor}; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700;">${estadoLabel}</span>
             <div style="display:flex; gap:4px;">
+              ${applyBtn}
               <button class="fumig-edit-btn" data-producto="${prodAttr}" data-fecha="${fechaAttr}" title="Editar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; padding:4px;">
                 <span class="material-icons" style="font-size:18px;">edit</span>
               </button>
@@ -609,6 +628,11 @@ export function initGanado() {
       }).join('');
     } catch (err) {
       recordsBox.innerHTML = `<p style="color:#c62828; font-size:13px; text-align:center; padding:12px 0;">Error: ${err.message || err}</p>`;
+    }
+    const applyAllBtn = document.getElementById('ganado-fumig-apply-all');
+    if (applyAllBtn) {
+      const pendingCount = groups.filter(g => g.estado !== 'Aplicada').length;
+      applyAllBtn.style.display = pendingCount > 0 ? 'inline-flex' : 'none';
     }
   };
 
@@ -678,7 +702,29 @@ export function initGanado() {
     recordsBox.addEventListener('click', (e) => {
       const editBtn = e.target.closest('.fumig-edit-btn');
       const delBtn = e.target.closest('.fumig-del-btn');
-      if (editBtn && !editBtn.disabled) {
+      const applyBtnRow = e.target.closest('.fumig-apply-btn');
+      if (applyBtnRow) {
+        const producto = decodeURIComponent(applyBtnRow.dataset.producto);
+        const fecha = decodeURIComponent(applyBtnRow.dataset.fecha);
+        const hoy = getLocalToday();
+        if (fecha !== hoy) {
+          const fechaDia = fecha ? new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' }) : '';
+          window.Snackbar.show(`No se puede aplicar hoy: la fumigación es para el día ${fechaDia} y hoy no corresponde`, { type: 'error' });
+          return;
+        }
+        const fechaDiaNombre = fecha ? new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' }) : '';
+        window.Snackbar.confirm(`¿Aplicar la fumigación "${producto}" (día ${fechaDiaNombre}) a todos los animales?`, async () => {
+          try {
+            let base = `/rest/v1/animal_fumigaciones?producto=eq.${encodeURIComponent(producto)}&fecha=eq.${encodeURIComponent(fecha)}&estado=eq.Programada`;
+            if (window._currentEmpresaId) base += `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`;
+            await restFetch(base, { method: 'PATCH', body: JSON.stringify({ estado: 'Aplicada' }) });
+            window.Snackbar.show('Fumigación aplicada ✓');
+            await refreshFumigAll();
+          } catch (err) {
+            window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
+          }
+        }, { confirmLabel: 'Aplicar', cancelLabel: 'Cancelar' });
+      } else if (editBtn && !editBtn.disabled) {
         editBtn.disabled = true;
         renderFumigEditForm(decodeURIComponent(editBtn.dataset.producto), decodeURIComponent(editBtn.dataset.fecha), editBtn.closest('.ganado-fumig-row'));
       } else if (delBtn) {
@@ -702,13 +748,31 @@ export function initGanado() {
   const refreshBtn = document.getElementById('ganado-fumig-refresh');
   if (refreshBtn) refreshBtn.onclick = () => loadFumigRecords();
 
+  const applyAllBtn = document.getElementById('ganado-fumig-apply-all');
+  if (applyAllBtn) applyAllBtn.onclick = () => {
+    const hoy = getLocalToday();
+    window.Snackbar.confirm('¿Aplicar las fumigaciones programadas para hoy?', async () => {
+      try {
+        let base = `/rest/v1/animal_fumigaciones?estado=eq.Programada&fecha=eq.${hoy}`;
+        if (window._currentEmpresaId) base += `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`;
+        await restFetch(base, { method: 'PATCH', body: JSON.stringify({ estado: 'Aplicada' }) });
+        window.Snackbar.show('Fumigaciones del día aplicadas ✓');
+        await refreshFumigAll();
+      } catch (err) {
+        window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
+      }
+    }, { confirmLabel: 'Aplicar', cancelLabel: 'Cancelar' });
+  };
+
   if (applyBtn) applyBtn.onclick = async () => {
     const fecha = fumigFecha ? fumigFecha.value : '';
     const producto = fumigProducto ? fumigProducto.value.trim() : '';
     if (!fecha) { window.Snackbar.show('Indicá la fecha de fumigación', { type: 'error' }); return; }
     if (!producto) { window.Snackbar.show('Indicá el producto a fumigar', { type: 'error' }); return; }
     const estado = fecha <= getLocalToday() ? 'Aplicada' : 'Programada';
-    window.Snackbar.confirm(`¿Aplicar la fumigación "${producto}" (${estado}) a todos los animales activos?`, async () => {
+    const diaNombre = fecha ? new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' }) : '';
+    const estadoDesc = estado === 'Programada' ? `Programada para el día ${diaNombre}` : 'Aplicada para hoy';
+    window.Snackbar.confirm(`¿Aplicar la fumigación "${producto}" (${estadoDesc}) a todos los animales activos?`, async () => {
       try {
         const { data: animals } = await supabase.from('ganado').select('id').neq('estado', 'Vendido');
         const ids = (animals || []).map(a => a.id);
