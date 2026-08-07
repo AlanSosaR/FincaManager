@@ -549,34 +549,43 @@ export function initGanado() {
     try {
       recordsBox.innerHTML = '<p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Cargando...</p>';
       const { data: recs, error } = await supabase.from('animal_fumigaciones')
-        .select('*').order('fecha', { ascending: false }).range(0, 49);
+        .select('producto,fecha,estado,animal_id').order('fecha', { ascending: false }).range(0, 499);
       if (error) throw error;
       const list = recs || [];
       if (!list.length) {
         recordsBox.innerHTML = '<p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Sin registros de fumigación.</p>';
         return;
       }
-      const animalIds = [...new Set(list.map(r => r.animal_id))];
-      const { data: animals } = await supabase.from('ganado').select('id,nombre').in('id', animalIds);
-      const nameMap = new Map((animals || []).map(a => [a.id, a.nombre || 'Animal']));
+      const groups = [];
+      const groupMap = new Map();
+      for (const r of list) {
+        const key = `${r.producto || ''}\u0000${r.fecha || ''}`;
+        if (!groupMap.has(key)) {
+          groupMap.set(key, { producto: r.producto || '', fecha: r.fecha || '', count: 0, estado: r.estado });
+          groups.push(groupMap.get(key));
+        }
+        groupMap.get(key).count++;
+      }
 
-      recordsBox.innerHTML = list.map(r => {
-        const isAplicada = r.estado === 'Aplicada';
+      recordsBox.innerHTML = groups.map(g => {
+        const isAplicada = g.estado === 'Aplicada';
         const badgeColor = isAplicada ? '#2c666e' : '#e65100';
         const badgeBg = isAplicada ? '#e0f2f1' : '#fff3e0';
+        const prodAttr = encodeURIComponent(g.producto);
+        const fechaAttr = encodeURIComponent(g.fecha);
         return `
-          <div class="ganado-fumig-row" data-id="${r.id}" style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid rgba(0,0,0,0.06); flex-wrap:wrap;">
+          <div class="ganado-fumig-row" style="display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid rgba(0,0,0,0.06); flex-wrap:wrap;">
             <span class="material-icons" style="font-size:20px; color:${badgeColor};">${isAplicada ? 'check_circle' : 'schedule'}</span>
-            <div style="flex:1; min-width:130px;">
-              <div style="font-size:14px; font-weight:600; color:var(--on-surface,#222);">${nameMap.get(r.animal_id) || 'Sin nombre'}</div>
-              <div style="font-size:12px; color:#777;">${r.producto || '—'} · ${r.fecha || '—'}</div>
+            <div style="flex:1; min-width:140px;">
+              <div style="font-size:14px; font-weight:600; color:var(--on-surface,#222);">${g.producto || '—'}</div>
+              <div style="font-size:12px; color:#777;">${g.fecha || '—'} · <strong>${g.count}</strong> ${g.count === 1 ? 'animal' : 'animales'}</div>
             </div>
-            <span style="background:${badgeBg}; color:${badgeColor}; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700;">${r.estado || '—'}</span>
+            <span style="background:${badgeBg}; color:${badgeColor}; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700;">${g.estado || '—'}</span>
             <div style="display:flex; gap:4px;">
-              <button class="fumig-edit-btn" data-id="${r.id}" title="Editar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; padding:4px;">
+              <button class="fumig-edit-btn" data-producto="${prodAttr}" data-fecha="${fechaAttr}" title="Editar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; padding:4px;">
                 <span class="material-icons" style="font-size:18px;">edit</span>
               </button>
-              <button class="fumig-del-btn" data-id="${r.id}" title="Eliminar" style="background:none; border:none; cursor:pointer; color:#d32f2f; display:flex; align-items:center; padding:4px;">
+              <button class="fumig-del-btn" data-producto="${prodAttr}" data-fecha="${fechaAttr}" title="Eliminar" style="background:none; border:none; cursor:pointer; color:#d32f2f; display:flex; align-items:center; padding:4px;">
                 <span class="material-icons" style="font-size:18px;">delete</span>
               </button>
             </div>
@@ -587,14 +596,14 @@ export function initGanado() {
     }
   };
 
-  const renderFumigEditForm = (record, rowEl) => {
+  const renderFumigEditForm = (producto, fecha, rowEl) => {
     rowEl.innerHTML = `
       <div class="m3-field" style="min-width:140px; flex:1 1 160px;">
-        <input type="text" id="fumig-edit-producto" value="${(record.producto || '').replace(/"/g, '&quot;')}" placeholder=" " required>
+        <input type="text" id="fumig-edit-producto" value="${(producto || '').replace(/"/g, '&quot;')}" placeholder=" " required>
         <label>Producto</label>
       </div>
       <div class="m3-field" style="min-width:150px; flex:1 1 160px;">
-        <input type="date" id="fumig-edit-fecha" value="${record.fecha || ''}" placeholder=" " required>
+        <input type="date" id="fumig-edit-fecha" value="${fecha || ''}" placeholder=" " required>
         <label>Fecha</label>
       </div>
       <div style="display:flex; gap:6px;">
@@ -603,22 +612,29 @@ export function initGanado() {
       </div>`;
     rowEl.style.width = '100%';
     rowEl.style.flexWrap = 'wrap';
-    rowEl.querySelector('.fumig-save-btn').onclick = async () => {
+    const saveBtn = rowEl.querySelector('.fumig-save-btn');
+    const cancelBtnEdit = rowEl.querySelector('.fumig-cancel-btn');
+    const doSave = async () => {
       const prod = document.getElementById('fumig-edit-producto').value.trim();
-      const fecha = document.getElementById('fumig-edit-fecha').value;
+      const fechaEdit = document.getElementById('fumig-edit-fecha').value;
       if (!prod) { window.Snackbar.show('Indicá el producto', { type: 'error' }); return; }
-      if (!fecha) { window.Snackbar.show('Indicá la fecha', { type: 'error' }); return; }
-      const estado = fecha <= getLocalToday() ? 'Aplicada' : 'Programada';
+      if (!fechaEdit) { window.Snackbar.show('Indicá la fecha', { type: 'error' }); return; }
+      const estado = fechaEdit <= getLocalToday() ? 'Aplicada' : 'Programada';
+      let base = `/rest/v1/animal_fumigaciones?producto=eq.${encodeURIComponent(producto)}&fecha=eq.${encodeURIComponent(fecha)}`;
+      if (window._currentEmpresaId) base += `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`;
       try {
-        const { error } = await supabase.from('animal_fumigaciones').update({ producto: prod, fecha, estado }).eq('id', record.id);
-        if (error) throw error;
+        await restFetch(base, {
+          method: 'PATCH',
+          body: JSON.stringify({ producto: prod, fecha: fechaEdit, estado })
+        });
         window.Snackbar.show('Fumigación actualizada ✓');
         await refreshFumigAll();
       } catch (err) {
         window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
       }
     };
-    rowEl.querySelector('.fumig-cancel-btn').onclick = () => loadFumigRecords();
+    saveBtn.onclick = () => doSave();
+      if (cancelBtnEdit) cancelBtnEdit.onclick = () => loadFumigRecords();
   };
 
   const refreshFumigAll = async () => {
@@ -645,20 +661,16 @@ export function initGanado() {
       const editBtn = e.target.closest('.fumig-edit-btn');
       const delBtn = e.target.closest('.fumig-del-btn');
       if (editBtn && !editBtn.disabled) {
-        const id = editBtn.dataset.id;
-        const row = editBtn.closest('.ganado-fumig-row');
-        supabase.from('animal_fumigaciones').select('*').eq('id', id).maybeSingle()
-          .then(({ data }) => {
-            if (!data) return;
-            editBtn.disabled = true;
-            renderFumEditForm(data, editBtn.closest('.ganado-fumig-row'));
-          });
+        editBtn.disabled = true;
+        renderFumigEditForm(decodeURIComponent(editBtn.dataset.producto), decodeURIComponent(editBtn.dataset.fecha), editBtn.closest('.ganado-fumig-row'));
       } else if (delBtn) {
-        const id = delBtn.dataset.id;
-        window.Snackbar.confirm('¿Eliminar esta fumigación?', async () => {
+        const producto = decodeURIComponent(delBtn.dataset.producto);
+        const fecha = decodeURIComponent(delBtn.dataset.fecha);
+        window.Snackbar.confirm(`¿Eliminar la fumigación "${producto}" (${fecha})?`, async () => {
           try {
-            const { error } = await supabase.from('animal_fumigaciones').delete().eq('id', id);
-            if (error) throw error;
+            let base = `/rest/v1/animal_fumigaciones?producto=eq.${encodeURIComponent(producto)}&fecha=eq.${encodeURIComponent(fecha)}`;
+            if (window._currentEmpresaId) base += `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`;
+            await restFetch(base, { method: 'DELETE' });
             window.Snackbar.show('Fumigación eliminada');
             await refreshFumigAll();
           } catch (err) {
