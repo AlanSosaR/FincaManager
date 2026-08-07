@@ -54,14 +54,14 @@ export async function renderGanado(page = 1, filter = 'all') {
     supabase.from('ganado').select('*', { count: 'exact', head: true }).eq('reproductivo', 'Preñada')
   ]);
 
-  const fumigGroups = new Map();
+  const fumigAppliedGroups = new Map();
   const fumigPendGroups = new Map();
   for (const f of (fumigaciones.data || [])) {
     const key = `${f.fecha || ''}\u0000${f.producto || ''}`;
-    fumigGroups.set(key, true);
+    if (f.estado === 'Aplicada') fumigAppliedGroups.set(key, true);
     if (f.estado === 'Programada') fumigPendGroups.set(key, true);
   }
-  const vecesFumigadas = fumigGroups.size;
+  const vecesFumigadas = fumigAppliedGroups.size;
   const fumigPendGroupCount = fumigPendGroups.size;
 
   let activeFilterIds = [];
@@ -258,7 +258,7 @@ export async function renderGanado(page = 1, filter = 'all') {
             </div>
             <div style="display:flex; gap:10px; margin-top:18px; justify-content:flex-end;">
               <button type="button" class="btn-m3-tonal" id="ganado-fumig-cancel">Cancelar</button>
-              <button type="button" class="btn-m3-fill" id="ganado-fumig-apply" style="background:#2c666e; color:#fff;">Aplicar a todos</button>
+              <button type="button" class="btn-m3-fill" id="ganado-fumig-apply" style="background:#2c666e; color:#fff;"><span id="ganado-fumig-apply-label">Aplicar</span></button>
             </div>
           </div>
 
@@ -547,7 +547,17 @@ export function initGanado() {
   const openFumigPanel = () => {
     if (fumigPanel) fumigPanel.style.display = 'block';
     if (fumigFecha && !fumigFecha.value) fumigFecha.value = getLocalToday();
+    updateFumigApplyLabel();
   };
+
+  const updateFumigApplyLabel = () => {
+    if (!fumigFecha || !applyBtn) return;
+    const fecha = fumigFecha.value || getLocalToday();
+    const labelEl = document.getElementById('ganado-fumig-apply-label');
+    if (labelEl) labelEl.textContent = fecha <= getLocalToday() ? 'Aplicar' : 'Programar';
+  };
+  if (fumigFecha) fumigFecha.addEventListener('change', updateFumigApplyLabel);
+  updateFumigApplyLabel();
 
   const loadFumigRecords = async () => {
     const recordsBox = document.getElementById('ganado-fumig-records');
@@ -648,15 +658,15 @@ export function initGanado() {
       loadFumigRecords(),
       (async () => {
         const { data } = await supabase.from('animal_fumigaciones').select('fecha,producto,estado').range(0, 4999);
-        const fumigGroups = new Map();
+        const fumigAppliedGroups = new Map();
         const fumigPendGroups = new Map();
         for (const f of (data || [])) {
           const key = `${f.fecha || ''}\u0000${f.producto || ''}`;
-          fumigGroups.set(key, true);
+          if (f.estado === 'Aplicada') fumigAppliedGroups.set(key, true);
           if (f.estado === 'Programada') fumigPendGroups.set(key, true);
         }
         const vecesValue = document.getElementById('fumig-veces-value');
-        if (vecesValue) vecesValue.textContent = String(fumigGroups.size);
+        if (vecesValue) vecesValue.textContent = String(fumigAppliedGroups.size);
         const pendingChip = document.getElementById('fumig-pend-chip');
         if (pendingChip) pendingChip.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroups.size} pendientes`;
       })()
