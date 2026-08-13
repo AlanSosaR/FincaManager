@@ -1,12 +1,12 @@
 import { restFetch } from '../auth.js';
-import { getPlanIfcafe, getZonaLabel, calcularDosis, normalizarProducto, fraccionDesdeDosis } from '../utils/calculadora_dosis.js';
-import { dibujarVasitoCompacto } from '../utils/vasito_medidor.js';
+import { getPlanIfcafe, getZonaLabel, calcularDosis, normalizarProducto } from '../utils/calculadora_dosis.js';
 import { sendWhatsApp } from '../wa.js';
 
-let _ifcafeMonth = null;
 let _ifcafeLoteId = null;
-let _ifcafeViewData = null;
-let _ifcafeCurrentIdx = 0;
+let _calYear = 2026;
+let _calMonth = 0;
+let _ifcafeEvents = [];
+let _ifcafeLotes = [];
 
 const MESES_NOMBRE = {
   1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
@@ -15,11 +15,17 @@ const MESES_NOMBRE = {
 };
 
 const descripcionProposito = {
-  0: 'Fertilización de fondo para arranque del ciclo productivo',
-  1: 'Estimula la floración y el cuaje del fruto',
-  2: 'Sostén de la carga para el desarrollo del grano',
-  3: 'Previene clorosis y fortalece el follaje',
+  0: 'Fertilizar el suelo para el arranque del ciclo productivo',
+  1: 'Estimular la floración y el cuaje del fruto',
+  2: 'Sostener la carga para el desarrollo del grano',
+  3: 'Mantener las hojas sanas y verdes',
   4: 'Llenado y peso del grano antes de cosecha'
+};
+
+const badgeStyle = {
+  Realizada: 'background:#2d3e2c;color:#fff;',
+  Pendiente: 'background:#c9a227;color:#fff;',
+  Atrasada: 'background:#FF4103;color:#fff;'
 };
 
 function getLocalToday() {
@@ -31,68 +37,176 @@ function waNotifiedKey(appFecha, loteId) {
   return `wa_notified_app_${appFecha}_${loteId}`;
 }
 
-function getSelectedMes(planMonths) {
-  const cur = new Date().getMonth() + 1;
-  if (_ifcafeMonth === null) {
-    return planMonths.includes(cur) ? cur : 'all';
-  }
-  return _ifcafeMonth;
+function matchFechaStr(item) {
+  return `2026-${String(item.mes).padStart(2, '0')}-15`;
 }
 
-function buildIfcafeInfoHtml(pc, data, idx) {
-  const { item, matchFecha, realizada } = pc;
-  const total = data.plan.length;
-  const icono = item.tipo === 'Suelo' ? 'humidity_high' : 'spa';
-  const metodoLabel = item.tipo === 'Suelo' ? 'Al suelo' : 'Foliar';
-  const atrasada = matchFecha < getLocalToday();
-  const estadoLabel = realizada ? 'Realizada' : (atrasada ? 'Atrasada' : 'Pendiente');
-  const badgeBg = realizada ? '#c8e6c9' : (atrasada ? '#ffcdd2' : '#ffd54f');
-  const purpose = descripcionProposito[data.plan.indexOf(item)] || '';
+function matchFechaDate(item) {
+  return new Date(2026, item.mes - 1, 15);
+}
 
-  let fraccion = data.dosisCalc.porAplicacion.fraccion;
-  let dosisLabel = data.dosisCalc.porAplicacion.vasitoLabel;
-  if (realizada?.dosis) {
-    const f = fraccionDesdeDosis(realizada.dosis);
-    if (f) { fraccion = f; dosisLabel = realizada.dosis; }
-  } else if (item.dosis?.fraccion) {
-    fraccion = item.dosis.fraccion;
-    dosisLabel = item.dosis.vasitoLabel || dosisLabel;
+function esc(s) {
+  return String(s).replace(/'/g, "\\'");
+}
+
+function estadoDeEvento(item, apps, loteId) {
+  const mfs = matchFechaStr(item);
+  const realizada = (apps || []).find(a =>
+    a.lote_id === loteId &&
+    a.estado === 'Aplicada' &&
+    a.producto && normalizarProducto(a.producto) === normalizarProducto(item.producto) &&
+    a.fecha && a.fecha.substring(0, 7) === mfs.substring(0, 7)
+  ) || null;
+  if (realizada) return { realizada, estado: 'Realizada' };
+  if (mfs < getLocalToday()) return { realizada: null, estado: 'Atrasada' };
+  return { realizada: null, estado: 'Pendiente' };
+}
+
+function setDefaultCalMonth() {
+  _calYear = 2026;
+  const months = _ifcafeEvents.map(e => e.matchFecha.getMonth());
+  const cur = new Date().getMonth();
+  _calMonth = months.includes(cur) ? cur : (months.length ? months[0] : 0);
+}
+
+function eventCardHtml(ev) {
+  const fecha = matchFechaStr(ev.item);
+  const metodo = ev.item.tipo === 'Suelo' ? 'Al suelo' : 'Foliar';
+  const acciones = [];
+  if (ev.estado !== 'Realizada') {
+    acciones.push(`<button class="plan-btn-primary" onclick="window.marcarAplicada('${ev.loteId}','${fecha}','${esc(ev.item.producto)}','${ev.item.tipo}','${esc(ev.dosisLabel)}','${ev.item.mesLabel}')">✅ Marcar como aplicada</button>`);
   }
-
-  const notifBtn = !realizada ? `
-    <button onclick="event.preventDefault();enviarNotifAhora('${data.lote.id}','${data.lote.nombre.replace(/'/g, "\\'")}','${matchFecha}','${item.producto.replace(/'/g, "\\'")}','${dosisLabel.replace(/'/g, "\\'")}','${item.tipo}','${item.mesLabel}','')" style="background:#f0f7e6;color:#2d3e2c;border:1.5px solid #2d3e2c;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:'Work Sans',sans-serif;">
-      📤 Enviar notificación
-    </button>` : '';
+  acciones.push(`<button class="plan-btn-ghost" onclick="window.enviarNotifAhora('${ev.loteId}','${esc(ev.loteNombre)}','${fecha}','${esc(ev.item.producto)}','${esc(ev.dosisLabel)}','${ev.item.tipo}','${ev.item.mesLabel}')">📤 Enviar notificación</button>`);
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
-      <span style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:.5px;">Aplicación ${(idx ?? 0) + 1} de ${total}</span>
-      <span style="font-size:11px;font-weight:700;color:#2d3e2c;background:${badgeBg};padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;">${estadoLabel}</span>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-        <span class="material-symbols-outlined" style="font-size:22px;color:white;">${icono}</span>
-        <div style="min-width:0;">
-          <p style="font-size:14px;font-weight:700;color:white;margin:0;">${item.producto}</p>
-          <p style="font-size:12px;color:rgba(255,255,255,0.75);margin:4px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span>${item.mesLabel} · ${metodoLabel}</span>
-            <span style="display:inline-flex;align-items:center;gap:4px;">${dibujarVasitoCompacto(fraccion)} <span>${dosisLabel}</span></span>
-            ${realizada ? `<span>· Aplicada: ${realizada.fecha || ''}</span>` : ''}
-          </p>
+    <div class="plan-ev" style="border:1.5px solid ${ev.estado === 'Realizada' ? '#c8e6c9' : ev.estado === 'Atrasada' ? '#ffcdd2' : '#ffe9a8'};">
+      ${ev.showLote ? `<div class="plan-ev-lote"><span class="material-symbols-outlined" style="font-size:14px;">eco</span> ${ev.loteNombre}</div>` : ''}
+      <div class="plan-ev-head">
+        <p class="plan-ev-producto">${ev.item.producto}</p>
+        <span class="plan-ev-badge" style="${badgeStyle[ev.estado]}">${ev.estado}</span>
+      </div>
+      <p class="plan-ev-meta">${ev.item.mesLabel} · ${metodo} · Dosis: ${ev.dosisLabel}</p>
+      <p class="plan-ev-purpose">🎯 ${ev.purpose}</p>
+      <div class="plan-ev-actions">${acciones.join('')}</div>
+    </div>`;
+}
+
+function calendarShellHtml() {
+  return `
+    <div class="da-calendar-layout" style="align-items:start;">
+      <div class="da-calendar-card">
+        <div class="da-calendar-header">
+          <div class="da-cal-nav">
+            <button class="da-cal-nav-btn" onclick="window.changePlanCalMonth(-1)" aria-label="Mes anterior"><span class="material-icons">chevron_left</span></button>
+            <h3 id="plan-cal-month-display"></h3>
+            <button class="da-cal-nav-btn" onclick="window.changePlanCalMonth(1)" aria-label="Mes siguiente"><span class="material-icons">chevron_right</span></button>
+          </div>
+        </div>
+        <div class="da-calendar-grid">
+          <div class="da-cal-day-name">Lun</div><div class="da-cal-day-name">Mar</div><div class="da-cal-day-name">Mié</div><div class="da-cal-day-name">Jue</div><div class="da-cal-day-name">Vie</div><div class="da-cal-day-name">Sáb</div><div class="da-cal-day-name">Dom</div>
+          <div class="da-cal-days-container" id="plan-cal-days"></div>
+        </div>
+        <div class="da-cal-legend">
+          <div><span class="plan-legend-dot" style="background:#2d3e2c;"></span><span>Realizada</span></div>
+          <div><span class="plan-legend-dot" style="background:#c9a227;"></span><span>Pendiente</span></div>
+          <div><span class="plan-legend-dot" style="background:#FF4103;"></span><span>Atrasada</span></div>
         </div>
       </div>
-      ${notifBtn}
-    </div>
-    <p style="font-size:12px;color:rgba(255,255,255,0.85);margin:10px 0 0;line-height:1.4;">🎯 ${purpose}</p>
-  `;
+      <div id="plan-day-details">
+        <div class="da-day-details">
+          <div style="text-align:center;color:#aaa;padding:20px;">
+            <span class="material-icons" style="font-size:40px;margin-bottom:8px;">touch_app</span>
+            <p>Selecciona un día en el calendario para ver las aplicaciones</p>
+          </div>
+        </div>
+      </div>
+    </div>`;
 }
 
-function buildIfcafeSegments(activeIdx) {
-  const data = _ifcafeViewData;
-  if (!data) return '';
-  return data.planConEstado.map((p, idx) => {
-    const active = idx === activeIdx;
-    return `<div onclick="selectIfcafeApp(${idx})" title="${p.item.mesLabel} — ${p.item.producto}" style="flex:1;height:12px;border-radius:6px;cursor:pointer;background:${p.realizada ? '#c8e6c9' : 'rgba(255,255,255,0.22)'};${active ? 'box-shadow:0 0 0 2px #ffffff;' : ''}"></div>`;
-  }).join('');
+function renderPlanCal() {
+  const container = document.getElementById('plan-cal-days');
+  if (!container) return;
+  const display = document.getElementById('plan-cal-month-display');
+  if (display) display.textContent = new Date(_calYear, _calMonth, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  container.innerHTML = '';
+
+  const firstDay = new Date(_calYear, _calMonth, 1).getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+  const lastDay = new Date(_calYear, _calMonth + 1, 0).getDate();
+
+  for (let i = 0; i < offset; i++) {
+    const e = document.createElement('div');
+    e.className = 'da-cal-day da-cal-empty';
+    container.appendChild(e);
+  }
+
+  const monthEvents = _ifcafeEvents.filter(ev => ev.matchFecha.getFullYear() === _calYear && ev.matchFecha.getMonth() === _calMonth);
+  const todayStr = getLocalToday();
+  const isTodayYear = Number(todayStr.slice(0, 4));
+  const isTodayMonth = Number(todayStr.slice(5, 7)) - 1;
+  const isTodayDay = Number(todayStr.slice(8, 10));
+
+  for (let day = 1; day <= lastDay; day++) {
+    const dayEvents = monthEvents.filter(ev => ev.matchFecha.getDate() === day);
+    const isToday = day === isTodayDay && _calMonth === isTodayMonth && _calYear === isTodayYear;
+    let cls = 'da-cal-day';
+    let extra = '';
+    if (dayEvents.length > 0) {
+      const worst = dayEvents.some(e => e.estado === 'Atrasada') ? 'da-cal-day-pending-highlight'
+        : dayEvents.some(e => e.estado === 'Pendiente') ? 'da-cal-day-highlight'
+        : 'da-cal-day-done';
+      cls += ` da-cal-has-event ${worst}`;
+      if (dayEvents.length > 1) extra = `<span class="plan-cal-count">${dayEvents.length}</span>`;
+    }
+    if (isToday) cls += ' da-cal-today';
+    const el = document.createElement('div');
+    el.className = cls;
+    el.innerHTML = `<span>${day}</span>${extra}`;
+    el.onclick = () => showPlanDayDetails(day, dayEvents);
+    container.appendChild(el);
+  }
+}
+
+function showPlanDayDetails(day, dayEvents) {
+  const panel = document.getElementById('plan-day-details');
+  if (!panel) return;
+  if (!dayEvents.length) {
+    panel.innerHTML = `<div class="da-day-details"><div style="text-align:center;color:#aaa;padding:20px;"><span class="material-icons" style="font-size:40px;margin-bottom:8px;">touch_app</span><p>Sin aplicaciones este día</p></div></div>`;
+    return;
+  }
+  panel.innerHTML = `<div class="da-day-details"><h4>Aplicaciones del ${day} de ${MESES_NOMBRE[_calMonth + 1]}</h4>${dayEvents.map(eventCardHtml).join('')}</div>`;
+}
+
+function emptyStateHtml(title, sub) {
+  return `<div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width:900px;margin:0 auto;">
+    <div style="background:white;border-radius:20px;padding:48px 24px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
+      <span class="material-symbols-outlined" style="font-size:48px;color:#ccc;">eco</span>
+      <p style="font-size:16px;font-weight:600;color:#666;margin:12px 0 0;">${title}</p>
+      ${sub ? `<p style="font-size:13px;color:#999;margin:6px 0 0;">${sub}</p>` : ''}
+    </div>
+  </div>`;
+}
+
+function planStyles() {
+  return `
+  <style>
+    .da-cal-day-done { background: #c8e6c9; color: #1b5e20; font-weight: 800; }
+    .da-cal-day-done:hover { background: #a9d8ab; }
+    .da-cal-day.da-cal-day-highlight { color: #6b4f00; }
+    .da-cal-day.da-cal-day-pending-highlight { color: #fff; }
+    .plan-cal-count { position: absolute; top: 4px; right: 6px; font-size: 10px; font-weight: 800; background: rgba(0,0,0,0.35); color: #fff; border-radius: 8px; padding: 0 5px; line-height: 1.6; }
+    .plan-legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .plan-ev { background: #fdfdfd; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+    .plan-ev-lote { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #2d3e2c; margin-bottom: 6px; }
+    .plan-ev-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .plan-ev-producto { font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 0; }
+    .plan-ev-badge { font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .3px; flex-shrink: 0; }
+    .plan-ev-meta { font-size: 12px; color: #666; margin: 4px 0 0; }
+    .plan-ev-purpose { font-size: 12px; color: #3a6b3a; margin: 6px 0 0; line-height: 1.35; }
+    .plan-ev-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .plan-ev-actions button { font-family: 'Work Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 10px; padding: 8px 14px; display: flex; align-items: center; gap: 4px; }
+    .plan-btn-primary { background: #2d3e2c; color: #fff; border: none; }
+    .plan-btn-ghost { background: #f0f7e6; color: #2d3e2c; border: 1.5px solid #2d3e2c; }
+  </style>`;
 }
 
 export async function renderPlanIfcafe(filterLoteId) {
@@ -129,223 +243,66 @@ export async function renderPlanIfcafe(filterLoteId) {
       if (!Array.isArray(aplicaciones)) aplicaciones = [];
     } catch (e) { console.warn('No se pudieron cargar aplicaciones:', e); }
 
-    // Vista individual de lote (#plan_ifcafe/{loteId}): plan en una sola vista
     if (_ifcafeLoteId) {
       const lote = lotes.find(l => l.id === _ifcafeLoteId);
       if (!lote || !lote.edad_categoria) {
-        return `<div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width:900px;margin:0 auto;">
-          <div style="background:white;border-radius:20px;padding:48px 24px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
-            <span class="material-symbols-outlined" style="font-size:48px;color:#ccc;">eco</span>
-            <p style="font-size:16px;font-weight:600;color:#666;margin:12px 0 0;">Este lote no tiene plan IFCAFE</p>
-          </div>
-        </div>`;
+        return emptyStateHtml('Este lote no tiene plan de fertilización');
       }
       return renderLotePlanIfcafe(lote, aplicaciones.filter(a => a.lote_id === _ifcafeLoteId));
     }
 
-    let lotesConPlan = lotes.filter(l => l.edad_categoria);
+    const lotesConPlan = lotes.filter(l => l.edad_categoria);
+    if (lotesConPlan.length === 0) {
+      return emptyStateHtml('No hay lotes con plan de fertilización', 'Crea un lote con edad y altura para generar su plan de abonadas');
+    }
 
-    const planMonthsSet = new Set();
-    lotesConPlan.forEach(l => {
-      const p = getPlanIfcafe(parseInt(l.altura_msnm) || 0);
-      p.forEach(item => planMonthsSet.add(item.mes));
-    });
-    const planMonths = [...planMonthsSet].sort((a, b) => a - b);
-
-    const selectedMes = getSelectedMes(planMonths);
-
-    const gradientPorEstado = (realizada, matchFecha) => {
-      if (realizada) return 'linear-gradient(135deg, #e8f5e9, #c8e6c9)';
-      if (matchFecha < getLocalToday()) return 'linear-gradient(135deg, #ffebee, #ffcdd2)';
-      return 'linear-gradient(135deg, #fff8e1, #ffecb3)';
-    };
-
-    const cards = lotesConPlan.map(lote => {
+    _ifcafeEvents = [];
+    _ifcafeLotes = [];
+    lotesConPlan.forEach(lote => {
       const altura = parseInt(lote.altura_msnm) || 0;
       const numPlantas = parseInt(lote.num_plantas) || 0;
       const dosisCalc = calcularDosis(lote.edad_categoria, numPlantas);
       const plan = getPlanIfcafe(altura);
-      const zonaLabel = getZonaLabel(altura);
-
-      const realizadasCount = plan.filter(item => {
-        const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
-        return (aplicaciones || []).some(a =>
-          a.lote_id === lote.id &&
-          a.producto && normalizarProducto(a.producto) === normalizarProducto(item.producto) &&
-          a.fecha && a.fecha.startsWith(matchFecha.substring(0, 7)) &&
-          a.estado === 'Aplicada'
-        );
-      }).length;
-
-      const planItemsFiltered = selectedMes === 'all'
-        ? plan
-        : plan.filter(item => item.mes === selectedMes);
-
-      const planCards = planItemsFiltered.map((item, idx) => {
-        const origIdx = plan.indexOf(item);
-        const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
-        const realizada = (aplicaciones || []).find(a => {
-          if (a.lote_id !== lote.id) return false;
-          const aFecha = a.fecha ? a.fecha.substring(0, 7) : '';
-          const pFecha = matchFecha.substring(0, 7);
-          return a.producto && normalizarProducto(a.producto) === normalizarProducto(item.producto) && aFecha === pFecha && a.estado === 'Aplicada';
+      let realizadas = 0;
+      plan.forEach((item, idx) => {
+        const { realizada, estado } = estadoDeEvento(item, aplicaciones, lote.id);
+        if (estado === 'Realizada') realizadas++;
+        _ifcafeEvents.push({
+          loteId: lote.id, loteNombre: lote.nombre, showLote: true, lote, item, idx,
+          matchFecha: matchFechaDate(item), realizada, estado,
+          dosisLabel: dosisCalc.porAplicacion.vasitoLabel,
+          purpose: descripcionProposito[idx] || ''
         });
-        const estadoLabel = realizada ? 'Realizada' : (matchFecha < getLocalToday() ? 'Atrasada' : 'Pendiente');
-        const badgeBg = realizada ? '#2d3e2c' : (matchFecha < getLocalToday() ? '#c62828' : '#f57c00');
-        const icono = item.tipo === 'Suelo' ? 'humidity_high' : 'spa';
-        const purpose = descripcionProposito[origIdx] || '';
-        const cardId = `ifcafe-card-${lote.id}-${origIdx}`;
-        const expandId = `ifcafe-expand-${lote.id}-${origIdx}`;
-        const waSent = localStorage.getItem(waNotifiedKey(matchFecha, lote.id));
-        const appReal = (aplicaciones || []).find(a => a.lote_id === lote.id && a.fecha && a.fecha.startsWith(matchFecha.substring(0, 7)) && a.producto && normalizarProducto(a.producto) === normalizarProducto(item.producto));
-
-        return `
-          <div id="${cardId}" style="background:white;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #e0e0e0;overflow:hidden;transition:all .2s;cursor:pointer;" onclick="toggleIfcafeCard('${expandId}')">
-            <div style="background:${gradientPorEstado(realizada, matchFecha)};padding:20px 20px 16px;border-bottom:1px solid rgba(0,0,0,0.04);">
-              <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                  <span class="material-symbols-outlined" style="font-size:28px;color:#2d3e2c;">${icono}</span>
-                  <div>
-                    <span style="font-size:16px;font-weight:700;color:#1a1a1a;letter-spacing:-.3px;">${item.mesLabel}</span>
-                    <span style="font-size:12px;font-weight:600;color:#5a5a5a;margin-left:6px;text-transform:uppercase;">${item.tipo}</span>
-                  </div>
-                </div>
-                <span style="font-size:11px;font-weight:700;color:white;background:${badgeBg};padding:4px 12px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;">${estadoLabel}</span>
-              </div>
-            </div>
-            <div style="padding:16px 20px 12px;">
-              <p style="font-size:15px;font-weight:600;color:#2d3e2c;margin:0 0 4px;">${item.producto}</p>
-              <p style="font-size:13px;color:#666;margin:0 0 6px;line-height:1.4;font-style:italic;">${item.recomendacion}</p>
-              <p style="font-size:13px;color:#3a6b3a;margin:0;line-height:1.3;">🎯 ${purpose}</p>
-              <div style="margin-top:8px;display:flex;align-items:center;gap:6px;">
-                <span class="material-symbols-outlined" style="font-size:14px;color:#888;">calendar_month</span>
-                <span style="font-size:12px;color:#888;">${matchFecha}</span>
-                ${selectedMes === 'all' ? '<span style="font-size:11px;color:#aaa;margin-left:auto;">▼ tocar para detalles</span>' : ''}
-              </div>
-            </div>
-            <div id="${expandId}" style="display:none;border-top:1px solid #e0e0e0;padding:16px 20px 20px;background:#fafafa;">
-              <div style="display:flex;flex-direction:column;gap:10px;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span class="material-symbols-outlined" style="font-size:18px;color:${appReal?.estado === 'Aplicada' ? '#2d3e2c' : '#888'};">${appReal?.estado === 'Aplicada' ? 'check_circle' : 'radio_button_unchecked'}</span>
-                  <span style="font-size:13px;font-weight:600;color:#333;">Estado:</span>
-                  <span style="font-size:13px;color:${appReal?.estado === 'Aplicada' ? '#2d3e2c' : '#888'};">${appReal?.estado || 'No registrada'}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <span class="material-symbols-outlined" style="font-size:18px;color:${waSent ? '#2d3e2c' : '#888'};">${waSent ? 'notifications_active' : 'notifications_off'}</span>
-                  <span style="font-size:13px;font-weight:600;color:#333;">Notificación:</span>
-                  <span style="font-size:13px;color:${waSent ? '#2d3e2c' : '#888'};">${waSent || 'No enviada'}</span>
-                </div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
-                  ${!realizada ? `
-                  <button onclick="event.stopPropagation();marcarAplicada('${lote.id}','${matchFecha}','${item.producto.replace(/'/g, "\\'")}','${item.tipo}','${dosisCalc.porAplicacion.vasitoLabel}','${item.mesLabel}','${expandId}')" style="background:#2d3e2c;color:white;border:none;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:'Work Sans',sans-serif;">
-                    ✅ Marcar como aplicada
-                  </button>
-                  ` : ''}
-                  <button onclick="event.stopPropagation();enviarNotifAhora('${lote.id}','${lote.nombre.replace(/'/g, "\\'")}','${matchFecha}','${item.producto.replace(/'/g, "\\'")}','${dosisCalc.porAplicacion.vasitoLabel}','${item.tipo}','${item.mesLabel}','${expandId}')" style="background:#f0f7e6;color:#2d3e2c;border:1.5px solid #2d3e2c;padding:8px 16px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:'Work Sans',sans-serif;">
-                    📤 Enviar notificación
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      return `
-        <div style="background:white;border-radius:20px;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:2px solid #e8ede8;overflow:hidden;">
-          <div style="background:linear-gradient(135deg,#f0f7e6,#e8f5e9);padding:20px 24px 16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-              <div style="display:flex;align-items:center;gap:12px;">
-                <span class="material-symbols-outlined" style="font-size:28px;color:#2d3e2c;">eco</span>
-                <h2 style="font-size:20px;font-weight:800;color:#1a1a1a;margin:0;letter-spacing:-.5px;">${lote.nombre}</h2>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:11px;font-weight:700;color:white;background:${realizadasCount === 5 ? '#2d3e2c' : realizadasCount > 0 ? '#f57c00' : '#888'};padding:4px 12px;border-radius:20px;">${realizadasCount}/5 realizadas</span>
-                <a href="#" onclick="event.preventDefault();window.navigateTo('detalle_lote','${lote.id}')" style="font-size:12px;font-weight:600;color:#2d3e2c;text-decoration:none;display:flex;align-items:center;gap:4px;padding:6px 14px;background:white;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
-                  Ver lote
-                  <span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span>
-                </a>
-              </div>
-            </div>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
-              <div style="display:flex;align-items:center;gap:6px;background:white;padding:5px 12px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-                <span style="font-size:11px;font-weight:700;color:#5a5a5a;text-transform:uppercase;">Edad</span>
-                <span style="font-size:12px;font-weight:600;color:#2d3e2c;">${dosisCalc.label}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;background:white;padding:5px 12px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-                <span style="font-size:11px;font-weight:700;color:#5a5a5a;text-transform:uppercase;">Dosis</span>
-                <span style="font-size:12px;font-weight:600;color:#2d3e2c;">${dosisCalc.porAplicacion.vasitoLabel}</span>
-                ${dibujarVasitoCompacto(dosisCalc.porAplicacion.fraccion)}
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;background:white;padding:5px 12px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-                <span style="font-size:11px;font-weight:700;color:#5a5a5a;text-transform:uppercase;">Zona</span>
-                <span style="font-size:12px;font-weight:600;color:#2d3e2c;">${zonaLabel}</span>
-              </div>
-              ${numPlantas > 0 ? `
-              <div style="display:flex;align-items:center;gap:6px;background:white;padding:5px 12px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-                <span style="font-size:11px;font-weight:700;color:#5a5a5a;text-transform:uppercase;">Sacos</span>
-                <span style="font-size:12px;font-weight:600;color:#2d3e2c;">${dosisCalc.sacosNecesarios} x apl.</span>
-              </div>` : ''}
-            </div>
-          </div>
-          <div style="padding:20px 24px 24px;">
-            ${planCards ? `<div class="${selectedMes === 'all' ? 'plan-grid' : ''}">${planCards}</div>` : ''}
-          </div>
-        </div>
-      `;
+      });
+      _ifcafeLotes.push({ id: lote.id, nombre: lote.nombre, realizadas, total: plan.length });
     });
 
-    const selectOptions = `
-      <option value="all">Todas las aplicaciones</option>
-      ${planMonths.map(m => `
-        <option value="${m}" ${selectedMes === m ? 'selected' : ''}>
-          ${MESES_NOMBRE[m] || m}
-        </option>
-      `).join('')}
-    `;
+    setDefaultCalMonth();
 
     return `
-      <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width:900px;margin:0 auto;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap;">
-          <div>
-            <h1 style="font-size:26px;font-weight:800;color:#1a1a1a;margin:0;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;">
-              <span>📋</span> Plan IFCAFE 2026${lotesConPlan.length === 1 && filterLoteId && filterLoteId !== 'null' ? ` — ${lotesConPlan[0].nombre}` : ''}
-            </h1>
-            <p style="font-size:13px;color:#666;margin:4px 0 0;">Plan de fertilización para café según IHCAFE</p>
-          </div>
-          <div style="min-width:200px;">
-            <label for="ifcafe-month-select" style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Filtrar por mes</label>
-            <select id="ifcafe-month-select" style="width:100%;padding:12px 36px 12px 16px;border:2px solid #d0d8d0;border-radius:12px;font-size:14px;font-weight:600;color:#2d3e2c;background:#f5f8f5;font-family:'Work Sans',sans-serif;appearance:none;-webkit-appearance:none;cursor:pointer;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%232d3e2c'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 12px center;background-size:16px;">
-              ${selectOptions}
-            </select>
-          </div>
+      <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width:960px;margin:0 auto;">
+        <div style="margin-bottom:20px;">
+          <h1 style="font-size:26px;font-weight:800;color:#1a1a1a;margin:0;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;"><span>📋</span> Plan de Fertilización 2026</h1>
+          <p style="font-size:13px;color:#666;margin:4px 0 0;">Guía de abonadas para tu cafetal</p>
         </div>
 
-        ${lotesConPlan.length === 0 ? `
-        <div style="background:white;border-radius:20px;padding:60px 24px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
-          <span class="material-symbols-outlined" style="font-size:56px;color:#ccc;">eco</span>
-          <p style="font-size:18px;font-weight:600;color:#666;margin:16px 0 4px;">No hay lotes con plan IFCAFE</p>
-          <p style="font-size:14px;color:#999;">Crea un lote con edad y altura para generar su plan de fertilización</p>
-        </div>
-        ` : `
-        <div style="display:flex;flex-direction:column;gap:24px;">
-          ${cards.join('\n')}
-        </div>
-        `}
+        ${calendarShellHtml()}
 
-        <div style="margin-top:24px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
-          ${planMonths.map(m => `
-            <span style="font-size:12px;color:#555;background:white;padding:6px 14px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-              ${MESES_NOMBRE[m] || m}
-            </span>
-          `).join('')}
+        <div style="margin-top:28px;">
+          <h3 style="font-size:15px;font-weight:800;color:#1a1a1a;margin:0 0 10px;display:flex;align-items:center;gap:6px;"><span class="material-symbols-outlined" style="font-size:18px;color:#2d3e2c;">eco</span> Lotes</h3>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${_ifcafeLotes.map(l => `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:white;border:1.5px solid #e8ede8;border-radius:14px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+                <span style="font-size:14px;font-weight:700;color:#1a1a1a;">${l.nombre}</span>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span style="font-size:12px;font-weight:700;color:${l.realizadas === l.total ? '#2d3e2c' : l.realizadas > 0 ? '#b26a00' : '#888'};background:${l.realizadas === l.total ? '#e8f5e9' : l.realizadas > 0 ? '#fff3e0' : '#f5f5f5'};padding:4px 12px;border-radius:20px;">${l.realizadas}/${l.total} realizadas</span>
+                  <a href="#" onclick="event.preventDefault();window.navigateTo('detalle_lote','${l.id}')" style="font-size:12px;font-weight:600;color:#2d3e2c;text-decoration:none;display:flex;align-items:center;gap:4px;padding:6px 12px;background:#f0f7e6;border-radius:20px;">Ver lote <span class="material-symbols-outlined" style="font-size:13px;">arrow_forward</span></a>
+                </div>
+              </div>`).join('')}
+          </div>
         </div>
       </div>
-      <style>
-        .plan-grid { display:grid;grid-template-columns:1fr;gap:16px; }
-        @media (min-width:640px) { .plan-grid { grid-template-columns:repeat(2,1fr); } }
-        @media (min-width:1024px) { .plan-grid { grid-template-columns:repeat(3,1fr); } }
-      </style>
+      ${planStyles()}
     `;
   } catch (err) {
     console.error('Error en plan_ifcafe:', err);
@@ -359,205 +316,63 @@ export function renderLotePlanIfcafe(lote, aplicacionesLote) {
   const dosisCalc = calcularDosis(lote.edad_categoria, numPlantas);
   const plan = getPlanIfcafe(altura);
   const zonaLabel = getZonaLabel(altura);
-  const hoy = getLocalToday();
 
-  const planConEstado = plan.map((item) => {
-    const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
-    const mesPlan = matchFecha.substring(0, 7);
-    const realizada = (aplicacionesLote || []).find(a =>
-      a.estado === 'Aplicada' &&
-      a.producto && normalizarProducto(a.producto) === normalizarProducto(item.producto) &&
-      a.fecha && a.fecha.substring(0, 7) === mesPlan
-    ) || null;
-    return { item, matchFecha, realizada };
+  _ifcafeEvents = [];
+  _ifcafeLotes = [];
+  let realizadas = 0;
+  plan.forEach((item, idx) => {
+    const { realizada, estado } = estadoDeEvento(item, aplicacionesLote, lote.id);
+    if (estado === 'Realizada') realizadas++;
+    _ifcafeEvents.push({
+      loteId: lote.id, loteNombre: lote.nombre, showLote: false, lote, item, idx,
+      matchFecha: matchFechaDate(item), realizada, estado,
+      dosisLabel: dosisCalc.porAplicacion.vasitoLabel,
+      purpose: descripcionProposito[idx] || ''
+    });
   });
 
-  const realizadas = planConEstado.filter(p => p.realizada);
-  const ultimaRealizada = realizadas.length ? realizadas[realizadas.length - 1] : null;
-  const siguientes = planConEstado.filter(p => !p.realizada);
-  const realizadasCount = realizadas.length;
-
-  _ifcafeViewData = { plan, planConEstado, lote, dosisCalc };
-
-  const progressLabel = realizadasCount >= plan.length
-    ? '¡Plan completado! 5 de 5 aplicaciones realizadas 🎉'
-    : `Aplicación ${plan.indexOf(siguientes[0].item) + 1} de ${plan.length} — ${siguientes[0].item.producto} en ${siguientes[0].item.mesLabel}`;
-
-  const defaultPc = siguientes[0] || realizadas[realizadas.length - 1] || planConEstado[0] || null;
-  const defaultIdx = defaultPc ? plan.indexOf(defaultPc.item) : 0;
-  _ifcafeCurrentIdx = defaultIdx;
-  const mainInfoHtml = defaultPc ? buildIfcafeInfoHtml(defaultPc, { plan, dosisCalc, lote }, defaultIdx) : '';
-  const segmentos = buildIfcafeSegments(defaultIdx);
-
-  const chip = (label, value, extra = '') => `
-    <div style="display:flex;align-items:center;gap:6px;background:white;padding:5px 12px;border-radius:20px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-      <span style="font-size:11px;font-weight:700;color:#5a5a5a;text-transform:uppercase;">${label}</span>
-      <span style="font-size:12px;font-weight:600;color:#2d3e2c;">${value}</span>
-      ${extra}
-    </div>`;
-
-  const headerBadgeBg = realizadasCount === plan.length ? '#c8e6c9' : (realizadasCount > 0 ? '#ffd54f' : 'rgba(255,255,255,0.18)');
-  const headerBadgeText = realizadasCount === plan.length ? '#2d3e2c' : 'white';
-
-  const aplicadaSection = ultimaRealizada ? `
-    <div style="margin-top:24px;">
-      <h3 style="font-size:15px;font-weight:700;color:#1a1a1a;margin:0 0 10px;display:flex;align-items:center;gap:6px;">
-        <span class="material-symbols-outlined" style="font-size:18px;color:#2d3e2c;">check_circle</span>
-        Aplicada
-      </h3>
-      <div style="background:white;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1.5px solid #c8e6c9;overflow:hidden;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-            <span class="material-symbols-outlined" style="font-size:22px;color:#2d3e2c;">humidity_high</span>
-            <div style="min-width:0;">
-              <p style="font-size:14px;font-weight:700;color:#2d3e2c;margin:0;">${ultimaRealizada.item.producto}</p>
-              <p style="font-size:12px;color:#666;margin:2px 0 0;">${ultimaRealizada.item.mesLabel} · ${ultimaRealizada.item.tipo === 'Suelo' ? 'Al suelo' : 'Foliar'} · ${ultimaRealizada.realizada.fecha || ''}</p>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <button onclick="event.preventDefault();enviarNotifAhora('${lote.id}','${lote.nombre.replace(/'/g, "\\'")}','${ultimaRealizada.matchFecha}','${ultimaRealizada.item.producto.replace(/'/g, "\\'")}','${dosisCalc.porAplicacion.vasitoLabel}','${ultimaRealizada.item.tipo}','${ultimaRealizada.item.mesLabel}','')" style="background:#f0f7e6;color:#2d3e2c;border:1.5px solid #2d3e2c;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:'Work Sans',sans-serif;">
-              📤 Enviar notificación
-            </button>
-            <span style="font-size:11px;font-weight:700;color:#2d3e2c;background:#e8f5e9;padding:4px 12px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;">Realizada</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  ` : '';
-
-  const siguientesCards = siguientes.map((p, idx) => {
-    const idxPlan = plan.indexOf(p.item);
-    const icono = p.item.tipo === 'Suelo' ? 'humidity_high' : 'spa';
-    const atrasada = p.matchFecha < hoy;
-    const estadoLabel = atrasada ? 'Atrasada' : 'Pendiente';
-    const badgeBg = atrasada ? '#c62828' : '#f57c00';
-    const purpose = descripcionProposito[idxPlan] || '';
-    const metodoLabel = p.item.tipo === 'Suelo' ? 'Al suelo' : 'Foliar';
-    const notifBtn = idx === 0 ? `
-      <button onclick="event.preventDefault();enviarNotifAhora('${lote.id}','${lote.nombre.replace(/'/g, "\\'")}','${p.matchFecha}','${p.item.producto.replace(/'/g, "\\'")}','${dosisCalc.porAplicacion.vasitoLabel}','${p.item.tipo}','${p.item.mesLabel}','')" style="background:#f0f7e6;color:#2d3e2c;border:1.5px solid #2d3e2c;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;font-family:'Work Sans',sans-serif;">
-        📤 Enviar notificación
-      </button>` : '';
-    return `
-      <div style="background:white;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,0.05);border:1.5px solid ${atrasada ? '#ffcdd2' : '#e0e0e0'};padding:14px 16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;">
-            <span class="material-symbols-outlined" style="font-size:20px;color:#2d3e2c;">${icono}</span>
-            <div style="min-width:0;">
-              <p style="font-size:14px;font-weight:700;color:#1a1a1a;margin:0;">${p.item.producto}</p>
-              <p style="font-size:12px;color:#666;margin:2px 0 0;">${p.item.mesLabel} · ${metodoLabel} · Dosis ${dosisCalc.porAplicacion.vasitoLabel}</p>
-              <p style="font-size:12px;color:#3a6b3a;margin:4px 0 0;line-height:1.3;">🎯 ${purpose}</p>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            ${notifBtn}
-            <span style="font-size:11px;font-weight:700;color:white;background:${badgeBg};padding:4px 12px;border-radius:20px;text-transform:uppercase;letter-spacing:.3px;">${estadoLabel}</span>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  const siguientesSection = `
-    <div style="margin-top:24px;">
-      <h3 style="font-size:15px;font-weight:700;color:#1a1a1a;margin:0 0 10px;display:flex;align-items:center;gap:6px;">
-        <span class="material-symbols-outlined" style="font-size:18px;color:#2d3e2c;">spa</span>
-        Siguientes en el plan
-      </h3>
-      ${siguientes.length ? `<div style="display:flex;flex-direction:column;gap:10px;">${siguientesCards}</div>` : `
-      <div style="background:#e8f5e9;border-radius:14px;padding:16px 20px;text-align:center;">
-        <p style="font-size:14px;font-weight:600;color:#2d3e2c;margin:0;">🎉 ¡El plan IFCAFE 2026 está completo!</p>
-      </div>`}
-    </div>
-  `;
+  setDefaultCalMonth();
 
   return `
-    <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width:900px;margin:0 auto;">
-      <h1 style="font-size:24px;font-weight:800;color:#1a1a1a;margin:0 0 4px;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;">
-        <span>📋</span> Plan IFCAFE 2026
-      </h1>
-      <p style="font-size:13px;color:#666;margin:0 0 20px;">Plan de fertilización para café según IHCAFE</p>
+    <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width:960px;margin:0 auto;">
+      <h1 style="font-size:24px;font-weight:800;color:#1a1a1a;margin:0 0 4px;letter-spacing:-.5px;display:flex;align-items:center;gap:8px;"><span>📋</span> Plan de Fertilización 2026</h1>
+      <p style="font-size:13px;color:#666;margin:0 0 16px;">Guía de abonadas para tu cafetal</p>
 
-      <div style="background:linear-gradient(135deg,#2d3e2c,#4a7a48);border-radius:20px;padding:24px;box-shadow:0 4px 24px rgba(45,62,44,0.25);">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <span class="material-symbols-outlined" style="font-size:30px;color:white;">eco</span>
-            <div>
-              <h2 style="font-size:20px;font-weight:800;color:white;margin:0;letter-spacing:-.4px;">${lote.nombre}</h2>
-              <p style="font-size:12px;color:rgba(255,255,255,0.75);margin:2px 0 0;">${dosisCalc.label}</p>
-            </div>
+      <div style="background:linear-gradient(135deg,#2d3e2c,#4a7a48);border-radius:16px;padding:18px 20px;color:white;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 4px 20px rgba(45,62,44,0.22);">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="material-symbols-outlined" style="font-size:28px;">eco</span>
+          <div>
+            <div style="font-size:18px;font-weight:800;letter-spacing:-.3px;">${lote.nombre}</div>
+            <div style="font-size:12px;opacity:.85;">${dosisCalc.label}</div>
           </div>
-          <span style="font-size:11px;font-weight:700;color:${headerBadgeText};background:${headerBadgeBg};padding:5px 14px;border-radius:20px;letter-spacing:.3px;">${realizadasCount}/5 realizadas</span>
         </div>
-        <div id="ifcafe-segments" style="display:flex;gap:6px;margin-top:20px;">
-          ${segmentos}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.16);padding:5px 12px;border-radius:20px;">Dosis: ${dosisCalc.porAplicacion.vasitoLabel}</span>
+          <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.16);padding:5px 12px;border-radius:20px;">Zona ${zonaLabel.split(' — ')[0]}</span>
+          ${numPlantas > 0 ? `<span style="font-size:11px;font-weight:700;background:rgba(255,255,255,0.16);padding:5px 12px;border-radius:20px;">${dosisCalc.sacosNecesarios} sacos</span>` : ''}
         </div>
-        <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.9);margin:8px 0 0;">${progressLabel}</p>
-        <div style="display:flex;align-items:stretch;gap:8px;margin-top:16px;">
-          <button onclick="event.preventDefault();prevIfcafeApp()" aria-label="Anterior" style="flex:0 0 auto;width:42px;border:none;border-radius:12px;background:rgba(255,255,255,0.15);color:white;font-size:22px;cursor:pointer;font-family:'Work Sans',sans-serif;">‹</button>
-          <div id="ifcafe-main-info" style="flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:14px 16px;">
-            ${mainInfoHtml}
-          </div>
-          <button onclick="event.preventDefault();nextIfcafeApp()" aria-label="Siguiente" style="flex:0 0 auto;width:42px;border:none;border-radius:12px;background:rgba(255,255,255,0.15);color:white;font-size:22px;cursor:pointer;font-family:'Work Sans',sans-serif;">›</button>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">
-          ${chip('Edad', dosisCalc.label)}
-          ${chip('Dosis', dosisCalc.porAplicacion.vasitoLabel, dibujarVasitoCompacto(dosisCalc.porAplicacion.fraccion))}
-          ${chip('Zona', `Zona ${zonaLabel.split(' — ')[0]}`)}
-          ${numPlantas > 0 ? chip('Sacos', `${dosisCalc.sacosNecesarios} x apl.`) : ''}
-        </div>
-        <div style="margin-top:18px;">
-          <a href="#" onclick="event.preventDefault();window.navigateTo('detalle_lote','${lote.id}')" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#2d3e2c;background:white;padding:8px 18px;border-radius:20px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-            Ver lote
-            <span class="material-symbols-outlined" style="font-size:15px;">arrow_forward</span>
-          </a>
-        </div>
+        <span style="font-size:12px;font-weight:800;background:${realizadas === plan.length ? '#c8e6c9' : 'rgba(255,255,255,0.16)'};color:${realizadas === plan.length ? '#2d3e2c' : '#fff'};padding:6px 14px;border-radius:20px;">${realizadas}/${plan.length} realizadas</span>
       </div>
 
-      ${aplicadaSection}
-      ${siguientesSection}
+      ${calendarShellHtml()}
+
+      <div style="margin-top:16px;">
+        <a href="#" onclick="event.preventDefault();window.navigateTo('detalle_lote','${lote.id}')" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#2d3e2c;background:#f0f7e6;padding:8px 16px;border-radius:20px;text-decoration:none;">Ver lote <span class="material-symbols-outlined" style="font-size:15px;">arrow_forward</span></a>
+      </div>
     </div>
-    <style>
-      #ifcafe-main-info { transition: box-shadow .2s; }
-      .ifcafe-main-flash { animation: ifcafeMainFlash .8s ease; }
-      @keyframes ifcafeMainFlash {
-        0% { box-shadow: 0 0 0 3px rgba(255,255,255,0.7); }
-        100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
-      }
-    </style>
+    ${planStyles()}
   `;
 }
 
 export function initPlanIfcafe() {
-  window.toggleIfcafeCard = function(expandId) {
-    const el = document.getElementById(expandId);
-    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  window.changePlanCalMonth = function(dir) {
+    const next = _calMonth + dir;
+    if (next < 0 || next > 11) return;
+    _calMonth = next;
+    renderPlanCal();
   };
 
-  window.selectIfcafeApp = function(idx) {
-    const data = _ifcafeViewData;
-    const pc = data?.planConEstado?.find(p => data.plan.indexOf(p.item) === idx);
-    const el = document.getElementById('ifcafe-main-info');
-    if (!pc || !el) return;
-    _ifcafeCurrentIdx = idx;
-    el.innerHTML = buildIfcafeInfoHtml(pc, data, idx);
-    el.classList.remove('ifcafe-main-flash');
-    void el.offsetWidth;
-    el.classList.add('ifcafe-main-flash');
-    const segEl = document.getElementById('ifcafe-segments');
-    if (segEl) segEl.innerHTML = buildIfcafeSegments(idx);
-  };
-
-  function moveIfcafeApp(dir) {
-    const data = _ifcafeViewData;
-    if (!data || data.plan.length === 0) return;
-    const next = Math.min(Math.max((_ifcafeCurrentIdx ?? 0) + dir, 0), data.plan.length - 1);
-    if (next !== _ifcafeCurrentIdx) window.selectIfcafeApp(next);
-  }
-
-  window.prevIfcafeApp = () => moveIfcafeApp(-1);
-  window.nextIfcafeApp = () => moveIfcafeApp(1);
-
-  window.marcarAplicada = async function(loteId, fecha, producto, tipo, dosis, mesLabel, expandId) {
+  window.marcarAplicada = async function(loteId, fecha, producto, tipo, dosis, mesLabel) {
     try {
       const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
       const metodo = tipo === 'Suelo' ? 'Al suelo' : 'Foliar';
@@ -586,39 +401,25 @@ export function initPlanIfcafe() {
       }
 
       window.Snackbar?.show('✅ Aplicación marcada como realizada');
-      const expandEl = document.getElementById(expandId);
-      if (expandEl) expandEl.style.display = 'none';
       window.clearScreenCache?.('plan_ifcafe');
-      window.navigateTo('plan_ifcafe', loteId);
+      window.navigateTo('plan_ifcafe', ...(_ifcafeLoteId ? [_ifcafeLoteId] : []));
     } catch (err) {
       window.Snackbar?.show('Error: ' + err.message, { type: 'error' });
     }
   };
 
-  window.enviarNotifAhora = async function(loteId, loteNombre, fecha, producto, dosisLabel, tipo, mesLabel, expandId) {
+  window.enviarNotifAhora = async function(loteId, loteNombre, fecha, producto, dosisLabel, tipo, mesLabel) {
     try {
-      const msg = `📋 Recordatorio IFCAFE 2026\n\nLote: ${loteNombre}\nMes: ${mesLabel}\nTipo: ${tipo}\nProducto: ${producto}\nDosis: ${dosisLabel}\nFecha: ${fecha}`;
+      const msg = `📋 Recordatorio de abonada\n\nLote: ${loteNombre || 'Mi finca'}\nMes: ${mesLabel}\nTipo: ${tipo}\nProducto: ${producto}\nDosis: ${dosisLabel}\nFecha: ${fecha}`;
       await sendWhatsApp(msg);
       localStorage.setItem(waNotifiedKey(fecha, loteId), new Date().toLocaleString());
       window.Snackbar?.show('📤 Notificación enviada por WhatsApp');
-      if (expandId) {
-        const expandEl = document.getElementById(expandId);
-        if (expandEl) expandEl.style.display = 'none';
-      } else {
-        window.clearScreenCache?.('plan_ifcafe');
-        window.navigateTo('plan_ifcafe', loteId);
-      }
+      window.clearScreenCache?.('plan_ifcafe');
+      window.navigateTo('plan_ifcafe', ...(_ifcafeLoteId ? [_ifcafeLoteId] : []));
     } catch (err) {
       window.Snackbar?.show('Error al enviar: ' + err.message, { type: 'error' });
     }
   };
 
-  const select = document.getElementById('ifcafe-month-select');
-  if (select) {
-    select.addEventListener('change', function() {
-      _ifcafeMonth = this.value === 'all' ? 'all' : parseInt(this.value, 10);
-      window.clearScreenCache?.('plan_ifcafe');
-      window.navigateTo('plan_ifcafe', ...(_ifcafeLoteId ? [_ifcafeLoteId] : []));
-    });
-  }
+  renderPlanCal();
 }

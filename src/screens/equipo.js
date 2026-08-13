@@ -3,6 +3,25 @@ import { getEmpresaMembers, getEmpresaInvitations, inviteUser, revokeInvitation,
 const SUPABASE_URL = 'https://udhuizkqnmkhljmezzkd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkaHVpemtxbm1raGxqbWV6emtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTM2MTYsImV4cCI6MjA5MTIyOTYxNn0.W9bJ1S8A45RUGaulhdVG6UohGmGNxGMjLBsc0Q7voPE';
 
+let currentEquipoSearchQuery = '';
+let allEquipoMembers = [];
+let _equipoCurrentUserId = null;
+
+function filterEquipoMembers() {
+  if (!currentEquipoSearchQuery) return allEquipoMembers;
+  const q = currentEquipoSearchQuery.toLowerCase();
+  return allEquipoMembers.filter(m =>
+    (m.nombre || m.email || '').toLowerCase().includes(q) ||
+    (m.email || '').toLowerCase().includes(q)
+  );
+}
+
+function refreshEquipoMembers() {
+  const container = document.getElementById('members-list');
+  if (!container) return;
+  container.innerHTML = filterEquipoMembers().map(m => renderMemberRow(m, _equipoCurrentUserId)).join('');
+}
+
 export async function renderEquipo() {
   const empresaId = window._currentEmpresaId;
   if (!empresaId) return '<div style="padding:24px;">Selecciona una empresa primero.</div>';
@@ -12,10 +31,25 @@ export async function renderEquipo() {
     getEmpresaInvitations(empresaId),
   ]);
 
+  allEquipoMembers = members;
   const currentUserId = await getUser().then(u => u?.id || null);
+  _equipoCurrentUserId = currentUserId;
+  const visibleMembers = filterEquipoMembers();
 
   return `
     <div class="m3-card-filled" style="margin-bottom:80px;">
+      <!-- Search (green split control, sin menú) -->
+      <div style="display:flex;justify-content:flex-end;margin:16px 0 8px;">
+        <div class="ganado-split-ctrl" id="equipo-search-wrapper">
+          <button id="equipo-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar">
+            <span class="material-icons" style="color:#ffffff;">search</span>
+          </button>
+          <input type="text" id="equipo-search-input" placeholder="Buscar por nombre..." value="${currentEquipoSearchQuery}" style="border:none;background:transparent;outline:none;font-size:15px;width:${currentEquipoSearchQuery?'160px':'0px'};transition:width 0.3s;opacity:${currentEquipoSearchQuery?'1':'0'};padding:${currentEquipoSearchQuery?'0 8px 0 0':'0'};color:#ffffff;">
+          <button id="equipo-search-clear" style="background:none;border:none;cursor:pointer;display:${currentEquipoSearchQuery?'flex':'none'};align-items:center;justify-content:center;padding:0 16px 0 8px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
+            <span class="material-icons" style="font-size:20px;">close</span>
+          </button>
+        </div>
+      </div>
       <h2 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;margin-bottom:24px;">Equipo</h2>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
@@ -23,7 +57,7 @@ export async function renderEquipo() {
       </div>
 
       <div id="members-list">
-        ${members.map(m => renderMemberRow(m, currentUserId)).join('')}
+        ${visibleMembers.map(m => renderMemberRow(m, currentUserId)).join('')}
       </div>
 
       <div id="invite-inline-container" style="margin-top:16px;"></div>
@@ -89,6 +123,43 @@ function renderMemberRow(m, currentUserId) {
 }
 
 export function initEquipo() {
+  // Search logic (sin menú registrar)
+  const searchToggle  = document.getElementById('equipo-search-toggle');
+  const searchWrapper = document.getElementById('equipo-search-wrapper');
+  const searchInput   = document.getElementById('equipo-search-input');
+  const searchClear   = document.getElementById('equipo-search-clear');
+
+  if (searchToggle && searchInput && searchWrapper && searchClear) {
+    searchToggle.addEventListener('click', () => {
+      if (!searchInput.style.width || searchInput.style.width === '0px') {
+        searchInput.style.width = '160px';
+        searchInput.style.opacity = '1';
+        searchInput.style.padding = '0 8px 0 0';
+        searchClear.style.display = 'flex';
+        searchInput.focus();
+      }
+    });
+
+    searchClear.addEventListener('click', () => {
+      currentEquipoSearchQuery = '';
+      searchInput.value = '';
+      searchInput.style.width = '0px';
+      searchInput.style.opacity = '0';
+      searchInput.style.padding = '0';
+      searchClear.style.display = 'none';
+      refreshEquipoMembers();
+    });
+
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      currentEquipoSearchQuery = e.target.value;
+      searchTimeout = setTimeout(() => {
+        refreshEquipoMembers();
+      }, 500);
+    });
+  }
+
   const btn = document.getElementById('btn-invite-member');
   if (btn) {
     btn.addEventListener('click', toggleInviteInline);

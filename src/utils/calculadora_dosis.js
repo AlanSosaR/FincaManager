@@ -26,19 +26,19 @@ const DOSIS_POR_EDAD = {
 };
 
 const PLAN_IFCAFE_ZONA_A = [
-  { mes: 5,  mesLabel: 'Mayo',     tipo: 'Suelo',  producto: 'Fórmula Completa (15-15-15 o 18-6-12)',     recomendacion: '1ra abonada — para las ramas nuevas' },
-  { mes: 6,  mesLabel: 'Junio',    tipo: 'Foliar', producto: 'Zinc + Boro',                                  recomendacion: '1ra rociada — para asegurar que pegue la flor' },
-  { mes: 8,  mesLabel: 'Agosto',   tipo: 'Suelo',  producto: 'Fórmula Completa (15-15-15 o 18-6-12)',       recomendacion: '2da abonada — para mantener el grano creciendo' },
-  { mes: 8,  mesLabel: 'Agosto',   tipo: 'Foliar', producto: 'Magnesio y menores',                          recomendacion: '2da rociada — para mantener las hojas verdes' },
-  { mes: 10, mesLabel: 'Octubre',  tipo: 'Suelo',  producto: 'Fórmula alta en Potasio (12-12-17)',          recomendacion: '3ra abonada — para que el grano pese más' },
+  { mes: 5,  mesLabel: 'Mayo',     tipo: 'Suelo',  producto: 'Abono de suelo (granulado)',     recomendacion: '1ra abonada — para que la planta eche ramas nuevas y se desarrolle' },
+  { mes: 6,  mesLabel: 'Junio',    tipo: 'Foliar', producto: 'Fertilizante foliar (se rocía en las hojas)', recomendacion: '1ra rociada — para que pegue bien la flor' },
+  { mes: 8,  mesLabel: 'Agosto',   tipo: 'Suelo',  producto: 'Abono de suelo (granulado)',     recomendacion: '2da abonada — para mantener el grano creciendo' },
+  { mes: 8,  mesLabel: 'Agosto',   tipo: 'Foliar', producto: 'Fertilizante foliar (se rocía en las hojas)', recomendacion: '2da rociada — para mantener las hojas sanas y verdes' },
+  { mes: 10, mesLabel: 'Octubre',  tipo: 'Suelo',  producto: 'Abono con más potasio',          recomendacion: '3ra abonada — para que el grano llene y pese más' },
 ];
 
 const PLAN_IFCAFE_ZONA_B = [
-  { mes: 6,  mesLabel: 'Junio',    tipo: 'Suelo',  producto: 'Fórmula Completa (15-15-15 o 18-6-12)',   recomendacion: '1ra abonada — esperando que caliente el suelo' },
-  { mes: 7,  mesLabel: 'Julio',    tipo: 'Foliar', producto: 'Zinc + Boro',                               recomendacion: '1ra rociada — para la flor' },
-  { mes: 9,  mesLabel: 'Septiembre', tipo: 'Suelo',  producto: 'Fórmula Completa (15-15-15 o 18-6-12)',  recomendacion: '2da abonada — para sostener la carga' },
-  { mes: 9,  mesLabel: 'Septiembre', tipo: 'Foliar', producto: 'Magnesio y menores',                      recomendacion: '2da rociada — para la salud de la hoja' },
-  { mes: 11, mesLabel: 'Noviembre', tipo: 'Suelo',  producto: 'Fórmula alta en Potasio (12-12-17)',      recomendacion: '3ra abonada — antes del frío fuerte para ganar peso' },
+  { mes: 6,  mesLabel: 'Junio',    tipo: 'Suelo',  producto: 'Abono de suelo (granulado)',     recomendacion: '1ra abonada — esperando que caliente el suelo' },
+  { mes: 7,  mesLabel: 'Julio',    tipo: 'Foliar', producto: 'Fertilizante foliar (se rocía en las hojas)', recomendacion: '1ra rociada — para que pegue bien la flor' },
+  { mes: 9,  mesLabel: 'Septiembre', tipo: 'Suelo',  producto: 'Abono de suelo (granulado)',  recomendacion: '2da abonada — para sostener el grano' },
+  { mes: 9,  mesLabel: 'Septiembre', tipo: 'Foliar', producto: 'Fertilizante foliar (se rocía en las hojas)', recomendacion: '2da rociada — para la salud de la hoja' },
+  { mes: 11, mesLabel: 'Noviembre', tipo: 'Suelo',  producto: 'Abono con más potasio',        recomendacion: '3ra abonada — para que el grano llene y pese más' },
 ];
 
 export function getDosisPorEdad(edadCategoria) {

@@ -40,6 +40,32 @@ export async function renderDetalleLote(id) {
           .dl-map-grid-cell { grid-column: 1 !important; grid-row: auto !important; }
           .dl-main-col { grid-column: 1 !important; grid-row: auto !important; }
         }
+        .db-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .db-stat-card {
+          background: var(--m3-surface-container-low);
+          border-radius: 14px;
+          padding: 14px 16px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .db-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+        .db-stat-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .db-stat-text { display: flex; flex-direction: column; min-width: 0; }
+        .db-stat-label { text-transform: uppercase; letter-spacing: 0.5px; }
+        @media (max-width: 768px) {
+          .db-stats-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+          .db-stat-card { padding: 12px 14px !important; }
+        }
       </style>
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-4xl m3-mx-auto m3-font-work-sans">
         <!-- Header -->
@@ -47,17 +73,34 @@ export async function renderDetalleLote(id) {
           <div class="m3-flex" style="gap: 24px; flex-wrap: wrap;">
             <div class="m3-flex m3-flex-col m3-gap-4" style="flex: 1; min-width: 280px;">
               <div class="m3-flex m3-mobile-flex-col m3-items-start m3-justify-between m3-gap-4">
-                <div class="m3-flex m3-items-center m3-gap-4 m3-flex-wrap">
-                  <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope">${lote.nombre}</h1>
-                </div>
-              </div>
-              <div class="m3-flex m3-gap-6 m3-text-on-surface-variant m3-label-medium m3-font-bold m3-flex-wrap">
-                <span class="m3-flex m3-items-center m3-gap-2 m3-bg-tertiary-container m3-text-on-tertiary-container m3-px-3 m3-py-1 m3-rounded-full"><img src="grano-de-cafe.png" alt="" style="width: 16px; height: 16px; object-fit: contain;"> Variedad ${lote.variedad || 'N/A'}</span>
-                <span class="m3-flex m3-items-center m3-gap-2"><img src="sprouts.png" alt="" style="width: 18px; height: 18px; object-fit: contain;"> ${(lote.num_plantas || 0).toLocaleString()} plantas</span>
+              <div class="m3-flex m3-items-center m3-gap-4 m3-flex-wrap">
+                <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope">${lote.nombre}</h1>
               </div>
             </div>
           </div>
+          </div>
         </section>
+
+        <div class="m3-grid m3-gap-4 m3-mb-6 db-stats-grid">
+          <div class="db-stat-card">
+            <div class="db-stat-icon">
+              <img src="grano-de-cafe.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
+            </div>
+            <div class="db-stat-text">
+              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Variedad</span>
+              <span class="m3-title-large m3-font-bold m3-text-on-surface">${lote.variedad || 'N/A'}</span>
+            </div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon">
+              <img src="sprouts.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
+            </div>
+            <div class="db-stat-text">
+              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Plantas</span>
+              <span class="m3-title-large m3-font-bold m3-text-on-surface">${(lote.num_plantas || 0).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
 
         <div class="m3-grid m3-grid-4 m3-gap-8" style="grid-template-columns: 3fr 2fr;">
           <!-- Map + Personal -->
@@ -123,7 +166,7 @@ export async function renderDetalleLote(id) {
               return `
             <div style="margin-bottom: 8px;">
               <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe', '${lote.id}')" style="color: #2d3e2c; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: #f0f7e6; border-radius: 8px;">
-                📋 Ver Plan IFCAFE 2026
+                📋 Ver Plan de Fertilización
                 <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
               </a>
             </div>

@@ -402,7 +402,7 @@ export async function checkAnalisisSueloPendiente() {
       }
 
       await sendWhatsApp(
-        `📊 Recordatorio IFCAFE\n\nLote: ${lote.nombre}\n⚠️ No tiene análisis de suelo en los últimos 11 meses.\nFebrero/Marzo es el momento ideal para tomar las muestras.\n\nFinca: ${window._empresaNombre || ''}`
+        `📊 Recordatorio de análisis de suelo\n\nLote: ${lote.nombre}\n⚠️ No tiene análisis de suelo en los últimos 11 meses.\nFebrero/Marzo es el momento ideal para tomar las muestras.\n\nFinca: ${window._empresaNombre || ''}`
       );
 
       alreadySent.add(lote.id);
@@ -500,7 +500,7 @@ export async function actualizarSaludPorPlan() {
 
         await sendWhatsApp(
           `⚠️ Salud del lote ${lote.nombre} reducida\n\n` +
-          `Motivo: ${atrasadas.length} aplicación(es) del Plan IFCAFE sin realizar\n` +
+          `Motivo: ${atrasadas.length} aplicación(es) del Plan de Fertilización sin realizar\n` +
           `Salud anterior: ${saludActual}%\n` +
           `Salud actual: ${nuevaSalud}%\n\n` +
           `Finca: ${window._empresaNombre || ''}`

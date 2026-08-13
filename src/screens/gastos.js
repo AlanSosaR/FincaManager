@@ -166,15 +166,24 @@ export async function renderGastos() {
     <div class="screen-herramientas" style="padding-bottom: 100px;">
 
       <!-- Search -->
-      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="gastos-search-wrapper" style="display: flex; align-items: center; background: ${currentGastosSearchQuery ? '#2d3e2c' : 'transparent'}; border-radius: 12px; transition: all 0.3s; height: 48px;">
-          <button id="gastos-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentGastosSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: ${currentGastosSearchQuery ? '#ffffff' : 'var(--primary-container)'};">search</span>
+      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
+        <div class="ganado-split-ctrl" id="gastos-search-wrapper">
+          <button id="gastos-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
+            <span class="material-icons" style="color: #ffffff;">search</span>
           </button>
-          <input type="text" id="gastos-search-input" placeholder="Buscar gasto..." value="${currentGastosSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentGastosSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentGastosSearchQuery ? '1' : '0'}; padding: ${currentGastosSearchQuery ? '0 8px 0 0' : '0'}; color: ${currentGastosSearchQuery ? '#ffffff' : '#333'};">
-          <button id="gastos-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentGastosSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: ${currentGastosSearchQuery ? '#ffffff' : '#666'}; height: 100%;" title="Limpiar búsqueda">
+          <input type="text" id="gastos-search-input" placeholder="Buscar gasto..." value="${currentGastosSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentGastosSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentGastosSearchQuery ? '1' : '0'}; padding: ${currentGastosSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
+          <button id="gastos-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentGastosSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
             <span class="material-icons" style="font-size: 20px;">close</span>
           </button>
+          <span class="ganado-split-ctrl-sep"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.toggleGastosSplitMenu(event)" title="Más opciones">
+            <span class="material-icons">arrow_drop_down</span>
+          </button>
+          <div class="ganado-split-menu" id="gastos-split-menu">
+            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_gasto'); document.getElementById('gastos-split-menu').classList.remove('open');">
+              <span class="material-icons">add</span><span>Registrar gasto</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -240,12 +249,6 @@ export async function renderGastos() {
           ${paginationFooterHtml()}
         </div>
       </div>
-
-      <!-- FAB -->
-      <button class="fab-premium" onclick="window.navigateTo('nuevo_gasto')">
-        <span class="material-icons">add</span>
-        <span class="label">Nuevo gasto</span>
-      </button>
     </div>
   `;
 }
@@ -266,6 +269,18 @@ export function initGastos() {
     if (!isActive) menu.classList.add('active');
   };
 
+  // Split control (search + arrow) menu
+  window.toggleGastosSplitMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('gastos-split-menu');
+    if (menu) menu.classList.toggle('open');
+  };
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('gastos-split-menu');
+    if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
+  });
+
   // Search logic
   const searchToggle  = document.getElementById('gastos-search-toggle');
   const searchWrapper = document.getElementById('gastos-search-wrapper');
@@ -275,14 +290,9 @@ export function initGastos() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#2d3e2c';
-        searchToggle.style.background = 'transparent';
-        searchToggle.querySelector('.material-icons').style.color = '#ffffff';
         searchInput.style.width = '180px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
-        searchInput.style.color = '#ffffff';
-        searchClear.style.color = '#ffffff';
         searchClear.style.display = 'flex';
         searchInput.focus();
       }
@@ -291,14 +301,9 @@ export function initGastos() {
     searchClear.addEventListener('click', () => {
       currentGastosSearchQuery = '';
       searchInput.value = '';
-      searchWrapper.style.background = 'transparent';
-      searchToggle.style.background = '';
-      searchToggle.querySelector('.material-icons').style.color = '';
       searchInput.style.width = '0px';
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
-      searchInput.style.color = '';
-      searchClear.style.color = '';
       searchClear.style.display = 'none';
       window.changeGastosPage(1);
     });

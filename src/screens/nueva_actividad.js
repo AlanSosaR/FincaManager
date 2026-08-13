@@ -84,7 +84,7 @@ export async function renderNuevaActividad(loteId, tipo) {
           <!-- IFCAFE dosage suggestion bar (only for Fertilizante when lot has edad_categoria) -->
           <div id="ifcafe-sugerencia-dosis" style="display: none; margin: -12px 0 16px 0; padding: 12px 14px; background: #f0f7e6; border-radius: 12px; border: 1px solid #c8e6c9;">
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-              <div style="font-size:13px; font-weight:600; color:#2d3e2c;">💡 Sugerencia IFCAFE 2026</div>
+              <div style="font-size:13px; font-weight:600; color:#2d3e2c;">💡 Sugerencia de dosis</div>
               <div id="sugerencia-vasito"></div>
               <div id="sugerencia-texto" style="font-size:12px; color:#4a6b48;"></div>
             </div>

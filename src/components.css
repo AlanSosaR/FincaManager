@@ -1345,6 +1345,17 @@ input:focus, textarea:focus, select:focus {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
+  .ganado-tally-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .ganado-tag-stat.ganado-tag-fumig {
+    display: none;
+  }
+  .ganado-tag-stat.ganado-fumig-mob {
+    display: flex;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1504,6 +1515,274 @@ input:focus, textarea:focus, select:focus {
 }
 .ganado-sex-icon.hembra { color: #d4838f; }
 .ganado-sex-icon.macho { color: #5b8def; }
+
+/* ---- Big summary (tally) card ---- */
+.ganado-card-primary {
+  grid-column: 1 / -1;
+}
+
+.ganado-card-primary.ganado-card-filter.active {
+  outline: none;
+}
+
+.ganado-split-ctrl {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 48px;
+  border-radius: 12px;
+  background: #2d3e2c;
+  transition: background 0.3s;
+}
+
+.ganado-split-ctrl .m3-icon-btn-tonal {
+  background: transparent;
+}
+
+#ganado-search-input::placeholder {
+  color: rgba(255,255,255,0.65);
+}
+
+.ganado-split-ctrl-sep {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255,255,255,0.3);
+  flex-shrink: 0;
+}
+
+.ganado-split-ctrl-reg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 100%;
+  background: #3a5240;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 0 11px 11px 0;
+  transition: background 0.15s;
+}
+
+.ganado-split-ctrl-reg:hover {
+  background: #4a6a52;
+}
+
+.ganado-split-ctrl-reg .material-icons {
+  font-size: 24px;
+}
+
+.ganado-split-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  padding: 6px;
+  display: none;
+  z-index: 100;
+}
+
+.ganado-split-menu.open {
+  display: block;
+}
+
+.ganado-split-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--m3-on-surface);
+  text-align: left;
+  border-radius: 8px;
+}
+
+.ganado-split-item:hover {
+  background: #f5f5f5;
+}
+
+.ganado-split-item .material-icons {
+  font-size: 20px;
+  color: var(--m3-primary);
+}
+
+.ganado-tally-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ganado-tally-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  opacity: 0.7;
+}
+
+.ganado-tally-count {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ganado-tally-count .ganado-card-value {
+  font-size: 48px;
+}
+
+.ganado-tally-unit {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.ganado-tally-divider {
+  height: 1px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.35) 0 6px, transparent 6px 12px);
+  margin: 14px 0 12px;
+}
+
+.ganado-tally-row {
+  display: flex;
+  gap: 12px;
+}
+
+.ganado-tag-stat {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--m3-surface-container-low);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, outline 0.15s;
+}
+
+.ganado-tag-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
+.ganado-tag-stat.active {
+  outline: 2px solid var(--m3-primary);
+}
+
+.ganado-tag-swatch {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ganado-tag-swatch.h { background: #f4d9e6; color: #c2528f; }
+.ganado-tag-swatch.m { background: #d9e5f1; color: #3e6fa6; }
+.ganado-tag-swatch.f { background: #f1dad4; color: #a63d2f; }
+.ganado-tag-swatch.g { background: #fde9e0; color: #c04a1f; }
+
+.ganado-tag-swatch .material-icons {
+  font-size: 22px;
+}
+
+.ganado-sex-icon-img {
+  width: 24px;
+  height: 24px;
+  background-color: #c2528f;
+  -webkit-mask-image: url('/hembra.png');
+  mask-image: url('/hembra.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.ganado-tag-swatch.m .ganado-sex-icon-img {
+  background-color: #3e6fa6;
+  -webkit-mask-image: url('/macho.png');
+  mask-image: url('/macho.png');
+}
+
+.ganado-tag-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ganado-tag-n {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--m3-on-surface);
+}
+
+.ganado-tag-l {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--m3-on-surface-variant);
+  margin-top: 2px;
+}
+
+.ganado-fumig-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fff3e0;
+  color: #e65100;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.ganado-tag-expand {
+  font-size: 18px;
+  color: var(--m3-on-surface-variant);
+  margin-left: auto;
+}
+
+/* Mobile-only fumigación card (hidden on desktop) */
+.ganado-fumig-mob {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .ganado-tally-count .ganado-card-value {
+    font-size: 40px;
+  }
+  .ganado-tally-row {
+    gap: 8px;
+  }
+  .ganado-tag-stat {
+    padding: 10px;
+    gap: 8px;
+  }
+  .ganado-tag-l {
+    font-size: 9px;
+  }
+}
 
 /* ---- List header ---- */
 .ganado-list-header {
@@ -2344,17 +2623,8 @@ input:focus, textarea:focus, select:focus {
 }
 
 .motores-top-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  display: block;
   margin-bottom: 40px;
-}
-
-@media (min-width: 1025px) {
-  .motores-top-cards {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-  }
 }
 
 .motores-card {

@@ -134,7 +134,7 @@ export async function renderNuevoLote(id) {
           <div style="margin-top: 24px; margin-bottom: 16px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="material-icons" style="color: var(--m3-primary); font-size: 20px;">eco</span>
-              <h3 style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Plan IFCAFE 2026</h3>
+              <h3 style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Plan de Fertilización 2026</h3>
             </div>
           </div>
           <div class="m3-grid-2col">
@@ -1634,7 +1634,7 @@ export async function setupNuevoLoteListeners() {
           }).join('\n');
 
           if (edadCat && numPlantas > 0) {
-            var msg = '📋 Plan IFCAFE 2026 generado\n\n' +
+            var msg = '📋 Plan de Fertilización 2026 generado\n\n' +
               'Lote: ' + data.nombre +
               '\nEdad: ' + dosisCalc.label +
               '\n🥤 Dosis: ' + dosisCalc.porAplicacion.vasitoLabel + ' (' + dosisCalc.porAplicacion.onzas + ' oz / ' + dosisCalc.porAplicacion.gramos + 'g)' +

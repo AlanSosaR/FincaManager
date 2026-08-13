@@ -117,15 +117,24 @@ export async function renderMotores(page = 1, filter = 'all') {
 
   return `
     <div class="screen-motores" style="padding-bottom: 120px;">
-      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="motors-search-wrapper" style="display: flex; align-items: center; background: ${currentMotorsSearchQuery ? '#2d3e2c' : 'transparent'}; border-radius: 12px; transition: all 0.3s; height: 48px;">
-          <button id="motors-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentMotorsSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: ${currentMotorsSearchQuery ? '#ffffff' : 'var(--primary-container)'};">search</span>
+      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
+        <div class="ganado-split-ctrl" id="motors-search-wrapper">
+          <button id="motors-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
+            <span class="material-icons" style="color: #ffffff;">search</span>
           </button>
-          <input type="text" id="motors-search-input" placeholder="Buscar equipo..." value="${currentMotorsSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentMotorsSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentMotorsSearchQuery ? '1' : '0'}; padding: ${currentMotorsSearchQuery ? '0 8px 0 0' : '0'}; color: ${currentMotorsSearchQuery ? '#ffffff' : '#333'};">
-          <button id="motors-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentMotorsSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: ${currentMotorsSearchQuery ? '#ffffff' : '#666'}; height: 100%;" title="Limpiar búsqueda">
+          <input type="text" id="motors-search-input" placeholder="Buscar equipo..." value="${currentMotorsSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentMotorsSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentMotorsSearchQuery ? '1' : '0'}; padding: ${currentMotorsSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
+          <button id="motors-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentMotorsSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
             <span class="material-icons" style="font-size: 20px;">close</span>
           </button>
+          <span class="ganado-split-ctrl-sep"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.toggleMotorsSplitMenu(event)" title="Más opciones">
+            <span class="material-icons">arrow_drop_down</span>
+          </button>
+          <div class="ganado-split-menu" id="motors-split-menu">
+            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_motor'); document.getElementById('motors-split-menu').classList.remove('open');">
+              <span class="material-icons">add</span><span>Registrar equipo</span>
+            </button>
+          </div>
         </div>
       </div>
       <div class="motores-page-title" style="margin-top: -10px; margin-bottom: 24px;">
@@ -136,39 +145,25 @@ export async function renderMotores(page = 1, filter = 'all') {
         <!-- Summary / Filter Cards -->
         <section class="motores-top-cards">
           <div class="motores-card motores-card-primary motores-card-filter ${currentMotorsFilter === 'all' ? 'active' : ''}" data-filter="all">
-            <div class="motores-card-header">
-              <span class="material-icons">settings</span>
-              <span class="motores-card-label">Total Maquinaria</span>
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Total Maquinaria</span>
+              <span class="ganado-tally-count">
+                <span class="ganado-card-value">${totalMachinery}</span>
+                <span class="ganado-tally-unit">equipos</span>
+              </span>
             </div>
-            <div class="motores-card-body">
-              <h3 class="motores-card-value">${totalMachinery}</h3>
-              <p class="ganado-card-sub">Registrados</p>
-            </div>
-          </div>
-
-          ${urgentCount > 0 ? `
-          <div class="motores-card motores-card-tertiary motores-card-filter ${currentMotorsFilter === 'urgent' ? 'active' : ''}" data-filter="urgent">
-            <div class="motores-card-header">
-              <span class="material-icons">build</span>
-              <span class="motores-card-label">Urgente</span>
-            </div>
-            <div class="motores-card-body">
-              <h3 class="motores-card-value">${urgentCount}</h3>
-              <p class="ganado-card-sub">Req. Aceite</p>
-            </div>
-          </div>
-          ` : ''}
-
-          <div class="motores-card motores-card-surface motores-card-filter ${currentMotorsFilter === 'active' ? 'active' : ''}" data-filter="active">
-            <div class="motores-card-header">
-              <span class="material-icons">bolt</span>
-              <span class="motores-card-label">En Uso</span>
-            </div>
-            <div class="motores-card-body">
-              <h3 class="motores-card-value">${activeCount}</h3>
-              <div class="progress-track">
-                <div class="progress-fill" style="width: ${totalMachinery ? (activeCount / totalMachinery) * 100 : 0}%; background: var(--primary);"></div>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              ${urgentCount > 0 ? `
+              <div class="ganado-tag-stat motores-card-filter ${currentMotorsFilter === 'urgent' ? 'active' : ''}" data-filter="urgent" title="Ver equipos que requieren aceite">
+                <span class="ganado-tag-swatch g"><span class="material-icons">build</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${urgentCount}</span>
+                  <span class="ganado-tag-l">Req. aceite</span>
+                  <span class="ganado-fumig-chip"><span class="material-icons" style="font-size:13px;">schedule</span> ${urgentCount} pendientes</span>
+                </span>
               </div>
+              ` : ''}
             </div>
           </div>
         </section>
@@ -190,11 +185,6 @@ export async function renderMotores(page = 1, filter = 'all') {
           ${paginationFooterHtml()}
         </div>
       </div>
-
-      <button class="fab-premium" onclick="window.navigateTo('nuevo_motor')">
-        <span class="material-icons">add</span>
-        <span class="label">Agregar motor</span>
-      </button>
     </div>
   `;
 }
@@ -225,6 +215,18 @@ export function initMotores() {
     });
   });
 
+  // Split control (search + arrow) menu
+  window.toggleMotorsSplitMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('motors-split-menu');
+    if (menu) menu.classList.toggle('open');
+  };
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('motors-split-menu');
+    if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
+  });
+
   // Search logic
   const searchToggle = document.getElementById('motors-search-toggle');
   const searchWrapper = document.getElementById('motors-search-wrapper');
@@ -234,14 +236,9 @@ export function initMotores() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#2d3e2c';
-        searchToggle.style.background = 'transparent';
-        searchToggle.querySelector('.material-icons').style.color = '#ffffff';
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
-        searchInput.style.color = '#ffffff';
-        searchClear.style.color = '#ffffff';
         searchClear.style.display = 'flex';
         searchInput.focus();
       }
@@ -250,14 +247,9 @@ export function initMotores() {
     searchClear.addEventListener('click', () => {
       currentMotorsSearchQuery = '';
       searchInput.value = '';
-      searchWrapper.style.background = 'transparent';
-      searchToggle.style.background = '';
-      searchToggle.querySelector('.material-icons').style.color = '';
       searchInput.style.width = '0px';
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
-      searchInput.style.color = '';
-      searchClear.style.color = '';
       searchClear.style.display = 'none';
       window.changeMotorsPage(1);
     });

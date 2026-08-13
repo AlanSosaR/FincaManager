@@ -117,15 +117,24 @@ export async function renderCultivos() {
     <div class="screen-herramientas" style="padding-bottom: 100px;">
 
       <!-- Search -->
-      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="cultivos-search-wrapper" style="display: flex; align-items: center; background: ${currentCultivosSearchQuery ? '#2d3e2c' : 'transparent'}; border-radius: 12px; transition: all 0.3s; height: 48px;">
-          <button id="cultivos-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentCultivosSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: ${currentCultivosSearchQuery ? '#ffffff' : 'var(--primary-container)'};">search</span>
+      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
+        <div class="ganado-split-ctrl" id="cultivos-search-wrapper">
+          <button id="cultivos-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
+            <span class="material-icons" style="color: #ffffff;">search</span>
           </button>
-          <input type="text" id="cultivos-search-input" placeholder="Buscar por tipo..." value="${currentCultivosSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentCultivosSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentCultivosSearchQuery ? '1' : '0'}; padding: ${currentCultivosSearchQuery ? '0 8px 0 0' : '0'}; color: ${currentCultivosSearchQuery ? '#ffffff' : '#333'};">
-          <button id="cultivos-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentCultivosSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: ${currentCultivosSearchQuery ? '#ffffff' : '#666'}; height: 100%;" title="Limpiar búsqueda">
+          <input type="text" id="cultivos-search-input" placeholder="Buscar por tipo..." value="${currentCultivosSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentCultivosSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentCultivosSearchQuery ? '1' : '0'}; padding: ${currentCultivosSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
+          <button id="cultivos-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentCultivosSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
             <span class="material-icons" style="font-size: 20px;">close</span>
           </button>
+          <span class="ganado-split-ctrl-sep"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.toggleCultivosSplitMenu(event)" title="Más opciones">
+            <span class="material-icons">arrow_drop_down</span>
+          </button>
+          <div class="ganado-split-menu" id="cultivos-split-menu">
+            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_cultivo'); document.getElementById('cultivos-split-menu').classList.remove('open');">
+              <span class="material-icons">add</span><span>Registrar cultivo</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -197,12 +206,6 @@ export async function renderCultivos() {
           ${paginationFooterHtml()}
         </div>
       </div>
-
-      <!-- FAB -->
-      <button class="fab-premium" onclick="window.navigateTo('nuevo_cultivo')">
-        <span class="material-icons">add</span>
-        <span class="label">Nuevo cultivo</span>
-      </button>
     </div>
   `;
 }
@@ -223,6 +226,18 @@ export function initCultivos() {
     if (!isActive) menu.classList.add('active');
   };
 
+  // Split control (search + arrow) menu
+  window.toggleCultivosSplitMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('cultivos-split-menu');
+    if (menu) menu.classList.toggle('open');
+  };
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('cultivos-split-menu');
+    if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
+  });
+
   // Search logic
   const searchToggle  = document.getElementById('cultivos-search-toggle');
   const searchWrapper = document.getElementById('cultivos-search-wrapper');
@@ -232,14 +247,9 @@ export function initCultivos() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#2d3e2c';
-        searchToggle.style.background = 'transparent';
-        searchToggle.querySelector('.material-icons').style.color = '#ffffff';
         searchInput.style.width = '180px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
-        searchInput.style.color = '#ffffff';
-        searchClear.style.color = '#ffffff';
         searchClear.style.display = 'flex';
         searchInput.focus();
       }
@@ -248,14 +258,9 @@ export function initCultivos() {
     searchClear.addEventListener('click', () => {
       currentCultivosSearchQuery = '';
       searchInput.value = '';
-      searchWrapper.style.background = 'transparent';
-      searchToggle.style.background = '';
-      searchToggle.querySelector('.material-icons').style.color = '';
       searchInput.style.width = '0px';
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
-      searchInput.style.color = '';
-      searchClear.style.color = '';
       searchClear.style.display = 'none';
       window.changeCultivosPage(1);
     });

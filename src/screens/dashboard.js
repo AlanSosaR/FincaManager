@@ -1,17 +1,23 @@
 import { supabase } from '../supabase.js';
 import { getPaginationFooterHtml } from '../pagination.js';
-import { calcularDosis } from '../utils/calculadora_dosis.js';
-
-function calcDosis(edadCat, numPlantas) {
-  try { return calcularDosis(edadCat, numPlantas); } catch { return { porAplicacion: { vasitoLabel: 'N/A', onzas: 0, gramos: 0, fraccion: 0 } }; }
-}
 
 const LOTES_PAGE_SIZE = 4;
 let currentLotesPage = 1;
 let allLotes = [];
+let currentLotesSearchQuery = '';
+let filteredLotesCount = 0;
+
+function filterLotes() {
+  if (!currentLotesSearchQuery) return allLotes;
+  const q = currentLotesSearchQuery.toLowerCase();
+  return allLotes.filter(l =>
+    (l.nombre || '').toLowerCase().includes(q) ||
+    (l.variedad || '').toLowerCase().includes(q)
+  );
+}
 
 function paginationFooterHtml() {
-  const totalPages = Math.ceil(allLotes.length / LOTES_PAGE_SIZE) || 1;
+  const totalPages = Math.ceil(filteredLotesCount / LOTES_PAGE_SIZE) || 1;
   return getPaginationFooterHtml({
     currentPage: currentLotesPage,
     totalPages,
@@ -58,15 +64,40 @@ export async function renderDashboard(page) {
     }
 
     allLotes = lotes || [];
+    const filteredLotes = filterLotes();
+    filteredLotesCount = filteredLotes.length;
     const totalPlantas = allLotes.reduce((sum, l) => sum + (l.num_plantas || 0), 0) || 0;
+    const totalArea = allLotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0);
     const from = (currentLotesPage - 1) * LOTES_PAGE_SIZE;
     const to = from + LOTES_PAGE_SIZE;
-    const pageLotes = allLotes.slice(from, to);
+    const pageLotes = filteredLotes.slice(from, to);
     return `
       <style>
         @media (min-width: 769px) {
           .db-lotes-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
+        .db-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .db-stat-card {
+          background: var(--m3-surface-container-low);
+          border-radius: 14px;
+          padding: 14px 16px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .db-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+        .db-stat-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .db-stat-text { display: flex; flex-direction: column; min-width: 0; }
+        .db-stat-label { text-transform: uppercase; letter-spacing: 0.5px; }
         @media (max-width: 1024px) {
           .db-page { padding: 0 !important; max-width: 100vw !important; overflow-x: hidden !important; overflow-y: auto !important; }
         }
@@ -74,11 +105,8 @@ export async function renderDashboard(page) {
           .db-page .m3-grid-4.m3-gap-8 { gap: 8px !important; min-width: 0 !important; }
           .db-page .m3-grid-4.m3-gap-8 > * { min-width: 0 !important; }
           .db-title { font-size: 22px !important; }
-          .db-stats-wrap { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
-          .db-stat-row { flex-wrap: wrap !important; gap: 6px !important; width: 100% !important; }
-          .db-stat-row > div { width: 100% !important; padding: 12px 16px !important; background: var(--m3-surface-container-highest) !important; border-radius: 12px !important; }
-          .db-stat-row .m3-title-medium { font-size: 16px !important; }
-          .db-stat-row .m3-label-medium { font-size: 12px !important; }
+          .db-stats-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
+          .db-stat-card { padding: 12px 14px !important; }
           .db-table-wrap { overflow-x: auto !important; }
           .db-table-wrap table { min-width: 480px !important; }
           .db-table-wrap th, .db-table-wrap td { padding: 8px !important; font-size: 12px !important; }
@@ -90,12 +118,33 @@ export async function renderDashboard(page) {
         .db-table-wrap table tbody tr:last-child td { border-bottom: none !important; }
       </style>
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans db-page">
+        <!-- Search + Register split control -->
+        <div style="display:flex;justify-content:flex-end;margin:16px 0 8px;">
+          <div class="ganado-split-ctrl" id="lotes-search-wrapper">
+            <button id="lotes-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar">
+              <span class="material-icons" style="color:#ffffff;">search</span>
+            </button>
+            <input type="text" id="lotes-search-input" placeholder="Buscar lote..." value="${currentLotesSearchQuery}" style="border:none;background:transparent;outline:none;font-size:15px;width:${currentLotesSearchQuery?'160px':'0px'};transition:width 0.3s;opacity:${currentLotesSearchQuery?'1':'0'};padding:${currentLotesSearchQuery?'0 8px 0 0':'0'};color:#ffffff;">
+            <button id="lotes-search-clear" style="background:none;border:none;cursor:pointer;display:${currentLotesSearchQuery?'flex':'none'};align-items:center;justify-content:center;padding:0 16px 0 8px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
+              <span class="material-icons" style="font-size:20px;">close</span>
+            </button>
+            <span class="ganado-split-ctrl-sep"></span>
+            <button class="ganado-split-ctrl-reg" onclick="window.toggleLotesSplitMenu(event)" title="Más opciones">
+              <span class="material-icons">arrow_drop_down</span>
+            </button>
+            <div class="ganado-split-menu" id="lotes-split-menu">
+              <button class="ganado-split-item" onclick="window.navigateTo('nuevo_lote'); document.getElementById('lotes-split-menu').classList.remove('open');">
+                <span class="material-icons">add</span><span>Agregar lote</span>
+              </button>
+            </div>
+          </div>
+        </div>
         <section class="m3-mb-6">
           <div>
             <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-mt-1 m3-font-manrope db-title">Gestión del Cafetal</h1>
             <div style="margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" style="color: #2d3e2c; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; background: #f0f7e6; border-radius: 8px; transition: all 0.2s;">
-                📋 Plan IFCAFE 2026
+                📋 Plan de Fertilización 2026
                 <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
               </a>
             </div>
@@ -103,22 +152,32 @@ export async function renderDashboard(page) {
         </section>
 
         ${allLotes.length > 0 ? `
-        <div class="m3-p-4 m3-bg-surface-container-low m3-rounded-2xl m3-mb-8 db-stats-wrap" style="margin-left: 0; margin-right: 0;">
-          <div class="m3-flex m3-items-center m3-gap-6 m3-flex-wrap db-stat-row">
-            <div class="m3-flex m3-items-center m3-gap-2">
-              <img src="sprouts.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
-              <span class="m3-label-medium m3-text-on-surface-variant">Total plantas:</span>
-              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${totalPlantas.toLocaleString()}</span>
+        <div class="m3-grid m3-gap-4 m3-mb-6 db-stats-grid">
+          <div class="db-stat-card">
+            <div class="db-stat-icon">
+              <img src="sprouts.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
             </div>
-            <div class="m3-flex m3-items-center m3-gap-2">
-              <img src="area.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
-              <span class="m3-label-medium m3-text-on-surface-variant">Área total:</span>
-              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${allLotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0).toFixed(1)} hectareas</span>
+            <div class="db-stat-text">
+              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Total plantas</span>
+              <span class="m3-title-large m3-font-bold m3-text-on-surface">${totalPlantas.toLocaleString()}</span>
             </div>
-            <div class="m3-flex m3-items-center m3-gap-2">
-              <img src="mapa.png" alt="" style="width: 20px; height: 20px; object-fit: contain;">
-              <span class="m3-label-medium m3-text-on-surface-variant">Lotes:</span>
-              <span class="m3-title-medium m3-font-bold m3-text-on-surface">${allLotes.length}</span>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon">
+              <img src="area.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
+            </div>
+            <div class="db-stat-text">
+              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Área total</span>
+              <span class="m3-title-large m3-font-bold m3-text-on-surface">${totalArea.toFixed(1)} <small class="m3-label-medium m3-text-on-surface-variant">hectareas</small></span>
+            </div>
+          </div>
+          <div class="db-stat-card">
+            <div class="db-stat-icon">
+              <img src="mapa.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
+            </div>
+            <div class="db-stat-text">
+              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Lotes</span>
+              <span class="m3-title-large m3-font-bold m3-text-on-surface">${allLotes.length}</span>
             </div>
           </div>
         </div>
@@ -163,18 +222,6 @@ export async function renderDashboard(page) {
                           </div>
                         </div>
                         <h3 class="m3-exp-card-title">${lote.nombre}</h3>
-                        ${lote.edad_categoria ? (() => {
-                          const dosisCalc = calcDosis(lote.edad_categoria, lote.num_plantas || 0);
-                          return `
-                          <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <span class="m3-label-small m3-font-bold m3-px-2 m3-py-1 m3-rounded-full" style="background: #f0f7e6; color: #2d3e2c; font-size: 10px;">
-                              🥤 ${dosisCalc.porAplicacion.vasitoLabel}
-                            </span>
-                            <span class="m3-label-small m3-px-2 m3-py-1 m3-rounded-full" style="background: #fff3e0; color: #e65100; font-size: 10px;">
-                              ${lote.salud_porcentaje || 100}% salud
-                            </span>
-                          </div>`;
-                        })() : ''}
                         <div class="m3-exp-card-details">
                           <div class="m3-exp-detail-item">
                             <img src="sprouts.png" alt="" style="width: 18px; height: 18px; object-fit: contain;">
@@ -271,16 +318,62 @@ export async function renderDashboard(page) {
             </div>
           </div>
         </div>
-        
-        <button onclick="window.navigateTo('nuevo_lote')" class="m3-fab" style="background: #2d3e2c; color: white;">
-          <span class="material-symbols-outlined">add_location</span>
-          <span>Agregar Lote</span>
-        </button>
       </div>
     `;
   } catch (err) {
     console.error('Error in renderDashboard:', err);
     return `<div style="padding: 24px; color: red;">Error cargando dashboard: ${err.message}</div>`;
+  }
+}
+
+export function initDashboard() {
+  // Split control (search + arrow) menu
+  window.toggleLotesSplitMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('lotes-split-menu');
+    if (menu) menu.classList.toggle('open');
+  };
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('lotes-split-menu');
+    if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
+  });
+
+  // Search logic
+  const searchToggle  = document.getElementById('lotes-search-toggle');
+  const searchWrapper = document.getElementById('lotes-search-wrapper');
+  const searchInput   = document.getElementById('lotes-search-input');
+  const searchClear   = document.getElementById('lotes-search-clear');
+
+  if (searchToggle && searchInput && searchWrapper && searchClear) {
+    searchToggle.addEventListener('click', () => {
+      if (!searchInput.style.width || searchInput.style.width === '0px') {
+        searchInput.style.width = '160px';
+        searchInput.style.opacity = '1';
+        searchInput.style.padding = '0 8px 0 0';
+        searchClear.style.display = 'flex';
+        searchInput.focus();
+      }
+    });
+
+    searchClear.addEventListener('click', () => {
+      currentLotesSearchQuery = '';
+      searchInput.value = '';
+      searchInput.style.width = '0px';
+      searchInput.style.opacity = '0';
+      searchInput.style.padding = '0';
+      searchClear.style.display = 'none';
+      window.changeLotesPage(1);
+    });
+
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      currentLotesSearchQuery = e.target.value;
+      searchTimeout = setTimeout(() => {
+        window.changeLotesPage(1);
+      }, 500);
+    });
   }
 }
 

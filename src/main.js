@@ -278,7 +278,7 @@ function initOnlineSync() {
 
 // ─── Screen imports ──────────────────────────────────────────────────────────
 
-import { renderDashboard } from './screens/dashboard.js';
+import { renderDashboard, initDashboard } from './screens/dashboard.js';
 import { renderMotores, initMotores } from './screens/motores.js';
 import { renderHerramientas, initHerramientas } from './screens/herramientas.js';
 import { renderNuevaHerramienta, initNuevaHerramienta } from './screens/nueva_herramienta.js';
@@ -349,7 +349,7 @@ const screens = {
     aceptar_invitacion: { title: 'Invitación', render: renderAceptarInvitacion, noAuth: true },
     recuperar: { title: 'Recuperar Contraseña', render: renderRecuperar, noAuth: true },
     restablecer: { title: 'Restablecer Contraseña', render: renderRestablecer },
-    plan_ifcafe: { title: 'Plan IFCAFE 2026', backTo: 'dashboard', render: renderPlanIfcafe },
+    plan_ifcafe: { title: 'Plan de Fertilización 2026', backTo: 'dashboard', render: renderPlanIfcafe },
 };
 
 window.navigateTo = function(screenId, ...args) {
@@ -460,6 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (screenId === 'nuevo_lote') setupNuevoLoteListeners();
         if (screenId === 'detalle_lote') initDetalleLote(...args);
+        if (screenId === 'dashboard') initDashboard();
         if (screenId === 'nueva_actividad') initNuevaActividad(...args);
         if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
         if (screenId === 'detalle_personal') initDetallePersonal(...args);

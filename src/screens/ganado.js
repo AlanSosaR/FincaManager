@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { restFetch } from '../auth.js';
+import { sendWhatsApp } from '../wa.js';
 import { getPaginationFooterHtml } from '../pagination.js';
 let currentGanadoPage = 1;
 const PAGE_SIZE = 8;
@@ -126,16 +127,25 @@ export async function renderGanado(page = 1, filter = 'all') {
   const machosRatio  = totalAnimales ? Math.round((machosCount  / totalAnimales) * 100) : 0;
 
   return `
-    <div class="screen-ganado" style="padding-bottom: 120px;">
-      <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-        <div class="search-wrapper" id="ganado-search-wrapper" style="display: flex; align-items: center; background: ${currentSearchQuery ? '#2d3e2c' : 'transparent'}; border-radius: 12px; transition: all 0.3s; height: 48px;">
-          <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: ${currentSearchQuery ? 'transparent' : ''};" title="Buscar">
-            <span class="material-icons" style="color: ${currentSearchQuery ? '#ffffff' : 'var(--primary-container)'};">search</span>
+    <div class="screen-ganado" style="padding-bottom: 40px;">
+      <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 8px;">
+        <div class="ganado-split-ctrl" id="ganado-search-wrapper">
+          <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
+            <span class="material-icons" style="color: #ffffff;">search</span>
           </button>
-          <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentSearchQuery ? '1' : '0'}; padding: ${currentSearchQuery ? '0 8px 0 0' : '0'}; color: ${currentSearchQuery ? '#ffffff' : '#333'};">
-          <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: ${currentSearchQuery ? '#ffffff' : '#666'}; height: 100%;" title="Limpiar búsqueda">
+          <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentSearchQuery ? '1' : '0'}; padding: ${currentSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
+          <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
             <span class="material-icons" style="font-size: 20px;">close</span>
           </button>
+          <span class="ganado-split-ctrl-sep"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.toggleGanadoSplitMenu(event)" title="Más opciones">
+            <span class="material-icons">arrow_drop_down</span>
+          </button>
+          <div class="ganado-split-menu" id="ganado-split-menu">
+            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_animal'); document.getElementById('ganado-split-menu').classList.remove('open');">
+              <span class="material-icons">add</span><span>Registrar animal</span>
+            </button>
+          </div>
         </div>
       </div>
       <div class="ganado-page-title" style="margin-top: -10px; margin-bottom: 24px;">
@@ -144,36 +154,50 @@ export async function renderGanado(page = 1, filter = 'all') {
 
       <div class="da-tabs-section" style="margin-top: 16px;">
         <section class="ganado-top-cards">
-          <div class="ganado-card ganado-card-primary ganado-card-filter ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">
-            <div class="ganado-card-header">
-              <img src="/vaca.png" alt="Ganado" style="width: 28px; height: 28px; filter: grayscale(1) opacity(0.85);">
-              <span class="ganado-card-label">Total Animales</span>
+          <div class="ganado-card ganado-card-primary ganado-tally ganado-card-filter ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Total Animales</span>
+              <span class="ganado-tally-count">
+                <span class="ganado-card-value">${totalAnimales}</span>
+                <span class="ganado-tally-unit">animales</span>
+              </span>
             </div>
-            <div class="ganado-card-body">
-              <h3 class="ganado-card-value">${totalAnimales}</h3>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'hembra' ? 'active' : ''}" data-filter="hembra" title="Ver hembras">
+                <span class="ganado-tag-swatch h"><span class="ganado-sex-icon-img"></span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${hembrasCount}</span>
+                  <span class="ganado-tag-l">Hembras</span>
+                </span>
+              </div>
+              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'macho' ? 'active' : ''}" data-filter="macho" title="Ver machos">
+                <span class="ganado-tag-swatch m"><span class="ganado-sex-icon-img"></span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${machosCount}</span>
+                  <span class="ganado-tag-l">Machos</span>
+                </span>
+              </div>
+              <div class="ganado-tag-stat ganado-tag-fumig ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" title="Abrir panel de fumigación">
+                <span class="ganado-tag-swatch f"><span class="material-icons">bug_report</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n fumig-veces-value">${vecesFumigadas}</span>
+                  <span class="ganado-tag-l">Fumigación aplicada</span>
+                  <span class="ganado-fumig-chip fumig-pend-chip"><span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes</span>
+                </span>
+                <span class="material-icons ganado-tag-expand">expand_more</span>
+              </div>
             </div>
           </div>
 
-          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'hembra' ? 'active' : ''}" data-filter="hembra">
-            <div class="ganado-card-header">
-              <span class="material-icons" style="font-size:28px;">female</span>
-              <span class="ganado-card-label">Hembras</span>
-            </div>
-            <div class="ganado-card-body">
-              <h3 class="ganado-card-value">${hembrasCount}</h3>
-              <div class="progress-track"><div class="progress-fill female" style="width:${hembrasRatio}%"></div></div>
-            </div>
-          </div>
-
-          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'macho' ? 'active' : ''}" data-filter="macho">
-            <div class="ganado-card-header">
-              <span class="material-icons" style="font-size:28px;">male</span>
-              <span class="ganado-card-label">Machos</span>
-            </div>
-            <div class="ganado-card-body">
-              <h3 class="ganado-card-value">${machosCount}</h3>
-              <div class="progress-track"><div class="progress-fill male" style="width:${machosRatio}%"></div></div>
-            </div>
+          <div class="ganado-tag-stat ganado-fumig-mob ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" id="ganado-fumig-card" data-filter="fumigaciones" title="Abrir panel de fumigación">
+            <span class="ganado-tag-swatch f"><span class="material-icons">bug_report</span></span>
+            <span class="ganado-tag-info">
+              <span class="ganado-tag-n fumig-veces-value">${vecesFumigadas}</span>
+              <span class="ganado-tag-l">Fumigación aplicada</span>
+              <span class="ganado-fumig-chip fumig-pend-chip"><span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes</span>
+            </span>
+            <span class="material-icons ganado-tag-expand">expand_more</span>
           </div>
 
           ${vacunasCount > 0 ? `
@@ -195,23 +219,6 @@ export async function renderGanado(page = 1, filter = 'all') {
             <div class="ganado-card-body"><h3 class="ganado-card-value">${pesajesCount}</h3></div>
           </div>
           ` : ''}
-
-          <div class="ganado-card ganado-card-surface ganado-card-filter ganado-card-fumig ${currentFilter === 'fumigaciones' ? 'active' : ''}" data-filter="fumigaciones" id="ganado-fumig-card" style="border-left: 4px solid #2c666e; cursor: pointer;">
-            <div class="ganado-card-header">
-              <span class="material-icons" style="font-size:28px; color: #2c666e;">bug_report</span>
-              <span class="ganado-card-label" style="color: #2c666e;">Fumigación</span>
-            </div>
-            <div class="ganado-card-body">
-              <h3 class="ganado-card-value" id="fumig-veces-value">${vecesFumigadas}</h3>
-              <span class="ganado-card-hint" style="display:flex; align-items:center; gap:6px; color:#2c666e; font-size:12px; font-weight:500; margin-top:4px; flex-wrap:wrap;">
-                <span id="fumig-pend-chip" class="fumig-count-chip" style="background:#fff3e0; color:#e65100; border-radius:999px; padding:2px 8px; font-weight:700; display:inline-flex; align-items:center; gap:3px;">
-                  <span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes
-                </span>
-                <span class="ganado-card-title" style="font-size:11px; color:#777;">veces fumigadas</span>
-                <span class="material-icons" style="font-size:15px;">expand_more</span>
-              </span>
-            </div>
-          </div>
 
           ${preñadasCount > 0 ? `
           <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'preñadas' ? 'active' : ''}" data-filter="preñadas" style="border-left: 4px solid #b26a00;">
@@ -293,11 +300,6 @@ export async function renderGanado(page = 1, filter = 'all') {
           ${paginationFooterHtml()}
         </div>
       </div>
-
-      <button class="fab-premium" onclick="window.navigateTo('nuevo_animal')">
-        <span class="material-icons">add</span>
-        <span class="label">Registrar animal</span>
-      </button>
     </div>
   `;
 }
@@ -491,6 +493,18 @@ function renderAnimalRow(a, setVacunas, setPesajes, setFumigaciones, pesajesMap 
 
 export function initGanado() {
 
+  // Split control (search + arrow) menu
+  window.toggleGanadoSplitMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('ganado-split-menu');
+    if (menu) menu.classList.toggle('open');
+  };
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('ganado-split-menu');
+    if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
+  });
+
   // Action menus logic
   window.toggleActionMenu = (btn) => {
     const menu = btn.nextElementSibling;
@@ -517,8 +531,9 @@ export function initGanado() {
 
   // Filter cards logic
   document.querySelectorAll('.ganado-card-filter').forEach(card => {
-    card.addEventListener('click', () => {
-      if (card.id === 'ganado-fumig-card') {
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (card.classList.contains('ganado-tag-fumig') || card.id === 'ganado-fumig-card') {
         const panel = document.getElementById('ganado-fumig-panel');
         if (panel) {
           const isOpen = panel.style.display === 'block';
@@ -689,10 +704,8 @@ export function initGanado() {
           if (f.estado === 'Aplicada') fumigAppliedGroups.set(key, true);
           if (f.estado === 'Programada') fumigPendGroups.set(key, true);
         }
-        const vecesValue = document.getElementById('fumig-veces-value');
-        if (vecesValue) vecesValue.textContent = String(fumigAppliedGroups.size);
-        const pendingChip = document.getElementById('fumig-pend-chip');
-        if (pendingChip) pendingChip.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroups.size} pendientes`;
+        document.querySelectorAll('.fumig-veces-value').forEach(el => el.textContent = String(fumigAppliedGroups.size));
+        document.querySelectorAll('.fumig-pend-chip').forEach(el => el.innerHTML = `<span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroups.size} pendientes`);
       })()
     ]);
   };
@@ -719,6 +732,7 @@ export function initGanado() {
             if (window._currentEmpresaId) base += `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`;
             await restFetch(base, { method: 'PATCH', body: JSON.stringify({ estado: 'Aplicada' }) });
             window.Snackbar.show('Fumigación aplicada ✓');
+            sendWhatsApp(`✅ Fumigación Aplicada\nProducto: ${producto}\nFecha: ${fecha} (día ${fechaDiaNombre})\nFinca: ${window._empresaNombre || ''}`);
             await refreshFumigAll();
           } catch (err) {
             window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
@@ -757,6 +771,7 @@ export function initGanado() {
         if (window._currentEmpresaId) base += `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`;
         await restFetch(base, { method: 'PATCH', body: JSON.stringify({ estado: 'Aplicada' }) });
         window.Snackbar.show('Fumigaciones del día aplicadas ✓');
+        sendWhatsApp(`✅ Fumigaciones del día aplicadas\nFecha: ${hoy}\nFinca: ${window._empresaNombre || ''}`);
         await refreshFumigAll();
       } catch (err) {
         window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });
@@ -784,6 +799,11 @@ export function initGanado() {
           if (error) throw error;
         }
         window.Snackbar.show(`Fumigación ${estado.toLowerCase()} para ${rows.length} animales ✓`);
+        sendWhatsApp(
+          estado === 'Programada'
+            ? `🗓 Fumigación PROGRAMADA\nProducto: ${producto}\nDía: ${diaNombre} (${fecha})\nAnimales: ${rows.length}\nFinca: ${window._empresaNombre || ''}`
+            : `✅ Fumigación Aplicada\nProducto: ${producto}\nFecha: ${fecha}\nAnimales: ${rows.length}\nFinca: ${window._empresaNombre || ''}`
+        );
         if (fumigFecha) fumigFecha.value = getLocalToday();
         if (fumigProducto) fumigProducto.value = '';
         await refreshFumigAll();
@@ -804,14 +824,9 @@ export function initGanado() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchWrapper.style.background = '#2d3e2c';
-        searchToggle.style.background = 'transparent';
-        searchToggle.querySelector('.material-icons').style.color = '#ffffff';
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
-        searchInput.style.color = '#ffffff';
-        searchClear.style.color = '#ffffff';
         searchClear.style.display = 'flex';
         searchInput.focus();
       }
@@ -820,14 +835,9 @@ export function initGanado() {
     searchClear.addEventListener('click', () => {
       currentSearchQuery = '';
       searchInput.value = '';
-      searchWrapper.style.background = 'transparent';
-      searchToggle.style.background = '';
-      searchToggle.querySelector('.material-icons').style.color = '';
       searchInput.style.width = '0px';
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
-      searchInput.style.color = '';
-      searchClear.style.color = '';
       searchClear.style.display = 'none';
       window.changeGanadoPage(1);
     });

@@ -4,9 +4,18 @@ import { getPaginationFooterHtml } from '../pagination.js';
 let currentPotrerosPage = 1;
 let totalPotrerosCount = 0;
 let potreroCounts = {};
+let currentPotrerosSearchQuery = '';
 const PAGE_SIZE = 5;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildPotrerosQuery() {
+  let query = supabase.from('potreros').select('*', { count: 'exact' });
+  if (currentPotrerosSearchQuery) {
+    query = query.ilike('nombre', `%${currentPotrerosSearchQuery}%`);
+  }
+  return query;
+}
 
 function paginationFooterHtml() {
   const totalPages = Math.ceil(totalPotrerosCount / PAGE_SIZE) || 1;
@@ -33,9 +42,7 @@ window.changePotrerosPage = async function(page) {
       <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
-  const { data: potreros, error } = await supabase
-    .from('potreros')
-    .select('*')
+  const { data: potreros, count, error } = await buildPotrerosQuery()
     .order('nombre', { ascending: true })
     .range(from, to);
 
@@ -44,6 +51,7 @@ window.changePotrerosPage = async function(page) {
     return;
   }
 
+  totalPotrerosCount = count || 0;
   listContainer.innerHTML = potreros.length === 0
     ? `<div class="ganado-empty" style="grid-column: 1 / -1;"><span class="material-icons">landscape</span><p>No hay potreros en esta página.</p></div>`
     : potreros.map(p => renderPotreroRow(p)).join('');
@@ -65,9 +73,7 @@ async function changePotrerosPage(page) {
       <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
     </div>`;
 
-  const { data: potreros, error } = await supabase
-    .from('potreros')
-    .select('*')
+  const { data: potreros, count, error } = await buildPotrerosQuery()
     .order('nombre', { ascending: true })
     .range(from, to);
 
@@ -76,6 +82,7 @@ async function changePotrerosPage(page) {
     return;
   }
 
+  totalPotrerosCount = count || 0;
   listContainer.innerHTML = potreros.length === 0
     ? `<div class="ganado-empty"><span class="material-icons">landscape</span><p>No hay potreros en esta página.</p></div>`
     : potreros.map(p => renderPotreroRow(p)).join('');
@@ -88,11 +95,14 @@ async function changePotrerosPage(page) {
 export async function renderPotreros() {
   currentPotrerosPage = 1;
 
+  let countQuery = supabase.from('potreros').select('*', { count: 'exact', head: true });
+  if (currentPotrerosSearchQuery) countQuery = countQuery.ilike('nombre', `%${currentPotrerosSearchQuery}%`);
+
   const [
     { count: totalCount },
     { data: allStats, error: statsError }
   ] = await Promise.all([
-    supabase.from('potreros').select('*', { count: 'exact', head: true }),
+    countQuery,
     supabase.from('potreros').select('status, capacidad')
   ]);
 
@@ -100,9 +110,7 @@ export async function renderPotreros() {
 
   if (statsError) console.error('Error fetching potreros stats:', statsError);
 
-  const { data: potreros, error } = await supabase
-    .from('potreros')
-    .select('*')
+  const { data: potreros, error } = await buildPotrerosQuery()
     .order('nombre', { ascending: true })
     .range(0, PAGE_SIZE - 1);
 
@@ -125,6 +133,28 @@ export async function renderPotreros() {
 
   return `
     <div class="screen-potreros" style="padding-bottom: 100px;">
+
+      <!-- Search + Register split control -->
+      <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
+        <div class="ganado-split-ctrl" id="potreros-search-wrapper">
+          <button id="potreros-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
+            <span class="material-icons" style="color: #ffffff;">search</span>
+          </button>
+          <input type="text" id="potreros-search-input" placeholder="Buscar potrero..." value="${currentPotrerosSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentPotrerosSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentPotrerosSearchQuery ? '1' : '0'}; padding: ${currentPotrerosSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
+          <button id="potreros-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentPotrerosSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
+            <span class="material-icons" style="font-size: 20px;">close</span>
+          </button>
+          <span class="ganado-split-ctrl-sep"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.togglePotrerosSplitMenu(event)" title="Más opciones">
+            <span class="material-icons">arrow_drop_down</span>
+          </button>
+          <div class="ganado-split-menu" id="potreros-split-menu">
+            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_potrero'); document.getElementById('potreros-split-menu').classList.remove('open');">
+              <span class="material-icons">add</span><span>Registrar potrero</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Page Title -->
       <div class="potreros-page-title">
@@ -202,12 +232,6 @@ export async function renderPotreros() {
           ${paginationFooterHtml()}
         </div>
       </div>
-
-      <!-- FAB -->
-      <button class="fab-premium" onclick="window.navigateTo('nuevo_potrero')">
-        <span class="material-icons">add_location</span>
-        <span class="label">Nuevo potrero</span>
-      </button>
     </div>
   `;
 }
@@ -221,6 +245,55 @@ export function initPotreros() {
     document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
     if (!isActive) menu.classList.add('active');
   };
+
+  // Split control (search + arrow) menu
+  window.togglePotrerosSplitMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('potreros-split-menu');
+    if (menu) menu.classList.toggle('open');
+  };
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('potreros-split-menu');
+    if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
+  });
+
+  // Search logic
+  const searchToggle  = document.getElementById('potreros-search-toggle');
+  const searchWrapper = document.getElementById('potreros-search-wrapper');
+  const searchInput   = document.getElementById('potreros-search-input');
+  const searchClear   = document.getElementById('potreros-search-clear');
+
+  if (searchToggle && searchInput && searchWrapper && searchClear) {
+    searchToggle.addEventListener('click', () => {
+      if (!searchInput.style.width || searchInput.style.width === '0px') {
+        searchInput.style.width = '160px';
+        searchInput.style.opacity = '1';
+        searchInput.style.padding = '0 8px 0 0';
+        searchClear.style.display = 'flex';
+        searchInput.focus();
+      }
+    });
+
+    searchClear.addEventListener('click', () => {
+      currentPotrerosSearchQuery = '';
+      searchInput.value = '';
+      searchInput.style.width = '0px';
+      searchInput.style.opacity = '0';
+      searchInput.style.padding = '0';
+      searchClear.style.display = 'none';
+      window.changePotrerosPage(1);
+    });
+
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      currentPotrerosSearchQuery = e.target.value;
+      searchTimeout = setTimeout(() => {
+        window.changePotrerosPage(1);
+      }, 500);
+    });
+  }
 
   window.confirmDeletePotrero = (id, name) => {
     window.Snackbar.confirm(
