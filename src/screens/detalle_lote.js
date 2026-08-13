@@ -37,6 +37,9 @@ export async function renderDetalleLote(id) {
     return `
       <style>
         @media (max-width: 768px) {
+          .dl-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+          .dl-main-col { gap: 16px !important; }
+          .dl-screen-pad { padding: 0 !important; }
           .dl-map-grid-cell { grid-column: 1 !important; grid-row: auto !important; }
           .dl-main-col { grid-column: 1 !important; grid-row: auto !important; }
         }
@@ -50,7 +53,7 @@ export async function renderDetalleLote(id) {
           flex-shrink: 0;
         }
       </style>
-      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans">
+      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dl-screen-pad">
         <!-- Header -->
         <section class="m3-mb-6">
           <div class="m3-flex" style="gap: 24px; flex-wrap: wrap;">
@@ -101,7 +104,7 @@ export async function renderDetalleLote(id) {
           </div>
         </div>
 
-        <div class="m3-grid m3-grid-4 m3-gap-8" style="grid-template-columns: 3fr 2fr;">
+        <div class="m3-grid m3-grid-4 m3-gap-8 dl-grid" style="grid-template-columns: 3fr 2fr;">
           <!-- Map + Personal -->
           <div class="dl-map-grid-cell" style="grid-column: 2; grid-row: 1; ${lote.coordenadas_json ? '' : 'display: none;'}" id="dl-map-grid-wrapper">
             <div class="m3-flex m3-items-center m3-gap-2 m3-text-on-surface-variant m3-label-medium m3-font-bold m3-mb-3" style="padding-left: 4px;">
