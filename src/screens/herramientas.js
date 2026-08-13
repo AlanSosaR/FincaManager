@@ -122,36 +122,33 @@ export async function renderHerramientas() {
       <div class="da-tabs-section">
         <!-- Summary Cards -->
         <section class="herramientas-top-cards">
-          <div class="herramientas-card herramientas-card-primary">
-            <div class="herramientas-card-header">
-              <span class="material-icons">construction</span>
-              <span class="herramientas-card-label">Total Equipos</span>
+          <div class="herramientas-card herramientas-card-primary ganado-tally">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Total Equipos</span>
+              <span class="ganado-tally-count">
+                <span class="ganado-card-value">${totalTools}</span>
+                <span class="ganado-tally-unit">equipos</span>
+              </span>
             </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${totalTools}</h3>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch o"><span class="material-icons">check_circle</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${available}</span>
+                  <span class="ganado-tag-l">Disponibles</span>
+                </span>
+              </div>
+              ${inRepair > 0 ? `
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch g"><span class="material-icons">build</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${inRepair}</span>
+                  <span class="ganado-tag-l">En Taller</span>
+                </span>
+              </div>` : ''}
             </div>
           </div>
-
-          <div class="herramientas-card herramientas-card-surface">
-            <div class="herramientas-card-header">
-              <span class="material-icons">check_circle</span>
-              <span class="herramientas-card-label">Disponibles</span>
-            </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${available}</h3>
-            </div>
-          </div>
-
-          ${inRepair > 0 ? `
-          <div class="herramientas-card herramientas-card-tertiary">
-            <div class="herramientas-card-header">
-              <span class="material-icons">build</span>
-              <span class="herramientas-card-label">En Taller</span>
-            </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${inRepair}</h3>
-            </div>
-          </div>` : ''}
         </section>
 
         <!-- List Header -->

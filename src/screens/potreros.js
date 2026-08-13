@@ -172,36 +172,30 @@ export async function renderPotreros() {
       <div class="da-tabs-section">
         <!-- Summary Cards -->
         <section class="potreros-top-cards">
-          <div class="potreros-card potreros-card-primary">
-            <div class="herramientas-card-header">
-              <span class="material-icons">grass</span>
-              <span class="herramientas-card-label">Carga Total</span>
+          <div class="potreros-card potreros-card-primary ganado-tally">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Carga Total</span>
+              <span class="ganado-tally-count">
+                <span class="ganado-card-value">${currentTotalAnimals}</span>
+                <span class="ganado-tally-unit">animales</span>
+              </span>
             </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${currentTotalAnimals}</h3>
-              <p class="ganado-card-sub">${globalOccupancy}% de capacidad total</p>
-            </div>
-          </div>
-
-          <div class="potreros-card potreros-card-surface">
-            <div class="herramientas-card-header">
-              <span class="material-icons">event_repeat</span>
-              <span class="herramientas-card-label">En Descanso</span>
-            </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${restingCount}</h3>
-              <p class="ganado-card-sub">Áreas recuperándose</p>
-            </div>
-          </div>
-
-          <div class="potreros-card potreros-card-tertiary">
-            <div class="herramientas-card-header">
-              <span class="material-icons">priority_high</span>
-              <span class="herramientas-card-label">Ocupados</span>
-            </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${occupiedCount}</h3>
-              <p class="ganado-card-sub">En pastoreo activo</p>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch m"><span class="material-icons">event_repeat</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${restingCount}</span>
+                  <span class="ganado-tag-l">En descanso</span>
+                </span>
+              </div>
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch f"><span class="material-icons">priority_high</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${occupiedCount}</span>
+                  <span class="ganado-tag-l">Ocupados</span>
+                </span>
+              </div>
             </div>
           </div>
         </section>

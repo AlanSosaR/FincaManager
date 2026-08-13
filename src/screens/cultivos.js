@@ -146,36 +146,33 @@ export async function renderCultivos() {
       <div class="da-tabs-section">
         <!-- Summary Cards -->
         <section class="herramientas-top-cards">
-          <div class="herramientas-card herramientas-card-primary">
-            <div class="herramientas-card-header">
-              <span class="material-icons">agriculture</span>
-              <span class="herramientas-card-label">Cultivos activos</span>
+          <div class="herramientas-card herramientas-card-primary ganado-tally">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Cultivos activos</span>
+              <span class="ganado-tally-count">
+                <span class="ganado-card-value">${activos}</span>
+                <span class="ganado-tally-unit">cultivos</span>
+              </span>
             </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${activos}</h3>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch m"><span class="material-icons">terrain</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${areaTotal.toFixed(2)}</span>
+                  <span class="ganado-tag-l">Área (ha)</span>
+                </span>
+              </div>
+              ${cosechados > 0 ? `
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch o"><span class="material-icons">check_circle</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${cosechados}</span>
+                  <span class="ganado-tag-l">Cosechados</span>
+                </span>
+              </div>` : ''}
             </div>
           </div>
-
-          <div class="herramientas-card herramientas-card-surface">
-            <div class="herramientas-card-header">
-              <span class="material-icons">terrain</span>
-              <span class="herramientas-card-label">Área total (ha)</span>
-            </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${areaTotal.toFixed(2)}</h3>
-            </div>
-          </div>
-
-          ${cosechados > 0 ? `
-          <div class="herramientas-card herramientas-card-tertiary">
-            <div class="herramientas-card-header">
-              <span class="material-icons">check_circle</span>
-              <span class="herramientas-card-label">Cosechados</span>
-            </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${cosechados}</h3>
-            </div>
-          </div>` : ''}
         </section>
 
         <!-- List Header -->

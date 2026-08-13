@@ -142,42 +142,43 @@ export async function renderDashboard(page) {
         <section class="m3-mb-6">
           <div>
             <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-mt-1 m3-font-manrope db-title">Gestión del Cafetal</h1>
-            <div style="margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" style="color: #2d3e2c; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; background: #f0f7e6; border-radius: 8px; transition: all 0.2s;">
-                📋 Plan de Fertilización 2026
-                <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
-              </a>
-            </div>
           </div>
         </section>
 
         ${allLotes.length > 0 ? `
-        <div class="m3-grid m3-gap-4 m3-mb-6 db-stats-grid">
-          <div class="db-stat-card">
-            <div class="db-stat-icon">
-              <img src="sprouts.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
+        <div class="m3-mb-6 cafetal-hero">
+          <div class="ganado-card ganado-card-primary ganado-tally">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Total Plantas</span>
+              <span class="ganado-tally-count">
+                <span class="ganado-card-value">${totalPlantas.toLocaleString()}</span>
+                <span class="ganado-tally-unit">plantas</span>
+              </span>
             </div>
-            <div class="db-stat-text">
-              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Total plantas</span>
-              <span class="m3-title-large m3-font-bold m3-text-on-surface">${totalPlantas.toLocaleString()}</span>
-            </div>
-          </div>
-          <div class="db-stat-card">
-            <div class="db-stat-icon">
-              <img src="area.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
-            </div>
-            <div class="db-stat-text">
-              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Área total</span>
-              <span class="m3-title-large m3-font-bold m3-text-on-surface">${totalArea.toFixed(1)} <small class="m3-label-medium m3-text-on-surface-variant">hectareas</small></span>
-            </div>
-          </div>
-          <div class="db-stat-card">
-            <div class="db-stat-icon">
-              <img src="mapa.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
-            </div>
-            <div class="db-stat-text">
-              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Lotes</span>
-              <span class="m3-title-large m3-font-bold m3-text-on-surface">${allLotes.length}</span>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch w"><img src="area.png" alt="" style="width: 30px; height: 30px; object-fit: contain;"></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${totalArea.toFixed(1)}</span>
+                  <span class="ganado-tag-l">Hectáreas</span>
+                </span>
+              </div>
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch w"><img src="mapa.png" alt="" style="width: 22px; height: 22px; object-fit: contain;"></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${allLotes.length}</span>
+                  <span class="ganado-tag-l">Lotes</span>
+                </span>
+              </div>
+              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat cafetal-ifcafe-btn" title="Abrir Plan de Fertilización 2026">
+                <span class="ganado-tag-swatch w"><span style="font-size:20px;line-height:1;">📋</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n" style="font-size:14px;">Plan IFCAFE</span>
+                  <span class="ganado-tag-l">2026</span>
+                </span>
+                <span class="material-icons ganado-tag-expand">chevron_right</span>
+              </a>
             </div>
           </div>
         </div>

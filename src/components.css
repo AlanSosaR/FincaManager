@@ -1695,6 +1695,27 @@ input:focus, textarea:focus, select:focus {
 .ganado-tag-swatch.m { background: #d9e5f1; color: #3e6fa6; }
 .ganado-tag-swatch.f { background: #f1dad4; color: #a63d2f; }
 .ganado-tag-swatch.g { background: #fde9e0; color: #c04a1f; }
+.ganado-tag-swatch.w { background: rgba(255,255,255,0.18); }
+.ganado-tag-swatch.o { background: #d6e8d8; color: #1f7a2e; }
+
+.ganado-card-primary .ganado-tally-row .ganado-tag-swatch img {
+  filter: brightness(0) !important;
+}
+
+.cafetal-hero .ganado-card-primary,
+.herramientas-card.ganado-tally,
+.potreros-card.ganado-tally {
+  min-height: auto;
+}
+
+.ganado-tally-count.gastos-money .ganado-card-value {
+  font-size: 30px;
+}
+
+.cafetal-ifcafe-btn {
+  text-decoration: none;
+  color: inherit;
+}
 
 .ganado-tag-swatch .material-icons {
   font-size: 22px;
@@ -2331,23 +2352,8 @@ input:focus, textarea:focus, select:focus {
 }
 
 .herramientas-top-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  display: block;
   margin-bottom: 40px;
-}
-
-@media (max-width: 900px) {
-  .herramientas-top-cards {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 580px) {
-  .herramientas-top-cards {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
 }
 
 .herramientas-card {
@@ -2486,23 +2492,8 @@ input:focus, textarea:focus, select:focus {
 }
 
 .potreros-top-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  display: block;
   margin-bottom: 40px;
-}
-
-@media (max-width: 900px) {
-  .potreros-top-cards {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 580px) {
-  .potreros-top-cards {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
 }
 
 .potreros-card {
@@ -2897,14 +2888,14 @@ input:focus, textarea:focus, select:focus {
 
 @media (min-width: 768px) {
   .da-screen {
-    max-width: 720px;
+    max-width: none;
     margin: 0 auto;
   }
 }
 
 @media (min-width: 1024px) {
   .da-screen {
-    max-width: 960px;
+    max-width: none;
     margin: 0 auto;
   }
 }

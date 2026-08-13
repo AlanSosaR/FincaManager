@@ -195,23 +195,30 @@ export async function renderGastos() {
       <div class="da-tabs-section">
         <!-- Summary Cards -->
         <section class="herramientas-top-cards">
-          <div class="herramientas-card herramientas-card-primary">
-            <div class="herramientas-card-header">
-              <span class="material-icons">account_balance_wallet</span>
-              <span class="herramientas-card-label">${PERIOD_LABEL[currentGastosPeriod]}</span>
+          <div class="herramientas-card herramientas-card-primary ganado-tally">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">${PERIOD_LABEL[currentGastosPeriod]}</span>
+              <span class="ganado-tally-count gastos-money">
+                <span class="ganado-card-value">${formatMoney(totalPeriod)}</span>
+                <span class="ganado-tally-unit">total</span>
+              </span>
             </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${formatMoney(totalPeriod)}</h3>
-            </div>
-          </div>
-
-          <div class="herramientas-card herramientas-card-surface">
-            <div class="herramientas-card-header">
-              <span class="material-icons">receipt_long</span>
-              <span class="herramientas-card-label">Gastos</span>
-            </div>
-            <div class="herramientas-card-body">
-              <h3 class="herramientas-card-value">${periodRows.length}</h3>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch m"><span class="material-icons">receipt_long</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${periodRows.length}</span>
+                  <span class="ganado-tag-l">Registros</span>
+                </span>
+              </div>
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch g"><span class="material-icons">category</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${Object.keys(byCategory).length}</span>
+                  <span class="ganado-tag-l">Categorías</span>
+                </span>
+              </div>
             </div>
           </div>
         </section>

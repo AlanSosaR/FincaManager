@@ -40,17 +40,6 @@ export async function renderDetalleLote(id) {
           .dl-map-grid-cell { grid-column: 1 !important; grid-row: auto !important; }
           .dl-main-col { grid-column: 1 !important; grid-row: auto !important; }
         }
-        .db-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-        .db-stat-card {
-          background: var(--m3-surface-container-low);
-          border-radius: 14px;
-          padding: 14px 16px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          transition: transform 0.18s ease, box-shadow 0.18s ease;
-        }
-        .db-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
         .db-stat-icon {
           width: 44px;
           height: 44px;
@@ -60,14 +49,8 @@ export async function renderDetalleLote(id) {
           justify-content: center;
           flex-shrink: 0;
         }
-        .db-stat-text { display: flex; flex-direction: column; min-width: 0; }
-        .db-stat-label { text-transform: uppercase; letter-spacing: 0.5px; }
-        @media (max-width: 768px) {
-          .db-stats-grid { grid-template-columns: 1fr !important; gap: 8px !important; }
-          .db-stat-card { padding: 12px 14px !important; }
-        }
       </style>
-      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-4xl m3-mx-auto m3-font-work-sans">
+      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans">
         <!-- Header -->
         <section class="m3-mb-6">
           <div class="m3-flex" style="gap: 24px; flex-wrap: wrap;">
@@ -81,23 +64,39 @@ export async function renderDetalleLote(id) {
           </div>
         </section>
 
-        <div class="m3-grid m3-gap-4 m3-mb-6 db-stats-grid">
-          <div class="db-stat-card">
-            <div class="db-stat-icon">
-              <img src="grano-de-cafe.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
+        <div class="m3-mb-6">
+          <div class="ganado-card ganado-card-primary ganado-tally">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Total Plantas</span>
+              <span class="ganado-tally-count">
+                <span class="ganado-card-value">${(lote.num_plantas || 0).toLocaleString()}</span>
+                <span class="ganado-tally-unit">plantas</span>
+              </span>
             </div>
-            <div class="db-stat-text">
-              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Variedad</span>
-              <span class="m3-title-large m3-font-bold m3-text-on-surface">${lote.variedad || 'N/A'}</span>
-            </div>
-          </div>
-          <div class="db-stat-card">
-            <div class="db-stat-icon">
-              <img src="sprouts.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
-            </div>
-            <div class="db-stat-text">
-              <span class="m3-label-small m3-text-on-surface-variant db-stat-label">Plantas</span>
-              <span class="m3-title-large m3-font-bold m3-text-on-surface">${(lote.num_plantas || 0).toLocaleString()}</span>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch w"><img src="grano-de-cafe.png" alt="" style="width: 22px; height: 22px; object-fit: contain;"></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n" style="font-size: 16px;">${lote.variedad || 'N/A'}</span>
+                  <span class="ganado-tag-l">Variedad</span>
+                </span>
+              </div>
+              <div class="ganado-tag-stat">
+                <span class="ganado-tag-swatch w"><img src="area.png" alt="" style="width: 30px; height: 30px; object-fit: contain;"></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${lote.area_ha || 0}</span>
+                  <span class="ganado-tag-l">Hectáreas</span>
+                </span>
+              </div>
+              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe', '${lote.id}')" class="ganado-tag-stat cafetal-ifcafe-btn" title="Abrir Plan de Fertilización">
+                <span class="ganado-tag-swatch w"><span style="font-size:20px;line-height:1;">📋</span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n" style="font-size:14px;">Plan IFCAFE</span>
+                  <span class="ganado-tag-l">Ver</span>
+                </span>
+                <span class="material-icons ganado-tag-expand">chevron_right</span>
+              </a>
             </div>
           </div>
         </div>
@@ -159,19 +158,6 @@ export async function renderDetalleLote(id) {
           </div>
           <!-- Main Column -->
           <div class="m3-flex m3-flex-col m3-gap-8 dl-main-col" style="margin-top: 8px; grid-column: 1;">
-
-            ${(() => {
-              const edadCat = lote.edad_categoria;
-              if (!edadCat) return '';
-              return `
-            <div style="margin-bottom: 8px;">
-              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe', '${lote.id}')" style="color: #2d3e2c; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: #f0f7e6; border-radius: 8px;">
-                📋 Ver Plan de Fertilización
-                <span class="material-symbols-outlined" style="font-size: 16px;">arrow_forward</span>
-              </a>
-            </div>
-            `;
-            })()}
 
             <!-- Fertilización Section -->
             <div class="m3-card m3-p-8" style="border-radius: 12px;">
