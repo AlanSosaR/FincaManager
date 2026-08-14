@@ -403,14 +403,15 @@ export function initDetalleLote(id) {
             touchZoom: false,
             keyboard: false
           });
-          const tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            maxZoom: 19,
-            maxNativeZoom: 18,
-            attribution: 'Tiles &copy; Esri'
+          const tileLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            maxZoom: 22,
+            maxNativeZoom: 20,
+            attribution: 'Imagery &copy; Google'
           }).addTo(map);
           L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
-            maxZoom: 19,
+            maxZoom: 22,
             opacity: 0.8
           }).addTo(map);
           tileLayer.on('tileerror', (e) => {

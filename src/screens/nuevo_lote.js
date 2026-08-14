@@ -452,7 +452,7 @@ function initMap() {
   mapInstance = L.map('lote-map', {
     center: [14.5, -88.5],
     zoom: 9,
-    maxZoom: 18,
+    maxZoom: 22,
     zoomControl: false,
     attributionControl: false
   });
@@ -468,27 +468,29 @@ function initMap() {
   const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap, CARTO',
     subdomains: 'abcd',
-    maxZoom: 19,
+    maxZoom: 22,
     maxNativeZoom: 18
   }).addTo(mapInstance);
 
   // ── Satellite imagery (Esri World Imagery) ──
-  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri',
-    maxZoom: 19
+  const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    attribution: 'Imagery &copy; Google',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    maxZoom: 22,
+    maxNativeZoom: 20
   });
 
   // Labels overlay for satellite
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
-    maxZoom: 19,
+    maxZoom: 22,
     opacity: 0.8
   });
 
   // ── Terrain (Esri World Topo) ──
   const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
-    maxZoom: 19,
+    maxZoom: 22,
     maxNativeZoom: 18
   });
 

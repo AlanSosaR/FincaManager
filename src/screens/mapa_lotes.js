@@ -4,6 +4,12 @@ import { loadPuntoReferencia } from '../auth.js';
 
 let refMarker = null;
 
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
+
 function parseCoordenadasJson(json) {
   try {
     const parsed = JSON.parse(json);
@@ -207,6 +213,30 @@ export async function renderMapaLotes() {
           width: calc(100vw - 80px) !important;
         }
       }
+      .leaflet-top.leaflet-right {
+        top: 64px;
+      }
+      .potrero-label {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        padding: 5px 12px 5px 8px;
+        border-radius: 999px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+        white-space: nowrap;
+        border: 2px solid #ffffff;
+        pointer-events: none;
+        z-index: 500;
+        font-family: 'Work Sans', sans-serif;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
     </style>
     <div class="mapa-page">
       <div class="mapa-summary" id="mapa-summary">
@@ -303,24 +333,26 @@ export async function initMapaLotes() {
   const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap, CARTO',
     subdomains: 'abcd',
-    maxZoom: 19,
+    maxZoom: 22,
     maxNativeZoom: 18
   });
 
-  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri',
-    maxZoom: 19
+  const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    attribution: 'Imagery &copy; Google',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    maxZoom: 22,
+    maxNativeZoom: 20
   }).addTo(map);
 
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
-    maxZoom: 19,
+    maxZoom: 22,
     opacity: 0.8
   }).addTo(map);
 
   const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
-    maxZoom: 19,
+    maxZoom: 22,
     maxNativeZoom: 18
   });
 
@@ -478,6 +510,24 @@ export async function initMapaLotes() {
 
   function searchFor(query, cb, ctx, allowFallback) {
     const q = query.trim().toLowerCase();
+    const areaResults = lotes
+      .filter(l => l.nombre && l.nombre.toLowerCase().includes(q))
+      .map(l => {
+        const { coordinates } = parseCoordenadasJson(l.coordenadas_json);
+        const bounds = coordinates && coordinates.length >= 3
+          ? L.latLngBounds(coordinates.map(c => [c.lat, c.lng]))
+          : null;
+        return {
+          name: l.nombre,
+          center: bounds ? bounds.getCenter() : null,
+          bbox: bounds,
+          _lote: l
+        };
+      });
+    if (areaResults.length) {
+      cb.call(ctx, areaResults);
+      return;
+    }
     const local = loadSavedPoints()
       .filter(p => p.name && p.name.toLowerCase().includes(q))
       .map(p => ({
@@ -525,7 +575,8 @@ export async function initMapaLotes() {
 
   const geocoder = L.Control.geocoder({
     defaultMarkGeocode: false,
-    collapsed: false,
+    collapsed: true,
+    expand: 'click',
     position: 'topleft',
     placeholder: 'Buscar lugar, ciudad, coordenadas o plus code...',
     errorMessage: 'No se encontró el lugar. Intenta con un plus code de Google Maps (ej. 3RPC+5C)',
@@ -547,6 +598,10 @@ export async function initMapaLotes() {
     const gc = e.geocode;
     const bbox = gc.bbox;
     if (bbox) map.fitBounds(bbox, { padding: [40, 40] });
+
+    if (gc._lote) {
+      return;
+    }
 
     if (gc._savedPoint) {
       return;
@@ -622,6 +677,20 @@ export async function initMapaLotes() {
     allBounds.push(poly.getBounds());
 
     poly.bindPopup(buildPopupHtml(lote, appsByLote[lote.id] || []));
+
+    const c = poly.getBounds().getCenter();
+    L.marker([c.lat, c.lng], {
+      icon: L.divIcon({
+        className: 'potrero-label-wrap',
+        html: `<div class="potrero-label" style="background:${escapeHtml(color)};">
+          <span class="material-icons" style="font-size:13px;color:#ffffff;">grass</span>
+          <span>${escapeHtml(lote.nombre || 'Lote')}</span>
+        </div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      }),
+      interactive: false
+    }).addTo(map);
   });
 
   const fitToParcels = () => {
