@@ -356,7 +356,7 @@ export async function initPotreros() {
       refMarker = L.marker([ref.lat, ref.lng], {
         icon: L.divIcon({
           className: 'ref-label-icon',
-          html: '<span class="material-icons" style="font-size:28px;color:#2d3e2c;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
+          html: '<span class="material-icons" style="font-size:28px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
           iconSize: null,
           iconAnchor: [14, 28]
         }),
