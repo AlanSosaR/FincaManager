@@ -1008,36 +1008,36 @@ function initMap() {
   const locateBtn = document.getElementById('btn-locate');
   if (locateBtn) {
     let userMarker = null;
-    mapInstance.on('locationfound', function(e) {
-      if (userMarker) mapInstance.removeLayer(userMarker);
-      userMarker = L.circleMarker(e.latlng, {
-        radius: 10,
-        color: '#fff',
-        fillColor: '#4285f4',
-        fillOpacity: 1,
-        weight: 3
-      }).addTo(mapInstance).bindPopup('Tu ubicación actual');
-
-      mapInstance.setView(e.latlng, 17, { animate: true });
-    });
-    mapInstance.on('locationerror', function(e) {
-      if (window.Snackbar) {
-        const msg = e.code === 1
-          ? 'Permiso de ubicación denegado — actívalo en la configuración del navegador'
-          : 'No se pudo obtener tu ubicación: ' + e.message;
-        window.Snackbar.show(msg, { type: 'error', duration: 5000 });
-      }
-    });
     locateBtn.addEventListener('click', () => {
-      if (window.Snackbar) {
-        window.Snackbar.show('Buscando ubicación...', { type: 'info', duration: 2000 });
+      if (!navigator.geolocation) {
+        window.Snackbar?.show('Tu navegador no soporta geolocalización', 'error');
+        return;
       }
-      mapInstance.locate({
-        setView: false,
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000
-      });
+      locateBtn.disabled = true;
+      window.Snackbar?.show('Buscando ubicación...', { type: 'info', duration: 2000 });
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          locateBtn.disabled = false;
+          const latlng = [pos.coords.latitude, pos.coords.longitude];
+          if (userMarker) mapInstance.removeLayer(userMarker);
+          userMarker = L.circleMarker(latlng, {
+            radius: 10,
+            color: '#fff',
+            fillColor: '#4285f4',
+            fillOpacity: 1,
+            weight: 3
+          }).addTo(mapInstance).bindPopup('Tu ubicación actual');
+          mapInstance.setView(latlng, 17, { animate: true });
+        },
+        (err) => {
+          locateBtn.disabled = false;
+          const msg = err.code === 1
+            ? 'Permiso de ubicación denegado — actívalo en la configuración del navegador'
+            : 'No se pudo obtener tu ubicación: ' + (err.message || err.code);
+          window.Snackbar?.show(msg, { type: 'error', duration: 5000 });
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
     });
   }
 
