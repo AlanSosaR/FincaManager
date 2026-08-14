@@ -89,7 +89,7 @@ export async function renderDashboard(page) {
         .db-stat-text { display: flex; flex-direction: column; min-width: 0; }
         .db-stat-label { text-transform: uppercase; letter-spacing: 0.5px; }
         @media (max-width: 1024px) {
-          .db-page { padding: 0 !important; max-width: 100vw !important; overflow-x: hidden !important; overflow-y: auto !important; }
+          .db-page { padding: 0 !important; max-width: 100vw !important; overflow-x: clip !important; }
         }
         @media (max-width: 768px) {
           .db-page .m3-grid-4.m3-gap-8 { gap: 8px !important; min-width: 0 !important; }
