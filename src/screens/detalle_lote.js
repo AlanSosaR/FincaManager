@@ -39,7 +39,7 @@ export async function renderDetalleLote(id) {
         @media (max-width: 768px) {
           .dl-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
           .dl-main-col { gap: 16px !important; }
-          .dl-screen-pad { padding: 0 !important; }
+          .dl-screen-pad { padding: 0 0 120px 0 !important; }
           .dl-map-grid-cell { grid-column: 1 !important; grid-row: auto !important; }
           .dl-main-col { grid-column: 1 !important; grid-row: auto !important; }
         }
