@@ -407,7 +407,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // data is loaded via init(). Caching the spinner causes triple re-renders
         // (cached HTML → initDetalleX → IndexedDB render → REST render).
         'detalle_animal','detalle_motor','detalle_potrero',
-        'detalle_herramienta','detalle_lote','detalle_personal','mapa_lotes'
+        'detalle_herramienta','detalle_lote','detalle_personal','mapa_lotes',
+        // potreros: render() solo devuelve el shell del mapa; initPotreros() dibuja
+        'potreros'
     ]);
 
     window.clearScreenCache = (screenId) => {

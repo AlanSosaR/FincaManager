@@ -49,10 +49,8 @@ export async function renderDetallePotrero(potreroId) {
     nombre: potrero.nombre || 'Potrero Sin Nombre',
     area: (potrero.area || '--') + ' ' + (potrero.area_unidad || 'ha'),
     pasto: potrero.pasto || 'Natural',
-    ultimoRiego: potrero.ultimo_riego ? new Date(potrero.ultimo_riego).toLocaleDateString() : 'No registrado',
     carga: (animales ? animales.length : 0) + ' cabezas',
-    ubicacion: potrero.ubicacion || 'Sin ubicación registrada',
-    cycle: potrero.ciclo_recuperacion ? `${potrero.ciclo_recuperacion} días de ciclo` : 'No configurado',
+    cycle: potrero.ciclo_recuperacion ? `${potrero.ciclo_recuperacion} días de rotación` : 'No configurado',
     icon: potrero.icon || '🌿',
   };
 
@@ -67,7 +65,7 @@ export async function renderDetallePotrero(potreroId) {
             <div class="detail-hero-icon">${potreroData.icon}</div>
             <div>
               <h2>${potreroData.nombre}</h2>
-              <p class="detail-subtitle">${potreroData.ubicacion}</p>
+              <p class="detail-subtitle">${potreroData.pasto}</p>
             </div>
           </div>
           <button class="btn-m3-text" onclick="window.navigateTo('nuevo_potrero', '${potrero.id}')" style="min-width: 48px; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
@@ -87,10 +85,6 @@ export async function renderDetallePotrero(potreroId) {
           <div class="detail-stat-item">
             <span class="detail-stat-label">Carga Actual</span>
             <span class="detail-stat-value">${potreroData.carga}</span>
-          </div>
-          <div class="detail-stat-item">
-            <span class="detail-stat-label">Último Riego</span>
-            <span class="detail-stat-value">${potreroData.ultimoRiego}</span>
           </div>
         </div>
 

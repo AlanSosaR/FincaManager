@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
-import { restFetch, restInsert } from '../auth.js';
+import { restFetch, restInsert, loadPuntoReferencia } from '../auth.js';
+import { showNamePrompt } from '../modals.js';
 import { sendWhatsApp } from '../wa.js';
 import { getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
 
@@ -218,12 +219,12 @@ export async function renderNuevoLote(id) {
               </div>
             </div>
 
-            <div id="area-info-badge" style="display: none; margin-top: 12px; padding: 16px 24px; background: var(--m3-primary-container); border-radius: 12px; align-items: center; justify-content: space-between;">
+            <div id="area-info-badge" style="display: none; margin-top: 12px; padding: 16px 24px; background: #ffffff; border-radius: 12px; align-items: center; justify-content: space-between; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
               <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="material-icons" style="color: var(--m3-on-primary-container); font-size: 28px;">check_circle</span>
+                <span class="material-icons" style="color: #2d3e2c; font-size: 28px;">check_circle</span>
                 <div>
-                  <p style="font-size: 12px; font-weight: 700; color: var(--m3-on-primary-container); text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Área Calculada</p>
-                  <p id="area-calculated-text" style="font-size: 22px; font-weight: 800; color: var(--m3-on-primary-container); margin: 0; font-family: 'Work Sans', sans-serif;">0.00 ha</p>
+                  <p style="font-size: 12px; font-weight: 700; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;">Área Calculada</p>
+                  <p id="area-calculated-text" style="font-size: 22px; font-weight: 800; color: #2d3e2c; margin: 0; font-family: 'Work Sans', sans-serif;">0.00 ha</p>
                 </div>
               </div>
               <button type="button" id="btn-clear-drawing" class="btn-m3-text" style="padding: 8px 16px; font-size: 12px;">
@@ -245,26 +246,202 @@ export async function renderNuevoLote(id) {
         </form>
       </div>
     </div>
+    <style>
+      .mapa-pop {
+        font-family: 'Work Sans', sans-serif;
+        width: 260px;
+      }
+      .mapa-pop-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .mapa-pop-title {
+        margin: 0;
+        color: #2d3e2c;
+        font-size: 15px;
+        font-weight: 800;
+      }
+      .mapa-pop-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 20px;
+        background: #2d3e2c;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .mapa-pop-stats {
+        display: flex;
+        gap: 14px;
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 8px;
+      }
+      .mapa-pop-stats span {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .mapa-pop-stats img {
+        width: 15px;
+        height: 15px;
+        object-fit: contain;
+      }
+      .mapa-pop-sec {
+        background: #f4f6f2;
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+      }
+      .mapa-pop-sec-t {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        color: #7a8a76;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-bottom: 4px;
+      }
+      .mapa-pop-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: #333;
+        padding: 2px 0;
+      }
+      .mapa-pop-row img {
+        width: 16px;
+        height: 16px;
+        object-fit: contain;
+        flex-shrink: 0;
+      }
+      .mapa-pop-row b {
+        font-weight: 700;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .mapa-pop-row .mapa-pop-date {
+        color: #888;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      .mapa-pop-empty {
+        font-size: 12px;
+        color: #999;
+        font-style: italic;
+      }
+      .mapa-pop-btn {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        padding: 9px 12px;
+        border: none;
+        border-radius: 10px;
+        background: #2d3e2c;
+        color: #fff;
+        font-weight: 700;
+        font-size: 12px;
+        cursor: pointer;
+        font-family: 'Work Sans', sans-serif;
+      }
+      .mapa-pop-btn:hover {
+        background: #3d5240;
+      }
+    </style>
   `;
 }
 
 async function loadExistingLotes() {
   try {
-    const { data, error } = await supabase
-      .from('lotes')
-      .select('*');
+    const [lotesRes, appsRes] = await Promise.all([
+      supabase.from('lotes').select('*'),
+      supabase.from('lote_aplicaciones').select('*').neq('estado', 'Programada').order('fecha', { ascending: false })
+    ]);
     
-    if (error || !data) return [];
+    if (lotesRes.error || !lotesRes.data) return [];
     
     // Exclude the lote being edited so it doesn't show as dashed overlay
     const editingId = window.__currentLoteData?.id;
     
-    return data.filter(l => l.coordenadas_json != null && l.id !== editingId)
-               .map(l => ({ id: l.id, nombre: l.nombre, coordenadas_json: l.coordenadas_json, area_ha: l.area_ha }));
+    const appsByLote = {};
+    (appsRes.data || []).forEach(a => {
+      if (!appsByLote[a.lote_id]) appsByLote[a.lote_id] = [];
+      appsByLote[a.lote_id].push(a);
+    });
+    
+    return lotesRes.data
+      .filter(l => l.coordenadas_json != null && l.id !== editingId)
+      .map(l => ({ ...l, apps: appsByLote[l.id] || [] }));
   } catch (err) {
     console.error('Error loading lotes:', err);
     return [];
   }
+}
+
+function fmtFecha(fecha) {
+  if (!fecha) return '';
+  try {
+    const d = new Date(fecha);
+    if (isNaN(d)) return fecha;
+    return d.toLocaleDateString('es-HN', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return fecha;
+  }
+}
+
+function buildExistingLotePopupHtml(lote) {
+  const apps = lote.apps || [];
+  const fertilizantes = apps.filter(a => a.tipo === 'Fertilizante').slice(0, 3);
+  const limpiezas = apps.filter(a => a.tipo === 'Limpieza').slice(0, 3);
+
+  const abonoHtml = fertilizantes.length > 0
+    ? fertilizantes.map(a => `
+        <div class="mapa-pop-row">
+          <img src="fertilizante.png" alt="">
+          <b>${a.producto || 'Abono'}</b>
+          <span class="mapa-pop-date">${fmtFecha(a.fecha)}</span>
+        </div>`).join('')
+    : '<div class="mapa-pop-empty">Sin abono aplicado aún</div>';
+
+  const limpiezaHtml = limpiezas.length > 0
+    ? limpiezas.map(a => `
+        <div class="mapa-pop-row">
+          <img src="sale-de.png" alt="">
+          <b>${a.producto || 'Limpieza'}</b>
+          <span class="mapa-pop-date">${fmtFecha(a.fecha)}</span>
+        </div>`).join('')
+    : '<div class="mapa-pop-empty">Sin limpieza registrada</div>';
+
+  return `
+    <div class="mapa-pop">
+      <div class="mapa-pop-head">
+        <span class="mapa-pop-title">${lote.nombre}</span>
+        <span class="mapa-pop-badge">${lote.variedad || 'Café'}</span>
+      </div>
+      <div class="mapa-pop-stats">
+        <span><img src="area.png" alt="">${lote.area_ha ? parseFloat(lote.area_ha).toFixed(2) : '0.00'} ha</span>
+        <span><img src="sprouts.png" alt="">${(lote.num_plantas || 0).toLocaleString()} plantas</span>
+      </div>
+      <div class="mapa-pop-sec">
+        <span class="mapa-pop-sec-t">Abono / Fertilización</span>
+        ${abonoHtml}
+      </div>
+      <div class="mapa-pop-sec">
+        <span class="mapa-pop-sec-t">Limpieza</span>
+        ${limpiezaHtml}
+      </div>
+      <button class="mapa-pop-btn" onclick="window.navigateTo('detalle_lote','${lote.id}')">Ver detalle completo</button>
+    </div>
+  `;
 }
 
 function initMap() {
@@ -280,19 +457,25 @@ function initMap() {
     attributionControl: false
   });
 
+  // Centro inicial en el punto de referencia de la finca (si existe)
+  loadPuntoReferencia(window._currentEmpresaId).then(ref => {
+    if (ref && mapInstance) {
+      mapInstance.setView([ref.lat, ref.lng], 15);
+    }
+  }).catch(() => {});
+
   // ── Google Maps style street map (default) ──
   const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap, CARTO',
+    subdomains: 'abcd',
     maxZoom: 19,
-    maxNativeZoom: 18,
-    subdomains: 'abcd'
+    maxNativeZoom: 18
   }).addTo(mapInstance);
 
   // ── Satellite imagery (Esri World Imagery) ──
   const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
-    maxZoom: 19,
-    maxNativeZoom: 18
+    maxZoom: 19
   });
 
   // Labels overlay for satellite
@@ -302,7 +485,7 @@ function initMap() {
     opacity: 0.8
   });
 
-  // ── Improved Terrain (Esri World Topo, maxZoom 19) ──
+  // ── Terrain (Esri World Topo) ──
   const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
     maxZoom: 19,
@@ -350,21 +533,162 @@ function initMap() {
     document.getElementById('m3-zoom-out')?.addEventListener('click', () => mapInstance.zoomOut());
   }, 200);
 
-  // Search control - Material 3 Expressive
-  const geocoder = L.Control.geocoder({
-    defaultMarkGeocode: true,
-    position: 'topleft',
-    placeholder: 'Buscar lugar, ciudad o coordenadas...',
-    errorMessage: 'No se encontró el lugar',
-    suggestTimeout: 250,
-    queryMinLength: 2,
-    geocoder: L.Control.Geocoder.nominatim({
+  // Search control - Material 3 Expressive (places + coordinates + plus codes)
+  function extractPlusCode(query) {
+    const match = query.match(/([23456789CFGHJMPQRVWXcfghjmpqrvwx]+\+[23456789CFGHJMPQRVWXcfghjmpqrvwx]+)/);
+    return match ? { code: match[1].toUpperCase(), raw: match[1] } : null;
+  }
+
+  function geocodeLocality(locality) {
+    const parts = locality.split(',').map(p => p.trim()).filter(Boolean);
+    const candidates = [locality];
+    for (let i = 1; i < parts.length; i++) {
+      candidates.push(parts.slice(i).join(', '));
+    }
+    return new Promise((resolve) => {
+      const tryGeocode = (idx) => {
+        if (idx >= candidates.length) {
+          geocodeXYZ(locality).then(fb => resolve(fb && fb.length ? fb[0].center : null));
+          return;
+        }
+        const q = candidates[idx];
+        L.Control.Geocoder.nominatim({
+          serviceUrl: 'https://nominatim.openstreetmap.org/',
+          params: { countrycodes: 'hn', limit: 1 }
+        }).geocode(q, (results) => {
+          if (results && results.length && results[0].center) {
+            resolve(results[0].center);
+          } else {
+            tryGeocode(idx + 1);
+          }
+        });
+      };
+      tryGeocode(0);
+    });
+  }
+
+  async function plusCodeResult(query) {
+    if (typeof OpenLocationCode === 'undefined') return null;
+    const pc = extractPlusCode(query);
+    if (!pc) return null;
+    try {
+      let full;
+      if (OpenLocationCode.isShort(pc.code)) {
+        const locality = query.replace(pc.raw, '').replace(/^[\s,.\-]+|[\s,.\-]+$/g, '').trim();
+        let ref = null;
+        if (locality) ref = await geocodeLocality(locality);
+        if (!ref) {
+          const c = mapInstance.getCenter();
+          ref = c;
+        }
+        full = OpenLocationCode.recoverNearest(pc.code, ref.lat, ref.lng);
+      } else {
+        full = pc.code;
+      }
+      if (!OpenLocationCode.isFull(full)) return null;
+      const d = OpenLocationCode.decode(full);
+      const center = L.latLng(d.latitudeCenter, d.longitudeCenter);
+      const bbox = L.latLngBounds(
+        L.latLng(d.latitudeLo, d.longitudeLo),
+        L.latLng(d.latitudeHi, d.longitudeHi)
+      );
+      return { name: 'Plus Code: ' + pc.code, center: center, bbox: bbox };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Fallback geocoder (geocode.xyz) - finds places OSM/Nominatim doesn't have
+  const geoCache = new Map();
+  function geocodeXYZ(query) {
+    if (geoCache.has(query)) return Promise.resolve(geoCache.get(query));
+    return fetch('https://geocode.xyz/' + encodeURIComponent(query) + '?json=1')
+      .then(r => r.json())
+      .then(data => {
+        const lat = parseFloat(data?.latt);
+        const lng = parseFloat(data?.longt);
+        let results = [];
+        if (data && !data.error && Number.isFinite(lat) && Number.isFinite(lng)) {
+          const std = data.standard || {};
+          const name = [std.city, std.prov, std.countryname].filter(Boolean).join(', ') || query;
+          const center = L.latLng(lat, lng);
+          results = [{ name, center, bbox: center.toBounds(20000) }];
+        }
+        geoCache.set(query, results);
+        return results;
+      })
+      .catch(() => {
+        geoCache.set(query, []);
+        return [];
+      });
+  }
+
+  const searchGeocoder = L.Control.Geocoder.latLng({
+    next: L.Control.Geocoder.nominatim({
       serviceUrl: 'https://nominatim.openstreetmap.org/',
       params: {
         countrycodes: 'hn',
         limit: 8
       }
     })
+  });
+
+  function searchFor(query, cb, ctx, allowFallback) {
+    const q = query.trim().toLowerCase();
+    const local = loadSavedPoints()
+      .filter(p => p.name && p.name.toLowerCase().includes(q))
+      .map(p => ({
+        name: p.name,
+        center: L.latLng(p.lat, p.lng),
+        bbox: L.latLng(p.lat, p.lng).toBounds(500),
+        _savedPoint: p
+      }));
+    if (local.length) {
+      cb.call(ctx, local);
+      return;
+    }
+    const center = L.Control.Geocoder.parseLatLng(query);
+    if (center) {
+      cb.call(ctx, [{ name: query, center: center, bbox: center.toBounds(10000) }]);
+      return;
+    }
+    if (extractPlusCode(query)) {
+      plusCodeResult(query).then(res => {
+        if (res) {
+          cb.call(ctx, [res]);
+        } else {
+          runNominatim(query, cb, ctx, allowFallback);
+        }
+      });
+      return;
+    }
+    runNominatim(query, cb, ctx, allowFallback);
+  }
+
+  function runNominatim(query, cb, ctx, allowFallback) {
+    searchGeocoder.options.next.geocode(query, (results) => {
+      if (results && results.length) {
+        cb.call(ctx, results);
+      } else if (allowFallback) {
+        geocodeXYZ(query).then(fb => cb.call(ctx, fb && fb.length ? fb : []));
+      } else {
+        cb.call(ctx, []);
+      }
+    }, ctx);
+  }
+
+  searchGeocoder.geocode = function(query, cb, ctx) { searchFor(query, cb, ctx, true); };
+  searchGeocoder.suggest = function(query, cb, ctx) { searchFor(query, cb, ctx, false); };
+
+  const geocoder = L.Control.geocoder({
+    defaultMarkGeocode: false,
+    collapsed: false,
+    position: 'topleft',
+    placeholder: 'Buscar lugar, ciudad, coordenadas o plus code...',
+    errorMessage: 'No se encontró el lugar. Intenta con un plus code de Google Maps (ej. 3RPC+5C)',
+    suggestTimeout: 250,
+    queryMinLength: 2,
+    geocoder: searchGeocoder
   }).addTo(mapInstance);
 
   // Customize the geocoder icon to use Material Icons and Spanish
@@ -374,52 +698,86 @@ function initMap() {
       iconEl.innerHTML = '<span class="material-icons" style="font-size:22px;color:#444;line-height:48px;">search</span>';
       iconEl.title = 'Buscar lugar';
     }
-    const geocoderInput = document.querySelector('.leaflet-control-geocoder-form input');
-    if (geocoderInput) {
-      geocoderInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-          const value = this.value.trim();
-          const coordMatch = value.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
-          if (coordMatch) {
-            const lat = parseFloat(coordMatch[1]);
-            const lng = parseFloat(coordMatch[2]);
-            if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-              mapInstance.setView([lat, lng], 15);
-              L.marker([lat, lng]).addTo(mapInstance)
-                .bindPopup(`Coordenadas: ${lat.toFixed(6)}, ${lng.toFixed(6)}`)
-                .openPopup();
-              e.preventDefault();
-              return;
-            }
-          }
-        }
-      });
-      geocoderInput.addEventListener('focus', function() {
-        document.querySelector('.leaflet-control-geocoder')?.classList.add('leaflet-control-geocoder-expanded');
-      });
-      geocoderInput.addEventListener('blur', function() {
-        if (!this.value) {
-          document.querySelector('.leaflet-control-geocoder')?.classList.remove('leaflet-control-geocoder-expanded');
-        }
-      });
-    }
   }, 500);
 
+  let tempMarker = null;
   geocoder.on('markgeocode', function(e) {
-    const bbox = e.geocode.bbox;
-    const poly = L.polygon([
-      bbox.getSouthEast(), bbox.getNorthEast(),
-      bbox.getNorthWest(), bbox.getSouthWest()
-    ]).addTo(mapInstance);
-    mapInstance.fitBounds(poly.getBounds());
-    setTimeout(() => mapInstance.removeLayer(poly), 3000);
+    const gc = e.geocode;
+    const bbox = gc.bbox;
+    if (bbox) {
+      const poly = L.polygon([
+        bbox.getSouthEast(), bbox.getNorthEast(),
+        bbox.getNorthWest(), bbox.getSouthWest()
+      ]).addTo(mapInstance);
+      mapInstance.fitBounds(poly.getBounds());
+      setTimeout(() => mapInstance.removeLayer(poly), 3000);
+    }
+
+    if (tempMarker) mapInstance.removeLayer(tempMarker);
+    const icon = L.divIcon({
+      className: 'mapa-saved-icon',
+      html: '<span class="material-icons" style="font-size:20px;color:#ffffff;line-height:36px;">place</span>',
+      iconSize: [36, 36],
+      iconAnchor: [18, 36]
+    });
+    tempMarker = L.marker(gc.center, { icon }).addTo(mapInstance);
+
+    if (gc._savedPoint) {
+      return;
+    }
+
+    const defaultName = gc.name || ('Punto ' + (gc.center ? gc.center.lat.toFixed(5) + ', ' + gc.center.lng.toFixed(5) : ''));
+    tempMarker.on('click', () => {
+      showSaveBar(defaultName, (nombre) => {
+        const pts = loadSavedPoints();
+        pts.push({ name: nombre, lat: gc.center.lat, lng: gc.center.lng });
+        localStorage.setItem(puntosKey, JSON.stringify(pts));
+        addSavedMarker({ name: nombre, lat: gc.center.lat, lng: gc.center.lng });
+        if (tempMarker) { mapInstance.removeLayer(tempMarker); tempMarker = null; }
+      });
+    });
   });
+
+  function showSaveBar(currentName, onSave, onDelete) {
+    let saveBar = document.getElementById('temp-save-bar');
+    const mapWrap = document.getElementById('lote-map-container');
+    if (!saveBar) {
+      saveBar = document.createElement('div');
+      saveBar.id = 'temp-save-bar';
+      saveBar.className = 'temp-save-bar';
+      saveBar.innerHTML = `
+        <input type="text" id="temp-marker-name" placeholder="Nombre del punto">
+        <button id="temp-del-btn" style="display:none;padding:8px 14px;border:none;border-radius:10px;background:#c62828;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Work Sans',sans-serif;white-space:nowrap;">Eliminar</button>
+        <button id="temp-save-btn">Guardar</button>
+      `;
+      if (mapWrap) mapWrap.appendChild(saveBar);
+      saveBar.querySelector('#temp-save-btn').addEventListener('click', () => {
+        const input = saveBar.querySelector('#temp-marker-name');
+        const nombre = (input && input.value.trim()) || 'Punto';
+        if (typeof saveBar._onSave === 'function') saveBar._onSave(nombre);
+        saveBar.style.display = 'none';
+      });
+      saveBar.querySelector('#temp-del-btn').addEventListener('click', () => {
+        if (typeof saveBar._onDelete === 'function') saveBar._onDelete();
+        saveBar.style.display = 'none';
+      });
+    }
+    const input = saveBar.querySelector('#temp-marker-name');
+    input.value = currentName;
+    saveBar._onSave = onSave;
+    saveBar._onDelete = onDelete || null;
+    const delBtn = saveBar.querySelector('#temp-del-btn');
+    delBtn.style.display = onDelete ? 'inline-block' : 'none';
+    saveBar.style.display = 'flex';
+    input.focus();
+    input.select();
+  }
 
   // Attribution in Google Earth style
   L.control.attribution({
     position: 'bottomleft',
     prefix: false
-  }).addTo(mapInstance);
+  }).addTo(mapInstance).addAttribution('Geocoding &copy; Geocode.XYZ');
 
   // FeatureGroup for drawn items
   drawnItems = new L.FeatureGroup();
@@ -428,6 +786,70 @@ function initMap() {
   // Existing lotes layer
   existingLotesLayer = new L.FeatureGroup();
   mapInstance.addLayer(existingLotesLayer);
+
+  // ── Puntos guardados (persistentes por empresa) ──
+  const puntosKey = 'finca_puntos_guardados_' + (window._currentEmpresaId || 'default');
+
+  function loadSavedPoints() {
+    try {
+      return JSON.parse(localStorage.getItem(puntosKey)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function renameSavedPoint(lat, lng, name) {
+    const pts = loadSavedPoints();
+    const p = pts.find(x => x.lat === lat && x.lng === lng);
+    if (p) {
+      p.name = name;
+      localStorage.setItem(puntosKey, JSON.stringify(pts));
+    }
+  }
+
+  function removeSavedPoint(lat, lng) {
+    const pts = loadSavedPoints();
+    const idx = pts.findIndex(x => x.lat === lat && x.lng === lng);
+    if (idx >= 0) pts.splice(idx, 1);
+    localStorage.setItem(puntosKey, JSON.stringify(pts));
+  }
+
+  const savedPointsGroup = L.featureGroup().addTo(mapInstance);
+
+  function savedMarkerIcon(p) {
+    return L.divIcon({
+      className: 'mapa-saved-icon-wrap',
+      html: `
+        <div class="mapa-saved-icon">
+          <span class="material-icons" style="font-size:20px;color:#ffffff;line-height:36px;">place</span>
+        </div>
+        <div class="mapa-saved-label">${p.name || 'Punto'}</div>
+      `,
+      iconSize: [190, 44],
+      iconAnchor: [18, 44]
+    });
+  }
+
+  function addSavedMarker(p) {
+    const m = L.marker([p.lat, p.lng], { icon: savedMarkerIcon(p) }).addTo(savedPointsGroup);
+    m.on('click', () => {
+      showSaveBar(p.name || 'Punto', (nombre) => {
+        renameSavedPoint(p.lat, p.lng, nombre);
+        p.name = nombre;
+        m.setIcon(savedMarkerIcon(p));
+      }, () => {
+        removeSavedPoint(p.lat, p.lng);
+        savedPointsGroup.removeLayer(m);
+      });
+    });
+  }
+
+  loadSavedPoints().forEach(p => addSavedMarker(p));
+
+  const savedPts = loadSavedPoints();
+  if (savedPts.length) {
+    mapInstance.setView([savedPts[0].lat, savedPts[0].lng], 16);
+  }
 
   // ── Spanish localization for Leaflet.draw ──
   if (L.drawLocal) {
@@ -652,35 +1074,20 @@ function initMap() {
     
     lotes.forEach(lote => {
       if (lote.coordenadas_json) {
-        const { coordinates } = parseCoordenadasJson(lote.coordenadas_json);
+        const { coordinates, color } = parseCoordenadasJson(lote.coordenadas_json);
         const latlngs = coordinates.map(c => [c.lat, c.lng]);
+        const loteColor = color || '#2d3e2c';
         
-        // Main polygon (fill only)
-        L.polygon(latlngs, {
-          color: '#2d3e2c',
-          fillColor: '#2d3e2c',
-          fillOpacity: 0.08,
-          weight: 0
+        // Polygon with solid fill and border
+        const poly = L.polygon(latlngs, {
+          color: loteColor,
+          fillColor: loteColor,
+          fillOpacity: 0.5,
+          weight: 2,
+          opacity: 0.9
         }).addTo(existingLotesLayer);
         
-        // Dashed border overlay for distinction
-        const borderPoly = L.polygon(latlngs, {
-          color: '#2d3e2c',
-          fillColor: 'transparent',
-          fillOpacity: 0,
-          weight: 3,
-          dashArray: '8, 6',
-          lineCap: 'round',
-          lineJoin: 'round',
-          opacity: 0.8
-        }).addTo(existingLotesLayer);
-        
-        borderPoly.bindPopup(`
-          <div style="font-family: 'Work Sans', sans-serif; padding: 8px;">
-            <h4 style="margin: 0 0 4px 0; color: #2d3e2c; font-size: 14px;">${lote.nombre}</h4>
-            <p style="margin: 0; font-size: 12px; color: #666;">${lote.area_ha} hectáreas</p>
-          </div>
-        `);
+        poly.bindPopup(buildExistingLotePopupHtml(lote));
       }
     });
   });
@@ -768,6 +1175,8 @@ function initMap() {
         btnLayers.style.color = '#e65100';
         if (layersLabel) layersLabel.textContent = 'Satélite';
       }
+      if (existingLotesLayer) existingLotesLayer.bringToFront();
+      if (drawnItems) drawnItems.bringToFront();
     });
   }
 
@@ -1654,33 +2063,17 @@ export async function setupNuevoLoteListeners() {
         loadExistingLotes().then(lotes => {
           lotes.forEach(lote => {
             if (lote.coordenadas_json) {
-              const { coordinates } = parseCoordenadasJson(lote.coordenadas_json);
+              const { coordinates, color } = parseCoordenadasJson(lote.coordenadas_json);
               const latlngs = coordinates.map(c => [c.lat, c.lng]);
+              const loteColor = color || '#2d3e2c';
               
               L.polygon(latlngs, {
-                color: '#2d3e2c',
-                fillColor: '#2d3e2c',
-                fillOpacity: 0.08,
-                weight: 0
-              }).addTo(existingLotesLayer);
-              
-              const borderPoly = L.polygon(latlngs, {
-                color: '#2d3e2c',
-                fillColor: 'transparent',
-                fillOpacity: 0,
-                weight: 3,
-                dashArray: '8, 6',
-                lineCap: 'round',
-                lineJoin: 'round',
-                opacity: 0.8
-              }).addTo(existingLotesLayer);
-              
-              borderPoly.bindPopup(`
-                <div style="font-family: 'Work Sans', sans-serif; padding: 8px;">
-                  <h4 style="margin: 0 0 4px 0; color: #2d3e2c; font-size: 14px;">${lote.nombre}</h4>
-                  <p style="margin: 0; font-size: 12px; color: #666;">${lote.area_ha} hectáreas</p>
-                </div>
-              `);
+                color: loteColor,
+                fillColor: loteColor,
+                fillOpacity: 0.5,
+                weight: 2,
+                opacity: 0.9
+              }).addTo(existingLotesLayer).bindPopup(buildExistingLotePopupHtml(lote));
             }
           });
         });

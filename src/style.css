@@ -1180,3 +1180,90 @@ body.screen-auth #app .main-content {
   display: inline-block;
   vertical-align: middle;
 }
+
+.mapa-saved-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.temp-save-bar {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  font-family: 'Work Sans', sans-serif;
+  max-width: calc(100% - 40px);
+  box-sizing: border-box;
+}
+
+.temp-save-bar input {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.temp-save-bar button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #2d3e2c;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: 'Work Sans', sans-serif;
+  white-space: nowrap;
+}
+
+.mapa-saved-icon-wrap .mapa-saved-icon {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.mapa-saved-label {
+  background: #2d3e2c;
+  color: #fff;
+  font-family: 'Work Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  margin-left: 6px;
+  border-radius: 20px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapa-saved-icon {
+  background: #2d3e2c;
+  border-radius: 50% 50% 50% 0;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  text-align: center;
+  transform: rotate(-45deg);
+}
+
+.mapa-saved-icon span {
+  transform: rotate(45deg);
+}

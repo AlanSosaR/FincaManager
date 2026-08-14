@@ -5,6 +5,31 @@ export function closeModal() {
   if (mc) mc.classList.remove('active');
 }
 
+export function showNamePrompt(title, defaultValue, onSave) {
+  showModal(title, `
+    <input type="text" id="name-prompt-input" value="${(defaultValue || '').replace(/"/g, '&quot;')}" placeholder="Nombre del marcador" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--m3-outline-variant);background:var(--m3-surface-container-low);font-family:'Work Sans',sans-serif;font-size:14px;color:var(--m3-on-surface);margin-bottom:16px;box-sizing:border-box;" autofocus>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn-outline" id="cancel-modal">Cancelar</button>
+      <button type="button" class="btn-primary" id="confirm-name-prompt">Guardar</button>
+    </div>
+  `);
+  const input = document.getElementById('name-prompt-input');
+  if (input) {
+    input.focus();
+    input.select();
+    const confirmBtn = document.getElementById('confirm-name-prompt');
+    if (confirmBtn) confirmBtn.addEventListener('click', () => {
+      const val = (input.value || '').trim();
+      if (!val) { input.focus(); return; }
+      closeModal();
+      if (onSave) onSave(val);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirmBtn && confirmBtn.click();
+    });
+  }
+}
+
 export function showModal(titleOrType, contentHTMLOrOnSave) {
   const modalContainer = document.getElementById('modal-container');
   const modalBody = document.getElementById('modal-body');

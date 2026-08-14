@@ -1,4 +1,6 @@
 import { supabase } from '../supabase.js';
+import { showNamePrompt } from '../modals.js';
+import { loadPuntoReferencia } from '../auth.js';
 
 function parseCoordenadasJson(json) {
   try {
@@ -199,6 +201,9 @@ export async function renderMapaLotes() {
       }
       @media (max-width: 600px) {
         .mapa-chip { padding: 8px 12px; font-size: 12px; }
+        .leaflet-control-geocoder.leaflet-control-geocoder-expanded {
+          width: calc(100vw - 80px) !important;
+        }
       }
     </style>
     <div class="mapa-page">
@@ -262,21 +267,36 @@ export async function initMapaLotes() {
     zoomControl: false,
     attributionControl: false
   });
+  // Si hay lotes con polígono, se ajusta la vista a ellos; si no, centra en el punto de referencia de la finca
+  setTimeout(async () => {
+    if (allBounds.length > 0) {
+      const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
+      map.fitBounds(group.getBounds().pad(0.1));
+    } else {
+      const ref = await loadPuntoReferencia(window._currentEmpresaId).catch(() => null);
+      if (ref) {
+        map.setView([ref.lat, ref.lng], 15);
+      }
+    }
+  }, 50);
+  L.control.attribution({
+    position: 'bottomleft',
+    prefix: false
+  }).addTo(map).addAttribution('Geocoding &copy; Geocode.XYZ');
   const layersBtnEl = document.getElementById('mapa-layers-btn');
   layersBtnEl.style.background = '#2d3e2c';
   layersBtnEl.style.color = '#ffffff';
 
   const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; OpenStreetMap, CARTO',
+    subdomains: 'abcd',
     maxZoom: 19,
-    maxNativeZoom: 18,
-    subdomains: 'abcd'
+    maxNativeZoom: 18
   });
 
   const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
-    maxZoom: 19,
-    maxNativeZoom: 18
+    maxZoom: 19
   }).addTo(map);
 
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
@@ -343,6 +363,235 @@ export async function initMapaLotes() {
     }
   });
 
+  // Search control - Material 3 Expressive (places + coordinates + plus codes)
+  function extractPlusCode(query) {
+    const match = query.match(/([23456789CFGHJMPQRVWXcfghjmpqrvwx]+\+[23456789CFGHJMPQRVWXcfghjmpqrvwx]+)/);
+    return match ? { code: match[1].toUpperCase(), raw: match[1] } : null;
+  }
+
+  function geocodeLocality(locality) {
+    const parts = locality.split(',').map(p => p.trim()).filter(Boolean);
+    const candidates = [locality];
+    for (let i = 1; i < parts.length; i++) {
+      candidates.push(parts.slice(i).join(', '));
+    }
+    return new Promise((resolve) => {
+      const tryGeocode = (idx) => {
+        if (idx >= candidates.length) {
+          geocodeXYZ(locality).then(fb => resolve(fb && fb.length ? fb[0].center : null));
+          return;
+        }
+        const q = candidates[idx];
+        L.Control.Geocoder.nominatim({
+          serviceUrl: 'https://nominatim.openstreetmap.org/',
+          params: { countrycodes: 'hn', limit: 1 }
+        }).geocode(q, (results) => {
+          if (results && results.length && results[0].center) {
+            resolve(results[0].center);
+          } else {
+            tryGeocode(idx + 1);
+          }
+        });
+      };
+      tryGeocode(0);
+    });
+  }
+
+  async function plusCodeResult(query) {
+    if (typeof OpenLocationCode === 'undefined') return null;
+    const pc = extractPlusCode(query);
+    if (!pc) return null;
+    try {
+      let full;
+      if (OpenLocationCode.isShort(pc.code)) {
+        const locality = query.replace(pc.raw, '').replace(/^[\s,.\-]+|[\s,.\-]+$/g, '').trim();
+        let ref = null;
+        if (locality) ref = await geocodeLocality(locality);
+        if (!ref) {
+          const c = map.getCenter();
+          ref = c;
+        }
+        full = OpenLocationCode.recoverNearest(pc.code, ref.lat, ref.lng);
+      } else {
+        full = pc.code;
+      }
+      if (!OpenLocationCode.isFull(full)) return null;
+      const d = OpenLocationCode.decode(full);
+      const center = L.latLng(d.latitudeCenter, d.longitudeCenter);
+      const bbox = L.latLngBounds(
+        L.latLng(d.latitudeLo, d.longitudeLo),
+        L.latLng(d.latitudeHi, d.longitudeHi)
+      );
+      return { name: 'Plus Code: ' + pc.code, center: center, bbox: bbox };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Fallback geocoder (geocode.xyz) - finds places OSM/Nominatim doesn't have
+  const geoCache = new Map();
+  function geocodeXYZ(query) {
+    if (geoCache.has(query)) return Promise.resolve(geoCache.get(query));
+    return fetch('https://geocode.xyz/' + encodeURIComponent(query) + '?json=1')
+      .then(r => r.json())
+      .then(data => {
+        const lat = parseFloat(data?.latt);
+        const lng = parseFloat(data?.longt);
+        let results = [];
+        if (data && !data.error && Number.isFinite(lat) && Number.isFinite(lng)) {
+          const std = data.standard || {};
+          const name = [std.city, std.prov, std.countryname].filter(Boolean).join(', ') || query;
+          const center = L.latLng(lat, lng);
+          results = [{ name, center, bbox: center.toBounds(20000) }];
+        }
+        geoCache.set(query, results);
+        return results;
+      })
+      .catch(() => {
+        geoCache.set(query, []);
+        return [];
+      });
+  }
+
+  const searchGeocoder = L.Control.Geocoder.latLng({
+    next: L.Control.Geocoder.nominatim({
+      serviceUrl: 'https://nominatim.openstreetmap.org/',
+      params: {
+        countrycodes: 'hn',
+        limit: 8
+      }
+    })
+  });
+
+  function searchFor(query, cb, ctx, allowFallback) {
+    const q = query.trim().toLowerCase();
+    const local = loadSavedPoints()
+      .filter(p => p.name && p.name.toLowerCase().includes(q))
+      .map(p => ({
+        name: p.name,
+        center: L.latLng(p.lat, p.lng),
+        bbox: L.latLng(p.lat, p.lng).toBounds(500),
+        _savedPoint: p
+      }));
+    if (local.length) {
+      cb.call(ctx, local);
+      return;
+    }
+    const center = L.Control.Geocoder.parseLatLng(query);
+    if (center) {
+      cb.call(ctx, [{ name: query, center: center, bbox: center.toBounds(10000) }]);
+      return;
+    }
+    if (extractPlusCode(query)) {
+      plusCodeResult(query).then(res => {
+        if (res) {
+          cb.call(ctx, [res]);
+        } else {
+          runNominatim(query, cb, ctx, allowFallback);
+        }
+      });
+      return;
+    }
+    runNominatim(query, cb, ctx, allowFallback);
+  }
+
+  function runNominatim(query, cb, ctx, allowFallback) {
+    searchGeocoder.options.next.geocode(query, (results) => {
+      if (results && results.length) {
+        cb.call(ctx, results);
+      } else if (allowFallback) {
+        geocodeXYZ(query).then(fb => cb.call(ctx, fb && fb.length ? fb : []));
+      } else {
+        cb.call(ctx, []);
+      }
+    }, ctx);
+  }
+
+  searchGeocoder.geocode = function(query, cb, ctx) { searchFor(query, cb, ctx, true); };
+  searchGeocoder.suggest = function(query, cb, ctx) { searchFor(query, cb, ctx, false); };
+
+  const geocoder = L.Control.geocoder({
+    defaultMarkGeocode: false,
+    collapsed: false,
+    position: 'topleft',
+    placeholder: 'Buscar lugar, ciudad, coordenadas o plus code...',
+    errorMessage: 'No se encontró el lugar. Intenta con un plus code de Google Maps (ej. 3RPC+5C)',
+    suggestTimeout: 250,
+    queryMinLength: 2,
+    geocoder: searchGeocoder
+  }).addTo(map);
+
+  setTimeout(() => {
+    const iconEl = document.querySelector('.leaflet-control-geocoder-icon');
+    if (iconEl) {
+      iconEl.innerHTML = '<span class="material-icons" style="font-size:22px;color:#444;line-height:48px;">search</span>';
+      iconEl.title = 'Buscar lugar';
+    }
+  }, 500);
+
+  let tempMarker = null;
+  geocoder.on('markgeocode', function(e) {
+    const gc = e.geocode;
+    const bbox = gc.bbox;
+    if (bbox) map.fitBounds(bbox, { padding: [40, 40] });
+
+    if (gc._savedPoint) {
+      return;
+    }
+
+    if (tempMarker) map.removeLayer(tempMarker);
+    const icon = L.divIcon({
+      className: 'mapa-saved-icon',
+      html: '<span class="material-icons" style="font-size:20px;color:#ffffff;line-height:36px;">place</span>',
+      iconSize: [36, 36],
+      iconAnchor: [18, 36]
+    });
+    tempMarker = L.marker(gc.center, { icon }).addTo(map);
+
+    const defaultName = gc.name || ('Punto ' + (gc.center ? gc.center.lat.toFixed(5) + ', ' + gc.center.lng.toFixed(5) : ''));
+    tempMarker.on('click', () => {
+      showSaveBar(defaultName, (nombre) => {
+        saveSavedPoint({ name: nombre, lat: gc.center.lat, lng: gc.center.lng });
+        addSavedMarker({ name: nombre, lat: gc.center.lat, lng: gc.center.lng });
+        if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+      });
+    });
+  });
+
+  function showSaveBar(currentName, onSave, onDelete) {
+    let saveBar = document.getElementById('temp-save-bar');
+    if (!saveBar) {
+      saveBar = document.createElement('div');
+      saveBar.id = 'temp-save-bar';
+      saveBar.className = 'temp-save-bar';
+      saveBar.innerHTML = `
+        <input type="text" id="temp-marker-name" placeholder="Nombre del punto">
+        <button id="temp-del-btn" style="display:none;padding:8px 14px;border:none;border-radius:10px;background:#c62828;color:#fff;font-weight:700;font-size:12px;cursor:pointer;font-family:'Work Sans',sans-serif;white-space:nowrap;">Eliminar</button>
+        <button id="temp-save-btn">Guardar</button>
+      `;
+      container.appendChild(saveBar);
+      saveBar.querySelector('#temp-save-btn').addEventListener('click', () => {
+        const input = saveBar.querySelector('#temp-marker-name');
+        const nombre = (input && input.value.trim()) || 'Punto';
+        if (typeof saveBar._onSave === 'function') saveBar._onSave(nombre);
+        saveBar.style.display = 'none';
+      });
+      saveBar.querySelector('#temp-del-btn').addEventListener('click', () => {
+        if (typeof saveBar._onDelete === 'function') saveBar._onDelete();
+        saveBar.style.display = 'none';
+      });
+    }
+    const input = saveBar.querySelector('#temp-marker-name');
+    input.value = currentName;
+    saveBar._onSave = onSave;
+    saveBar._onDelete = onDelete || null;
+    const delBtn = saveBar.querySelector('#temp-del-btn');
+    delBtn.style.display = onDelete ? 'inline-block' : 'none';
+    saveBar.style.display = 'flex';
+    input.focus();
+    input.select();
+  }
+
   // Draw all parcels
   const allBounds = [];
   withCoords.forEach(lote => {
@@ -368,6 +617,75 @@ export async function initMapaLotes() {
       map.fitBounds(group.getBounds().pad(0.1));
     }
   };
+
+  // ── Puntos guardados (persistentes por empresa) ──
+  const puntosKey = 'finca_puntos_guardados_' + (window._currentEmpresaId || 'default');
+
+  function loadSavedPoints() {
+    try {
+      return JSON.parse(localStorage.getItem(puntosKey)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveSavedPoint(p) {
+    const pts = loadSavedPoints();
+    pts.push(p);
+    localStorage.setItem(puntosKey, JSON.stringify(pts));
+  }
+
+  function findSavedPoint(lat, lng) {
+    return loadSavedPoints().findIndex(x => x.lat === lat && x.lng === lng);
+  }
+
+  function removeSavedPoint(lat, lng) {
+    const pts = loadSavedPoints();
+    const idx = pts.findIndex(x => x.lat === lat && x.lng === lng);
+    if (idx >= 0) pts.splice(idx, 1);
+    localStorage.setItem(puntosKey, JSON.stringify(pts));
+  }
+
+  function renameSavedPoint(lat, lng, name) {
+    const pts = loadSavedPoints();
+    const p = pts.find(x => x.lat === lat && x.lng === lng);
+    if (p) {
+      p.name = name;
+      localStorage.setItem(puntosKey, JSON.stringify(pts));
+    }
+  }
+
+  const savedPointsGroup = L.featureGroup().addTo(map);
+
+  function savedMarkerIcon(p) {
+    return L.divIcon({
+      className: 'mapa-saved-icon-wrap',
+      html: `
+        <div class="mapa-saved-icon">
+          <span class="material-icons" style="font-size:20px;color:#ffffff;line-height:36px;">place</span>
+        </div>
+        <div class="mapa-saved-label">${p.name || 'Punto'}</div>
+      `,
+      iconSize: [190, 44],
+      iconAnchor: [18, 44]
+    });
+  }
+
+  function addSavedMarker(p) {
+    const m = L.marker([p.lat, p.lng], { icon: savedMarkerIcon(p) }).addTo(savedPointsGroup);
+    m.on('click', () => {
+      showSaveBar(p.name || 'Punto', (nombre) => {
+        renameSavedPoint(p.lat, p.lng, nombre);
+        p.name = nombre;
+        m.setIcon(savedMarkerIcon(p));
+      }, () => {
+        removeSavedPoint(p.lat, p.lng);
+        savedPointsGroup.removeLayer(m);
+      });
+    });
+  }
+
+  loadSavedPoints().forEach(p => addSavedMarker(p));
 
   setTimeout(() => { map.invalidateSize(); fitToParcels(); }, 250);
   setTimeout(() => { map.invalidateSize(); fitToParcels(); }, 600);
