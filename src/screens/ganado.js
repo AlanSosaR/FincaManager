@@ -127,7 +127,7 @@ export async function renderGanado(page = 1, filter = 'all') {
   const machosRatio  = totalAnimales ? Math.round((machosCount  / totalAnimales) * 100) : 0;
 
   return `
-    <div class="screen-ganado" style="padding-bottom: 40px;">
+    <div class="screen-ganado" style="padding-bottom: 80px;">
       <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 8px;">
         <div class="ganado-split-ctrl ${currentSearchQuery ? 'expanded' : ''}" id="ganado-search-wrapper">
           <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">

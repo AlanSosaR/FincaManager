@@ -4048,6 +4048,7 @@ input:focus, textarea:focus, select:focus {
 @media (max-width: 600px) {
   .da-screen {
     padding: 8px !important;
+    padding-bottom: 24px !important;
     gap: 12px !important;
   }
   .da-hero {

@@ -107,6 +107,7 @@ body {
 #app {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
 }
 
@@ -347,6 +348,7 @@ body.screen-auth #app .main-content {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   position: relative;
   background: var(--background);

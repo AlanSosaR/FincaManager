@@ -59,6 +59,10 @@ export async function renderDetalleLote(id) {
           overflow: hidden;
           text-overflow: ellipsis;
         }
+        #dl-map-container,
+        #dl-map-container .leaflet-container {
+          touch-action: pan-y !important;
+        }
       </style>
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dl-screen-pad">
         <!-- Header -->
