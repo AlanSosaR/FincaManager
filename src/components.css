@@ -2127,21 +2127,24 @@ input:focus, textarea:focus, select:focus {
   opacity: 0.7;
 }
 
-.ganado-row-sold {
-  opacity: 0.6;
-}
-
 .ganado-row-sold .ganado-col-value {
-  text-decoration: line-through;
+  text-decoration: none;
 }
 
 .ganado-col-sold-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: #d32f2f;
+  background: #ffcdd2;
+  padding: 2px 8px;
+  border-radius: 999px;
   margin-top: 2px;
+  width: fit-content;
 }
 
 .ganado-col-prenada-tag {
@@ -2157,12 +2160,18 @@ input:focus, textarea:focus, select:focus {
 }
 
 .ganado-sold-label {
-  font-size: 12px;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
   color: #d32f2f;
+  background: #ffcdd2;
   text-transform: uppercase;
   letter-spacing: 1px;
   white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: 999px;
 }
 
 .ganado-days-line {

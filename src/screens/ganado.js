@@ -145,6 +145,9 @@ export async function renderGanado(page = 1, filter = 'all') {
             <button class="ganado-split-item" onclick="window.navigateTo('nuevo_animal'); document.getElementById('ganado-split-menu').classList.remove('open');">
               <span class="material-icons">add</span><span>Registrar animal</span>
             </button>
+            <button class="ganado-split-item" onclick="window.navigateTo('ganado', 1, 'vendido'); document.getElementById('ganado-split-menu').classList.remove('open');">
+              <span class="material-icons">payments</span><span>Animales vendidos</span>
+            </button>
           </div>
         </div>
       </div>
@@ -226,16 +229,6 @@ export async function renderGanado(page = 1, filter = 'all') {
               <span class="ganado-card-label" style="color: #b26a00;">Preñadas</span>
             </div>
             <div class="ganado-card-body"><h3 class="ganado-card-value">${preñadasCount}</h3></div>
-          </div>
-          ` : ''}
-
-          ${vendidosCount > 0 ? `
-          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'vendido' ? 'active' : ''}" data-filter="vendido" style="border-left: 4px solid #d32f2f;">
-            <div class="ganado-card-header">
-              <span class="material-icons" style="font-size:28px; color: #d32f2f;">payments</span>
-              <span class="ganado-card-label" style="color: #d32f2f;">Vendidos</span>
-            </div>
-            <div class="ganado-card-body"><h3 class="ganado-card-value">${vendidosCount}</h3></div>
           </div>
           ` : ''}
         </section>
