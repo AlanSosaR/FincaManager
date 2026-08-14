@@ -341,12 +341,12 @@ function renderFullContent(container, animalId, flag) {
     if (currentAnimal.sexo === 'Hembra') {
         if (activePreg && currentAnimal.reproductivo === 'Preñada') {
             reproBadge = `<div class="da-badge" style="border:1px solid #f0d9a8;background:#fff4e0;color:#b26a00;">
-                <img src="/cow.png" style="width:18px; height:18px; object-fit:contain;">
+                <span class="da-badge-chip amber"><img src="/cow.png"></span>
                 Preñada — Parto: ${new Date(activePreg.fecha_probable_parto + 'T00:00:00').toLocaleDateString()}
             </div>`;
         } else if (currentAnimal.reproductivo === 'Lactando') {
             reproBadge = `<div class="da-badge" style="border:1px solid #d4e8b0;background:#f0f7e6;color:#2d3e2c;">
-                <span class="material-icons">child_care</span>
+                <span class="da-badge-chip green"><span class="material-icons">child_care</span></span>
                 Lactando
             </div>`;
         }
@@ -359,34 +359,95 @@ function renderFullContent(container, animalId, flag) {
             </div>
             <div class="da-hero-info">
                 <div>
-                    <div class="da-hero-subtitle">${currentAnimal.raza || 'Raza no especificada'}</div>
-                    <h2 class="da-hero-title">${currentAnimal.nombre || 'Sin Nombre'}</h2>
+                    <div class="da-hero-name-row">
+                        <h2 class="da-hero-title">${currentAnimal.nombre || 'Sin Nombre'}</h2>
+                        <div class="da-hero-subtitle">${currentAnimal.raza || 'Raza no especificada'}</div>
+                    </div>
                 </div>
                 
                 <div class="da-badge-row">
                     ${currentAnimal.potreros?.nombre ? `
                     <div class="da-badge da-badge-surface">
-                        <span class="material-icons">location_on</span>
+                        <span class="da-badge-chip green"><span class="material-icons">location_on</span></span>
                         Potrero: ${currentAnimal.potreros.nombre}
                     </div>` : ''}
                     <div class="da-badge da-badge-surface">
-                        <span class="material-icons">cake</span>
-                        Acuquisición: ${currentAnimal.fecha_adquisicion ? new Date(currentAnimal.fecha_adquisicion).toLocaleDateString() : 'N/A'}
+                        <span class="da-badge-chip amber"><span class="material-icons">cake</span></span>
+                        Adquisición: ${currentAnimal.fecha_adquisicion ? new Date(currentAnimal.fecha_adquisicion).toLocaleDateString() : 'N/A'}
                     </div>
-                    <div class="da-badge da-badge-surface">
-                        <span class="material-icons">${currentAnimal.sexo === 'Macho' ? 'male' : 'female'}</span>
+                    <div class="da-badge da-badge-surface da-badge-sex">
+                        <span class="da-badge-chip ${currentAnimal.sexo === 'Macho' ? 'blue' : 'pink'}"><span class="ganado-sex-icon-img"></span></span>
                         ${currentAnimal.sexo || 'Sexo N/A'}
                     </div>
                     ${currentAnimal.madre ? `
                     <div class="da-badge da-badge-surface">
-                        <img src="/cria.png" style="width:18px; height:18px; object-fit:contain;">
+                        <span class="da-badge-chip sky"><img src="/cria.png"></span>
                         Hija/o de: ${currentAnimal.madre.nombre}
                     </div>` : ''}
                     ${reproBadge}
                     <div class="da-badge da-badge-surface">
-                        <span class="material-icons">${currentAnimal.origen === 'Comprado' ? 'shopping_cart' : 'eco'}</span>
+                        <span class="da-badge-chip ${currentAnimal.origen === 'Comprado' ? 'red' : 'green'}"><span class="material-icons">${currentAnimal.origen === 'Comprado' ? 'shopping_cart' : 'eco'}</span></span>
                         ${currentAnimal.origen || 'Criollo'}${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
                     </div>
+                </div>
+
+                <div class="da-stat-grid da-stat-grid-inline">
+                    <div class="da-stat-card da-stat-tab active" data-tab="vacunas" style="cursor:pointer;" title="Ver Vacunas y Salud">
+                        <div class="da-stat-icon">
+                            <span class="material-icons">vaccines</span>
+                        </div>
+                        <div>
+                            <div class="da-stat-label">Total Vacunas</div>
+                            <div class="da-stat-value">${vaccines.length}</div>
+                            <div class="da-stat-sub">Aplicadas con éxito</div>
+                        </div>
+                    </div>
+
+                    <div class="da-stat-card da-stat-tab" data-tab="pesajes" style="cursor:pointer;" title="Ver Historial de Pesajes">
+                        <div class="da-stat-icon da-stat-icon-secondary">
+                            <span class="material-icons">monitor_weight</span>
+                        </div>
+                        <div>
+                            <div class="da-stat-label">${weights.length <= 1 ? 'Peso Inicial' : 'Último Pesaje'}</div>
+                            <div class="da-stat-value">${lastWeight} <small class="da-stat-value-md">${currentAnimal.peso_unidad || 'kg'}</small></div>
+                            <div class="da-stat-sub">
+                                <span class="da-variation-pill ${weightTrend}">
+                                    <span class="material-icons">${weightTrend === 'positive' ? 'trending_up' : (weightTrend === 'negative' ? 'trending_down' : 'trending_flat')}</span>
+                                    ${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} ${currentAnimal.peso_unidad || 'kg'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="da-stat-card da-stat-tab" data-tab="fumigacion" style="cursor:pointer;" title="Ver Fumigación y Químicos">
+                        <div class="da-stat-icon" style="background: #e1f5fe; color: #2c666e;">
+                            <span class="material-icons">bug_report</span>
+                        </div>
+                        <div>
+                            <div class="da-stat-label">Fumigaciones</div>
+                            <div class="da-stat-value"><span class="material-icons" style="font-size:22px; vertical-align:middle; color:#2c666e;">check_circle</span> ${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length} <small class="da-stat-value-md">aplicada${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length === 1 ? '' : 's'}</small></div>
+                            <div class="da-stat-sub">
+                                ${(() => {
+                                    const pend = fumigaciones.filter(f => f.estado === 'Programada').length;
+                                    return pend > 0 ? `<span class="da-variation-pill pending">
+                                        <span class="material-icons">schedule</span> ${pend} programada${pend > 1 ? 's' : ''}
+                                    </span>` : '';
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+
+                    ${currentAnimal.sexo === 'Hembra' ? `
+                    <div class="da-stat-card da-stat-tab" data-tab="repro" style="cursor:pointer;" title="Ver Reproducción">
+                        <div class="da-stat-icon" style="background: #fff4e0; color: #b26a00;">
+                            <img src="/cow.png" style="width:26px; height:26px; object-fit:contain;">
+                        </div>
+                        <div>
+                            <div class="da-stat-label">Reproducción</div>
+                            <div class="da-stat-value">${currentAnimal.reproductivo || 'Vacía'}</div>
+                            <div class="da-stat-sub">${activePreg ? `Parto: ${new Date(activePreg.fecha_probable_parto + 'T00:00:00').toLocaleDateString()}` : pregnancies.length + (pregnancies.length === 1 ? ' gestación registrada' : ' gestaciones registradas')}</div>
+                        </div>
+                    </div>` : ''}
                 </div>
 
                 ${isSold ? `
@@ -440,65 +501,6 @@ function renderFullContent(container, animalId, flag) {
                 </div>
                 </div>` : '')}
             </div>
-        </div>
-
-        <div class="da-stat-grid">
-            <div class="da-stat-card da-stat-tab active" data-tab="vacunas" style="cursor:pointer;" title="Ver Vacunas y Salud">
-                <div class="da-stat-icon">
-                    <span class="material-icons">vaccines</span>
-                </div>
-                <div>
-                    <div class="da-stat-label">Total Vacunas</div>
-                    <div class="da-stat-value">${vaccines.length}</div>
-                    <div class="da-stat-sub">Aplicadas con éxito</div>
-                </div>
-            </div>
-
-            <div class="da-stat-card da-stat-tab" data-tab="pesajes" style="cursor:pointer;" title="Ver Historial de Pesajes">
-                <div class="da-stat-icon da-stat-icon-secondary">
-                    <span class="material-icons">monitor_weight</span>
-                </div>
-                <div>
-                    <div class="da-stat-label">${weights.length <= 1 ? 'Peso Inicial' : 'Último Pesaje'}</div>
-                    <div class="da-stat-value">${lastWeight} <small class="da-stat-value-md">${currentAnimal.peso_unidad || 'kg'}</small></div>
-                    <div class="da-stat-sub">
-                        <span class="da-variation-pill ${weightTrend}">
-                            <span class="material-icons">${weightTrend === 'positive' ? 'trending_up' : (weightTrend === 'negative' ? 'trending_down' : 'trending_flat')}</span>
-                            ${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} ${currentAnimal.peso_unidad || 'kg'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="da-stat-card da-stat-tab" data-tab="fumigacion" style="cursor:pointer;" title="Ver Fumigación y Químicos">
-                <div class="da-stat-icon" style="background: #e1f5fe; color: #2c666e;">
-                    <span class="material-icons">bug_report</span>
-                </div>
-                <div>
-                    <div class="da-stat-label">Fumigaciones</div>
-                    <div class="da-stat-value"><span class="material-icons" style="font-size:22px; vertical-align:middle; color:#2c666e;">check_circle</span> ${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length} <small class="da-stat-value-md">aplicada${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length === 1 ? '' : 's'}</small></div>
-                    <div class="da-stat-sub">
-                        ${(() => {
-                            const pend = fumigaciones.filter(f => f.estado === 'Programada').length;
-                            return pend > 0 ? `<span class="da-variation-pill pending">
-                                <span class="material-icons">schedule</span> ${pend} programada${pend > 1 ? 's' : ''}
-                            </span>` : '';
-                        })()}
-                    </div>
-                </div>
-            </div>
-
-            ${currentAnimal.sexo === 'Hembra' ? `
-            <div class="da-stat-card da-stat-tab" data-tab="repro" style="cursor:pointer;" title="Ver Reproducción">
-                <div class="da-stat-icon" style="background: #fff4e0; color: #b26a00;">
-                    <img src="/cow.png" style="width:26px; height:26px; object-fit:contain;">
-                </div>
-                <div>
-                    <div class="da-stat-label">Reproducción</div>
-                    <div class="da-stat-value">${currentAnimal.reproductivo || 'Vacía'}</div>
-                    <div class="da-stat-sub">${activePreg ? `Parto: ${new Date(activePreg.fecha_probable_parto + 'T00:00:00').toLocaleDateString()}` : pregnancies.length + (pregnancies.length === 1 ? ' gestación registrada' : ' gestaciones registradas')}</div>
-                </div>
-            </div>` : ''}
         </div>
 
         <div class="da-tabs-section">

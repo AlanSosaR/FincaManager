@@ -2979,6 +2979,37 @@ input:focus, textarea:focus, select:focus {
   color: #888;
 }
 
+.da-hero-name-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.da-hero-info .da-stat-grid-inline {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.da-hero-info .da-stat-grid-inline .da-stat-card {
+  background: #f6f6f4;
+  padding: 18px 20px;
+  gap: 14px;
+  border-radius: 14px;
+}
+
+.da-hero-info .da-stat-grid-inline .da-stat-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 22px !important;
+  border-radius: 12px;
+}
+
+.da-hero-info .da-stat-grid-inline .da-stat-value {
+  font-size: 22px;
+}
+
 .da-badge-row {
   display: flex;
   gap: 12px;
@@ -2998,6 +3029,36 @@ input:focus, textarea:focus, select:focus {
 .da-badge-surface {
   background: #f5f5f5;
   color: #666;
+}
+
+.da-badge-chip {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.da-badge-chip .material-icons { font-size: 17px; }
+.da-badge-chip img { width: 18px; height: 18px; object-fit: contain; }
+.da-badge-chip.green { background: #d6e8d8; color: #1f7a2e; }
+.da-badge-chip.amber { background: #fde9e0; color: #c04a1f; }
+.da-badge-chip.pink  { background: #f4d9e6; color: #c2528f; }
+.da-badge-chip.blue  { background: #d9e5f1; color: #3e6fa6; }
+.da-badge-chip.sky   { background: #e1f5fe; color: #2c666e; }
+.da-badge-chip.red   { background: #f1dad4; color: #a63d2f; }
+
+.da-badge-chip .ganado-sex-icon-img {
+  width: 18px;
+  height: 18px;
+}
+
+.da-badge-chip.blue .ganado-sex-icon-img {
+  background-color: #3e6fa6;
+  -webkit-mask-image: url('/macho.png');
+  mask-image: url('/macho.png');
 }
 
 .da-hero-actions {
@@ -3857,6 +3918,9 @@ input:focus, textarea:focus, select:focus {
   }
   .da-hero-subtitle {
     text-align: center;
+  }
+  .da-hero-name-row {
+    justify-content: center;
   }
   .da-badge-row, .da-hero-actions {
     justify-content: center;
