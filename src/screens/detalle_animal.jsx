@@ -473,7 +473,7 @@ function renderFullContent(container, animalId, flag) {
                         <span class="material-icons">payments</span>
                         <span class="da-sell-title">Información de Venta</span>
                     </div>
-                    <div class="da-sell-details">
+                    <div class="da-sell-details" id="da-sell-details">
                         <div class="da-sell-row"><span>Precio venta</span><strong>$${currentAnimal.precio_venta || '—'}</strong></div>
                         <div class="da-sell-row"><span>Fecha</span><strong>${currentAnimal.fecha_venta ? new Date(currentAnimal.fecha_venta).toLocaleDateString() : '—'}</strong></div>
                         ${currentAnimal.comprador ? `<div class="da-sell-row"><span>Comprador</span><strong>${currentAnimal.comprador}</strong></div>` : ''}
@@ -481,8 +481,8 @@ function renderFullContent(container, animalId, flag) {
                         ${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? `<div class="da-sell-row"><span>Precio compra</span><strong>$${currentAnimal.precio_compra}</strong></div>` : ''}
                         ${currentAnimal.origen ? `<div class="da-sell-row"><span>Origen</span><strong>${currentAnimal.origen}</strong></div>` : ''}
                     </div>
-                <button class="btn-m3-text" style="margin-top:12px;width:100%;" onclick="window.returnToInventory('${currentAnimal.id}')">
-                    <span class="material-icons" style="font-size:18px;">undo</span> Regresar al inventario
+                <button class="btn-m3-text" style="margin-top:12px;width:100%;" onclick="window.editSale('${currentAnimal.id}')">
+                    <span class="material-icons" style="font-size:18px;">edit</span> Editar precio de venta
                 </button>
                 </div>
                 </div>` : (sellMode ? `
@@ -573,9 +573,9 @@ function renderFullContent(container, animalId, flag) {
                 <div class="da-chart-card">
                     <div class="da-chart-header">
                         <h3>Evolución de Peso</h3>
-                        <button class="btn-m3-tonal" style="padding: 10px 20px;" id="da-add-weight">
+                        ${!isSold ? `<button class="btn-m3-tonal" style="padding: 10px 20px;" id="da-add-weight">
                             <span class="material-icons">add</span> Registrar Pesaje
-                        </button>
+                        </button>` : ''}
                     </div>
                     <div class="da-chart-area">
                         <canvas id="weightChart"></canvas>
@@ -642,6 +642,7 @@ function renderFullContent(container, animalId, flag) {
                         <p style="margin:4px 0 0; color:#777; font-size:14px;">Gestaciones, partos y crías de este animal.</p>
                     </div>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        ${!isSold ? `
                         ${!activePreg ? `
                         <button class="btn-m3-fill" id="da-add-pregnancy">
                             <span class="material-icons">add</span> Registrar preñez
@@ -651,7 +652,7 @@ function renderFullContent(container, animalId, flag) {
                         </button>
                         <button class="btn-m3-tonal" id="da-register-abort" style="background:#ffe2db; color:#ff4103;">
                             <span class="material-icons">block</span> Aborto
-                        </button>`}
+                        </button>`}` : ''}
                     </div>
                 </div>
                 <div id="da-pregnancy-inline"></div>
@@ -767,18 +768,65 @@ function setupEventListeners(animalId, container, sellMode) {
         });
     }
 
-    window.returnToInventory = async (id) => {
-        try {
-            await restFetch('/rest/v1/animal_ventas?animal_id=eq.' + id, { method: 'DELETE' });
-            await restFetch('/rest/v1/ganado?id=eq.' + id, {
-                method: 'PATCH',
-                body: JSON.stringify({ estado: null }),
-            });
-            showSnackbar('Animal regresado al inventario');
+    window.editSale = (id) => {
+        const card = document.querySelector('#da-container .da-sell-card.sold');
+        if (!card) return;
+        const v = currentAnimal;
+        card.innerHTML = `
+            <div class="da-sell-header">
+                <span class="material-icons">payments</span>
+                <span class="da-sell-title">Editar Venta</span>
+            </div>
+            <form id="form-edit-sale" class="da-sell-form-inner" style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+                <div class="m3-field">
+                    <input type="number" step="0.01" name="precio" id="edit-sale-precio" value="${v.precio_venta ?? ''}" placeholder=" " required>
+                    <label>Precio de venta ($)</label>
+                </div>
+                <div class="m3-field">
+                    <input type="date" name="fecha" id="edit-sale-fecha" value="${v.fecha_venta || ''}" placeholder=" ">
+                    <label>Fecha de venta</label>
+                </div>
+                <div class="m3-field">
+                    <input type="text" name="comprador" id="edit-sale-comprador" value="${v.comprador ?? ''}" placeholder=" ">
+                    <label>Comprador</label>
+                </div>
+                <div class="m3-field">
+                    <input type="number" step="0.1" name="peso" id="edit-sale-peso" value="${v.peso_venta ?? ''}" placeholder=" ">
+                    <label>Peso de venta (kg)</label>
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+                    <button type="button" class="btn-m3-text" id="cancel-edit-sale">Cancelar</button>
+                    <button type="submit" class="btn-m3-primary">Guardar</button>
+                </div>
+            </form>
+        `;
+
+        document.getElementById('cancel-edit-sale').addEventListener('click', () => {
             window.location.reload();
-        } catch (err) {
-            showSnackbar(err.message, 'error');
-        }
+        });
+
+        document.getElementById('form-edit-sale').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = {
+                precio_venta: parseFloat(document.getElementById('edit-sale-precio').value),
+            };
+            const fecha = document.getElementById('edit-sale-fecha').value;
+            if (fecha) body.fecha_venta = fecha;
+            const comprador = document.getElementById('edit-sale-comprador').value;
+            body.comprador = comprador ? comprador : null;
+            const peso = document.getElementById('edit-sale-peso').value;
+            body.peso_venta = peso ? parseFloat(peso) : null;
+            try {
+                await restFetch('/rest/v1/animal_ventas?animal_id=eq.' + id, {
+                    method: 'PATCH',
+                    body: JSON.stringify(body),
+                });
+                showSnackbar('Venta actualizada');
+                window.location.reload();
+            } catch (err) {
+                showSnackbar(err.message, 'error');
+            }
+        });
     };
 
     function switchTab(target) {
@@ -1101,7 +1149,7 @@ function showDayDetails(day, dayEvents) {
     const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isFuture = formattedDate > getLocalToday();
     
-    const addBtnHtml = `
+    const addBtnHtml = currentAnimal?.estado === 'Vendido' ? '' : `
         <div style="margin-top: 16px; text-align: center;">
             <select class="da-mobile-tab-select" style="width: auto; min-width: 200px; padding: 10px 36px 10px 16px;" id="da-add-vaccine-specific-date">
                 <option value="">Vacuna...</option>
@@ -1133,7 +1181,7 @@ function showDayDetails(day, dayEvents) {
                     let subtitle = 'Vacunación aplicada';
                     let actionsHtml = '';
 
-                    if (currentEstado === 'Programada') {
+                    if (currentEstado === 'Programada' && currentAnimal?.estado !== 'Vendido') {
                         iconColor = '#f57c00';
                         iconName = 'schedule';
                         subtitle = 'Vacunación programada';
@@ -1462,6 +1510,7 @@ function renderVaccinesTable(allVaccines, page) {
     }
 
     const today = getLocalToday();
+    const isSold = currentAnimal?.estado === 'Vendido';
 
     const rowsHtml = paged.map(v => {
         const isPastOrToday = v.fecha <= today;
@@ -1482,10 +1531,13 @@ function renderVaccinesTable(allVaccines, page) {
                 </span>`;
             estadoHtml = `
                 <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                    ${applyBtn}
-                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e;" onclick="window.editVaccine('${v.id}')">
+                    ${isSold ? `<span class="da-variation-pill pending" style="margin-right: 4px;">
+                        <span class="material-icons">schedule</span>
+                        Programada
+                    </span>` : applyBtn}
+                    ${isSold ? '' : `<button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e;" onclick="window.editVaccine('${v.id}')">
                         <span class="material-icons" style="font-size: 16px;">edit</span>
-                    </button>
+                    </button>`}
                 </div>
             `;
         } else if (currentEstado === 'Cancelada') {
@@ -1641,6 +1693,7 @@ function renderFumigacionesTable(allFumigaciones, page) {
     }
 
     const today = getLocalToday();
+    const isSold = currentAnimal?.estado === 'Vendido';
 
     const rowsHtml = paged.map(f => {
         const isPastOrToday = f.fecha <= today;
@@ -1661,10 +1714,13 @@ function renderFumigacionesTable(allFumigaciones, page) {
                 </span>`;
             estadoHtml = `
                 <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-                    ${applyBtnF}
-                    <button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e;" onclick="window.editFumigacion('${f.id}')">
+                    ${isSold ? `<span class="da-variation-pill pending" style="margin-right: 4px;">
+                        <span class="material-icons">schedule</span>
+                        Programada
+                    </span>` : applyBtnF}
+                    ${isSold ? '' : `<button title="Editar" class="btn-m3-tonal" style="padding: 4px 8px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e;" onclick="window.editFumigacion('${f.id}')">
                         <span class="material-icons" style="font-size: 16px;">edit</span>
-                    </button>
+                    </button>`}
                 </div>
             `;
         } else if (currentEstado === 'Cancelada') {
@@ -1786,7 +1842,7 @@ function showDayDetailsFumig(day, dayEvents) {
     const formattedDate = `${currentYearFumig}-${String(currentMonthFumig + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isFuture = formattedDate > getLocalToday();
     
-    const addBtnHtml = `
+    const addBtnHtml = currentAnimal?.estado === 'Vendido' ? '' : `
         <div style="margin-top: 16px; text-align: center;">
             <select class="da-mobile-tab-select" style="width: auto; min-width: 200px; padding: 10px 36px 10px 16px;" id="da-add-fumigacion-specific-date">
                 <option value="">Aplicación...</option>
@@ -1818,7 +1874,7 @@ function showDayDetailsFumig(day, dayEvents) {
                     let subtitle = 'Fumigación aplicada';
                     let actionsHtml = '';
 
-                    if (currentEstado === 'Programada') {
+                    if (currentEstado === 'Programada' && currentAnimal?.estado !== 'Vendido') {
                         iconColor = '#f57c00';
                         iconName = 'schedule';
                         subtitle = 'Fumigación programada';
