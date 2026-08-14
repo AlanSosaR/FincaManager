@@ -1536,6 +1536,17 @@ input:focus, textarea:focus, select:focus {
   transition: background 0.3s;
 }
 
+@media (max-width: 600px) {
+  .ganado-top-actions-container { width: 100%; }
+  .ganado-split-ctrl { flex-grow: 0; position: relative; padding-right: 49px; transition: flex-grow 0.3s ease; }
+  .ganado-split-ctrl:has(.ganado-split-ctrl-reg) { min-width: 97px; }
+  .ganado-split-ctrl.expanded { flex-grow: 1; }
+  .ganado-split-ctrl .ganado-split-ctrl-reg { position: absolute; right: 0; top: 0; bottom: 0; }
+  .ganado-split-ctrl .ganado-split-ctrl-sep { position: absolute; right: 48px; top: 0; bottom: 0; }
+  input[id$="-search-input"] { flex-grow: 0; flex-basis: 0; min-width: 0; transition: flex-grow 0.3s ease, width 0.3s; }
+  .ganado-split-ctrl.expanded input[id$="-search-input"] { flex-grow: 1; width: auto !important; }
+}
+
 .ganado-split-ctrl .m3-icon-btn-tonal {
   background: transparent;
 }

@@ -406,10 +406,26 @@ export default class QueryBuilder {
         return this._processLocally(localData);
       }
 
-      return await this._executeOnline();
+      const result = await this._executeOnline();
+      this._updateLocalCache(result.data);
+      return result;
     }
 
     return this._processLocally(localData);
+  }
+
+  async _updateLocalCache(data) {
+    if (!data) return;
+    if (this._selectColumns && this._selectColumns !== '*') return;
+    if (this._joins.length > 0) return;
+    const table = db.table(this.tableName);
+    const records = (this._single || this._maybeSingle) ? (data ? [data] : []) : data;
+    if (!records.length) return;
+    try {
+      await table.bulkPut(records);
+    } catch (e) {
+      console.warn(`_updateLocalCache error en ${this.tableName}:`, e);
+    }
   }
 
   async _applyJoin(results, join) {

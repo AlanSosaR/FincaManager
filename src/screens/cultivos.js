@@ -118,7 +118,7 @@ export async function renderCultivos() {
 
       <!-- Search -->
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
-        <div class="ganado-split-ctrl" id="cultivos-search-wrapper">
+        <div class="ganado-split-ctrl ${currentCultivosSearchQuery ? 'expanded' : ''}" id="cultivos-search-wrapper">
           <button id="cultivos-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
             <span class="material-icons" style="color: #ffffff;">search</span>
           </button>
@@ -151,7 +151,6 @@ export async function renderCultivos() {
               <span class="ganado-tally-label">Cultivos activos</span>
               <span class="ganado-tally-count">
                 <span class="ganado-card-value">${activos}</span>
-                <span class="ganado-tally-unit">cultivos</span>
               </span>
             </div>
             <div class="ganado-tally-divider"></div>
@@ -248,6 +247,7 @@ export function initCultivos() {
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';
+        searchWrapper.classList.add('expanded');
         searchInput.focus();
       }
     });
@@ -259,6 +259,7 @@ export function initCultivos() {
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
       searchClear.style.display = 'none';
+      searchWrapper.classList.remove('expanded');
       window.changeCultivosPage(1);
     });
 

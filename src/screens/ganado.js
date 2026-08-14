@@ -129,7 +129,7 @@ export async function renderGanado(page = 1, filter = 'all') {
   return `
     <div class="screen-ganado" style="padding-bottom: 40px;">
       <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 8px;">
-        <div class="ganado-split-ctrl" id="ganado-search-wrapper">
+        <div class="ganado-split-ctrl ${currentSearchQuery ? 'expanded' : ''}" id="ganado-search-wrapper">
           <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
             <span class="material-icons" style="color: #ffffff;">search</span>
           </button>
@@ -159,7 +159,6 @@ export async function renderGanado(page = 1, filter = 'all') {
               <span class="ganado-tally-label">Total Animales</span>
               <span class="ganado-tally-count">
                 <span class="ganado-card-value">${totalAnimales}</span>
-                <span class="ganado-tally-unit">animales</span>
               </span>
             </div>
             <div class="ganado-tally-divider"></div>
@@ -288,7 +287,7 @@ export async function renderGanado(page = 1, filter = 'all') {
 
         <div class="ganado-list-header" style="margin-top: 32px;">
           <h4>${currentFilter === 'all' ? 'Inventario Ganadero' : 'Resultados del Filtro'}</h4>
-          <span class="ganado-count-label" id="ganado-count-label">${totalGanadoCount} ${currentFilter === 'all' ? 'animales registrados' : 'animales encontrados'}</span>
+          ${currentFilter !== 'all' ? `<span class="ganado-count-label" id="ganado-count-label">${totalGanadoCount} animales encontrados</span>` : ''}
         </div>
 
         <div class="ganado-list" id="ganado-list-container">
@@ -828,6 +827,7 @@ export function initGanado() {
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';
+        searchWrapper.classList.add('expanded');
         searchInput.focus();
       }
     });
@@ -839,6 +839,7 @@ export function initGanado() {
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
       searchClear.style.display = 'none';
+      searchWrapper.classList.remove('expanded');
       window.changeGanadoPage(1);
     });
 

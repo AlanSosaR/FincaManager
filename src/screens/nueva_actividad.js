@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { restFetch, restInsert } from '../auth.js';
 import { sendWhatsApp } from '../wa.js';
+import { invalidateCache } from '../sync.js';
 import { getDosisPorEdad, calcularDosis } from '../utils/calculadora_dosis.js';
 import { dibujarVasitoCompacto } from '../utils/vasito_medidor.js';
 
@@ -99,7 +100,6 @@ export async function renderNuevaActividad(loteId, tipo) {
               </select>
               <label>Tipo de equipo usado</label>
             </div>
-          </div>
 
           <!-- 6. Operador / Responsable (Multiple Operators) -->
           <div class="m3-field" style="margin-top: 12px; position: relative; display: flex; align-items: center;">
@@ -520,8 +520,8 @@ export function initNuevaActividad(loteId, tipo) {
     }
 
     // Collect structured soil analysis data into observaciones
+    const soilFields = ['edad_cafetal','variedad','altitud','sombra','textura','profundidad_efectiva','pendiente','drenaje','ph','materia_organica','cic','aluminio','n_nivel','p_nivel','k_nivel','ca_nivel','mg_nivel','micro_nivel','encalado','fertilizante_recomendado','epocas_aplicacion'];
     if (tipo === 'Análisis de Suelo') {
-      const soilFields = ['edad_cafetal','variedad','altitud','sombra','textura','profundidad_efectiva','pendiente','drenaje','ph','materia_organica','cic','aluminio','n_nivel','p_nivel','k_nivel','ca_nivel','mg_nivel','micro_nivel','encalado','fertilizante_recomendado','epocas_aplicacion'];
       const soilData = {};
       soilFields.forEach(k => { soilData[k] = data[k] || ''; delete data[k]; });
       data.producto = 'Análisis de Suelo';
@@ -529,6 +529,8 @@ export function initNuevaActividad(loteId, tipo) {
       data.observaciones = data.observaciones
         ? data.observaciones + '\n\n--- DATOS DE LABORATORIO ---\n' + JSON.stringify(soilData, null, 2)
         : JSON.stringify(soilData, null, 2);
+    } else {
+      soilFields.forEach(k => { delete data[k]; });
     }
 
     data.empresa_id = window._currentEmpresaId;
@@ -538,6 +540,7 @@ export function initNuevaActividad(loteId, tipo) {
       // Use restInsert for lote_aplicaciones (no .select needed)
       const insertResult = await restInsert('/rest/v1/lote_aplicaciones', data);
       if (!insertResult) throw new Error('Error al guardar actividad');
+      invalidateCache('lote_aplicaciones');
 
       // Send WhatsApp notification for fertilizer applications
       if (tipo === 'Fertilizante') {

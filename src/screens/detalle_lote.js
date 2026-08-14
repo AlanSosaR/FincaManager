@@ -52,6 +52,13 @@ export async function renderDetalleLote(id) {
           justify-content: center;
           flex-shrink: 0;
         }
+        .dl-variedad-name {
+          font-size: 14px;
+          font-weight: 700;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
       </style>
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dl-screen-pad">
         <!-- Header -->
@@ -69,8 +76,8 @@ export async function renderDetalleLote(id) {
 
         <div class="m3-mb-6">
           <div class="ganado-card ganado-card-primary ganado-tally">
-            <div class="ganado-tally-top">
-              <span class="ganado-tally-label">Total Plantas</span>
+            <div class="ganado-tally-top" style="align-items: baseline;">
+              <span class="ganado-tally-label" style="color: #fff; opacity: 1;">Variedad&nbsp;<span class="dl-variedad-name">${lote.variedad || 'N/A'}</span></span>
               <span class="ganado-tally-count">
                 <span class="ganado-card-value">${(lote.num_plantas || 0).toLocaleString()}</span>
                 <span class="ganado-tally-unit">plantas</span>
@@ -78,13 +85,6 @@ export async function renderDetalleLote(id) {
             </div>
             <div class="ganado-tally-divider"></div>
             <div class="ganado-tally-row">
-              <div class="ganado-tag-stat">
-                <span class="ganado-tag-swatch w"><img src="grano-de-cafe.png" alt="" style="width: 22px; height: 22px; object-fit: contain;"></span>
-                <span class="ganado-tag-info">
-                  <span class="ganado-tag-n" style="font-size: 16px;">${lote.variedad || 'N/A'}</span>
-                  <span class="ganado-tag-l">Variedad</span>
-                </span>
-              </div>
               <div class="ganado-tag-stat">
                 <span class="ganado-tag-swatch w"><img src="area.png" alt="" style="width: 30px; height: 30px; object-fit: contain;"></span>
                 <span class="ganado-tag-info">
@@ -220,7 +220,7 @@ export async function renderDetalleLote(id) {
                     <div class="dl-timeline-dot ${i === 0 ? 'dl-timeline-dot-primary' : 'dl-timeline-dot-tertiary'}"></div>
                     <div class="dl-timeline-content">
                       <h4 class="m3-label-large m3-font-bold m3-text-on-surface">${app.producto}</h4>
-                      <p class="m3-body-small m3-text-on-surface-variant m3-mt-1">${app.tipo} — ${app.dosis}</p>
+                      ${app.dosis && app.dosis !== 'N/A' ? `<p class="m3-body-small m3-text-on-surface-variant m3-mt-1">${app.tipo} — ${app.dosis}</p>` : ''}
                       <div class="m3-flex m3-items-center m3-gap-4 m3-mt-3">
                         <span class="m3-flex m3-items-center m3-gap-1 m3-label-small m3-font-bold ${i === 0 ? 'm3-text-primary' : 'm3-text-tertiary'}">
                           <span class="material-symbols-outlined" style="font-size: 12px;">${i === 0 ? 'event' : 'event_available'}</span>

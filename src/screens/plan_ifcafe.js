@@ -1,6 +1,7 @@
 import { restFetch } from '../auth.js';
 import { getPlanIfcafe, getZonaLabel, calcularDosis, normalizarProducto } from '../utils/calculadora_dosis.js';
 import { sendWhatsApp } from '../wa.js';
+import { invalidateCache } from '../sync.js';
 
 let _ifcafeLoteId = null;
 let _calYear = 2026;
@@ -399,6 +400,8 @@ export function initPlanIfcafe() {
           })
         });
       }
+
+      invalidateCache('lote_aplicaciones');
 
       window.Snackbar?.show('✅ Aplicación marcada como realizada');
       window.clearScreenCache?.('plan_ifcafe');

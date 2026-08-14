@@ -171,7 +171,7 @@ export async function renderListaPersonal() {
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-3xl m3-mx-auto m3-font-work-sans">
         <!-- Search + Register split control -->
         <div style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
-          <div class="ganado-split-ctrl" id="personal-search-wrapper">
+          <div class="ganado-split-ctrl ${currentPersonalSearchQuery ? 'expanded' : ''}" id="personal-search-wrapper">
             <button id="personal-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
               <span class="material-icons" style="color: #ffffff;">search</span>
             </button>
@@ -253,6 +253,7 @@ export function initListaPersonal() {
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';
+        searchWrapper.classList.add('expanded');
         searchInput.focus();
       }
     });
@@ -264,6 +265,7 @@ export function initListaPersonal() {
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
       searchClear.style.display = 'none';
+      searchWrapper.classList.remove('expanded');
       refreshPersonalList();
     });
 

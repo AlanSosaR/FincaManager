@@ -118,7 +118,7 @@ export async function renderMotores(page = 1, filter = 'all') {
   return `
     <div class="screen-motores" style="padding-bottom: 120px;">
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
-        <div class="ganado-split-ctrl" id="motors-search-wrapper">
+        <div class="ganado-split-ctrl ${currentMotorsSearchQuery ? 'expanded' : ''}" id="motors-search-wrapper">
           <button id="motors-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
             <span class="material-icons" style="color: #ffffff;">search</span>
           </button>
@@ -240,6 +240,7 @@ export function initMotores() {
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';
+        searchWrapper.classList.add('expanded');
         searchInput.focus();
       }
     });
@@ -251,6 +252,7 @@ export function initMotores() {
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
       searchClear.style.display = 'none';
+      searchWrapper.classList.remove('expanded');
       window.changeMotorsPage(1);
     });
 

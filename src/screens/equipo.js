@@ -40,7 +40,7 @@ export async function renderEquipo() {
     <div class="m3-card-filled" style="margin-bottom:80px;">
       <!-- Search (green split control, sin menú) -->
       <div style="display:flex;justify-content:flex-end;margin:16px 0 8px;">
-        <div class="ganado-split-ctrl" id="equipo-search-wrapper">
+        <div class="ganado-split-ctrl ${currentEquipoSearchQuery ? 'expanded' : ''}" id="equipo-search-wrapper">
           <button id="equipo-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar">
             <span class="material-icons" style="color:#ffffff;">search</span>
           </button>
@@ -136,6 +136,7 @@ export function initEquipo() {
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';
+        searchWrapper.classList.add('expanded');
         searchInput.focus();
       }
     });
@@ -147,6 +148,7 @@ export function initEquipo() {
       searchInput.style.opacity = '0';
       searchInput.style.padding = '0';
       searchClear.style.display = 'none';
+      searchWrapper.classList.remove('expanded');
       refreshEquipoMembers();
     });
 

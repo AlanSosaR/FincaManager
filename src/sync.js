@@ -60,6 +60,17 @@ export function isOnline() {
   return navigator.onLine;
 }
 
+// Borra la caché local de una tabla para que la siguiente lectura
+// vaya a REST y traiga datos frescos (se usa tras writes por REST crudo).
+export async function invalidateCache(tableName) {
+  try {
+    const table = db.table(tableName);
+    await table.clear();
+  } catch (e) {
+    console.warn(`invalidateCache error en ${tableName}:`, e);
+  }
+}
+
 export async function fullDownload() {
   if (syncInProgress) return;
   syncInProgress = true;
