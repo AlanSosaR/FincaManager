@@ -302,6 +302,7 @@ import { renderNuevoPersonal, initNuevoPersonal } from './screens/nuevo_personal
 import { renderDetallePersonal, initDetallePersonal } from './screens/detalle_personal.js';
 import { renderListaPersonal, initListaPersonal } from './screens/lista_personal.js';
 import { renderPlanIfcafe, initPlanIfcafe } from './screens/plan_ifcafe.js';
+import { renderMapaLotes, initMapaLotes } from './screens/mapa_lotes.js';
 import { renderLogin, initLogin } from './screens/login.js';
 import { renderRegister, initRegister } from './screens/register.js';
 import { renderPerfil, initPerfil } from './screens/perfil.js';
@@ -350,6 +351,7 @@ const screens = {
     recuperar: { title: 'Recuperar Contraseña', render: renderRecuperar, noAuth: true },
     restablecer: { title: 'Restablecer Contraseña', render: renderRestablecer },
     plan_ifcafe: { title: 'Plan de Fertilización 2026', backTo: 'dashboard', render: renderPlanIfcafe },
+    mapa_lotes: { title: 'Mapa del Cafetal', backTo: 'dashboard', render: renderMapaLotes },
 };
 
 window.navigateTo = function(screenId, ...args) {
@@ -405,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // data is loaded via init(). Caching the spinner causes triple re-renders
         // (cached HTML → initDetalleX → IndexedDB render → REST render).
         'detalle_animal','detalle_motor','detalle_potrero',
-        'detalle_herramienta','detalle_lote','detalle_personal'
+        'detalle_herramienta','detalle_lote','detalle_personal','mapa_lotes'
     ]);
 
     window.clearScreenCache = (screenId) => {
@@ -465,6 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
         if (screenId === 'detalle_personal') initDetallePersonal(...args);
         if (screenId === 'plan_ifcafe') initPlanIfcafe();
+        if (screenId === 'mapa_lotes') initMapaLotes();
         if (screenId === 'login')    initLogin();
         if (screenId === 'register') initRegister();
         if (screenId === 'perfil') initPerfil();

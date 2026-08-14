@@ -524,12 +524,18 @@ export function initConfiguracion() {
   document.getElementById('btn-config-download')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-config-download');
     btn.disabled = true;
-    btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Descargando...';
-    try {
-      await fullDownload();
-    } catch (e) { console.error(e); }
+    btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> <span id="config-dl-progress">Descargando... 0%</span>';
+    const started = await fullDownload((pct) => {
+      const label = document.getElementById('config-dl-progress');
+      if (label) label.textContent = pct >= 100 ? 'Descarga completada' : `Descargando... ${pct}%`;
+    });
+    if (!started) {
+      window.Snackbar?.show('Ya hay una sincronización en curso', { type: 'warning' });
+    }
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons">cloud_download</span> Descargar datos';
+    btn.innerHTML = started
+      ? '<span class="material-icons">check_circle</span> Descarga completada'
+      : '<span class="material-icons">cloud_download</span> Descargar datos';
   });
 
   document.getElementById('btn-config-clear-cache')?.addEventListener('click', () => {

@@ -57,7 +57,6 @@ export async function renderDashboard(page) {
     const filteredLotes = filterLotes();
     filteredLotesCount = filteredLotes.length;
     const totalPlantas = allLotes.reduce((sum, l) => sum + (l.num_plantas || 0), 0) || 0;
-    const totalArea = allLotes.reduce((sum, l) => sum + (parseFloat(l.area_ha) || 0), 0);
     const from = (currentLotesPage - 1) * LOTES_PAGE_SIZE;
     const to = from + LOTES_PAGE_SIZE;
     const pageLotes = filteredLotes.slice(from, to);
@@ -172,20 +171,14 @@ export async function renderDashboard(page) {
             </div>
             <div class="ganado-tally-divider"></div>
             <div class="ganado-tally-row">
-              <div class="ganado-tag-stat">
-                <span class="ganado-tag-swatch w"><img src="area.png" alt="" style="width: 30px; height: 30px; object-fit: contain;"></span>
-                <span class="ganado-tag-info">
-                  <span class="ganado-tag-n">${totalArea.toFixed(1)}</span>
-                  <span class="ganado-tag-l">Hectáreas</span>
-                </span>
-              </div>
-              <div class="ganado-tag-stat">
+              <a href="#" onclick="event.preventDefault(); window.navigateTo('mapa_lotes')" class="ganado-tag-stat" style="text-decoration:none;color:inherit;" title="Ver mapa de todas las parcelas">
                 <span class="ganado-tag-swatch w"><img src="mapa.png" alt="" style="width: 22px; height: 22px; object-fit: contain;"></span>
                 <span class="ganado-tag-info">
                   <span class="ganado-tag-n">${allLotes.length}</span>
                   <span class="ganado-tag-l">Lotes</span>
                 </span>
-              </div>
+                <span class="material-icons ganado-tag-expand">chevron_right</span>
+              </a>
               <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat cafetal-ifcafe-btn" title="Abrir Plan de Fertilización 2026">
                 <span class="ganado-tag-swatch w"><span style="font-size:20px;line-height:1;">📋</span></span>
                 <span class="ganado-tag-info">

@@ -48,6 +48,15 @@ export async function renderEquipo() {
           <button id="equipo-search-clear" style="background:none;border:none;cursor:pointer;display:${currentEquipoSearchQuery?'flex':'none'};align-items:center;justify-content:center;padding:0 16px 0 8px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
             <span class="material-icons" style="font-size:20px;">close</span>
           </button>
+          <span class="ganado-split-ctrl-sep"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.toggleEquipoSplitMenu(event)" title="Más opciones">
+            <span class="material-icons">arrow_drop_down</span>
+          </button>
+          <div class="ganado-split-menu" id="equipo-split-menu">
+            <button class="ganado-split-item" onclick="window.toggleInviteInline(); document.getElementById('equipo-split-menu').classList.remove('open');">
+              <span class="material-icons">person_add</span><span>Invitar</span>
+            </button>
+          </div>
         </div>
       </div>
       <h2 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;margin-bottom:24px;">Equipo</h2>
@@ -76,10 +85,6 @@ export async function renderEquipo() {
           `).join('')}
         </div>
       ` : ''}
-      <button id="btn-invite-member" class="m3-fab" style="position:fixed;bottom:32px;right:32px;">
-        <span class="material-icons">person_add</span>
-        <span>Invitar</span>
-      </button>
     </div>
   `;
 }
@@ -162,10 +167,18 @@ export function initEquipo() {
     });
   }
 
-  const btn = document.getElementById('btn-invite-member');
-  if (btn) {
-    btn.addEventListener('click', toggleInviteInline);
-  }
+  // Split control (search + arrow) menu
+  window.toggleEquipoSplitMenu = (e) => {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('equipo-split-menu');
+    if (menu) menu.classList.toggle('open');
+  };
+  window.toggleInviteInline = toggleInviteInline;
+
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('equipo-split-menu');
+    if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
+  });
 
   document.querySelectorAll('.btn-revoke-invitation').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -180,65 +193,73 @@ export function initEquipo() {
     });
   });
 
-  document.querySelectorAll('.btn-member-menu').forEach((btn) => {
-    const dropdown = btn.parentElement.querySelector('.member-menu-dropdown');
-    if (!dropdown) return;
-
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = dropdown.style.display === 'block';
-      document.querySelectorAll('.member-menu-dropdown').forEach(d => d.style.display = 'none');
-      dropdown.style.display = isOpen ? 'none' : 'block';
-    });
-
-    dropdown.querySelector('.menu-option-role')?.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      dropdown.style.display = 'none';
-      const userId = btn.dataset.userid;
-      const currentRol = btn.dataset.rol;
-      const nombre = btn.dataset.nombre;
-      const newRol = currentRol === 'admin' ? 'visitante' : 'admin';
-      if (!confirm(`¿Cambiar rol de ${nombre} a "${newRol}"?`)) return;
-      try {
-        await updateMemberRole(window._currentEmpresaId, userId, newRol);
-        btn.dataset.rol = newRol;
-        const badge = btn.closest('div[style*="display:flex"]')?.querySelector('.m3-badge');
-        if (badge) {
-          const roleColors = { propietario: '#2d3e2c', admin: '#1565c0', visitante: '#888' };
-          badge.textContent = newRol;
-          badge.style.background = roleColors[newRol] || '#888';
-        }
-        const label = dropdown.querySelector('.menu-option-role span:last-child');
-        if (label) label.innerHTML = `Cambiar rol a <strong>${newRol === 'admin' ? 'visitante' : 'admin'}</strong>`;
-        window.Snackbar.show(`Rol cambiado a "${newRol}"`);
-      } catch (e) {
-        window.Snackbar.show('Error: ' + e.message, { type: 'error' });
-      }
-    });
-
-    dropdown.querySelector('.menu-option-remove')?.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      dropdown.style.display = 'none';
-      const userId = btn.dataset.userid;
-      const nombre = btn.dataset.nombre;
-      if (!confirm(`¿Eliminar a ${nombre} de la empresa?`)) return;
-      try {
-        await removeMember(window._currentEmpresaId, userId);
-        btn.closest('div[style*="display:flex"]')?.remove();
-        window.Snackbar.show('Miembro eliminado');
-      } catch (e) {
-        window.Snackbar.show('Error: ' + e.message, { type: 'error' });
-      }
-    });
-  });
-
+  // Member menu (event delegation, robusto ante re-renders y caché de HTML)
   if (!window._memberMenuHandler) {
     window._memberMenuHandler = true;
     document.addEventListener('click', (e) => {
-      document.querySelectorAll('.member-menu-dropdown').forEach(d => {
-        if (!d.contains(e.target)) d.style.display = 'none';
-      });
+      const option = e.target.closest('.menu-option-role, .menu-option-remove');
+      if (option) {
+        e.stopPropagation();
+        const dropdown = option.closest('.member-menu-dropdown');
+        const btn = dropdown?.parentElement.querySelector('.btn-member-menu');
+        if (!btn) return;
+        dropdown.style.display = 'none';
+        if (option.classList.contains('menu-option-role')) {
+          handleMemberRoleChange(btn);
+        } else {
+          handleRemoveMember(btn);
+        }
+        return;
+      }
+      const btn = e.target.closest('.btn-member-menu');
+      if (btn) {
+        e.stopPropagation();
+        const dropdown = btn.parentElement.querySelector('.member-menu-dropdown');
+        if (!dropdown) return;
+        const isOpen = dropdown.style.display === 'block';
+        document.querySelectorAll('.member-menu-dropdown').forEach(d => d.style.display = 'none');
+        dropdown.style.display = isOpen ? 'none' : 'block';
+        return;
+      }
+      document.querySelectorAll('.member-menu-dropdown').forEach(d => d.style.display = 'none');
     });
+  }
+}
+
+async function handleMemberRoleChange(btn) {
+  const dropdown = btn.parentElement.querySelector('.member-menu-dropdown');
+  const userId = btn.dataset.userid;
+  const currentRol = btn.dataset.rol;
+  const nombre = btn.dataset.nombre;
+  const newRol = currentRol === 'admin' ? 'visitante' : 'admin';
+  if (!confirm(`¿Cambiar rol de ${nombre} a "${newRol}"?`)) return;
+  try {
+    await updateMemberRole(window._currentEmpresaId, userId, newRol);
+    btn.dataset.rol = newRol;
+    const badge = btn.closest('div[style*="display:flex"]')?.querySelector('.m3-badge');
+    if (badge) {
+      const roleColors = { propietario: '#2d3e2c', admin: '#1565c0', visitante: '#888' };
+      badge.textContent = newRol;
+      badge.style.background = roleColors[newRol] || '#888';
+    }
+    const label = dropdown?.querySelector('.menu-option-role span:last-child');
+    if (label) label.innerHTML = `Cambiar rol a <strong>${newRol === 'admin' ? 'visitante' : 'admin'}</strong>`;
+    window.Snackbar.show(`Rol cambiado a "${newRol}"`);
+  } catch (e) {
+    window.Snackbar.show('Error: ' + e.message, { type: 'error' });
+  }
+}
+
+async function handleRemoveMember(btn) {
+  const userId = btn.dataset.userid;
+  const nombre = btn.dataset.nombre;
+  if (!confirm(`¿Eliminar a ${nombre} de la empresa?`)) return;
+  try {
+    await removeMember(window._currentEmpresaId, userId);
+    btn.closest('div[style*="display:flex"]')?.remove();
+    window.Snackbar.show('Miembro eliminado');
+  } catch (e) {
+    window.Snackbar.show('Error: ' + e.message, { type: 'error' });
   }
 }
 

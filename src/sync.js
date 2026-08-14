@@ -71,10 +71,11 @@ export async function invalidateCache(tableName) {
   }
 }
 
-export async function fullDownload() {
-  if (syncInProgress) return;
+export async function fullDownload(onProgress) {
+  if (syncInProgress) return false;
   syncInProgress = true;
   try {
+    onProgress?.(0);
     const pendingIds = new Map();
     const pending = await db._sync_queue.toArray();
     for (const item of pending) {
@@ -84,6 +85,8 @@ export async function fullDownload() {
       }
     }
 
+    const total = SUPABASE_TABLES.length;
+    let done = 0;
     for (const tableName of SUPABASE_TABLES) {
       try {
         let allData = [];
@@ -119,11 +122,17 @@ export async function fullDownload() {
         }
       } catch (tableErr) {
         console.warn(`fullDownload: error en tabla ${tableName}, continuando...`, tableErr);
+      } finally {
+        done += 1;
+        onProgress?.(Math.round((done / total) * 100));
       }
     }
     await updateSyncMeta('last_full_sync', new Date().toISOString());
+    onProgress?.(100);
+    return true;
   } catch (err) {
     console.error('fullDownload error:', err);
+    return false;
   } finally {
     syncInProgress = false;
   }
