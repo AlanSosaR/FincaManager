@@ -41,23 +41,6 @@ export async function renderConfiguracion() {
 
   return `
     <style>
-      .ref-label-icon { background: transparent; border: none; white-space: nowrap; }
-      .ref-label-icon .ref-label-text {
-        display: inline-block;
-        background: #2d3e2c;
-        color: #fff;
-        font-family: 'Work Sans', sans-serif;
-        font-size: 12px;
-        font-weight: 600;
-        padding: 3px 10px;
-        border-radius: 999px;
-        margin-left: 4px;
-        vertical-align: middle;
-        box-shadow: 0 1px 4px rgba(0,0,0,.3);
-        max-width: 220px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
     </style>
     <div class="m3-card-filled" style="margin-bottom:80px;">
       <h2 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;margin-bottom:24px;">Configuración</h2>

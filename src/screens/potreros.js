@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js';
 import { loadPuntoReferencia } from '../auth.js';
 
 let currentPotrerosSearchQuery = '';
+let refMarker = null;
 
 function parseCoordenadasJson(json) {
   try {
@@ -351,7 +352,8 @@ export async function initPotreros() {
   setTimeout(async () => {
     const ref = await loadPuntoReferencia(window._currentEmpresaId).catch(() => null);
     if (ref) {
-      L.marker([ref.lat, ref.lng], {
+      if (refMarker) map.removeLayer(refMarker);
+      refMarker = L.marker([ref.lat, ref.lng], {
         icon: L.divIcon({
           className: 'ref-label-icon',
           html: '<span class="material-icons" style="font-size:28px;color:#2d3e2c;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
