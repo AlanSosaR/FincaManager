@@ -19,6 +19,7 @@ let drawnItems = null;
 let drawControl = null;
 let existingPotrerosLayer = null;
 let selectedColor = '#2d3e2c';
+let refMarker = null;
 
 // Walking / GPS recording state
 let walkState = 'idle';        // 'idle' | 'searching' | 'recording' | 'paused'

@@ -349,14 +349,23 @@ export async function initPotreros() {
   });
   // Si hay potreros con polígono, se ajusta la vista a ellos; si no, centra en el punto de referencia de la finca
   setTimeout(async () => {
+    const ref = await loadPuntoReferencia(window._currentEmpresaId).catch(() => null);
+    if (ref) {
+      L.marker([ref.lat, ref.lng], {
+        icon: L.divIcon({
+          className: 'ref-label-icon',
+          html: '<span class="material-icons" style="font-size:28px;color:#2d3e2c;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
+          iconSize: null,
+          iconAnchor: [14, 28]
+        }),
+        interactive: false
+      }).addTo(map);
+    }
     if (allBounds.length > 0) {
       const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
       map.fitBounds(group.getBounds().pad(0.1));
-    } else {
-      const ref = await loadPuntoReferencia(window._currentEmpresaId).catch(() => null);
-      if (ref) {
-        map.setView([ref.lat, ref.lng], 15);
-      }
+    } else if (ref) {
+      map.setView([ref.lat, ref.lng], 15);
     }
   }, 50);
   L.control.attribution({
