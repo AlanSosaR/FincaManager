@@ -2982,9 +2982,9 @@ input:focus, textarea:focus, select:focus {
 
 .da-hero-name-row {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 
 .da-hero-info .da-stat-grid-inline {
@@ -3833,6 +3833,11 @@ input:focus, textarea:focus, select:focus {
 
 .da-variation-pill .material-icons {
   font-size: 14px;
+}
+
+.da-dias-edad {
+  color: #1f7a2e;
+  font-weight: 700;
 }
 
 .da-empty-state {

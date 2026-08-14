@@ -351,6 +351,13 @@ function renderFullContent(container, animalId, flag) {
             </div>`;
         }
     }
+    const fmtFechaEdad = (fechaStr) => {
+        if (!fechaStr) return '';
+        const f = new Date(fechaStr);
+        const dias = Math.floor((Date.now() - f.getTime()) / 86400000);
+        const diasTxt = dias >= 0 ? ` <span class="da-dias-edad">(${dias} día${dias === 1 ? '' : 's'})</span>` : '';
+        return f.toLocaleDateString() + diasTxt;
+    };
     container.innerHTML = `
 
         <div class="da-hero">
@@ -374,13 +381,13 @@ function renderFullContent(container, animalId, flag) {
                     ${currentAnimal.origen !== 'Comprado'
                         ? (currentAnimal.fecha_adquisicion ? `
                     <div class="da-badge da-badge-surface">
-                        <span class="da-badge-chip amber"><span class="material-icons">cake</span></span>
-                        Nacimiento: ${new Date(currentAnimal.fecha_adquisicion).toLocaleDateString()}
+                        <span class="da-badge-chip sky"><img src="/cria.png"></span>
+                        Nacimiento: ${fmtFechaEdad(currentAnimal.fecha_adquisicion)}
                     </div>` : '')
                         : `
                     <div class="da-badge da-badge-surface">
                         <span class="da-badge-chip amber"><span class="material-icons">cake</span></span>
-                        Adquisición: ${currentAnimal.fecha_adquisicion ? new Date(currentAnimal.fecha_adquisicion).toLocaleDateString() : 'N/A'}
+                        Adquisición: ${currentAnimal.fecha_adquisicion ? fmtFechaEdad(currentAnimal.fecha_adquisicion) : 'N/A'}
                     </div>`}
                     <div class="da-badge da-badge-surface da-badge-sex">
                         <span class="da-badge-chip ${currentAnimal.sexo === 'Macho' ? 'blue' : 'pink'}"><span class="ganado-sex-icon-img"></span></span>
@@ -392,10 +399,11 @@ function renderFullContent(container, animalId, flag) {
                         Hija/o de: ${currentAnimal.madre.nombre}
                     </div>` : ''}
                     ${reproBadge}
+                    ${currentAnimal.origen === 'Comprado' ? `
                     <div class="da-badge da-badge-surface">
-                        <span class="da-badge-chip ${currentAnimal.origen === 'Comprado' ? 'red' : 'green'}"><span class="material-icons">${currentAnimal.origen === 'Comprado' ? 'shopping_cart' : 'eco'}</span></span>
-                        ${currentAnimal.origen || 'Criollo'}${currentAnimal.origen === 'Comprado' && currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
-                    </div>
+                        <span class="da-badge-chip red"><span class="material-icons">shopping_cart</span></span>
+                        Comprado${currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
+                    </div>` : ''}
                 </div>
 
                 <div class="da-stat-grid da-stat-grid-inline">
@@ -692,6 +700,7 @@ function setupEventListeners(animalId, container, sellMode) {
             try {
                 await restInsert('/rest/v1/animal_ventas', {
                     animal_id: animalId,
+                    empresa_id: window._currentEmpresaId,
                     precio_venta: parseFloat(precio),
                     fecha_venta: document.getElementById('sell-fecha').value,
                     comprador: document.getElementById('sell-comprador').value || null,
