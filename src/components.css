@@ -2954,6 +2954,7 @@ input:focus, textarea:focus, select:focus {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
 }
 
@@ -2962,7 +2963,7 @@ input:focus, textarea:focus, select:focus {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 20px;
+  gap: 16px;
   padding: 40px 40px 40px 48px;
 }
 
@@ -2987,27 +2988,44 @@ input:focus, textarea:focus, select:focus {
 }
 
 .da-hero-info .da-stat-grid-inline {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
   margin-bottom: 0;
 }
 
 .da-hero-info .da-stat-grid-inline .da-stat-card {
   background: #f6f6f4;
-  padding: 18px 20px;
-  gap: 14px;
-  border-radius: 14px;
-}
-
-.da-hero-info .da-stat-grid-inline .da-stat-icon {
-  width: 48px;
-  height: 48px;
-  font-size: 22px !important;
+  padding: 12px 14px;
+  gap: 10px;
   border-radius: 12px;
 }
 
+.da-hero-info .da-stat-grid-inline .da-stat-icon {
+  width: 40px;
+  height: 40px;
+  font-size: 18px !important;
+  border-radius: 11px;
+}
+
 .da-hero-info .da-stat-grid-inline .da-stat-value {
-  font-size: 22px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.da-hero-info .da-stat-grid-inline .da-stat-label {
+  font-size: 9px;
+  margin-bottom: 2px;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.da-hero-info .da-stat-grid-inline .da-stat-sub {
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .da-badge-row {
@@ -3892,7 +3910,8 @@ input:focus, textarea:focus, select:focus {
 
 .da-calendar-layout {
   display: grid;
-  grid-template-columns: 1fr minmax(350px, 450px);
+  grid-template-columns: minmax(0, 620px) minmax(350px, 450px);
+  justify-content: center;
   gap: 32px;
 }
 
