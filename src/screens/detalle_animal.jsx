@@ -371,10 +371,17 @@ function renderFullContent(container, animalId, flag) {
                         <span class="da-badge-chip green"><span class="material-icons">location_on</span></span>
                         Potrero: ${currentAnimal.potreros.nombre}
                     </div>` : ''}
+                    ${currentAnimal.origen !== 'Comprado'
+                        ? (currentAnimal.fecha_adquisicion ? `
+                    <div class="da-badge da-badge-surface">
+                        <span class="da-badge-chip amber"><span class="material-icons">cake</span></span>
+                        Nacimiento: ${new Date(currentAnimal.fecha_adquisicion).toLocaleDateString()}
+                    </div>` : '')
+                        : `
                     <div class="da-badge da-badge-surface">
                         <span class="da-badge-chip amber"><span class="material-icons">cake</span></span>
                         Adquisición: ${currentAnimal.fecha_adquisicion ? new Date(currentAnimal.fecha_adquisicion).toLocaleDateString() : 'N/A'}
-                    </div>
+                    </div>`}
                     <div class="da-badge da-badge-surface da-badge-sex">
                         <span class="da-badge-chip ${currentAnimal.sexo === 'Macho' ? 'blue' : 'pink'}"><span class="ganado-sex-icon-img"></span></span>
                         ${currentAnimal.sexo || 'Sexo N/A'}
@@ -409,7 +416,7 @@ function renderFullContent(container, animalId, flag) {
                         </div>
                         <div>
                             <div class="da-stat-label">${weights.length <= 1 ? 'Peso Inicial' : 'Último Pesaje'}</div>
-                            <div class="da-stat-value">${lastWeight} <small class="da-stat-value-md">${currentAnimal.peso_unidad || 'kg'}</small></div>
+                            <div class="da-stat-value" style="font-size:22px; font-weight:800;">${lastWeight} <small class="da-stat-value-md" style="font-size:11px; font-weight:600; color:#555;">${currentAnimal.peso_unidad || 'kg'}</small></div>
                             <div class="da-stat-sub">
                                 <span class="da-variation-pill ${weightTrend}">
                                     <span class="material-icons">${weightTrend === 'positive' ? 'trending_up' : (weightTrend === 'negative' ? 'trending_down' : 'trending_flat')}</span>
@@ -425,13 +432,14 @@ function renderFullContent(container, animalId, flag) {
                         </div>
                         <div>
                             <div class="da-stat-label">Fumigaciones</div>
-                            <div class="da-stat-value"><span class="material-icons" style="font-size:22px; vertical-align:middle; color:#2c666e;">check_circle</span> ${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length} <small class="da-stat-value-md">aplicada${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length === 1 ? '' : 's'}</small></div>
+                            <div class="da-stat-value"><span class="material-icons" style="font-size:13px; vertical-align:middle; color:#2c666e;">check_circle</span> ${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length}</div>
                             <div class="da-stat-sub">
                                 ${(() => {
+                                    const aplicadas = fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length;
                                     const pend = fumigaciones.filter(f => f.estado === 'Programada').length;
                                     return pend > 0 ? `<span class="da-variation-pill pending">
                                         <span class="material-icons">schedule</span> ${pend} programada${pend > 1 ? 's' : ''}
-                                    </span>` : '';
+                                    </span>` : `aplicada${aplicadas === 1 ? '' : 's'}`;
                                 })()}
                             </div>
                         </div>

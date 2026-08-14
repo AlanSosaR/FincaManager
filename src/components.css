@@ -3028,6 +3028,18 @@ input:focus, textarea:focus, select:focus {
   text-overflow: ellipsis;
 }
 
+.da-hero-info .da-stat-grid-inline .da-variation-pill {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  gap: 2px;
+  border-radius: 10px;
+}
+
+.da-hero-info .da-stat-grid-inline .da-variation-pill .material-icons {
+  font-size: 11px;
+}
+
 .da-badge-row {
   display: flex;
   gap: 12px;
