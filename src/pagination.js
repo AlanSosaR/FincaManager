@@ -7,9 +7,6 @@ export function getPaginationFooterHtml({ currentPage, totalPages, prevId, nextI
     if (currentPage < totalPages) {
       pagesHtml += `<button class="da-page-btn" onclick="window.${changeFn}(${currentPage + 1})">${currentPage + 1}</button>`;
     }
-    if (currentPage + 1 < totalPages) {
-      pagesHtml += `<span class="da-page-ellipsis">…</span>`;
-    }
   } else {
     for (let i = 1; i <= totalPages; i++) {
       pagesHtml += `
