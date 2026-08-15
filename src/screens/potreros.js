@@ -42,6 +42,7 @@ export async function renderPotreros() {
         flex-wrap: wrap;
         position: relative;
         z-index: 1100;
+        padding-bottom: 8px;
       }
       .mapa-chip {
         display: inline-flex;
@@ -288,7 +289,7 @@ export async function renderPotreros() {
       }
       @media (max-width: 600px) {
         .mapa-chip { padding: 8px 12px; font-size: 12px; }
-        .mapa-page { padding-bottom: 72px; }
+        .mapa-page { padding-bottom: 24px; }
         .leaflet-control-geocoder.leaflet-control-geocoder-expanded {
           width: calc(100vw - 80px) !important;
         }
