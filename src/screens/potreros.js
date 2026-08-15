@@ -33,6 +33,7 @@ export async function renderPotreros() {
         flex-direction: column;
         gap: 12px;
         min-height: 0;
+        position: relative;
       }
       .mapa-summary {
         display: flex;
@@ -68,7 +69,6 @@ export async function renderPotreros() {
         min-height: 360px;
         border-radius: 12px;
         overflow: hidden;
-        border: 1px solid #e0e8e0;
         position: relative;
         background: #e8efe4;
       }
@@ -121,6 +121,51 @@ export async function renderPotreros() {
         cursor: pointer;
         box-shadow: 0 4px 14px rgba(0,0,0,0.25);
       }
+      .mapa-detail-panel {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        z-index: 1100;
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+        padding: 14px 16px;
+        font-family: 'Work Sans', sans-serif;
+        border: 1px solid #e0e8e0;
+        max-height: 46%;
+        overflow-y: auto;
+      }
+      .mapa-detail-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .mapa-detail-title {
+        margin: 0;
+        color: #2d3e2c;
+        font-size: 17px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .mapa-detail-close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #777;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        border-radius: 50%;
+      }
+      .mapa-detail-close:hover {
+        background: #f2f4f0;
+      }
       .mapa-reg-btn:hover {
         background: #3d5240;
       }
@@ -129,7 +174,18 @@ export async function renderPotreros() {
       }
       .mapa-pop {
         font-family: 'Work Sans', sans-serif;
-        width: 260px;
+        width: 300px;
+      }
+      .leaflet-popup-content-wrapper {
+        border-radius: 16px;
+        box-shadow: 0 10px 34px rgba(0,0,0,0.35);
+        border: 1px solid #dce6da;
+      }
+      .leaflet-popup-content {
+        margin: 14px 16px;
+      }
+      .leaflet-popup-tip {
+        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
       }
       .mapa-pop-head {
         display: flex;
@@ -232,6 +288,7 @@ export async function renderPotreros() {
       }
       @media (max-width: 600px) {
         .mapa-chip { padding: 8px 12px; font-size: 12px; }
+        .mapa-page { padding-bottom: 72px; }
         .leaflet-control-geocoder.leaflet-control-geocoder-expanded {
           width: calc(100vw - 80px) !important;
         }
@@ -261,35 +318,77 @@ export async function renderPotreros() {
         gap: 4px;
         text-shadow: 0 1px 2px rgba(0,0,0,0.3);
       }
+      .potrero-float-card {
+        position: absolute;
+        z-index: 1400;
+        max-width: 320px;
+        width: 320px;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+        border: 1px solid #e0e8e0;
+        padding: 14px 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: 'Work Sans', sans-serif;
+      }
+      .potrero-float-tip {
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-top: 10px solid #ffffff;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15));
+      }
+      .potrero-float-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #777;
+        padding: 4px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        margin-right: 4px;
+      }
+      .potrero-float-close:hover {
+        background: #f2f4f0;
+      }
     </style>
     <div class="mapa-page">
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin:16px 0 8px;">
+        <div class="ganado-split-ctrl ${currentPotrerosSearchQuery ? 'expanded' : ''}" id="potreros-search-wrapper">
+          <button id="potreros-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar potrero">
+            <span class="material-icons" style="color:#ffffff;">search</span>
+          </button>
+          <input type="text" id="potreros-search-input" placeholder="Buscar potrero..." value="${currentPotrerosSearchQuery}" style="border:none;background:transparent;outline:none;font-size:15px;width:${currentPotrerosSearchQuery ? '180px' : '0px'};transition:width 0.3s;opacity:${currentPotrerosSearchQuery ? '1' : '0'};padding:${currentPotrerosSearchQuery ? '0 8px 0 0' : '0'};color:#ffffff;">
+          <button id="potreros-search-clear" style="background:none;border:none;cursor:pointer;display:${currentPotrerosSearchQuery ? 'flex' : 'none'};align-items:center;justify-content:center;padding:0 16px 0 8px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
+            <span class="material-icons" style="font-size:20px;">close</span>
+          </button>
+          <span class="ganado-split-ctrl-sep"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.togglePotrerosSplitMenu(event)" title="Más opciones">
+            <span class="material-icons">arrow_drop_down</span>
+          </button>
+          <div class="ganado-split-menu" id="potreros-split-menu">
+            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_potrero'); document.getElementById('potreros-split-menu').classList.remove('open');">
+              <span class="material-icons">add</span><span>Registrar potrero</span>
+            </button>
+          </div>
+        </div>
+      </div>
       <div style="margin:0 0 12px;">
         <h2 style="margin:0;font-size:30px;font-weight:800;color:var(--on-surface);letter-spacing:-0.5px;">Potreros</h2>
-        <p style="margin:2px 0 0;font-size:13px;color:#666;display:flex;align-items:center;gap:6px;"><span class="material-icons" style="font-size:16px;color:#2d3e2c;">touch_app</span>Toca un potrero para ver su detalle</p>
       </div>
       <div class="mapa-summary" id="mapa-summary">
         <span class="mapa-chip"><img src="mapa.png" alt=""><strong id="mapa-n-potreros">0</strong> Potreros</span>
         <span class="mapa-chip"><img src="area.png" alt=""><strong id="mapa-n-ha">0.0</strong> Hectáreas</span>
-        <div style="margin-left:auto;">
-          <div class="ganado-split-ctrl ${currentPotrerosSearchQuery ? 'expanded' : ''}" id="potreros-search-wrapper">
-            <button id="potreros-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar potrero">
-              <span class="material-icons" style="color:#ffffff;">search</span>
-            </button>
-            <input type="text" id="potreros-search-input" placeholder="Buscar potrero..." value="${currentPotrerosSearchQuery}" style="border:none;background:transparent;outline:none;font-size:15px;width:${currentPotrerosSearchQuery ? '180px' : '0px'};transition:width 0.3s;opacity:${currentPotrerosSearchQuery ? '1' : '0'};padding:${currentPotrerosSearchQuery ? '0 8px 0 0' : '0'};color:#ffffff;">
-            <button id="potreros-search-clear" style="background:none;border:none;cursor:pointer;display:${currentPotrerosSearchQuery ? 'flex' : 'none'};align-items:center;justify-content:center;padding:0 16px 0 8px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
-              <span class="material-icons" style="font-size:20px;">close</span>
-            </button>
-            <span class="ganado-split-ctrl-sep"></span>
-            <button class="ganado-split-ctrl-reg" onclick="window.togglePotrerosSplitMenu(event)" title="Más opciones">
-              <span class="material-icons">arrow_drop_down</span>
-            </button>
-            <div class="ganado-split-menu" id="potreros-split-menu">
-              <button class="ganado-split-item" onclick="window.navigateTo('nuevo_potrero'); document.getElementById('potreros-split-menu').classList.remove('open');">
-                <span class="material-icons">add</span><span>Registrar potrero</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <span class="mapa-chip"><span class="material-icons" style="font-size:18px;color:#2d3e2c;">touch_app</span>Toca un potrero para ver su detalle</span>
       </div>
       <div id="mapa-container">
         <div class="mapa-empty" id="mapa-loading">
@@ -297,6 +396,7 @@ export async function renderPotreros() {
           <p>Cargando mapa de potreros...</p>
         </div>
       </div>
+      <div id="potrero-float-card" class="potrero-float-card" style="display:none;"></div>
     </div>
   `;
 }
@@ -356,9 +456,9 @@ export async function initPotreros() {
       refMarker = L.marker([ref.lat, ref.lng], {
         icon: L.divIcon({
           className: 'ref-label-icon',
-          html: '<span class="material-icons" style="font-size:28px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
+          html: '<span class="material-icons" style="font-size:38px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
           iconSize: null,
-          iconAnchor: [14, 28]
+          iconAnchor: [19, 38]
         }),
         interactive: false
       }).addTo(map);
@@ -704,6 +804,59 @@ export async function initPotreros() {
   // Draw all parcels
   const allBounds = [];
   const polyByPotrero = {};
+  let selectedPotreroId = null;
+
+  function selectPotrero(id) {
+    selectedPotreroId = id;
+    Object.values(polyByPotrero).forEach(({ poly, potrero }) => {
+      const selected = potrero.id === id;
+      if (selected) {
+        if (!map.hasLayer(poly)) map.addLayer(poly);
+        poly.setStyle({ fillOpacity: 0.35, weight: 4, opacity: 1 });
+      } else if (map.hasLayer(poly)) {
+        map.removeLayer(poly);
+      }
+    });
+    const sel = polyByPotrero[id];
+    if (sel) {
+      map.fitBounds(sel.poly.getBounds().pad(0.08));
+      showPotreroFloatCard(sel.potrero, eventosByPotrero[id] || []);
+    }
+  }
+
+  function clearPotreroSelection() {
+    selectedPotreroId = null;
+    hidePotreroFloatCard();
+    map.closePopup();
+    Object.values(polyByPotrero).forEach(({ poly, potrero }) => {
+      const { color } = parseCoordenadasJson(potrero.coordenadas_json);
+      if (!map.hasLayer(poly)) map.addLayer(poly);
+      poly.setStyle({ fillOpacity: 0.18, weight: 2, opacity: 0.9, color, fillColor: color });
+    });
+    fitToParcels();
+  }
+
+  function showPotreroFloatCard(potrero, eventos) {
+    const card = document.getElementById('potrero-float-card');
+    const containerEl = document.getElementById('mapa-container');
+    if (!card || !containerEl) return;
+    card.innerHTML = `
+      <div class="potrero-float-tip"></div>
+      ${buildPopupHtml(potrero, eventos)}
+    `;
+    card.style.display = 'block';
+    const pageEl = card.closest('.mapa-page') || document.body;
+    const pageRect = pageEl.getBoundingClientRect();
+    const cardHeight = card.offsetHeight;
+    card.style.top = Math.max(0, (pageRect.height - cardHeight) / 2) + 'px';
+    document.getElementById('potrero-float-close')?.addEventListener('click', clearPotreroSelection);
+  }
+
+  function hidePotreroFloatCard() {
+    const card = document.getElementById('potrero-float-card');
+    if (card) card.style.display = 'none';
+  }
+
   withCoords.forEach(potrero => {
     const { coordinates, color } = parseCoordenadasJson(potrero.coordenadas_json);
     if (!coordinates || coordinates.length < 3) return;
@@ -719,7 +872,10 @@ export async function initPotreros() {
     allBounds.push(poly.getBounds());
     polyByPotrero[potrero.id] = { poly, potrero };
 
-    poly.bindPopup(buildPopupHtml(potrero, eventosByPotrero[potrero.id] || []));
+    poly.on('click', (e) => {
+      selectPotrero(potrero.id);
+      L.DomEvent.stopPropagation(e);
+    });
 
     const c = poly.getBounds().getCenter();
     L.marker([c.lat, c.lng], {
@@ -742,6 +898,8 @@ export async function initPotreros() {
       map.fitBounds(group.getBounds().pad(0.1));
     }
   };
+
+  map.on('click', () => clearPotreroSelection());
 
   // ── Split control: búsqueda por nombre + registro ──
   window.togglePotrerosSplitMenu = (e) => {
@@ -918,6 +1076,9 @@ function buildPopupHtml(potrero, eventos) {
   return `
     <div class="mapa-pop">
       <div class="mapa-pop-head">
+        <button class="potrero-float-close" id="potrero-float-close" title="Cerrar">
+          <span class="material-icons" style="font-size:20px;">close</span>
+        </button>
         <span class="mapa-pop-title">${potrero.nombre || 'Potrero'}</span>
         <span class="mapa-pop-badge">${statusLabel(potrero.status)}</span>
       </div>

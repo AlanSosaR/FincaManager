@@ -2,6 +2,12 @@ import { supabase } from '../supabase.js';
 import { restFetch, restInsert, loadPuntoReferencia } from '../auth.js';
 import { invalidateCache } from '../sync.js';
 
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
+
 function parseCoordenadasJson(json) {
   try {
     const parsed = JSON.parse(json);
@@ -135,7 +141,7 @@ export async function renderNuevoPotrero(id) {
               </div>
 
               <!-- Map overlay buttons - M3 Floating -->
-              <div style="position: absolute; top: 16px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px;">
+              <div style="position: absolute; top: 128px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px;">
                 <button type="button" id="btn-toggle-layers" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Cambiar capa">
                   <span class="material-icons" style="font-size: 22px; color: #444;">layers</span>
                 </button>
@@ -345,7 +351,7 @@ function initMap() {
   mapInstance = L.map('lote-map', {
     center: [14.5, -88.5],
     zoom: 9,
-    maxZoom: 18,
+    maxZoom: 20,
     zoomControl: false,
     attributionControl: false
   });
@@ -353,18 +359,17 @@ function initMap() {
   // Centro inicial en el punto de referencia de la finca (si existe) y lo muestra marcado
   loadPuntoReferencia(window._currentEmpresaId).then(ref => {
     if (ref && mapInstance) {
-      mapInstance.setView([ref.lat, ref.lng], 15);
-      if (!refMarker) {
-        refMarker = L.marker([ref.lat, ref.lng], {
-          icon: L.divIcon({
-            className: 'ref-label-icon',
-            html: '<span class="material-icons" style="font-size:28px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
-            iconSize: null,
-            iconAnchor: [14, 28]
-          }),
-          interactive: false
-        }).addTo(mapInstance);
-      }
+      if (refMarker) mapInstance.removeLayer(refMarker);
+      mapInstance.setView([ref.lat, ref.lng], 17);
+      refMarker = L.marker([ref.lat, ref.lng], {
+        icon: L.divIcon({
+          className: 'ref-label-icon',
+          html: '<span class="material-icons" style="font-size:38px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
+          iconSize: null,
+          iconAnchor: [19, 38]
+        }),
+        interactive: false
+      }).addTo(mapInstance);
     }
   }).catch(() => {});
 
@@ -376,10 +381,12 @@ function initMap() {
     maxNativeZoom: 18
   });
 
-  // ── Satellite imagery (Esri World Imagery) ── default (muestra la vegetación)
-  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri',
-    maxZoom: 19
+  // ── Satellite imagery (Google) ── default (muestra la vegetación)
+  const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    attribution: 'Imagery &copy; Google',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    maxZoom: 20,
+    maxNativeZoom: 20
   }).addTo(mapInstance);
 
   // Labels overlay for satellite
@@ -749,11 +756,6 @@ function initMap() {
   }
 
   loadSavedPoints().forEach(p => addSavedMarker(p));
-
-  const savedPts = loadSavedPoints();
-  if (savedPts.length) {
-    mapInstance.setView([savedPts[0].lat, savedPts[0].lng], 16);
-  }
 
   // ── Spanish localization for Leaflet.draw ──
   if (L.drawLocal) {

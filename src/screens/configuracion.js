@@ -788,9 +788,9 @@ function initPuntoReferencia() {
     const nombreFinal = (typeof nombre === 'string' && nombre.trim()) ? nombre : refPoint?.nombre || '';
     const icon = L.divIcon({
       className: 'ref-label-icon',
-      html: '<span class="material-icons" style="font-size:28px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(nombreFinal) + '</span>',
+      html: '<span class="material-icons" style="font-size:38px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(nombreFinal) + '</span>',
       iconSize: null,
-      iconAnchor: [14, 28]
+      iconAnchor: [19, 38]
     });
     marker = L.marker([lat, lng], { draggable: true, icon }).addTo(map);
     marker.on('dragend', () => {
@@ -814,9 +814,9 @@ function initPuntoReferencia() {
     if (!marker) return;
     marker.setIcon(L.divIcon({
       className: 'ref-label-icon',
-      html: '<span class="material-icons" style="font-size:28px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(nombre || '') + '</span>',
+      html: '<span class="material-icons" style="font-size:38px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(nombre || '') + '</span>',
       iconSize: null,
-      iconAnchor: [14, 28]
+      iconAnchor: [19, 38]
     }));
   }
 
