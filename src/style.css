@@ -454,6 +454,23 @@ body.screen-auth #app .main-content {
     }
   }
 
+  #mapa-container {
+    min-height: 580px !important;
+    height: 580px !important;
+  }
+  #lote-map-container {
+    height: 580px !important;
+    min-height: 580px !important;
+  }
+  #dl-map-container {
+    height: 320px !important;
+    min-height: 320px !important;
+  }
+  #ref-map {
+    height: 380px !important;
+    min-height: 380px !important;
+  }
+
   .sidebar-overlay {
     position: fixed;
     top: 0;

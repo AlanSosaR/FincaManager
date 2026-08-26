@@ -464,16 +464,14 @@ function initMap() {
     }
   }).catch(() => {});
 
-  // ── Google Maps style street map (default) ──
-  const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap, CARTO',
-    subdomains: 'abcd',
+  // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
+  const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri',
     maxZoom: 22,
-    maxNativeZoom: 18
+    maxNativeZoom: 19
   }).addTo(mapInstance);
 
-  // ── Satellite imagery (Esri World Imagery) ──
-  const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     maxZoom: 22,
@@ -485,24 +483,16 @@ function initMap() {
     subdomains: 'abcd',
     maxZoom: 22,
     opacity: 0.8
-  });
-
-  // ── Terrain (Esri World Topo) ──
-  const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri',
-    maxZoom: 22,
-    maxNativeZoom: 18
-  });
+  }).addTo(mapInstance);
 
   // Store layers for toggling
   mapInstance._layersConfig = {
-    street: streetLayer,
-    satellite: satelliteLayer,
-    labels: labelsLayer,
-    terrain: terrainLayer
+    esriSat: esriSatLayer,
+    googleSat: googleSatLayer,
+    labels: labelsLayer
   };
 
-  // Track which base layer is active (0=street, 1=satellite, 2=terrain)
+  // Track which base layer is active (0=Esri Sat, 1=Google Sat, 2=Clean Sat)
   let layerMode = 0;
 
   // ── Tile error handler: show warning when tiles fail ──
@@ -1150,32 +1140,34 @@ function initMap() {
     });
   }
 
-  // Layers toggle - switch street / satellite / terrain
+  // Layers toggle: 0 = Google Sat, 1 = Esri Sat, 2 = Sat Limpio
   const btnLayers = document.getElementById('btn-toggle-layers');
-  const layersLabel = document.getElementById('layers-label');
   if (btnLayers) {
     btnLayers.addEventListener('click', () => {
       layerMode = (layerMode + 1) % 3;
-      mapInstance.removeLayer(streetLayer);
-      mapInstance.removeLayer(satelliteLayer);
+      mapInstance.removeLayer(googleSatLayer);
+      mapInstance.removeLayer(esriSatLayer);
       mapInstance.removeLayer(labelsLayer);
-      mapInstance.removeLayer(terrainLayer);
       if (layerMode === 0) {
-        mapInstance.addLayer(streetLayer);
-        btnLayers.style.background = '';
-        btnLayers.style.color = '';
-        if (layersLabel) layersLabel.textContent = 'Satélite';
-      } else if (layerMode === 1) {
-        mapInstance.addLayer(satelliteLayer);
+        mapInstance.addLayer(esriSatLayer);
         mapInstance.addLayer(labelsLayer);
-        btnLayers.style.background = '#2d3e2c';
-        btnLayers.style.color = '#ffffff';
-        if (layersLabel) layersLabel.textContent = 'Relieve';
+        btnLayers.style.background = '#e8f5e9';
+        btnLayers.style.color = '#1b5e20';
+        btnLayers.title = 'Capa: Esri Satélite (Claridad)';
+        window.Snackbar?.show('Capa: Esri Satélite (Claridad agrícola)', { duration: 1500 });
+      } else if (layerMode === 1) {
+        mapInstance.addLayer(googleSatLayer);
+        mapInstance.addLayer(labelsLayer);
+        btnLayers.style.background = '#ffffff';
+        btnLayers.style.color = '#2d3e2c';
+        btnLayers.title = 'Capa: Google Satélite';
+        window.Snackbar?.show('Capa: Google Satélite', { duration: 1500 });
       } else {
-        mapInstance.addLayer(terrainLayer);
-        btnLayers.style.background = '#fff3e0';
-        btnLayers.style.color = '#e65100';
-        if (layersLabel) layersLabel.textContent = 'Satélite';
+        mapInstance.addLayer(esriSatLayer);
+        btnLayers.style.background = '#eceff1';
+        btnLayers.style.color = '#37474f';
+        btnLayers.title = 'Capa: Satélite Limpio (Sin textos)';
+        window.Snackbar?.show('Capa: Satélite Limpio (Sin textos)', { duration: 1500 });
       }
       if (existingLotesLayer) existingLotesLayer.bringToFront();
       if (drawnItems) drawnItems.bringToFront();

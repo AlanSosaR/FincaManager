@@ -61,12 +61,18 @@ export async function renderMapaLotes() {
       #mapa-container {
         flex: 1;
         min-height: 0;
-        min-height: 360px;
+        min-height: 480px;
         border-radius: 12px;
         overflow: hidden;
         border: 1px solid #e0e8e0;
         position: relative;
         background: #e8efe4;
+      }
+      @media (max-width: 1024px) {
+        #mapa-container {
+          min-height: 580px;
+          height: 580px;
+        }
       }
       .mapa-layers-btn {
         position: absolute;
@@ -289,14 +295,14 @@ export async function initMapaLotes() {
   container.innerHTML = `
     <button id="mapa-layers-btn" class="mapa-layers-btn" title="Cambiar mapa base">
       <span class="material-icons" style="font-size:16px;">layers</span>
-      <span id="mapa-layers-label">Satélite</span>
+      <span id="mapa-layers-label">Esri Sat.</span>
     </button>
   `;
 
   const map = L.map(container, {
     center: [14.5, -88.5],
     zoom: 9,
-    maxZoom: 19,
+    maxZoom: 22,
     zoomControl: false,
     attributionControl: false
   });
@@ -322,39 +328,47 @@ export async function initMapaLotes() {
     } else if (ref) {
       map.setView([ref.lat, ref.lng], 15);
     }
+    setTimeout(() => map.invalidateSize(), 200);
   }, 50);
   L.control.attribution({
     position: 'bottomleft',
     prefix: false
   }).addTo(map).addAttribution('Geocoding &copy; Geocode.XYZ');
   const layersBtnEl = document.getElementById('mapa-layers-btn');
-  layersBtnEl.style.background = '#2d3e2c';
+  layersBtnEl.style.background = '#1b5e20';
   layersBtnEl.style.color = '#ffffff';
 
-  const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap, CARTO',
-    subdomains: 'abcd',
+  // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
+  const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri',
     maxZoom: 22,
     maxNativeZoom: 18
-  });
+  }).addTo(map);
 
-  const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     maxZoom: 22,
     maxNativeZoom: 20
-  }).addTo(map);
+  });
 
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 22,
+    maxNativeZoom: 19,
     opacity: 0.8
   }).addTo(map);
 
-  const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri',
-    maxZoom: 22,
-    maxNativeZoom: 18
+  // Fallback si Esri satélite falla
+  let esriFailed = false;
+  esriSatLayer.on('tileerror', function() {
+    if (esriFailed) return;
+    esriFailed = true;
+    if (map.hasLayer(esriSatLayer)) {
+      map.removeLayer(esriSatLayer);
+      map.addLayer(googleSatLayer);
+      window.Snackbar?.show('Cambiado a Google Satélite automáticamente', 'info');
+    }
   });
 
   // Zoom controls
@@ -380,32 +394,35 @@ export async function initMapaLotes() {
     document.getElementById('mapa-zoom-out')?.addEventListener('click', () => map.zoomOut());
   }, 200);
 
-  // Layer toggle (starts on satellite)
-  let layerMode = 1;
+  // Layer toggle: 0 = Esri Satélite (Claridad), 1 = Google Satélite (Híbrido), 2 = Satélite Limpio
+  let layerMode = 0;
   const btnLayers = document.getElementById('mapa-layers-btn');
   const layersLabel = document.getElementById('mapa-layers-label');
   btnLayers.addEventListener('click', () => {
     layerMode = (layerMode + 1) % 3;
-    map.removeLayer(streetLayer);
-    map.removeLayer(satelliteLayer);
+    map.removeLayer(esriSatLayer);
+    map.removeLayer(googleSatLayer);
     map.removeLayer(labelsLayer);
-    map.removeLayer(terrainLayer);
     if (layerMode === 0) {
-      map.addLayer(streetLayer);
-      btnLayers.style.background = '#ffffff';
-      btnLayers.style.color = '#2d3e2c';
-      if (layersLabel) layersLabel.textContent = 'Calle';
+      map.addLayer(esriSatLayer);
+      map.addLayer(labelsLayer);
+      btnLayers.style.background = '#1b5e20';
+      btnLayers.style.color = '#ffffff';
+      if (layersLabel) layersLabel.textContent = 'Esri Sat.';
+      window.Snackbar?.show('Capa: Esri Satélite (Claridad agrícola)', { duration: 1500 });
     } else if (layerMode === 1) {
-      map.addLayer(satelliteLayer);
+      map.addLayer(googleSatLayer);
       map.addLayer(labelsLayer);
       btnLayers.style.background = '#2d3e2c';
       btnLayers.style.color = '#ffffff';
-      if (layersLabel) layersLabel.textContent = 'Satélite';
+      if (layersLabel) layersLabel.textContent = 'Google Sat.';
+      window.Snackbar?.show('Capa: Google Satélite', { duration: 1500 });
     } else {
-      map.addLayer(terrainLayer);
-      btnLayers.style.background = '#fff3e0';
-      btnLayers.style.color = '#e65100';
-      if (layersLabel) layersLabel.textContent = 'Relieve';
+      map.addLayer(esriSatLayer);
+      btnLayers.style.background = '#37474f';
+      btnLayers.style.color = '#ffffff';
+      if (layersLabel) layersLabel.textContent = 'Sat. Limpio';
+      window.Snackbar?.show('Capa: Satélite Limpio (Sin textos)', { duration: 1500 });
     }
   });
 

@@ -31,9 +31,10 @@ export async function renderPotreros() {
         height: 100%;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 4px;
         min-height: 0;
         position: relative;
+        padding-bottom: 0;
       }
       .mapa-summary {
         display: flex;
@@ -67,11 +68,17 @@ export async function renderPotreros() {
       #mapa-container {
         flex: 1;
         min-height: 0;
-        min-height: 360px;
+        min-height: 480px;
         border-radius: 12px;
         overflow: hidden;
         position: relative;
         background: #e8efe4;
+      }
+      @media (max-width: 1024px) {
+        #mapa-container {
+          min-height: 580px;
+          height: 580px;
+        }
       }
       .mapa-layers-btn {
         position: absolute;
@@ -383,14 +390,15 @@ export async function renderPotreros() {
           </div>
         </div>
       </div>
-      <div style="margin:0 0 12px;">
-        <h2 style="margin:0;font-size:30px;font-weight:800;color:var(--on-surface);letter-spacing:-0.5px;">Potreros</h2>
+      <div style="margin:0 0 8px;">
+        <h2 style="margin:0;font-size:30px;font-weight:800;color:var(--on-surface);letter-spacing:-0.5px;">Potreros <span id="mapa-title-count" style="font-weight:500;font-size:22px;color:var(--on-surface-variant);"></span></h2>
       </div>
-      <div class="mapa-summary" id="mapa-summary">
-        <span class="mapa-chip"><img src="mapa.png" alt=""><strong id="mapa-n-potreros">0</strong> Potreros</span>
-        <span class="mapa-chip"><img src="area.png" alt=""><strong id="mapa-n-ha">0.0</strong> Hectáreas</span>
-        <span class="mapa-chip"><span class="material-icons" style="font-size:18px;color:#2d3e2c;">touch_app</span>Toca un potrero para ver su detalle</span>
-      </div>
+      <p class="m3-label-medium m3-text-on-surface-variant" id="mapa-summary-text" style="margin: 4px 0 4px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+        <span class="material-icons" style="font-size:18px;color:#2d3e2c;">touch_app</span>
+        <span>Toca un potrero para ver su detalle</span>
+        <span style="color:var(--m3-outline);">|</span>
+        <span id="mapa-ha-text"></span>
+      </p>
       <div id="mapa-container">
         <div class="mapa-empty" id="mapa-loading">
           <div class="spinner"></div>
@@ -432,13 +440,13 @@ export async function initPotreros() {
 
   const withCoords = potreros.filter(p => p.coordenadas_json);
   const totalHa = potreros.reduce((s, p) => s + (parseFloat(p.area) || 0), 0);
-  document.getElementById('mapa-n-potreros').textContent = potreros.length;
-  document.getElementById('mapa-n-ha').textContent = totalHa.toFixed(1);
+  document.getElementById('mapa-title-count').textContent = `(${potreros.length})`;
+  document.getElementById('mapa-ha-text').textContent = `${totalHa.toFixed(1)} hectáreas`;
 
   container.innerHTML = `
     <button id="mapa-layers-btn" class="mapa-layers-btn" title="Cambiar mapa base">
       <span class="material-icons" style="font-size:16px;">layers</span>
-      <span id="mapa-layers-label">Satélite</span>
+      <span id="mapa-layers-label">Esri Sat.</span>
     </button>
   `;
 
@@ -470,54 +478,47 @@ export async function initPotreros() {
     } else if (ref) {
       map.setView([ref.lat, ref.lng], 15);
     }
+    setTimeout(() => map.invalidateSize(), 200);
   }, 50);
   L.control.attribution({
     position: 'bottomleft',
     prefix: false
   }).addTo(map).addAttribution('Geocoding &copy; Geocode.XYZ');
   const layersBtnEl = document.getElementById('mapa-layers-btn');
-  layersBtnEl.style.background = '#2d3e2c';
+  layersBtnEl.style.background = '#1b5e20';
   layersBtnEl.style.color = '#ffffff';
 
-  const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap, CARTO',
-    subdomains: 'abcd',
+  // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
+  const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri',
     maxZoom: 22,
     maxNativeZoom: 18
-  });
+  }).addTo(map);
 
-  const satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     maxZoom: 22,
     maxNativeZoom: 20
-  }).addTo(map);
-
-  // Fallback: si las tiles de Esri fallan (p. ej. al hacer zoom), cambia a OpenStreetMap
-  let esriFailed = false;
-  const osmFallback = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap',
-    maxZoom: 22,
-    maxNativeZoom: 19
-  });
-  satelliteLayer.on('tileerror', function() {
-    if (esriFailed) return;
-    esriFailed = true;
-    if (map.hasLayer(satelliteLayer)) map.removeLayer(satelliteLayer);
-    if (!map.hasLayer(osmFallback)) osmFallback.addTo(map);
-    window.Snackbar?.show('Mapa satelital no disponible, se cambió a mapa de calles', 'error');
   });
 
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 22,
+    maxNativeZoom: 19,
     opacity: 0.8
   }).addTo(map);
 
-  const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri',
-    maxZoom: 22,
-    maxNativeZoom: 18
+  // Fallback si Esri satélite falla
+  let esriFailed = false;
+  esriSatLayer.on('tileerror', function() {
+    if (esriFailed) return;
+    esriFailed = true;
+    if (map.hasLayer(esriSatLayer)) {
+      map.removeLayer(esriSatLayer);
+      map.addLayer(googleSatLayer);
+      window.Snackbar?.show('Cambiado a Google Satélite automáticamente', 'info');
+    }
   });
 
   // Zoom controls
@@ -543,32 +544,35 @@ export async function initPotreros() {
     document.getElementById('mapa-zoom-out')?.addEventListener('click', () => map.zoomOut());
   }, 200);
 
-  // Layer toggle (starts on satellite)
-  let layerMode = 1;
+  // Layer toggle: 0 = Esri Satélite (Claridad), 1 = Google Satélite (Híbrido), 2 = Satélite Limpio
+  let layerMode = 0;
   const btnLayers = document.getElementById('mapa-layers-btn');
   const layersLabel = document.getElementById('mapa-layers-label');
   btnLayers.addEventListener('click', () => {
     layerMode = (layerMode + 1) % 3;
-    map.removeLayer(streetLayer);
-    map.removeLayer(satelliteLayer);
+    map.removeLayer(esriSatLayer);
+    map.removeLayer(googleSatLayer);
     map.removeLayer(labelsLayer);
-    map.removeLayer(terrainLayer);
     if (layerMode === 0) {
-      map.addLayer(streetLayer);
-      btnLayers.style.background = '#ffffff';
-      btnLayers.style.color = '#2d3e2c';
-      if (layersLabel) layersLabel.textContent = 'Calle';
+      map.addLayer(esriSatLayer);
+      map.addLayer(labelsLayer);
+      btnLayers.style.background = '#1b5e20';
+      btnLayers.style.color = '#ffffff';
+      if (layersLabel) layersLabel.textContent = 'Esri Sat.';
+      window.Snackbar?.show('Capa: Esri Satélite (Claridad agrícola)', { duration: 1500 });
     } else if (layerMode === 1) {
-      map.addLayer(satelliteLayer);
+      map.addLayer(googleSatLayer);
       map.addLayer(labelsLayer);
       btnLayers.style.background = '#2d3e2c';
       btnLayers.style.color = '#ffffff';
-      if (layersLabel) layersLabel.textContent = 'Satélite';
+      if (layersLabel) layersLabel.textContent = 'Google Sat.';
+      window.Snackbar?.show('Capa: Google Satélite', { duration: 1500 });
     } else {
-      map.addLayer(terrainLayer);
-      btnLayers.style.background = '#fff3e0';
-      btnLayers.style.color = '#e65100';
-      if (layersLabel) layersLabel.textContent = 'Relieve';
+      map.addLayer(esriSatLayer);
+      btnLayers.style.background = '#37474f';
+      btnLayers.style.color = '#ffffff';
+      if (layersLabel) layersLabel.textContent = 'Sat. Limpio';
+      window.Snackbar?.show('Capa: Satélite Limpio (Sin textos)', { duration: 1500 });
     }
   });
 

@@ -114,7 +114,7 @@ export async function renderDetalleLote(id) {
             <div class="m3-flex m3-items-center m3-gap-2 m3-text-on-surface-variant m3-label-medium m3-font-bold m3-mb-3" style="padding-left: 4px;">
               <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;"> ${lote.area_ha || 0} Hectáreas
             </div>
-            <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' class="m3-card m3-p-8" style="border-radius: 12px; height: 180px; overflow: hidden;"></div>
+            <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' class="m3-card m3-p-8" style="border-radius: 12px; height: 240px; overflow: hidden;"></div>
             <!-- Personal Asignado -->
             <div class="m3-card m3-p-6" style="border-radius: 12px; margin-top: 24px; overflow: hidden;">
               <h3 class="m3-title-large m3-font-bold m3-mb-6 m3-flex m3-items-center m3-gap-2" style="white-space: nowrap;">
