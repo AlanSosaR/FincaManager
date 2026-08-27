@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { restFetch } from '../auth.js';
 import { sendWhatsApp } from '../wa.js';
+import { uploadImage } from '../utils/image_uploader.js';
 
 export async function renderNuevoAnimal(id) {
   const isEdit = !!id;
@@ -263,11 +264,7 @@ export function initNuevoAnimal(id) {
     try {
       let image_url = null;
       if (selectedFile) {
-        image_url = await new Promise(resolve => {
-          const r = new FileReader();
-          r.onload = e => resolve(e.target.result);
-          r.readAsDataURL(selectedFile);
-        });
+        image_url = await uploadImage(selectedFile);
       }
 
       // Clean empty dates so Supabase doesn't error out on empty strings

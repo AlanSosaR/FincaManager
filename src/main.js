@@ -18,6 +18,7 @@ import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, c
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 import { initRealtime, disconnectRealtime } from './realtime.js';
+import { migrateExistingImagesToExternal } from './utils/image_uploader.js';
 
 const syncIcon = document.getElementById('sync-icon');
 const syncBadge = document.getElementById('sync-badge');
@@ -231,49 +232,76 @@ function initOnlineSync() {
     } catch (e) { /* silent */ }
   });
 
+  let lastVisibilitySync = Date.now();
   document.addEventListener('visibilitychange', async () => {
     if (document.visibilityState === 'visible' && navigator.onLine && isAuthenticated()) {
       try {
         await processSyncQueue();
-        await incrementalSync();
+        const now = Date.now();
+        if (now - lastVisibilitySync > 30 * 60 * 1000) { // Throttle a 1 vez cada 30 minutos
+          lastVisibilitySync = now;
+          await incrementalSync();
+        }
       } catch (e) { /* silent */ }
     }
   });
 
-  // Queue flush — writes pendientes cada 5s
+  // Queue flush — writes pendientes cada 15s (solo si hay internet y sesión)
   setInterval(async () => {
     if (navigator.onLine && isAuthenticated()) {
       try {
         await processSyncQueue();
       } catch (e) { /* silent */ }
     }
-  }, 5000);
+  }, 15000);
 
-  // WhatsApp checkers — respaldo periódico cada 60s
-  setInterval(async () => {
+  // WhatsApp checkers throttled — máximo 1 vez cada 6 horas para ahorrar Egress de Supabase
+  async function runWhatsAppCheckersThrottled(force = false) {
+    if (!navigator.onLine || !isAuthenticated()) return;
+    const WA_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // 6 horas
+    const lastCheck = parseInt(localStorage.getItem('wa_last_check_timestamp') || '0', 10);
+    const now = Date.now();
+    if (!force && (now - lastCheck < WA_CHECK_INTERVAL)) return;
+
+    try {
+      localStorage.setItem('wa_last_check_timestamp', String(now));
+      await checkPendingVaccines();
+      await checkPendingFumigaciones();
+      await checkOverdueVaccines();
+      await checkUpcomingVaccines();
+      await checkAplicacionesDelMes();
+      await checkAnalisisSueloPendiente();
+      await checkEnmiendaCal();
+      await actualizarSaludPorPlan();
+      await checkPartosProximos();
+    } catch (e) { /* silent */ }
+  }
+
+  // Ejecutar checkers al iniciar/cargar app
+  setTimeout(() => runWhatsAppCheckersThrottled(), 5000);
+
+  // Auto-migrar imágenes Base64 pesadas existentes hacia ImgBB en segundo plano
+  setTimeout(async () => {
     if (navigator.onLine && isAuthenticated()) {
       try {
-        await checkPendingVaccines();
-        await checkPendingFumigaciones();
-        await checkOverdueVaccines();
-        await checkUpcomingVaccines();
-        await checkAplicacionesDelMes();
-        await checkAnalisisSueloPendiente();
-        await checkEnmiendaCal();
-        await actualizarSaludPorPlan();
-        await checkPartosProximos();
+        await migrateExistingImagesToExternal(db, restFetch);
       } catch (e) { /* silent */ }
     }
-  }, 60000);
+  }, 10000);
 
-  // Full sync safety net — cada 5 minutos
+  // Comprobar si corresponde ejecutar cada 30 minutos
+  setInterval(() => {
+    runWhatsAppCheckersThrottled();
+  }, 1800000);
+
+  // Full sync safety net — cada 1 hora (en vez de cada 5 minutos)
   setInterval(async () => {
     if (navigator.onLine && isAuthenticated()) {
       try {
         await incrementalSync();
       } catch (e) { /* silent */ }
     }
-  }, 300000);
+  }, 3600000);
 }
 
 // ─── Screen imports ──────────────────────────────────────────────────────────

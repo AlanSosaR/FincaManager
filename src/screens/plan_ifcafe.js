@@ -3,6 +3,7 @@ import { getPlanIfcafe, getZonaLabel, calcularDosis, normalizarProducto } from '
 import { sendWhatsApp } from '../wa.js';
 import { invalidateCache } from '../sync.js';
 import { showModal, closeModal } from '../modals.js';
+import { uploadImage } from '../utils/image_uploader.js';
 
 function compressImage(file, maxWidth = 1000, quality = 0.75) {
   return new Promise((resolve, reject) => {
@@ -116,7 +117,6 @@ function eventCardHtml(ev) {
 
   // Calcular días transcurridos desde la aplicación
   let diasTranscurridosTexto = '';
-  let diasTranscurridosPill = '';
   if (isRealizada && ev.fecha) {
     const pFecha = ev.fecha.split('-');
     const fActividad = new Date(parseInt(pFecha[0]), parseInt(pFecha[1]) - 1, parseInt(pFecha[2]) || 1);
@@ -128,16 +128,12 @@ function eventCardHtml(ev) {
     
     if (diffDays === 0) {
       diasTranscurridosTexto = 'Hoy (hace 0 días)';
-      diasTranscurridosPill = '🟢 Aplicada hoy';
     } else if (diffDays === 1) {
       diasTranscurridosTexto = 'Ayer (hace 1 día)';
-      diasTranscurridosPill = '⏳ Hace 1 día';
     } else if (diffDays > 1) {
       diasTranscurridosTexto = `Hace ${diffDays} días (${fActividad.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })})`;
-      diasTranscurridosPill = `⏳ Hace ${diffDays} días`;
     } else if (diffDays < 0) {
       diasTranscurridosTexto = `Registrada para hoy`;
-      diasTranscurridosPill = '🟢 Hoy';
     }
   }
 
@@ -187,14 +183,7 @@ function eventCardHtml(ev) {
             ${ev.showLote ? `<div class="plan-ev-lote"><span class="material-symbols-outlined" style="font-size:13px;">eco</span> ${ev.loteNombre}</div>` : ''}
           </div>
         </div>
-        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-          <span class="plan-ev-badge" style="${badgeStyle[badgeLabel]}">${badgeLabel}</span>
-          ${diasTranscurridosPill ? `
-            <span style="font-size:10.5px; font-weight:800; color:#1b5e20; background:#e8f5e9; padding:2px 7px; border-radius:6px; border:1px solid #c8e6c9; white-space:nowrap;">
-              ${diasTranscurridosPill}
-            </span>
-          ` : ''}
-        </div>
+        <span class="plan-ev-badge" style="${badgeStyle[badgeLabel]}">${badgeLabel}</span>
       </div>
 
       <div class="plan-ev-meta">
@@ -585,11 +574,13 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-        if (fotoBtnLabel) fotoBtnLabel.textContent = 'Procesando foto...';
-        const compressedBase64 = await compressImage(file, 1000, 0.75);
-        fotoData.value = compressedBase64;
-        fotoImg.src = compressedBase64;
+        if (fotoBtnLabel) fotoBtnLabel.textContent = 'Subiendo foto...';
+        const localPreview = await compressImage(file, 1000, 0.75);
+        fotoImg.src = localPreview;
         fotoPreviewBox.style.display = 'block';
+
+        const hostedUrl = await uploadImage(file);
+        fotoData.value = hostedUrl || localPreview;
         if (fotoBtnLabel) fotoBtnLabel.textContent = 'Cambiar foto de la planta';
       } catch (err) {
         console.error('Error procesando imagen:', err);
@@ -1237,11 +1228,13 @@ export function initPlanIfcafe() {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
-          if (modalFotoBtnLabel) modalFotoBtnLabel.textContent = 'Procesando foto...';
-          const compressedBase64 = await compressImage(file, 1000, 0.75);
-          modalFotoData.value = compressedBase64;
-          modalFotoImg.src = compressedBase64;
+          if (modalFotoBtnLabel) modalFotoBtnLabel.textContent = 'Subiendo foto...';
+          const localPreview = await compressImage(file, 1000, 0.75);
+          modalFotoImg.src = localPreview;
           modalFotoPreviewBox.style.display = 'block';
+
+          const hostedUrl = await uploadImage(file);
+          modalFotoData.value = hostedUrl || localPreview;
           if (modalFotoBtnLabel) modalFotoBtnLabel.textContent = 'Cambiar foto de la planta';
         } catch (err) {
           console.error('Error procesando foto:', err);

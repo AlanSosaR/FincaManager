@@ -816,6 +816,48 @@ function buildPopupHtml(lote, apps) {
   const fertilizantes = (apps || []).filter(a => a.tipo === 'Fertilizante').slice(0, 3);
   const limpiezas = (apps || []).filter(a => a.tipo === 'Limpieza').slice(0, 3);
 
+  let maderablesVariedades = lote.maderables_variedades || '';
+  let musaceasTipo = lote.musaceas_tipo || '';
+
+  if (lote.coordenadas_json) {
+    try {
+      const parsedCoords = JSON.parse(lote.coordenadas_json);
+      if (parsedCoords && typeof parsedCoords === 'object' && !Array.isArray(parsedCoords)) {
+        if (parsedCoords.maderables_variedades && !maderablesVariedades) {
+          maderablesVariedades = parsedCoords.maderables_variedades;
+        }
+        if (parsedCoords.musaceas_tipo && !musaceasTipo) {
+          musaceasTipo = parsedCoords.musaceas_tipo;
+        }
+      }
+    } catch {}
+  }
+
+  const parseAgroItems = (str) => {
+    if (!str) return [];
+    return str.split(',').map(item => {
+      const trimmed = item.trim();
+      if (!trimmed) return null;
+      const match = trimmed.match(/^(.+?)(?:\s*\((\d+)\))?$/);
+      if (match) {
+        return { name: match[1].trim(), qty: match[2] ? parseInt(match[2], 10) : null };
+      }
+      return { name: trimmed, qty: null };
+    }).filter(Boolean);
+  };
+
+  const maderablesList = parseAgroItems(maderablesVariedades);
+  const musaceasList = parseAgroItems(musaceasTipo);
+
+  const formatEdadLabel = (edad) => {
+    if (!edad) return '';
+    if (edad === '1_anio') return '1 año · Café Tiernito';
+    if (edad === '2_anios') return '2 años · Creciendo';
+    if (edad === '3_mas') return '3+ años · En Producción';
+    if (edad === 'carga_alta') return 'Carga Muy Alta';
+    return edad;
+  };
+
   const abonoHtml = fertilizantes.length > 0
     ? fertilizantes.map(a => `
         <div class="mapa-pop-row">
@@ -838,12 +880,32 @@ function buildPopupHtml(lote, apps) {
     <div class="mapa-pop">
       <div class="mapa-pop-head">
         <span class="mapa-pop-title">${lote.nombre}</span>
-        <span class="mapa-pop-badge">${lote.variedad || 'Café'}</span>
+        <span class="mapa-pop-badge" style="display:inline-flex; align-items:center; gap:6px; background:#eef7ee; color:#1b5e20; border:1px solid #c8e6c9; font-weight:800; font-size:11.5px; padding:4px 10px; border-radius:12px;">
+          ${lote.variedad || 'Café'}${lote.edad_categoria ? ` · 🌱 ${formatEdadLabel(lote.edad_categoria)}` : ''}
+        </span>
       </div>
-      <div class="mapa-pop-stats">
-        <span><img src="area.png" alt="">${lote.area_ha ? parseFloat(lote.area_ha).toFixed(2) : '0.00'} ha</span>
-        <span><img src="sprouts.png" alt="">${(lote.num_plantas || 0).toLocaleString()} plantas</span>
+      <div class="mapa-pop-stats" style="flex-wrap:wrap; gap:8px;">
+        <span><img src="sprouts.png" alt=""><b>${(lote.num_plantas || 0).toLocaleString()}</b> plantas de café</span>
+        <span><img src="area.png" alt=""><b>${lote.area_ha ? parseFloat(lote.area_ha).toFixed(2) : '0.00'}</b> ha</span>
       </div>
+
+      ${maderablesList.length > 0 || musaceasList.length > 0 ? `
+        <div class="mapa-pop-chips-carousel" style="display:flex; gap:6px; overflow-x:auto; padding: 2px 0 6px; margin: 6px 0 10px; scrollbar-width: thin; -webkit-overflow-scrolling: touch;">
+          ${maderablesList.map(m => `
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#1b5e20; background:#eef7ee; border:1px solid #c8e6c9; border-radius:8px; padding:3px 8px; flex-shrink:0; white-space:nowrap;">
+              <span>🌲</span>
+              <span>${m.qty !== null ? `<b>${m.qty.toLocaleString()}</b> ${m.name}` : m.name}</span>
+            </span>
+          `).join('')}
+          ${musaceasList.map(m => `
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#7a6000; background:#fff8e1; border:1px solid #ffe082; border-radius:8px; padding:3px 8px; flex-shrink:0; white-space:nowrap;">
+              <span>🍌</span>
+              <span>${m.qty !== null ? `<b>${m.qty.toLocaleString()}</b> ${m.name}` : m.name}</span>
+            </span>
+          `).join('')}
+        </div>
+      ` : ''}
+
       <div class="mapa-pop-sec">
         <span class="mapa-pop-sec-t">Abono / Fertilización</span>
         ${abonoHtml}

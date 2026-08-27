@@ -66,18 +66,20 @@ export async function renderPotreros() {
         font-size: 16px;
       }
       #mapa-container {
-        flex: 1;
-        min-height: 0;
-        min-height: 480px;
-        border-radius: 12px;
+        width: 100%;
+        height: 680px;
+        min-height: 680px;
+        border-radius: 18px;
         overflow: hidden;
         position: relative;
         background: #e8efe4;
+        border: 1.5px solid #dce5da;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.06);
       }
-      @media (max-width: 1024px) {
+      @media (max-width: 768px) {
         #mapa-container {
-          min-height: 580px;
-          height: 580px;
+          height: 600px;
+          min-height: 600px;
         }
       }
       .mapa-layers-btn {
@@ -374,8 +376,8 @@ export async function renderPotreros() {
         background: #f2f4f0;
       }
     </style>
-    <div class="mapa-page">
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin:16px 0 8px;">
+    <div class="screen-potreros" style="padding-bottom: 80px;">
+      <div class="ganado-top-actions-container" style="display:flex;justify-content:flex-end;gap:10px;margin:16px 0 8px;">
         <div class="ganado-split-ctrl ${currentPotrerosSearchQuery ? 'expanded' : ''}" id="potreros-search-wrapper">
           <button id="potreros-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar potrero">
             <span class="material-icons" style="color:#ffffff;">search</span>
@@ -395,22 +397,36 @@ export async function renderPotreros() {
           </div>
         </div>
       </div>
-      <div style="margin:0 0 8px;">
-        <h2 style="margin:0;font-size:30px;font-weight:800;color:var(--on-surface);letter-spacing:-0.5px;">Potreros <span id="mapa-title-count" style="font-weight:500;font-size:22px;color:var(--on-surface-variant);"></span></h2>
+      <div class="ganado-page-title" style="margin-top: -10px; margin-bottom: 24px;">
+        <h2>Potreros <span id="mapa-title-count" style="font-weight:500;font-size:22px;color:var(--on-surface-variant);"></span></h2>
       </div>
-      <p class="m3-label-medium m3-text-on-surface-variant" id="mapa-summary-text" style="margin: 4px 0 4px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-        <span class="material-icons" style="font-size:18px;color:#2d3e2c;">touch_app</span>
-        <span>Toca un potrero para ver su detalle</span>
-        <span style="color:var(--m3-outline);">|</span>
-        <span id="mapa-ha-text"></span>
-      </p>
-      <div id="mapa-container">
-        <div class="mapa-empty" id="mapa-loading">
-          <div class="spinner"></div>
-          <p>Cargando mapa de potreros...</p>
+
+      <div class="da-tabs-section" style="margin-top: 10px;">
+        <div style="position: relative;">
+          <div class="ganado-tag-stat" style="background: #fdfdfd; border-radius: 16px; padding: 13px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; cursor: default;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;"><img src="mapa.png" alt="" style="width: 24px; height: 24px; object-fit: contain;"></span>
+              <div style="display: flex; flex-direction: column;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 16px; font-weight: 800; color: #2d3e2c;">Mapa de Potreros</span>
+                  <span id="mapa-ha-text" style="font-size: 12px; font-weight: 700; color: #2d3e2c; background: #eef4ec; border: 1px solid #d4dfd2; padding: 2px 10px; border-radius: 99px;">0 Hectáreas</span>
+                </div>
+                <span style="font-size: 11.5px; color: #666; font-weight: 600; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                  <span class="material-icons" style="font-size: 14px; color: #2d3e2c;">touch_app</span> Toca un potrero para ver su detalle
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div id="mapa-container">
+            <div class="mapa-empty" id="mapa-loading">
+              <div class="spinner"></div>
+              <p>Cargando mapa de potreros...</p>
+            </div>
+          </div>
+          <div id="potrero-float-card" class="potrero-float-card" style="display:none;"></div>
         </div>
       </div>
-      <div id="potrero-float-card" class="potrero-float-card" style="display:none;"></div>
     </div>
   `;
 }
@@ -446,7 +462,7 @@ export async function initPotreros() {
   const withCoords = potreros.filter(p => p.coordenadas_json);
   const totalHa = potreros.reduce((s, p) => s + (parseFloat(p.area) || 0), 0);
   document.getElementById('mapa-title-count').textContent = `(${potreros.length})`;
-  document.getElementById('mapa-ha-text').textContent = `${totalHa.toFixed(1)} hectáreas`;
+  document.getElementById('mapa-ha-text').textContent = `${totalHa.toFixed(2)} Hectáreas`;
 
   container.innerHTML = `
     <button id="mapa-layers-btn" class="mapa-layers-btn" title="Cambiar mapa base">

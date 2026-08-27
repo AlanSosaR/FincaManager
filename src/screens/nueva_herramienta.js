@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { uploadImage } from '../utils/image_uploader.js';
 
 export async function renderNuevaHerramienta(id) {
   const isEdit = !!id;
@@ -157,11 +158,7 @@ export async function initNuevaHerramienta(id) {
     try {
       let image_url = currentImageUrl;
       if (selectedFile) {
-        image_url = await new Promise(resolve => {
-          const r = new FileReader();
-          r.onload = e => resolve(e.target.result);
-          r.readAsDataURL(selectedFile);
-        });
+        image_url = await uploadImage(selectedFile);
       }
 
       const toolData = {

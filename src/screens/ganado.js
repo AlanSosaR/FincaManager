@@ -157,49 +157,42 @@ export async function renderGanado(page = 1, filter = 'all') {
 
       <div class="da-tabs-section" style="margin-top: 16px;">
         <section class="ganado-top-cards">
-          <div class="ganado-card ganado-card-primary ganado-tally ganado-card-filter ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">
-            <div class="ganado-tally-top">
-              <span class="ganado-tally-label">Total Animales</span>
+          <div class="ganado-card ganado-card-primary ganado-tally ganado-card-filter ${currentFilter === 'all' ? 'active' : ''}" data-filter="all" style="background: var(--m3-primary, #2d3e2c); border-radius: 20px; padding: 24px 22px 20px; box-shadow: 0 6px 24px rgba(45,62,44,0.22); width: 100%; box-sizing: border-box;">
+            <div class="ganado-tally-top" style="margin-bottom: 16px;">
+              <span class="ganado-tally-label" style="color: rgba(255,255,255,0.92); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13.5px;">Total Animales</span>
               <span class="ganado-tally-count">
-                <span class="ganado-card-value">${totalAnimales}</span>
+                <span class="ganado-card-value" style="color: #ffffff !important; font-size: 38px; font-weight: 800;">${totalAnimales}</span>
               </span>
             </div>
-            <div class="ganado-tally-divider"></div>
-            <div class="ganado-tally-row">
-              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'hembra' ? 'active' : ''}" data-filter="hembra" title="Ver hembras">
+            <div class="ganado-tally-divider" style="border-top: 1px solid rgba(255,255,255,0.18); margin-bottom: 16px;"></div>
+            <div class="ganado-tally-row" style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'hembra' ? 'active' : ''}" data-filter="hembra" title="Ver hembras" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px;">
                 <span class="ganado-tag-swatch h"><span class="ganado-sex-icon-img"></span></span>
                 <span class="ganado-tag-info">
-                  <span class="ganado-tag-n">${hembrasCount}</span>
-                  <span class="ganado-tag-l">Hembras</span>
+                  <span class="ganado-tag-n" style="font-size: 19px; font-weight: 800; color: #2d3e2c;">${hembrasCount}</span>
+                  <span class="ganado-tag-l" style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: 700;">Hembras</span>
                 </span>
               </div>
-              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'macho' ? 'active' : ''}" data-filter="macho" title="Ver machos">
+              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'macho' ? 'active' : ''}" data-filter="macho" title="Ver machos" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px;">
                 <span class="ganado-tag-swatch m"><span class="ganado-sex-icon-img"></span></span>
                 <span class="ganado-tag-info">
-                  <span class="ganado-tag-n">${machosCount}</span>
-                  <span class="ganado-tag-l">Machos</span>
+                  <span class="ganado-tag-n" style="font-size: 19px; font-weight: 800; color: #2d3e2c;">${machosCount}</span>
+                  <span class="ganado-tag-l" style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: 700;">Machos</span>
                 </span>
-              </div>
-              <div class="ganado-tag-stat ganado-tag-fumig ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" title="Abrir panel de fumigación">
-                <span class="ganado-tag-swatch f"><span class="material-icons">bug_report</span></span>
-                <span class="ganado-tag-info">
-                  <span class="ganado-tag-n fumig-veces-value">${vecesFumigadas}</span>
-                  <span class="ganado-tag-l">Fumigación aplicada</span>
-                  <span class="ganado-fumig-chip fumig-pend-chip"><span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes</span>
-                </span>
-                <span class="material-icons ganado-tag-expand">expand_more</span>
               </div>
             </div>
           </div>
 
-          <div class="ganado-tag-stat ganado-fumig-mob ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" id="ganado-fumig-card" data-filter="fumigaciones" title="Abrir panel de fumigación">
-            <span class="ganado-tag-swatch f"><span class="material-icons">bug_report</span></span>
-            <span class="ganado-tag-info">
-              <span class="ganado-tag-n fumig-veces-value">${vecesFumigadas}</span>
-              <span class="ganado-tag-l">Fumigación aplicada</span>
-              <span class="ganado-fumig-chip fumig-pend-chip"><span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes</span>
-            </span>
-            <span class="material-icons ganado-tag-expand">expand_more</span>
+          <div class="ganado-tag-stat ganado-fumig-mob ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" id="ganado-fumig-card" data-filter="fumigaciones" title="Abrir panel de fumigación" style="background: #fdfdfd; border-radius: 16px; padding: 15px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-top: 14px; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <span class="ganado-tag-swatch f" style="background: rgba(45,62,44,0.08); border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="color: #2d3e2c; font-size: 24px;">bug_report</span></span>
+              <span class="ganado-tag-info" style="display: flex; flex-direction: column;">
+                <span class="ganado-tag-n fumig-veces-value" style="font-size: 15.5px; font-weight: 800; color: #2d3e2c;">${vecesFumigadas}</span>
+                <span class="ganado-tag-l" style="font-size: 11.5px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.3px;">Fumigación aplicada</span>
+                <span class="ganado-fumig-chip fumig-pend-chip" style="margin-top: 4px;"><span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes</span>
+              </span>
+            </div>
+            <span class="material-icons ganado-tag-expand" style="color: #666; font-size: 24px;">expand_more</span>
           </div>
 
           ${vacunasCount > 0 ? `
@@ -815,12 +808,14 @@ export function initGanado() {
 
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
+      if (!searchWrapper.classList.contains('expanded') || !searchInput.style.width || searchInput.style.width === '0px') {
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';
         searchWrapper.classList.add('expanded');
+        searchInput.focus();
+      } else {
         searchInput.focus();
       }
     });
@@ -838,8 +833,10 @@ export function initGanado() {
 
     let searchTimeout;
     searchInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      searchClear.style.display = val ? 'flex' : 'none';
       clearTimeout(searchTimeout);
-      currentSearchQuery = e.target.value;
+      currentSearchQuery = val;
       searchTimeout = setTimeout(() => {
         window.changeGanadoPage(1);
       }, 500);

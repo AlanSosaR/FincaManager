@@ -60,19 +60,19 @@ export async function renderDashboard() {
         }
         #mapa-container {
           width: 100%;
-          height: 520px;
-          min-height: 520px;
-          border-radius: 16px;
+          height: 680px;
+          min-height: 680px;
+          border-radius: 18px;
           overflow: hidden;
           position: relative;
           background: #e8efe4;
           border: 1.5px solid #dce5da;
-          box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.06);
         }
         @media (max-width: 768px) {
           #mapa-container {
-            height: 480px;
-            min-height: 480px;
+            height: 600px;
+            min-height: 600px;
           }
         }
         .mapa-layers-btn {
@@ -280,91 +280,119 @@ export async function renderDashboard() {
         .cafetal-hero .ganado-tally-label {
           color: rgba(255,255,255,0.92) !important;
         }
+        .mapa-pop-chips-carousel {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding: 2px 0 6px;
+          margin: 6px 0 10px;
+          scrollbar-width: thin;
+          -webkit-overflow-scrolling: touch;
+        }
+        .mapa-pop-chips-carousel::-webkit-scrollbar {
+          height: 4px;
+        }
+        .mapa-pop-chips-carousel::-webkit-scrollbar-track {
+          background: rgba(0,0,0,0.03);
+          border-radius: 4px;
+        }
+        .mapa-pop-chips-carousel::-webkit-scrollbar-thumb {
+          background: #c8d8c6;
+          border-radius: 4px;
+        }
+        .screen-cafetal .da-tabs-section {
+          background: white;
+          border-radius: 18px;
+          padding: 20px 12px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+          border: 1px solid rgba(0,0,0,0.02);
+        }
+        @media (max-width: 600px) {
+          .screen-cafetal .da-tabs-section {
+            padding: 12px 6px;
+          }
+        }
       </style>
 
-      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans">
-        <!-- Top Search Bar + Quick Add -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-          <div>
-            <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="margin:0; font-size:28px;">
-              Gestión del Cafetal
-            </h1>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div class="ganado-split-ctrl ${currentLotesSearchQuery ? 'expanded' : ''}" id="lotes-search-wrapper">
-              <button id="lotes-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;" title="Buscar lote">
-                <span class="material-icons" style="color:#ffffff;font-size:20px;">search</span>
-              </button>
-              <input type="text" id="lotes-search-input" placeholder="Buscar lote..." value="${currentLotesSearchQuery}" style="border:none;background:transparent;outline:none;font-size:14px;width:${currentLotesSearchQuery ? '160px' : '0px'};transition:width 0.3s;opacity:${currentLotesSearchQuery ? '1' : '0'};padding:${currentLotesSearchQuery ? '0 8px 0 0' : '0'};color:#ffffff;">
-              <button id="lotes-search-clear" style="background:none;border:none;cursor:pointer;display:${currentLotesSearchQuery ? 'flex' : 'none'};align-items:center;justify-content:center;padding:0 12px 0 4px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
-                <span class="material-icons" style="font-size:18px;">close</span>
-              </button>
-              <span class="ganado-split-ctrl-sep"></span>
-              <button class="ganado-split-ctrl-reg" onclick="window.navigateTo('nuevo_lote')" title="Nuevo Lote">
-                <span class="material-icons">add</span>
-              </button>
-            </div>
+      <div class="screen-cafetal" style="padding-bottom: 80px;">
+        <!-- Top Search Bar + Quick Add aligned exactly like Ganado -->
+        <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 8px;">
+          <div class="ganado-split-ctrl ${currentLotesSearchQuery ? 'expanded' : ''}" id="lotes-search-wrapper">
+            <button id="lotes-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar lote">
+              <span class="material-icons" style="color: #ffffff;">search</span>
+            </button>
+            <input type="text" id="lotes-search-input" placeholder="Buscar lote..." value="${currentLotesSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentLotesSearchQuery ? '160px' : '0px'}; transition: width 0.3s, flex-grow 0.3s ease; opacity: ${currentLotesSearchQuery ? '1' : '0'}; padding: ${currentLotesSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
+            <button id="lotes-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentLotesSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
+              <span class="material-icons" style="font-size: 20px;">close</span>
+            </button>
+            <span class="ganado-split-ctrl-sep"></span>
+            <button class="ganado-split-ctrl-reg" onclick="window.navigateTo('nuevo_lote')" title="Nuevo Lote">
+              <span class="material-icons">add</span>
+            </button>
           </div>
         </div>
 
-        <!-- 1. Hero Summary Card (Dark Green Banner) -->
-        ${allLotes.length > 0 ? `
-        <div class="m3-mb-6 cafetal-hero">
-          <div class="ganado-card ganado-card-primary ganado-tally" style="background: var(--m3-primary, #2d3e2c); border-radius: 20px; box-shadow: 0 4px 20px rgba(45,62,44,0.22);">
-            <div class="ganado-tally-top">
-              <span class="ganado-tally-label" style="color: rgba(255,255,255,0.92); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Total Plantas</span>
-              <span class="ganado-tally-count">
-                <span class="ganado-card-value" style="color: #ffffff !important; font-size: 32px; font-weight: 800;">${totalPlantas.toLocaleString()}</span>
-              </span>
-            </div>
-            <div class="ganado-tally-divider" style="border-top: 1px solid rgba(255,255,255,0.15);"></div>
-            <div class="ganado-tally-row" style="display: flex; gap: 12px; flex-wrap: wrap;">
-              <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 12px; padding: 10px 16px; flex: 1; min-width: 140px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span class="ganado-tag-swatch w"><img src="mapa.png" alt="" style="width: 24px; height: 24px; object-fit: contain;"></span>
-                  <span class="ganado-tag-info">
-                    <span class="ganado-tag-n" style="font-size: 16px; font-weight: 800; color: #2d3e2c;">${allLotes.length}</span>
-                    <span class="ganado-tag-l" style="font-size: 11px; text-transform: uppercase; color: #666; font-weight: 700;">Lotes</span>
-                  </span>
-                </div>
-                <span class="material-icons ganado-tag-expand" style="color: #888; font-size: 20px;">chevron_right</span>
+        <div class="ganado-page-title" style="margin-top: -10px; margin-bottom: 24px;">
+          <h2>Gestión del Cafetal</h2>
+        </div>
+
+        <div class="da-tabs-section" style="margin-top: 10px;">
+          <!-- 1. Hero Summary Card (Dark Green Banner) -->
+          ${allLotes.length > 0 ? `
+          <div class="cafetal-hero" style="margin-bottom: 14px;">
+            <div class="ganado-card ganado-card-primary ganado-tally" style="background: var(--m3-primary, #2d3e2c); border-radius: 20px; padding: 24px 22px 20px; box-shadow: 0 6px 24px rgba(45,62,44,0.22); width: 100%; box-sizing: border-box;">
+              <div class="ganado-tally-top" style="margin-bottom: 16px;">
+                <span class="ganado-tally-label" style="color: rgba(255,255,255,0.92); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13.5px;">Total Plantas</span>
+                <span class="ganado-tally-count">
+                  <span class="ganado-card-value" style="color: #ffffff !important; font-size: 38px; font-weight: 800;">${totalPlantas.toLocaleString()}</span>
+                </span>
               </div>
-              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat cafetal-ifcafe-btn" style="background: rgba(255,255,255,0.95); border-radius: 12px; padding: 10px 16px; flex: 1.5; min-width: 200px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-decoration: none; color: inherit; display: flex; align-items: center; justify-content: space-between;" title="Abrir Manejo y Calendario del Cafetal">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span class="ganado-tag-swatch w"><span style="font-size: 22px; line-height: 1;">🌿</span></span>
+              <div class="ganado-tally-divider" style="border-top: 1px solid rgba(255,255,255,0.18); margin-bottom: 16px;"></div>
+              <div class="ganado-tally-row" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px;">
+                  <span class="ganado-tag-swatch w"><img src="mapa.png" alt="" style="width: 26px; height: 26px; object-fit: contain;"></span>
                   <span class="ganado-tag-info">
-                    <span class="ganado-tag-n" style="font-size: 13.5px; font-weight: 800; color: #2d3e2c;">Manejo Cafetal</span>
-                    <span class="ganado-tag-l" style="font-size: 11px; text-transform: uppercase; color: #666; font-weight: 700;">Registro y Programación</span>
+                    <span class="ganado-tag-n" style="font-size: 19px; font-weight: 800; color: #2d3e2c;">${allLotes.length}</span>
+                    <span class="ganado-tag-l" style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: 700;">Lotes</span>
                   </span>
                 </div>
-                <span class="material-icons ganado-tag-expand" style="color: #888; font-size: 20px;">chevron_right</span>
-              </a>
+                <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: inherit; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;" title="Abrir Manejo y Calendario del Cafetal">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 10px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🌿</span>
+                    <span class="ganado-tag-info" style="display: flex; flex-direction: column;">
+                      <span style="font-size: 15px; font-weight: 800; color: #2d3e2c; line-height: 1.2;">Manejo Cafetal</span>
+                      <span style="font-size: 11px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.3px;">Registro / Plan</span>
+                    </span>
+                  </div>
+                  <span class="material-icons" style="color: #2d3e2c; font-size: 22px;">chevron_right</span>
+                </a>
+              </div>
             </div>
           </div>
-        </div>
-        ` : ''}
+          ` : ''}
 
-        <!-- 2. Interactive ESRI Satellite Map of Lotes (Directly Below Banner) -->
-        <div class="m3-mb-6" style="position: relative;">
-          <div class="m3-flex m3-items-center m3-justify-between m3-mb-4" style="flex-wrap: wrap; gap: 8px;">
-            <div class="m3-flex m3-items-center m3-gap-2">
-              <h2 class="m3-headline-small m3-font-bold m3-text-on-surface" style="margin:0; font-size: 20px; font-family:'Manrope',sans-serif;">
-                Lotes & Microlotes
-              </h2>
-              <span style="font-size: 12.5px; font-weight: 700; color: #2d3e2c; background: #eef4ec; border: 1px solid #d4dfd2; padding: 3px 10px; border-radius: 99px;">
-                ${totalHa.toFixed(2)} Ha
-              </span>
+          <!-- 2. Interactive ESRI Satellite Map of Lotes (Directly Below Banner) -->
+          <div style="position: relative;">
+            <div class="ganado-tag-stat" style="background: #fdfdfd; border-radius: 16px; padding: 13px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; cursor: default;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;"><img src="mapa.png" alt="" style="width: 24px; height: 24px; object-fit: contain;"></span>
+                <div style="display: flex; flex-direction: column;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px; font-weight: 800; color: #2d3e2c;">Lotes & Microlotes</span>
+                    <span style="font-size: 12px; font-weight: 700; color: #2d3e2c; background: #eef4ec; border: 1px solid #d4dfd2; padding: 2px 10px; border-radius: 99px;">${totalHa.toFixed(2)} Hectáreas</span>
+                  </div>
+                  <span style="font-size: 11.5px; color: #666; font-weight: 600; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                    <span class="material-icons" style="font-size: 14px; color: #2d3e2c;">touch_app</span> Toca una parcela en el mapa para ver su detalle
+                  </span>
+                </div>
+              </div>
             </div>
-            <p class="m3-label-medium m3-text-on-surface-variant" style="margin:0; font-size: 12px; display: flex; align-items: center; gap: 4px; color: #666;">
-              <span class="material-icons" style="font-size: 16px; color: #2d3e2c;">touch_app</span> Toca una parcela en el mapa para ver su detalle
-            </p>
-          </div>
 
-          <div id="mapa-container">
-            <div class="mapa-empty" id="mapa-loading">
-              <div class="spinner"></div>
-              <p>Cargando mapa del cafetal...</p>
+            <div id="mapa-container">
+              <div class="mapa-empty" id="mapa-loading">
+                <div class="spinner"></div>
+                <p>Cargando mapa del cafetal...</p>
+              </div>
             </div>
           </div>
         </div>
@@ -422,10 +450,6 @@ export async function initDashboard() {
     <button class="mapa-layers-btn" id="mapa-layers-btn" title="Cambiar tipo de satélite">
       <span class="material-symbols-outlined" style="font-size:18px;">layers</span>
       <span id="mapa-layers-label">Esri Sat.</span>
-    </button>
-    <button class="mapa-reg-btn" onclick="window.navigateTo('nuevo_lote')">
-      <span class="material-symbols-outlined" style="font-size:18px;">add_location_alt</span>
-      <span>Nuevo Lote</span>
     </button>
   `;
 
@@ -532,6 +556,48 @@ export async function initDashboard() {
       return Math.floor((dHoy - d) / (1000 * 60 * 60 * 24));
     };
 
+    let maderablesVariedades = lote.maderables_variedades || '';
+    let musaceasTipo = lote.musaceas_tipo || '';
+
+    if (lote.coordenadas_json) {
+      try {
+        const parsedCoords = JSON.parse(lote.coordenadas_json);
+        if (parsedCoords && typeof parsedCoords === 'object' && !Array.isArray(parsedCoords)) {
+          if (parsedCoords.maderables_variedades && !maderablesVariedades) {
+            maderablesVariedades = parsedCoords.maderables_variedades;
+          }
+          if (parsedCoords.musaceas_tipo && !musaceasTipo) {
+            musaceasTipo = parsedCoords.musaceas_tipo;
+          }
+        }
+      } catch {}
+    }
+
+    const parseAgroItems = (str) => {
+      if (!str) return [];
+      return str.split(',').map(item => {
+        const trimmed = item.trim();
+        if (!trimmed) return null;
+        const match = trimmed.match(/^(.+?)(?:\s*\((\d+)\))?$/);
+        if (match) {
+          return { name: match[1].trim(), qty: match[2] ? parseInt(match[2], 10) : null };
+        }
+        return { name: trimmed, qty: null };
+      }).filter(Boolean);
+    };
+
+    const maderablesList = parseAgroItems(maderablesVariedades);
+    const musaceasList = parseAgroItems(musaceasTipo);
+
+    const formatEdadLabel = (edad) => {
+      if (!edad) return '';
+      if (edad === '1_anio') return '1 año · Café Tiernito';
+      if (edad === '2_anios') return '2 años · Creciendo';
+      if (edad === '3_mas') return '3+ años · En Producción';
+      if (edad === 'carga_alta') return 'Carga Muy Alta';
+      return edad;
+    };
+
     // Ordenar todas las labores de la más reciente a la más antigua
     const sortedApps = [...(apps || [])].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     const recentApps = sortedApps.slice(0, 3);
@@ -539,7 +605,9 @@ export async function initDashboard() {
 
     return `
       <div class="mapa-pop-head">
-        <span class="mapa-pop-badge">${escapeHtml(lote.variedad || 'Café')}</span>
+        <span class="mapa-pop-badge" style="display:inline-flex; align-items:center; gap:6px; background:#eef7ee; color:#1b5e20; border:1px solid #c8e6c9; font-weight:800; font-size:11.5px; padding:4px 10px; border-radius:12px;">
+          ${escapeHtml(lote.variedad || 'Café')}${lote.edad_categoria ? ` · 🌱 ${escapeHtml(formatEdadLabel(lote.edad_categoria))}` : ''}
+        </span>
         <button class="lote-float-close" id="lote-float-close" title="Cerrar">
           <span class="material-symbols-outlined" style="font-size:18px;">close</span>
         </button>
@@ -547,28 +615,32 @@ export async function initDashboard() {
 
       <h3 class="mapa-pop-title">${escapeHtml(lote.nombre)}</h3>
 
-      <div class="mapa-pop-stats" style="margin-top:6px;">
-        <span><img src="sprouts.png" alt="" style="width:16px;height:16px;object-fit:contain;"> <b>${(lote.num_plantas || 0).toLocaleString()}</b> plantas</span>
+      <div class="mapa-pop-stats" style="margin-top:6px; flex-wrap:wrap; gap:8px;">
+        <span><img src="sprouts.png" alt="" style="width:16px;height:16px;object-fit:contain;"> <b>${(lote.num_plantas || 0).toLocaleString()}</b> plantas de café</span>
         <span><img src="area.png" alt="" style="width:16px;height:16px;object-fit:contain;"> <b>${lote.area_ha ? parseFloat(lote.area_ha).toFixed(2) : '0.00'}</b> ha</span>
-        ${lote.edad_categoria ? `<span>🌱 <b>${escapeHtml(lote.edad_categoria)}</b></span>` : ''}
       </div>
 
-      ${lote.maderables_variedades ? `
-        <div style="font-size:11.5px; color:#2d3e2c; background:#edf4ec; border-radius:6px; padding:4px 8px; margin-bottom:8px; font-weight:600;">
-          🌲 Maderables: ${escapeHtml(lote.maderables_variedades)}
-        </div>
-      ` : ''}
-
-      ${lote.musaceas_tipo ? `
-        <div style="font-size:11.5px; color:#5c470a; background:#fef8e6; border-radius:6px; padding:4px 8px; margin-bottom:8px; font-weight:600;">
-          🍌 Musáceas: ${escapeHtml(lote.musaceas_tipo)}
+      ${maderablesList.length > 0 || musaceasList.length > 0 ? `
+        <div class="mapa-pop-chips-carousel">
+          ${maderablesList.map(m => `
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#1b5e20; background:#eef7ee; border:1px solid #c8e6c9; border-radius:8px; padding:3px 8px; flex-shrink:0; white-space:nowrap;">
+              <span>🌲</span>
+              <span>${m.qty !== null ? `<b>${m.qty.toLocaleString()}</b> ${escapeHtml(m.name)}` : escapeHtml(m.name)}</span>
+            </span>
+          `).join('')}
+          ${musaceasList.map(m => `
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#7a6000; background:#fff8e1; border:1px solid #ffe082; border-radius:8px; padding:3px 8px; flex-shrink:0; white-space:nowrap;">
+              <span>🍌</span>
+              <span>${m.qty !== null ? `<b>${m.qty.toLocaleString()}</b> ${escapeHtml(m.name)}` : escapeHtml(m.name)}</span>
+            </span>
+          `).join('')}
         </div>
       ` : ''}
 
       <!-- Actividades Más Recientes del Lote -->
-      <div class="mapa-pop-sec" style="padding: 10px; border-radius: 12px; margin-bottom: 8px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span class="mapa-pop-sec-t" style="margin:0; font-size:11px; font-weight:800; text-transform:uppercase; color:#4a5d48;">Actividades Recientes</span>
+      <div class="mapa-pop-sec" style="padding: 12px 14px; border-radius: 12px; margin-bottom: 10px; background: #fbfdfa; border: 1px solid #e2ebe0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span class="mapa-pop-sec-t" style="margin:0; font-size:11px; font-weight:800; text-transform:uppercase; color:#4a5d48; letter-spacing:0.3px;">Actividades Recientes</span>
           <span style="font-size:11px; font-weight:700; color:#555;">${sortedApps.length} en total</span>
         </div>
 
@@ -581,13 +653,13 @@ export async function initDashboard() {
 
           if (isAplicada && isHoy) {
             return `
-              <div style="background:#eef7ee; border-left:3.5px solid #2e7d32; border-radius:6px; padding:5px 8px; margin-bottom:5px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">
-                  <span style="display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:800; color:#1b5e20;">
-                    <span class="material-symbols-outlined" style="font-size:15px; color:#2e7d32;">check_circle</span>
+              <div style="background:#eef7ee; border-left:4px solid #2e7d32; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#1b5e20;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#2e7d32;">check_circle</span>
                     ${escapeHtml(a.producto || a.tipo)}
                   </span>
-                  <span style="font-size:10px; font-weight:800; color:#1b5e20; background:rgba(46,125,50,0.15); padding:1px 5px; border-radius:4px; white-space:nowrap;">
+                  <span style="font-size:10.5px; font-weight:800; color:#1b5e20; background:rgba(46,125,50,0.15); padding:2px 7px; border-radius:6px; white-space:nowrap;">
                     🟢 Aplicada hoy
                   </span>
                 </div>
@@ -595,81 +667,81 @@ export async function initDashboard() {
             `;
           } else if (isAplicada) {
             return `
-              <div style="background:#f4f6f2; border-left:3.5px solid #2d3e2c; border-radius:6px; padding:5px 8px; margin-bottom:5px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">
-                  <span style="display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:#2d3e2c;">
-                    <span class="material-symbols-outlined" style="font-size:15px; color:#2d3e2c;">eco</span>
+              <div style="background:#f4f6f2; border-left:4px solid #2d3e2c; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:#2d3e2c;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#2d3e2c;">eco</span>
                     ${escapeHtml(a.producto || a.tipo)}
                   </span>
-                  <span style="font-size:10.5px; color:#555; white-space:nowrap;">
+                  <span style="font-size:11px; color:#555; white-space:nowrap; font-weight:600;">
                     ${formatFechaStr(a.fecha)}
                   </span>
                 </div>
-                <div style="font-size:10.5px; color:#666; margin-top:2px;">
+                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
                   Aplicada ${dias === 1 ? 'ayer' : `hace ${dias} días`}
                 </div>
               </div>
             `;
           } else if (isParaHoy) {
             return `
-              <div style="background:#fffbe6; border-left:3.5px solid #f57f17; border-radius:6px; padding:5px 8px; margin-bottom:5px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">
-                  <span style="display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:800; color:#e65100;">
-                    <span class="material-symbols-outlined" style="font-size:15px; color:#f57f17;">today</span>
+              <div style="background:#fffbe6; border-left:4px solid #f57f17; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#e65100;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#f57f17;">today</span>
                     ${escapeHtml(a.producto || a.tipo)}
                   </span>
-                  <span style="font-size:10px; font-weight:800; color:#e65100; background:rgba(245,127,23,0.15); padding:1px 5px; border-radius:4px; white-space:nowrap;">
+                  <span style="font-size:10.5px; font-weight:800; color:#e65100; background:rgba(245,127,23,0.15); padding:2px 7px; border-radius:6px; white-space:nowrap;">
                     📅 Para hoy
                   </span>
                 </div>
-                <div style="font-size:10.5px; color:#666; margin-top:2px;">
+                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
                   Programada para hoy
                 </div>
               </div>
             `;
           } else if (isAtrasada) {
             return `
-              <div style="background:#fff2f0; border-left:3.5px solid #d32f2f; border-radius:6px; padding:5px 8px; margin-bottom:5px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">
-                  <span style="display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:800; color:#c62828;">
-                    <span class="material-symbols-outlined" style="font-size:15px; color:#d32f2f;">warning</span>
+              <div style="background:#fff2f0; border-left:4px solid #d32f2f; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#c62828;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#d32f2f;">warning</span>
                     ${escapeHtml(a.producto || a.tipo)}
                   </span>
-                  <span style="font-size:10px; font-weight:800; color:#d32f2f; background:rgba(211,47,47,0.12); padding:1px 5px; border-radius:4px; white-space:nowrap;">
+                  <span style="font-size:10.5px; font-weight:800; color:#d32f2f; background:rgba(211,47,47,0.12); padding:2px 7px; border-radius:6px; white-space:nowrap;">
                     Atrasada
                   </span>
                 </div>
-                <div style="font-size:10.5px; color:#666; margin-top:2px;">
+                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
                   Venció el ${formatFechaStr(a.fecha)} (hace ${dias} días)
                 </div>
               </div>
             `;
           } else {
             return `
-              <div style="background:#f0f7ff; border-left:3.5px solid #1976d2; border-radius:6px; padding:5px 8px; margin-bottom:5px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">
-                  <span style="display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:#0d47a1;">
-                    <span class="material-symbols-outlined" style="font-size:15px; color:#1976d2;">event</span>
+              <div style="background:#f0f7ff; border-left:4px solid #1976d2; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:#0d47a1;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#1976d2;">event</span>
                     ${escapeHtml(a.producto || a.tipo)}
                   </span>
-                  <span style="font-size:10.5px; font-weight:700; color:#1976d2; white-space:nowrap;">
+                  <span style="font-size:11px; font-weight:700; color:#1976d2; white-space:nowrap;">
                     ${formatFechaStr(a.fecha)}
                   </span>
                 </div>
-                <div style="font-size:10.5px; color:#666; margin-top:2px;">
+                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
                   Programada
                 </div>
               </div>
             `;
           }
         }).join('') : `
-          <div style="font-size:11.5px; color:#777; font-style:italic; padding:4px 0; text-align:center;">
+          <div style="font-size:11.5px; color:#777; font-style:italic; padding:6px 0; text-align:center;">
             Sin labores registradas en este lote
           </div>
         `}
 
         ${extraCount > 0 ? `
-          <div style="font-size:10.5px; color:#4a5d48; text-align:center; font-weight:700; padding:2px 0 0;">
+          <div style="font-size:11px; color:#4a5d48; text-align:center; font-weight:700; padding:6px 0 2px;">
             +${extraCount} labores anteriores registradas
           </div>
         ` : ''}
@@ -823,12 +895,14 @@ export async function initDashboard() {
 
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
+      if (!searchWrapper.classList.contains('expanded') || !searchInput.style.width || searchInput.style.width === '0px') {
         searchInput.style.width = '160px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';
         searchWrapper.classList.add('expanded');
+        searchInput.focus();
+      } else {
         searchInput.focus();
       }
     });
@@ -846,6 +920,7 @@ export async function initDashboard() {
 
     searchInput.addEventListener('input', (e) => {
       const q = (e.target.value || '').trim().toLowerCase();
+      searchClear.style.display = q ? 'flex' : 'none';
       currentLotesSearchQuery = q;
       if (!q) {
         clearLoteSelection();

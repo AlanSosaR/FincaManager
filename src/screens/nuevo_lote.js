@@ -4,6 +4,12 @@ import { showNamePrompt } from '../modals.js';
 import { sendWhatsApp } from '../wa.js';
 import { getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
 
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
+
 function parseCoordenadasJson(json) {
   try {
     const parsed = JSON.parse(json);
@@ -23,6 +29,7 @@ let drawnItems = null;
 let drawControl = null;
 let existingLotesLayer = null;
 let selectedColor = '#2d3e2c';
+let refMarker = null;
 
 // Walking / GPS recording state
 let walkState = 'idle';        // 'idle' | 'searching' | 'recording' | 'paused'
@@ -56,26 +63,63 @@ export async function renderNuevoLote(id) {
   const val = (field) => lote ? (lote[field] || '') : '';
   const selected = (field, value) => lote && lote[field] === value ? 'selected' : '';
 
-  const tieneMaderables = Boolean(lote?.tiene_maderables || (lote?.maderables_variedades && lote.maderables_variedades.trim()));
-  const maderablesVariedades = lote?.maderables_variedades || '';
-  const tieneMusaceas = Boolean(lote?.tiene_musaceas || (lote?.musaceas_tipo && lote.musaceas_tipo.trim()));
-  const musaceasTipo = lote?.musaceas_tipo || '';
+  let tieneMaderables = Boolean(lote?.tiene_maderables || (lote?.maderables_variedades && lote.maderables_variedades.trim()));
+  let maderablesVariedades = lote?.maderables_variedades || '';
+  let tieneMusaceas = Boolean(lote?.tiene_musaceas || (lote?.musaceas_tipo && lote.musaceas_tipo.trim()));
+  let musaceasTipo = lote?.musaceas_tipo || '';
+
+  if (lote?.coordenadas_json) {
+    try {
+      const parsedCoords = JSON.parse(lote.coordenadas_json);
+      if (parsedCoords && typeof parsedCoords === 'object' && !Array.isArray(parsedCoords)) {
+        if (parsedCoords.maderables_variedades && !maderablesVariedades) {
+          maderablesVariedades = parsedCoords.maderables_variedades;
+          tieneMaderables = true;
+        }
+        if (parsedCoords.musaceas_tipo && !musaceasTipo) {
+          musaceasTipo = parsedCoords.musaceas_tipo;
+          tieneMusaceas = true;
+        }
+      }
+    } catch {}
+  }
+
+  const parseAgroItems = (str) => {
+    if (!str) return [];
+    return str.split(',').map(item => {
+      const trimmed = item.trim();
+      if (!trimmed) return null;
+      const match = trimmed.match(/^(.+?)(?:\s*\((\d+)\))?$/);
+      if (match) {
+        return { name: match[1].trim(), qty: match[2] ? parseInt(match[2], 10) : '' };
+      }
+      return { name: trimmed, qty: '' };
+    }).filter(Boolean);
+  };
+
+  const maderablesParsed = parseAgroItems(maderablesVariedades);
+  const musaceasParsed = parseAgroItems(musaceasTipo);
 
   return `
     <div class="m3-form-screen">
-      <div class="m3-form-card">
-        <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
-          <div class="da-stat-icon" style="background: rgba(107, 130, 69, 0.1); color: #6b8245; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-            <span class="material-icons" style="font-size: 32px;">landscape</span>
+      <div class="m3-form-card" style="padding: 28px 32px;">
+        <div style="margin-bottom: 28px; display: flex; align-items: center; gap: 16px;">
+          <button type="button" onclick="window.navigateTo('dashboard')" class="m3-btn-icon" style="background: none; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--m3-primary, #2d3e2c);" title="Volver">
+            <span class="material-icons" style="font-size: 28px;">arrow_back</span>
+          </button>
+          <div class="da-stat-icon" style="background: rgba(107, 130, 69, 0.12); color: #2d3e2c; width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons" style="font-size: 28px;">landscape</span>
           </div>
           <div>
-            <div class="da-hero-subtitle" style="margin:0;">${subtitle}</div>
-            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">${title}</h2>
+            <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--m3-primary, #2d3e2c); letter-spacing: 0.5px;">${subtitle}</div>
+            <h2 style="margin: 2px 0 0; font-size: 24px; font-weight: 800; color: #1a1a1a; font-family: 'Work Sans', sans-serif;">${title}</h2>
           </div>
         </div>
 
-        <form id="form-nuevo-lote">
-          <input type="hidden" name="area_ha" id="area-ha-input" value="0">
+        <form id="form-nuevo-lote" class="m3-form">
+          <input type="hidden" name="lote_id" value="${val('id')}">
+          <input type="hidden" name="area_ha" id="area-ha-input" value="${val('area_ha') || 0}">
+          
           <div class="m3-grid-2col">
             <div class="m3-field ${val('nombre') ? 'has-value' : ''}">
               <input type="text" name="nombre" placeholder=" " value="${val('nombre')}" required>
@@ -173,7 +217,7 @@ export async function renderNuevoLote(id) {
                 <span style="font-size: 24px;">🌳</span>
                 <div>
                   <h3 style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Sombra y Cultivos Asociados</h3>
-                  <p style="margin: 2px 0 0; font-size: 12px; color: var(--m3-on-surface-variant);">Árboles maderables y musáceas (plátanos / mínimos)</p>
+                  <p style="margin: 2px 0 0; font-size: 12px; color: var(--m3-on-surface-variant);">Árboles maderables y musáceas (plátanos / mínimos) presentes en el lote</p>
                 </div>
               </div>
             </div>
@@ -189,19 +233,28 @@ export async function renderNuevoLote(id) {
                 </div>
 
                 <div id="maderables-details-container" style="${tieneMaderables ? 'display: block;' : 'display: none;'} margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e0e6df;">
-                  <p style="font-size: 12px; font-weight: 600; color: #444; margin: 0 0 8px;">Toca para seleccionar o alternar variedades presentes:</p>
+                  <p style="font-size: 12px; font-weight: 600; color: #444; margin: 0 0 8px;">Toca para seleccionar variedades presentes:</p>
                   
                   <div id="maderables-chips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
                     ${['Laurel', 'Cedro', 'Caoba', 'Guamo / Guama', 'Gravilea', 'Pino', 'Roble', 'Liquidámbar', 'Nogal', 'Macuelizo', 'San Juan', 'Ciprés'].map(varName => {
-                      const isSelected = maderablesVariedades.toLowerCase().includes(varName.toLowerCase());
+                      const isSelected = maderablesParsed.some(m => m.name.toLowerCase() === varName.toLowerCase());
                       return `<button type="button" class="agro-chip ${isSelected ? 'active' : ''}" data-val="${varName}" style="padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid ${isSelected ? '#2d3e2c' : '#c8d4c6'}; background: ${isSelected ? '#2d3e2c' : '#ffffff'}; color: ${isSelected ? '#ffffff' : '#2d3e2c'}; transition: all 0.15s;">${isSelected ? '✓ ' : '+ '}${varName}</button>`;
                     }).join('')}
                   </div>
 
-                  <div class="m3-field ${maderablesVariedades ? 'has-value' : ''}">
-                    <input type="text" name="maderables_variedades" id="input-maderables-variedades" value="${maderablesVariedades}" placeholder=" ">
-                    <label>Variedades de maderables (ej: Laurel, Cedro, Guamo...)</label>
+                  <!-- Dynamic tree varieties with optional quantity -->
+                  <div id="maderables-items-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;"></div>
+
+                  <!-- Custom Tree Input -->
+                  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+                    <input type="text" id="input-custom-maderable" placeholder="Agregar otra variedad (ej: Madreado, Tuno...)" style="flex: 1; height: 36px; padding: 6px 12px; font-size: 12.5px; border-radius: 8px; border: 1px solid #c8d4c6; background: #ffffff;">
+                    <button type="button" id="btn-add-custom-maderable" class="plan-btn-ghost" style="height: 36px; padding: 0 14px; font-size: 12px; font-weight: 700; white-space: nowrap;">
+                      + Agregar
+                    </button>
                   </div>
+
+                  <input type="hidden" name="maderables_variedades" id="input-maderables-variedades" value="${maderablesVariedades}">
+                  <div id="maderables-summary-badge" style="font-size: 12px; color: #2d3e2c; font-weight: 700; background: #eef5eb; border: 1px solid #c0d4be; border-radius: 8px; padding: 8px 12px; display: none;"></div>
                 </div>
               </div>
 
@@ -219,15 +272,24 @@ export async function renderNuevoLote(id) {
                   
                   <div id="musaceas-chips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
                     ${['Plátano Macho', 'Mínimo / Banano Criollo', 'Guineo / Manzano', 'Plátano Curare', 'Cuadrado / Majoncho'].map(musaName => {
-                      const isSelected = musaceasTipo.toLowerCase().includes(musaName.toLowerCase());
+                      const isSelected = musaceasParsed.some(m => m.name.toLowerCase() === musaName.toLowerCase());
                       return `<button type="button" class="agro-chip ${isSelected ? 'active' : ''}" data-val="${musaName}" style="padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid ${isSelected ? '#2d3e2c' : '#c8d4c6'}; background: ${isSelected ? '#2d3e2c' : '#ffffff'}; color: ${isSelected ? '#ffffff' : '#2d3e2c'}; transition: all 0.15s;">${isSelected ? '✓ ' : '+ '}${musaName}</button>`;
                     }).join('')}
                   </div>
 
-                  <div class="m3-field ${musaceasTipo ? 'has-value' : ''}">
-                    <input type="text" name="musaceas_tipo" id="input-musaceas-tipo" value="${musaceasTipo}" placeholder=" ">
-                    <label>Tipo de plátano / mínimo (ej: Plátano macho, Mínimo criollo...)</label>
+                  <!-- Dynamic musáceas with optional quantity -->
+                  <div id="musaceas-items-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;"></div>
+
+                  <!-- Custom Musácea Input -->
+                  <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+                    <input type="text" id="input-custom-musacea" placeholder="Agregar otro tipo (ej: Plátano Enano, Guineo de Seda...)" style="flex: 1; height: 36px; padding: 6px 12px; font-size: 12.5px; border-radius: 8px; border: 1px solid #c8d4c6; background: #ffffff;">
+                    <button type="button" id="btn-add-custom-musacea" class="plan-btn-ghost" style="height: 36px; padding: 0 14px; font-size: 12px; font-weight: 700; white-space: nowrap;">
+                      + Agregar
+                    </button>
                   </div>
+
+                  <input type="hidden" name="musaceas_tipo" id="input-musaceas-tipo" value="${musaceasTipo}">
+                  <div id="musaceas-summary-badge" style="font-size: 12px; color: #7a6000; font-weight: 700; background: #fffde7; border: 1px solid #ffe082; border-radius: 8px; padding: 8px 12px; display: none;"></div>
                 </div>
               </div>
             </div>
@@ -529,10 +591,38 @@ function initMap() {
     attributionControl: false
   });
 
-  // Centro inicial en el punto de referencia de la finca (si existe)
+  // Centro inicial y marcador del punto de referencia de la finca (si existe)
   loadPuntoReferencia(window._currentEmpresaId).then(ref => {
     if (ref && mapInstance) {
-      mapInstance.setView([ref.lat, ref.lng], 15);
+      const nombre = escapeHtml(ref.nombre || 'Finca');
+      if (refMarker && mapInstance.hasLayer(refMarker)) {
+        mapInstance.removeLayer(refMarker);
+      }
+      refMarker = L.marker([ref.lat, ref.lng], {
+        icon: L.divIcon({
+          className: 'ref-label-icon',
+          html: `<div style="display:flex; flex-direction:column; align-items:center; cursor:pointer;">
+                   <span class="material-icons" style="font-size:36px; color:#e53935; text-shadow:0 0 3px #fff, 0 0 6px #fff; line-height:1;">place</span>
+                   <span style="font-family:'Work Sans',sans-serif; font-size:11px; font-weight:800; color:#ffffff; background:#e53935; padding:2px 8px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.3); white-space:nowrap; margin-top:-4px;">📍 ${nombre}</span>
+                 </div>`,
+          iconSize: [120, 52],
+          iconAnchor: [60, 36]
+        }),
+        interactive: true,
+        zIndexOffset: 1000
+      }).addTo(mapInstance);
+
+      refMarker.bindPopup(`
+        <div style="font-family:'Work Sans',sans-serif; padding:4px;">
+          <div style="font-weight:800; font-size:13px; color:#e53935;">📍 Punto de Referencia de la Finca</div>
+          <div style="font-size:12px; color:#333; margin-top:2px;"><b>${nombre}</b></div>
+          <div style="font-size:11px; color:#777; margin-top:2px;">${ref.lat.toFixed(6)}, ${ref.lng.toFixed(6)}</div>
+        </div>
+      `);
+
+      if (!window.__currentLoteData?.coordenadas_json) {
+        mapInstance.setView([ref.lat, ref.lng], 15);
+      }
     }
   }).catch(() => {});
 
@@ -540,20 +630,21 @@ function initMap() {
   const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
     maxZoom: 22,
-    maxNativeZoom: 19
+    maxNativeZoom: 17
   }).addTo(mapInstance);
 
   const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     maxZoom: 22,
-    maxNativeZoom: 20
+    maxNativeZoom: 18
   });
 
   // Labels overlay for satellite
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 22,
+    maxNativeZoom: 17,
     opacity: 0.8
   }).addTo(mapInstance);
 
@@ -843,13 +934,13 @@ function initMap() {
     prefix: false
   }).addTo(mapInstance).addAttribution('Geocoding &copy; Geocode.XYZ');
 
-  // FeatureGroup for drawn items
-  drawnItems = new L.FeatureGroup();
-  mapInstance.addLayer(drawnItems);
-
-  // Existing lotes layer
+  // Existing lotes layer (Reference background)
   existingLotesLayer = new L.FeatureGroup();
   mapInstance.addLayer(existingLotesLayer);
+
+  // FeatureGroup for drawn items (Active editing on top)
+  drawnItems = new L.FeatureGroup();
+  mapInstance.addLayer(drawnItems);
 
   // ── Puntos guardados (persistentes por empresa) ──
   const puntosKey = 'finca_puntos_guardados_' + (window._currentEmpresaId || 'default');
@@ -1069,15 +1160,13 @@ function initMap() {
     });
   }, 500);
 
-  // Remove ghost shape when editing starts (Leaflet.draw creates _originalShape)
+  // When editing starts, ensure existing reference lotes stay visible
   mapInstance.on('draw:editstart', function() {
-    setTimeout(() => {
-      const overlayPane = document.querySelector('.leaflet-overlay-pane');
-      if (overlayPane) {
-        const paths = overlayPane.querySelectorAll('path[stroke-dasharray]');
-        paths.forEach(p => { p.style.display = 'none'; });
-      }
-    }, 50);
+    if (existingLotesLayer) {
+      existingLotesLayer.eachLayer(layer => {
+        if (layer._path) layer._path.style.display = '';
+      });
+    }
   });
 
   // On polygon created
@@ -1129,31 +1218,6 @@ function initMap() {
   // Update scale bar
   mapInstance.on('zoomend', function() {
     updateScaleBar();
-  });
-
-  // Load existing lotes (excludes current editing lote)
-  loadExistingLotes().then(lotes => {
-    // Always clear first to avoid duplicates
-    existingLotesLayer.clearLayers();
-    
-    lotes.forEach(lote => {
-      if (lote.coordenadas_json) {
-        const { coordinates, color } = parseCoordenadasJson(lote.coordenadas_json);
-        const latlngs = coordinates.map(c => [c.lat, c.lng]);
-        const loteColor = color || '#2d3e2c';
-        
-        // Polygon with solid fill and border
-        const poly = L.polygon(latlngs, {
-          color: loteColor,
-          fillColor: loteColor,
-          fillOpacity: 0.5,
-          weight: 2,
-          opacity: 0.9
-        }).addTo(existingLotesLayer);
-        
-        poly.bindPopup(buildExistingLotePopupHtml(lote));
-      }
-    });
   });
 
   // Clear button
@@ -1950,6 +2014,10 @@ export async function setupNuevoLoteListeners() {
         }
       });
     }
+    if (refMarker && mapInstance?.hasLayer(refMarker)) {
+      mapInstance.removeLayer(refMarker);
+      refMarker = null;
+    }
     if (mapInstance) {
       mapInstance.remove();
       mapInstance = null;
@@ -1957,6 +2025,7 @@ export async function setupNuevoLoteListeners() {
       drawControl = null;
       existingLotesLayer = null;
       walkControl = null;
+      refMarker = null;
     }
   };
 
@@ -1966,22 +2035,78 @@ export async function setupNuevoLoteListeners() {
   setTimeout(() => {
     initMap();
 
-    // Draw existing polygon if editing (after map is fully initialized)
-    setTimeout(() => {
+    // Load reference lotes and editing polygon
+    setTimeout(async () => {
+      // 1. Fetch all lotes for the farm and display other lotes as reference polygons
+      try {
+        let lotes = [];
+        try {
+          const res = await supabase.from('lotes').select('*');
+          lotes = res.data || [];
+        } catch (e) {
+          const empresaId = window._currentEmpresaId;
+          const query = empresaId 
+            ? `lotes?select=id,nombre,variedad,area_ha,num_plantas,coordenadas_json&empresa_id=eq.${empresaId}`
+            : `lotes?select=id,nombre,variedad,area_ha,num_plantas,coordenadas_json`;
+          lotes = await restFetch(query);
+        }
+        const currentId = editingLote?.id || loteId;
+
+        if (existingLotesLayer && lotes && lotes.length) {
+          existingLotesLayer.clearLayers();
+          
+          lotes.forEach(l => {
+            if (l.id === currentId || !l.coordenadas_json) return;
+            const { coordinates, color } = parseCoordenadasJson(l.coordenadas_json);
+            if (!coordinates || coordinates.length < 3) return;
+            
+            const otherLatlngs = coordinates.map(c => L.latLng(c.lat, c.lng));
+            const otherColor = color || '#2d3e2c';
+            const refPoly = L.polygon(otherLatlngs, {
+              color: otherColor,
+              fillColor: otherColor,
+              fillOpacity: 0.22,
+              weight: 2.5,
+              opacity: 0.9,
+              dashArray: '6, 6',
+              interactive: true
+            });
+
+            refPoly.bindTooltip(`🏷️ Lote: <b>${escapeHtml(l.nombre)}</b> (${parseFloat(l.area_ha || 0).toFixed(2)} ha)`, {
+              permanent: false,
+              sticky: true,
+              className: 'lote-ref-tooltip'
+            });
+
+            refPoly.bindPopup(`
+              <div style="font-family:'Work Sans',sans-serif; padding:4px;">
+                <div style="font-weight:800; font-size:14px; color:#2d3e2c;">${escapeHtml(l.nombre)}</div>
+                <div style="font-size:12px; color:#666; margin-top:2px;">Variedad: ${escapeHtml(l.variedad || 'Café')} · ${parseFloat(l.area_ha || 0).toFixed(2)} ha</div>
+                <div style="font-size:11px; color:#2d3e2c; font-weight:700; background:#e8efe4; padding:3px 8px; border-radius:6px; margin-top:6px; display:inline-block;">Lote de referencia (no editable aquí)</div>
+              </div>
+            `);
+
+            existingLotesLayer.addLayer(refPoly);
+          });
+        }
+      } catch (err) {
+        console.warn('[nuevo_lote] Error loading reference lotes:', err);
+      }
+
+      // 2. Draw existing polygon if editing (in drawnItems so it is editable)
       if (editingLote && editingLote.coordenadas_json && drawnItems) {
         try {
-          drawnItems.clearLayers(); // Clear any auto-loaded layers
+          drawnItems.clearLayers();
           
-          // Parse coordinates and get saved color
           const { coordinates, color: savedColor } = parseCoordenadasJson(editingLote.coordenadas_json);
-          selectedColor = savedColor; // Use the saved color
+          selectedColor = savedColor || '#2d3e2c';
           
           const latlngs = coordinates.map(c => L.latLng(c.lat, c.lng));
           const polygon = L.polygon(latlngs, {
             color: '#ffffff',
             fillColor: selectedColor,
-            fillOpacity: 0.5,
-            weight: 2
+            fillOpacity: 0.55,
+            weight: 2.5
           });
           drawnItems.addLayer(polygon);
           
@@ -2001,7 +2126,7 @@ export async function setupNuevoLoteListeners() {
             }
           });
           
-          mapInstance.fitBounds(polygon.getBounds().pad(0.2));
+          mapInstance.fitBounds(polygon.getBounds().pad(0.25));
           
           // Show area badge
           const badge = document.getElementById('area-info-badge');
@@ -2015,6 +2140,11 @@ export async function setupNuevoLoteListeners() {
         } catch (e) {
           console.warn('Error drawing existing polygon:', e);
         }
+      } else if (existingLotesLayer && existingLotesLayer.getLayers().length > 0 && mapInstance) {
+        // If creating a new lot and reference lotes exist, center on them
+        try {
+          mapInstance.fitBounds(existingLotesLayer.getBounds().pad(0.2));
+        } catch (err) {}
       }
     }, 300);
 
@@ -2046,83 +2176,304 @@ export async function setupNuevoLoteListeners() {
     });
   }, 100);
 
-  // Interactive Agroforestry Toggles & Chips
+  // Helper parsers and formatters
+  const parseAgroItems = (str) => {
+    if (!str) return [];
+    return str.split(',').map(item => {
+      const trimmed = item.trim();
+      if (!trimmed) return null;
+      const match = trimmed.match(/^(.+?)(?:\s*\((\d+)\))?$/);
+      if (match) {
+        return { name: match[1].trim(), qty: match[2] ? parseInt(match[2], 10) : '' };
+      }
+      return { name: trimmed, qty: '' };
+    }).filter(Boolean);
+  };
+
+  const formatAgroList = (items) => {
+    return items
+      .filter(it => it.name && it.name.trim())
+      .map(it => {
+        const q = (it.qty !== '' && it.qty !== null && !isNaN(it.qty)) ? parseInt(it.qty, 10) : null;
+        return q ? `${it.name.trim()} (${q})` : it.name.trim();
+      })
+      .join(', ');
+  };
+
+  // --- 1. Maderables & Sombra Logic ---
   const checkMaderables = document.getElementById('check-tiene-maderables');
   const maderablesBox = document.getElementById('maderables-details-container');
   const inputMaderables = document.getElementById('input-maderables-variedades');
   const maderablesChips = document.getElementById('maderables-chips');
+  const maderablesListEl = document.getElementById('maderables-items-list');
+  const maderablesSummaryEl = document.getElementById('maderables-summary-badge');
+  const inputCustomMaderable = document.getElementById('input-custom-maderable');
+  const btnAddCustomMaderable = document.getElementById('btn-add-custom-maderable');
+
+  let currentMaderables = parseAgroItems(inputMaderables?.value || '');
+
+  const updateMaderablesSummary = () => {
+    if (!maderablesSummaryEl) return;
+    if (currentMaderables.length === 0) {
+      maderablesSummaryEl.style.display = 'none';
+      return;
+    }
+    let sum = 0;
+    currentMaderables.forEach(m => {
+      if (m.qty !== '' && !isNaN(m.qty)) sum += parseInt(m.qty, 10);
+    });
+
+    maderablesSummaryEl.style.display = 'block';
+    if (sum > 0) {
+      maderablesSummaryEl.innerHTML = `🌲 <b>Total árboles de sombra:</b> ${sum.toLocaleString()} árboles registrados en ${currentMaderables.length} variedades`;
+    } else {
+      maderablesSummaryEl.innerHTML = `🌲 <b>Variedades seleccionadas:</b> ${currentMaderables.length} variedades presentes (conteo opcional no especificado)`;
+    }
+  };
+
+  const syncMaderables = () => {
+    if (inputMaderables) {
+      inputMaderables.value = formatAgroList(currentMaderables);
+    }
+
+    maderablesChips?.querySelectorAll('.agro-chip').forEach(btn => {
+      const val = btn.dataset.val;
+      const isSel = currentMaderables.some(m => m.name.toLowerCase() === val.toLowerCase());
+      btn.style.background = isSel ? '#2d3e2c' : '#ffffff';
+      btn.style.color = isSel ? '#ffffff' : '#2d3e2c';
+      btn.style.borderColor = isSel ? '#2d3e2c' : '#c8d4c6';
+      btn.textContent = (isSel ? '✓ ' : '+ ') + val;
+    });
+
+    if (maderablesListEl) {
+      if (currentMaderables.length === 0) {
+        maderablesListEl.innerHTML = '';
+      } else {
+        maderablesListEl.innerHTML = currentMaderables.map((m, idx) => `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fbfdfa; border: 1px solid #dce6db; border-radius: 10px; padding: 6px 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #2d3e2c;">
+              <span>🌲</span>
+              <span>${m.name}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 11.5px; color: #666;">Cant:</span>
+              <input type="number" min="0" placeholder="Opcional" value="${m.qty !== '' ? m.qty : ''}" data-idx="${idx}" class="input-maderable-qty" style="width: 85px; height: 32px; padding: 4px 8px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1px solid #c8d4c6; background: #ffffff; text-align: right;">
+              <span style="font-size: 11.5px; color: #666; font-weight: 600;">árboles</span>
+              <button type="button" data-idx="${idx}" class="btn-remove-maderable" style="background: none; border: none; color: #888; cursor: pointer; padding: 2px 4px;" title="Quitar variedad">
+                <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+        maderablesListEl.querySelectorAll('.input-maderable-qty').forEach(inp => {
+          inp.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.dataset.idx, 10);
+            const val = e.target.value.trim();
+            currentMaderables[idx].qty = val !== '' ? parseInt(val, 10) : '';
+            if (inputMaderables) inputMaderables.value = formatAgroList(currentMaderables);
+            updateMaderablesSummary();
+          });
+        });
+
+        maderablesListEl.querySelectorAll('.btn-remove-maderable').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx, 10);
+            currentMaderables.splice(idx, 1);
+            syncMaderables();
+          });
+        });
+      }
+    }
+
+    updateMaderablesSummary();
+  };
 
   if (checkMaderables && maderablesBox) {
     checkMaderables.addEventListener('change', () => {
       maderablesBox.style.display = checkMaderables.checked ? 'block' : 'none';
+      if (checkMaderables.checked && currentMaderables.length === 0) {
+        syncMaderables();
+      }
     });
   }
 
-  if (maderablesChips && inputMaderables) {
+  if (maderablesChips) {
     maderablesChips.querySelectorAll('.agro-chip').forEach(btn => {
       btn.addEventListener('click', () => {
         const val = btn.dataset.val;
-        let current = inputMaderables.value.split(',').map(s => s.trim()).filter(Boolean);
-        if (current.some(c => c.toLowerCase() === val.toLowerCase())) {
-          current = current.filter(c => c.toLowerCase() !== val.toLowerCase());
-          btn.style.background = '#ffffff';
-          btn.style.color = '#2d3e2c';
-          btn.style.borderColor = '#c8d4c6';
-          btn.textContent = '+ ' + val;
+        const existsIdx = currentMaderables.findIndex(m => m.name.toLowerCase() === val.toLowerCase());
+        if (existsIdx >= 0) {
+          currentMaderables.splice(existsIdx, 1);
         } else {
-          current.push(val);
-          btn.style.background = '#2d3e2c';
-          btn.style.color = '#ffffff';
-          btn.style.borderColor = '#2d3e2c';
-          btn.textContent = '✓ ' + val;
+          currentMaderables.push({ name: val, qty: '' });
         }
-        inputMaderables.value = current.join(', ');
-        if (inputMaderables.value) {
-          inputMaderables.closest('.m3-field')?.classList.add('has-value');
-        } else {
-          inputMaderables.closest('.m3-field')?.classList.remove('has-value');
-        }
+        syncMaderables();
       });
     });
   }
 
+  if (btnAddCustomMaderable && inputCustomMaderable) {
+    const handleAddCustomTree = () => {
+      const val = inputCustomMaderable.value.trim();
+      if (!val) return;
+      if (!currentMaderables.some(m => m.name.toLowerCase() === val.toLowerCase())) {
+        currentMaderables.push({ name: val, qty: '' });
+        syncMaderables();
+      }
+      inputCustomMaderable.value = '';
+    };
+
+    btnAddCustomMaderable.addEventListener('click', handleAddCustomTree);
+    inputCustomMaderable.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddCustomTree();
+      }
+    });
+  }
+
+  // Initial sync for maderables
+  if (currentMaderables.length > 0) {
+    syncMaderables();
+  }
+
+  // --- 2. Musáceas Logic ---
   const checkMusaceas = document.getElementById('check-tiene-musaceas');
   const musaceasBox = document.getElementById('musaceas-details-container');
   const inputMusaceas = document.getElementById('input-musaceas-tipo');
   const musaceasChips = document.getElementById('musaceas-chips');
+  const musaceasListEl = document.getElementById('musaceas-items-list');
+  const musaceasSummaryEl = document.getElementById('musaceas-summary-badge');
+  const inputCustomMusacea = document.getElementById('input-custom-musacea');
+  const btnAddCustomMusacea = document.getElementById('btn-add-custom-musacea');
+
+  let currentMusaceas = parseAgroItems(inputMusaceas?.value || '');
+
+  const updateMusaceasSummary = () => {
+    if (!musaceasSummaryEl) return;
+    if (currentMusaceas.length === 0) {
+      musaceasSummaryEl.style.display = 'none';
+      return;
+    }
+    let sum = 0;
+    currentMusaceas.forEach(m => {
+      if (m.qty !== '' && !isNaN(m.qty)) sum += parseInt(m.qty, 10);
+    });
+
+    musaceasSummaryEl.style.display = 'block';
+    if (sum > 0) {
+      musaceasSummaryEl.innerHTML = `🍌 <b>Total musáceas:</b> ${sum.toLocaleString()} matas registradas en ${currentMusaceas.length} tipos`;
+    } else {
+      musaceasSummaryEl.innerHTML = `🍌 <b>Tipos seleccionados:</b> ${currentMusaceas.length} tipos presentes (conteo opcional no especificado)`;
+    }
+  };
+
+  const syncMusaceas = () => {
+    if (inputMusaceas) {
+      inputMusaceas.value = formatAgroList(currentMusaceas);
+    }
+
+    musaceasChips?.querySelectorAll('.agro-chip').forEach(btn => {
+      const val = btn.dataset.val;
+      const isSel = currentMusaceas.some(m => m.name.toLowerCase() === val.toLowerCase());
+      btn.style.background = isSel ? '#2d3e2c' : '#ffffff';
+      btn.style.color = isSel ? '#ffffff' : '#2d3e2c';
+      btn.style.borderColor = isSel ? '#2d3e2c' : '#c8d4c6';
+      btn.textContent = (isSel ? '✓ ' : '+ ') + val;
+    });
+
+    if (musaceasListEl) {
+      if (currentMusaceas.length === 0) {
+        musaceasListEl.innerHTML = '';
+      } else {
+        musaceasListEl.innerHTML = currentMusaceas.map((m, idx) => `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fffdf7; border: 1px solid #ede4cb; border-radius: 10px; padding: 6px 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #5d4500;">
+              <span>🍌</span>
+              <span>${m.name}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 11.5px; color: #666;">Cant:</span>
+              <input type="number" min="0" placeholder="Opcional" value="${m.qty !== '' ? m.qty : ''}" data-idx="${idx}" class="input-musacea-qty" style="width: 85px; height: 32px; padding: 4px 8px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1px solid #c8d4c6; background: #ffffff; text-align: right;">
+              <span style="font-size: 11.5px; color: #666; font-weight: 600;">matas</span>
+              <button type="button" data-idx="${idx}" class="btn-remove-musacea" style="background: none; border: none; color: #888; cursor: pointer; padding: 2px 4px;" title="Quitar variedad">
+                <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+        musaceasListEl.querySelectorAll('.input-musacea-qty').forEach(inp => {
+          inp.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.dataset.idx, 10);
+            const val = e.target.value.trim();
+            currentMusaceas[idx].qty = val !== '' ? parseInt(val, 10) : '';
+            if (inputMusaceas) inputMusaceas.value = formatAgroList(currentMusaceas);
+            updateMusaceasSummary();
+          });
+        });
+
+        musaceasListEl.querySelectorAll('.btn-remove-musacea').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx, 10);
+            currentMusaceas.splice(idx, 1);
+            syncMusaceas();
+          });
+        });
+      }
+    }
+
+    updateMusaceasSummary();
+  };
 
   if (checkMusaceas && musaceasBox) {
     checkMusaceas.addEventListener('change', () => {
       musaceasBox.style.display = checkMusaceas.checked ? 'block' : 'none';
+      if (checkMusaceas.checked && currentMusaceas.length === 0) {
+        syncMusaceas();
+      }
     });
   }
 
-  if (musaceasChips && inputMusaceas) {
+  if (musaceasChips) {
     musaceasChips.querySelectorAll('.agro-chip').forEach(btn => {
       btn.addEventListener('click', () => {
         const val = btn.dataset.val;
-        let current = inputMusaceas.value.split(',').map(s => s.trim()).filter(Boolean);
-        if (current.some(c => c.toLowerCase() === val.toLowerCase())) {
-          current = current.filter(c => c.toLowerCase() !== val.toLowerCase());
-          btn.style.background = '#ffffff';
-          btn.style.color = '#2d3e2c';
-          btn.style.borderColor = '#c8d4c6';
-          btn.textContent = '+ ' + val;
+        const existsIdx = currentMusaceas.findIndex(m => m.name.toLowerCase() === val.toLowerCase());
+        if (existsIdx >= 0) {
+          currentMusaceas.splice(existsIdx, 1);
         } else {
-          current.push(val);
-          btn.style.background = '#2d3e2c';
-          btn.style.color = '#ffffff';
-          btn.style.borderColor = '#2d3e2c';
-          btn.textContent = '✓ ' + val;
+          currentMusaceas.push({ name: val, qty: '' });
         }
-        inputMusaceas.value = current.join(', ');
-        if (inputMusaceas.value) {
-          inputMusaceas.closest('.m3-field')?.classList.add('has-value');
-        } else {
-          inputMusaceas.closest('.m3-field')?.classList.remove('has-value');
-        }
+        syncMusaceas();
       });
     });
+  }
+
+  if (btnAddCustomMusacea && inputCustomMusacea) {
+    const handleAddCustomMusacea = () => {
+      const val = inputCustomMusacea.value.trim();
+      if (!val) return;
+      if (!currentMusaceas.some(m => m.name.toLowerCase() === val.toLowerCase())) {
+        currentMusaceas.push({ name: val, qty: '' });
+        syncMusaceas();
+      }
+      inputCustomMusacea.value = '';
+    };
+
+    btnAddCustomMusacea.addEventListener('click', handleAddCustomMusacea);
+    inputCustomMusacea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddCustomMusacea();
+      }
+    });
+  }
+
+  // Initial sync for musaceas
+  if (currentMusaceas.length > 0) {
+    syncMusaceas();
   }
 
   form.addEventListener('submit', async (e) => {
@@ -2133,8 +2484,8 @@ export async function setupNuevoLoteListeners() {
 
     data.tiene_maderables = Boolean(document.getElementById('check-tiene-maderables')?.checked);
     data.tiene_musaceas = Boolean(document.getElementById('check-tiene-musaceas')?.checked);
-    if (!data.tiene_maderables) data.maderables_variedades = '';
-    if (!data.tiene_musaceas) data.musaceas_tipo = '';
+    data.maderables_variedades = data.tiene_maderables ? formatAgroList(currentMaderables) : '';
+    data.musaceas_tipo = data.tiene_musaceas ? formatAgroList(currentMusaceas) : '';
 
     console.log('[nuevo_lote] Submit - loteId:', loteId);
     console.log('[nuevo_lote] Submit - data:', data);
@@ -2142,14 +2493,24 @@ export async function setupNuevoLoteListeners() {
     if (data.num_plantas) data.num_plantas = parseInt(data.num_plantas);
     if (data.area_ha) data.area_ha = parseFloat(data.area_ha);
 
+    let currentCoordinates = [];
     if (drawnItems && drawnItems.getLayers().length > 0) {
       const layer = drawnItems.getLayers()[0];
       const latlngs = layer.getLatLngs()[0];
-      data.coordenadas_json = JSON.stringify({
-        color: selectedColor,
-        coordinates: latlngs.map(ll => ({ lat: ll.lat, lng: ll.lng }))
-      });
+      currentCoordinates = latlngs.map(ll => ({ lat: ll.lat, lng: ll.lng }));
+    } else if (window.__currentLoteData?.coordenadas_json) {
+      const prev = parseCoordenadasJson(window.__currentLoteData.coordenadas_json);
+      currentCoordinates = prev.coordinates || [];
     }
+
+    data.coordenadas_json = JSON.stringify({
+      color: selectedColor,
+      coordinates: currentCoordinates,
+      tiene_maderables: data.tiene_maderables,
+      maderables_variedades: data.maderables_variedades,
+      tiene_musaceas: data.tiene_musaceas,
+      musaceas_tipo: data.musaceas_tipo
+    });
 
     data.empresa_id = window._currentEmpresaId;
 
@@ -2261,7 +2622,12 @@ export async function setupNuevoLoteListeners() {
         window.Snackbar.show(loteId ? 'Lote actualizado exitosamente' : 'Lote creado exitosamente', { type: 'success' });
       }
       window.clearScreenCache?.('dashboard');
-      window.navigateTo('dashboard');
+      window.clearScreenCache?.('detalle_lote');
+      if (submitLoteId) {
+        window.navigateTo('detalle_lote', submitLoteId);
+      } else {
+        window.navigateTo('dashboard');
+      }
     } catch (err) {
       console.error('Error saving lote:', err);
       if (window.Snackbar) {

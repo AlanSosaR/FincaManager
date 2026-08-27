@@ -1,6 +1,15 @@
 import { supabase } from '../supabase.js';
 import { renderPlanIfcafe, initPlanIfcafe } from './plan_ifcafe.js';
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export async function renderDetalleLote(id) {
   try {
     const [
@@ -45,6 +54,74 @@ export async function renderDetalleLote(id) {
       return '📌';
     };
 
+    const formatEdadLabel = (edad) => {
+      if (!edad) return '';
+      if (edad === '1_anio') return '1 año · Café Tiernito';
+      if (edad === '2_anios') return '2 años · Creciendo';
+      if (edad === '3_mas') return '3+ años · En Producción';
+      if (edad === 'carga_alta') return 'Carga Muy Alta';
+      return edad;
+    };
+
+    let tieneMaderables = Boolean(lote.tiene_maderables || (lote.maderables_variedades && lote.maderables_variedades.trim()));
+    let maderablesVariedades = lote.maderables_variedades || '';
+    let tieneMusaceas = Boolean(lote.tiene_musaceas || (lote.musaceas_tipo && lote.musaceas_tipo.trim()));
+    let musaceasTipo = lote.musaceas_tipo || '';
+
+    if (lote.coordenadas_json) {
+      try {
+        const parsedCoords = JSON.parse(lote.coordenadas_json);
+        if (parsedCoords && typeof parsedCoords === 'object' && !Array.isArray(parsedCoords)) {
+          if (parsedCoords.maderables_variedades && !maderablesVariedades) {
+            maderablesVariedades = parsedCoords.maderables_variedades;
+            tieneMaderables = true;
+          }
+          if (parsedCoords.musaceas_tipo && !musaceasTipo) {
+            musaceasTipo = parsedCoords.musaceas_tipo;
+            tieneMusaceas = true;
+          }
+        }
+      } catch {}
+    }
+
+    const parseAgroItems = (str) => {
+      if (!str) return [];
+      return str.split(',').map(item => {
+        const trimmed = item.trim();
+        if (!trimmed) return null;
+        const match = trimmed.match(/^(.+?)(?:\s*\((\d+)\))?$/);
+        if (match) {
+          return { name: match[1].trim(), qty: match[2] ? parseInt(match[2], 10) : null };
+        }
+        return { name: trimmed, qty: null };
+      }).filter(Boolean);
+    };
+
+    const maderablesList = parseAgroItems(maderablesVariedades);
+    const musaceasList = parseAgroItems(musaceasTipo);
+
+    let totalMaderablesCount = 0;
+    if (maderablesVariedades) {
+      const mMatches = maderablesVariedades.match(/\((\d+)\)/g);
+      if (mMatches) {
+        mMatches.forEach(m => {
+          const n = parseInt(m.replace(/[()]/g, ''), 10);
+          if (!isNaN(n)) totalMaderablesCount += n;
+        });
+      }
+    }
+
+    let totalMusaceasCount = 0;
+    if (musaceasTipo) {
+      const musMatches = musaceasTipo.match(/\((\d+)\)/g);
+      if (musMatches) {
+        musMatches.forEach(m => {
+          const n = parseInt(m.replace(/[()]/g, ''), 10);
+          if (!isNaN(n)) totalMusaceasCount += n;
+        });
+      }
+    }
+
     return `
       <style>
         .dl-screen-pad { padding: 0 0 100px 0 !important; width: 100%; margin: 0; }
@@ -54,6 +131,29 @@ export async function renderDetalleLote(id) {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+        }
+        .dl-chips-carousel {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 2px 2px 4px 2px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.3) transparent;
+          -webkit-overflow-scrolling: touch;
+          align-items: stretch;
+          flex: 1;
+          min-width: 0;
+        }
+        .dl-chips-carousel::-webkit-scrollbar {
+          height: 4px;
+        }
+        .dl-chips-carousel::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.35);
+          border-radius: 4px;
+        }
+        .dl-chips-carousel .ganado-tag-stat {
+          flex-shrink: 0;
+          white-space: nowrap;
         }
         .dl-fused-card {
           display: grid;
@@ -90,13 +190,14 @@ export async function renderDetalleLote(id) {
           gap: 6px;
           padding: 6px 14px;
           border-radius: 9999px;
-          border: 1.5px solid #d4dfd2;
-          background: #ffffff;
-          color: #2d3e2c;
           font-size: 12px;
           font-weight: 700;
           cursor: pointer;
+          border: 1.5px solid #c0d4be;
+          background: #ffffff;
+          color: #2d3e2c;
           transition: all 0.15s ease;
+          user-select: none;
         }
         .dl-filter-chip:hover {
           background: #eef5eb;
@@ -163,8 +264,16 @@ export async function renderDetalleLote(id) {
         <section class="m3-mb-6">
           <div class="m3-flex m3-items-center m3-justify-between m3-gap-4 m3-flex-wrap">
             <div>
-              <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--m3-primary); letter-spacing: 0.5px;">Lote de Café</span>
-              <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="margin: 2px 0 0;">${lote.nombre}</h1>
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="margin: 0; line-height: 1.1;">
+                  ${lote.nombre}
+                </h1>
+                ${lote.edad_categoria ? `
+                  <span style="font-size: 12px; font-weight: 700; background: #eaf2e8; color: #2d3e2c; border: 1px solid #c8d4c6; padding: 4px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px;">
+                    🌱 ${formatEdadLabel(lote.edad_categoria)}
+                  </span>
+                ` : ''}
+              </div>
             </div>
             <div class="m3-flex m3-items-center m3-gap-2" style="flex-wrap: wrap;">
               <button onclick="window.navigateTo('nuevo_lote', '${lote.id}')" class="plan-btn-ghost" style="padding: 8px 14px; font-size: 12.5px;" title="Editar Lote">
@@ -183,63 +292,68 @@ export async function renderDetalleLote(id) {
         <div class="m3-mb-6">
           <div class="dl-fused-card">
             <!-- Left Stats Column -->
-            <div style="padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;">
-              <div class="ganado-tally-top" style="align-items: baseline; margin: 0;">
-                <span class="ganado-tally-label" style="color: #fff; opacity: 1;">Variedad&nbsp;<span class="dl-variedad-name">${lote.variedad || 'Café'}</span></span>
-                <span class="ganado-tally-count">
-                  <span class="ganado-card-value">${(lote.num_plantas || 0).toLocaleString()}</span>
-                  <span class="ganado-tally-unit">plantas</span>
+            <div style="padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-width: 0; overflow: hidden;">
+              <div class="ganado-tally-top" style="display: flex; align-items: baseline; justify-content: flex-start; gap: 18px; margin: 0; flex-wrap: wrap;">
+                <span class="ganado-tally-label" style="color: rgba(255,255,255,0.92); font-size: 13.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; margin: 0;">
+                  Variedad&nbsp;<span class="dl-variedad-name" style="color: #ffffff; font-size: 16px; font-weight: 800; text-transform: none;">${lote.variedad || 'Café'}</span>
+                </span>
+                <span class="ganado-tally-count" style="display: inline-flex; align-items: baseline; gap: 8px; margin: 0;">
+                  <span class="ganado-card-value" style="font-size: 34px; font-weight: 800; color: #ffffff; line-height: 1;">${(lote.num_plantas || 0).toLocaleString()}</span>
+                  <span class="ganado-tally-unit" style="font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.85);">plantas de café</span>
                 </span>
               </div>
 
-              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch;">
-                <!-- 1. Selector de Línea de Tiempo y Fotos por Tipo de Actividad Global -->
-                <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.96); border-radius: 12px; padding: 6px 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; max-width: 320px;">
-                  <span class="ganado-tag-swatch w" style="flex-shrink: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: #eef4ec; border-radius: 8px;">
-                    <span class="material-symbols-outlined" style="font-size: 20px; color: #2d3e2c;">photo_library</span>
-                  </span>
-                  <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-                    <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #5a7056; letter-spacing: 0.4px;">Línea de Tiempo & Fotos</span>
-                    <select id="dl-select-actividad-foto" onchange="window.onSelectActividadEvolucion(this.value)" style="border: none; background: transparent; font-family: 'Work Sans', sans-serif; font-size: 12.5px; font-weight: 700; color: #1a1a1a; cursor: pointer; outline: none; padding: 2px 0; width: 100%; text-overflow: ellipsis; white-space: nowrap;">
-                      <option value="cal">📅 Calendario de Labores</option>
-                      ${Object.entries(tiposMap).map(([tName, tData]) => `
-                        <option value="gallery:${tName}">
-                          ${getTipoIcon(tName)} ${tName} (${tData.photoCount} fotos)
-                        </option>
-                      `).join('')}
-                    </select>
-                  </div>
+              <!-- Carrusel Horizontal de Ancho Completo para Árboles y Cultivos -->
+              <div style="width: 100%; min-width: 0; overflow: hidden;">
+                <div class="dl-chips-carousel">
+                  <!-- Píldoras individuales por cada variedad de Árbol Maderable / Sombra -->
+                  ${maderablesList.length > 0 ? maderablesList.map(m => `
+                    <div onclick="window.navigateTo('nuevo_lote', '${lote.id}')" class="ganado-tag-stat" style="background: rgba(255,255,255,0.96); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0;" title="Toca para editar ${m.name}">
+                      <span class="ganado-tag-swatch w" style="flex-shrink: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: #eef4ec; border-radius: 8px;">
+                        <span style="font-size: 18px;">🌲</span>
+                      </span>
+                      <div style="overflow: hidden; display: flex; flex-direction: column;">
+                        <span class="ganado-tag-n" style="font-size: 13px; font-weight: 800; color: #1a1a1a; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
+                          ${m.qty !== null ? `${m.qty.toLocaleString()} ${m.name}` : m.name}
+                        </span>
+                        <span class="ganado-tag-l" style="font-size: 9.5px; font-weight: 700; text-transform: uppercase; color: #5a7056; letter-spacing: 0.3px;">
+                          ${m.qty !== null ? 'Árboles de Sombra' : 'Árbol Maderable'}
+                        </span>
+                      </div>
+                    </div>
+                  `).join('') : `
+                    <div onclick="window.navigateTo('nuevo_lote', '${lote.id}')" class="ganado-tag-stat" style="background: rgba(255,255,255,0.96); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0;" title="Toca para registrar árboles de sombra">
+                      <span class="ganado-tag-swatch w" style="flex-shrink: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: #eef4ec; border-radius: 8px;">
+                        <span style="font-size: 18px;">🌲</span>
+                      </span>
+                      <div style="overflow: hidden; display: flex; flex-direction: column;">
+                        <span class="ganado-tag-n" style="font-size: 12.5px; font-weight: 700; color: #6b7280; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
+                          Sin árboles registrados
+                        </span>
+                        <span class="ganado-tag-l" style="font-size: 9.5px; font-weight: 700; text-transform: uppercase; color: #5a7056;">
+                          Árboles Maderables / Sombra
+                        </span>
+                      </div>
+                    </div>
+                  `}
+
+                  <!-- Píldoras individuales por cada tipo de Musácea / Plátano -->
+                  ${musaceasList.map(m => `
+                    <div onclick="window.navigateTo('nuevo_lote', '${lote.id}')" class="ganado-tag-stat" style="background: rgba(255,255,255,0.96); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0;" title="Toca para editar ${m.name}">
+                      <span class="ganado-tag-swatch w" style="flex-shrink: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: #fff8e1; border-radius: 8px;">
+                        <span style="font-size: 18px;">🍌</span>
+                      </span>
+                      <div style="overflow: hidden; display: flex; flex-direction: column;">
+                        <span class="ganado-tag-n" style="font-size: 13px; font-weight: 800; color: #1a1a1a; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
+                          ${m.qty !== null ? `${m.qty.toLocaleString()} ${m.name}` : m.name}
+                        </span>
+                        <span class="ganado-tag-l" style="font-size: 9.5px; font-weight: 700; text-transform: uppercase; color: #7a6000; letter-spacing: 0.3px;">
+                          ${m.qty !== null ? 'Matas de Musácea' : 'Cultivo Asociado'}
+                        </span>
+                      </div>
+                    </div>
+                  `).join('')}
                 </div>
-
-                ${lote.edad_categoria ? `
-                  <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.94); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
-                    <span class="ganado-tag-swatch w"><span style="font-size:16px;">🌱</span></span>
-                    <span class="ganado-tag-info">
-                      <span class="ganado-tag-n" style="font-size: 13px; font-weight:800;">${lote.edad_categoria}</span>
-                      <span class="ganado-tag-l">Edad / Etapa</span>
-                    </span>
-                  </div>
-                ` : ''}
-
-                ${lote.maderables_variedades ? `
-                  <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.94); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
-                    <span class="ganado-tag-swatch w"><span style="font-size:16px;">🌲</span></span>
-                    <span class="ganado-tag-info">
-                      <span class="ganado-tag-n" style="font-size: 12.5px; font-weight:800;">${lote.maderables_variedades}</span>
-                      <span class="ganado-tag-l">Maderables</span>
-                    </span>
-                  </div>
-                ` : ''}
-
-                ${lote.musaceas_tipo ? `
-                  <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.94); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
-                    <span class="ganado-tag-swatch w"><span style="font-size:16px;">🍌</span></span>
-                    <span class="ganado-tag-info">
-                      <span class="ganado-tag-n" style="font-size: 12.5px; font-weight:800;">${lote.musaceas_tipo}</span>
-                      <span class="ganado-tag-l">Plátanos / Mínimos</span>
-                    </span>
-                  </div>
-                ` : ''}
               </div>
             </div>
 
@@ -260,12 +374,56 @@ export async function renderDetalleLote(id) {
           
           <!-- Vista 1: Calendario Interactivo -->
           <div id="dl-calendar-wrap">
-            <div class="m3-flex m3-items-center m3-justify-between m3-mb-4" style="border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div class="m3-flex m3-items-center m3-justify-between m3-mb-4" style="border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
               <div class="m3-flex m3-items-center m3-gap-3">
                 <span style="font-size: 24px;">🌿</span>
                 <div>
                   <h2 class="m3-title-large m3-font-bold m3-text-on-surface" style="margin: 0; font-size: 18px;">Manejo del Cafetal</h2>
                   <p style="margin: 2px 0 0; font-size: 12px; color: var(--m3-on-surface-variant);">Calendario de labores, abonadas, foliares y podas de este lote</p>
+                </div>
+              </div>
+
+              <div class="m3-flex m3-items-center m3-gap-2">
+                <!-- Split Button for Timeline & Photos -->
+                <div class="m3-split-button-container" style="position: relative; display: inline-flex; align-items: stretch; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);">
+                  <button type="button" onclick="window.onSelectActividadEvolucion('gallery:all')" class="m3-split-btn-main" style="background: #2d3e2c; color: #ffffff; border: none; padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-top-left-radius: 20px; border-bottom-left-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s ease;">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">photo_library</span>
+                    <span>Línea de Tiempo & Fotos</span>
+                  </button>
+                  <div style="width: 1px; background: rgba(255,255,255,0.25);"></div>
+                  <button type="button" onclick="window.toggleDlTimelineDropdown(event)" class="m3-split-btn-toggle" style="background: #2d3e2c; color: #ffffff; border: none; padding: 7px 10px; border-top-right-radius: 20px; border-bottom-right-radius: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s ease;">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">arrow_drop_down</span>
+                  </button>
+
+                  <!-- Dropdown Menu -->
+                  <div id="dl-timeline-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 250px; background: #ffffff; border: 1px solid #e0e6de; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.14); z-index: 1000; overflow: hidden; padding: 6px 0;">
+                    <div style="padding: 6px 14px 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px;">
+                      Vistas y Evolución
+                    </div>
+                    <div onclick="window.onSelectActividadEvolucion('cal'); window.closeDlTimelineDropdown();" class="dl-menu-item" style="padding: 8px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: #2d3e2c; cursor: pointer;">
+                      <span style="font-size: 16px;">📅</span>
+                      <span>Calendario de Labores</span>
+                    </div>
+                    <div style="height: 1px; background: #edf2ec; margin: 4px 0;"></div>
+                    <div style="padding: 4px 14px 2px; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px;">
+                      Fotos por Actividad
+                    </div>
+                    ${Object.entries(tiposMap).length > 0 ? Object.entries(tiposMap).map(([tName, tData]) => `
+                      <div onclick="window.onSelectActividadEvolucion('gallery:${escapeHtml(tName)}'); window.closeDlTimelineDropdown();" class="dl-menu-item" style="padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; font-weight: 600; color: #1a1a1a; cursor: pointer;">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                          <span style="font-size: 15px;">${getTipoIcon(tName)}</span>
+                          <span>${escapeHtml(tName)}</span>
+                        </span>
+                        <span style="font-size: 11px; font-weight: 800; color: #2d3e2c; background: #eef4ec; padding: 2px 7px; border-radius: 10px;">
+                          ${tData.photoCount} ${tData.photoCount === 1 ? 'foto' : 'fotos'}
+                        </span>
+                      </div>
+                    `).join('') : `
+                      <div style="padding: 8px 14px; font-size: 12px; color: #777; font-style: italic;">
+                        Sin fotos registradas aún
+                      </div>
+                    `}
+                  </div>
                 </div>
               </div>
             </div>
@@ -298,6 +456,43 @@ export function initDetalleLote(id) {
     return '📌';
   };
 
+  window.toggleDlTimelineDropdown = (e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    let menu = null;
+    if (e && e.currentTarget) {
+      const container = e.currentTarget.closest('.m3-split-button-container');
+      if (container) {
+        menu = container.querySelector('#dl-timeline-menu, #dl-timeline-menu-evo');
+      }
+    }
+    if (!menu) {
+      const evoWrap = document.getElementById('dl-evolucion-wrap');
+      if (evoWrap && evoWrap.style.display !== 'none') {
+        menu = document.getElementById('dl-timeline-menu-evo');
+      } else {
+        menu = document.getElementById('dl-timeline-menu');
+      }
+    }
+    if (menu) {
+      const isVisible = menu.style.display === 'block';
+      window.closeDlTimelineDropdown();
+      if (!isVisible) {
+        menu.style.display = 'block';
+      }
+    }
+  };
+
+  window.closeDlTimelineDropdown = () => {
+    const menus = document.querySelectorAll('#dl-timeline-menu, #dl-timeline-menu-evo');
+    menus.forEach(m => m.style.display = 'none');
+  };
+
+  document.removeEventListener('click', window.closeDlTimelineDropdown);
+  document.addEventListener('click', window.closeDlTimelineDropdown);
+
   // Switcher between Calendar and Activity Photo Evolution
   window.onSelectActividadEvolucion = (val) => {
     const calWrap = document.getElementById('dl-calendar-wrap');
@@ -317,7 +512,7 @@ export function initDetalleLote(id) {
       
       const allPhotosApps = apps.filter(a => a.notas && (a.notas.startsWith('data:image') || a.notas.startsWith('http')));
       // Sort chronologically (oldest to newest for timeline evolution)
-      const sortedPhotos = [...allPhotosApps].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+      const sortedPhotos = [...allPhotosApps].sort((a, b) => new Date(a.fecha) - new Date(a.fecha));
 
       // Collect available types with photos
       const typesSet = {};
@@ -337,9 +532,6 @@ export function initDetalleLote(id) {
       calWrap.style.display = 'none';
       evoWrap.style.display = 'block';
 
-      const selectEl = document.getElementById('dl-select-actividad-foto');
-      if (selectEl && targetTipo) selectEl.value = 'gallery:' + targetTipo;
-
       const calcDaysBetween = (f1, f2) => {
         if (!f1 || !f2) return null;
         const d1 = new Date(f1.length === 10 ? f1 + 'T00:00:00' : f1);
@@ -358,20 +550,46 @@ export function initDetalleLote(id) {
               Mostrando la evolución y fotos registradas de <b>${targetTipo}</b> (${filteredPhotosApps.length} fotos)
             </p>
           </div>
-          <button type="button" onclick="window.onSelectActividadEvolucion('cal'); if(document.getElementById('dl-select-actividad-foto')) document.getElementById('dl-select-actividad-foto').value='cal';" class="plan-btn-ghost" style="font-size: 12.5px; padding: 7px 14px;">
-            <span class="material-symbols-outlined" style="font-size: 17px;">calendar_month</span>
-            <span>Volver al Calendario</span>
-          </button>
-        </div>
 
-        <!-- Filter Chips by Tipo de Actividad -->
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;">
-          ${Object.entries(typesSet).map(([tName, count]) => `
-            <button type="button" onclick="window.onSelectActividadEvolucion('gallery:${tName}')" class="dl-filter-chip ${targetTipo === tName ? 'active' : ''}">
-              <span>${getTipoIcon(tName)}</span>
-              <span>${tName} (${count})</span>
-            </button>
-          `).join('')}
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <!-- Split button in Timeline View -->
+            <div class="m3-split-button-container" style="position: relative; display: inline-flex; align-items: stretch; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);">
+              <button type="button" onclick="window.onSelectActividadEvolucion('cal')" class="m3-split-btn-main" style="background: #2d3e2c; color: #ffffff; border: none; padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-top-left-radius: 20px; border-bottom-left-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s ease;">
+                <span class="material-symbols-outlined" style="font-size: 17px;">calendar_month</span>
+                <span>Volver al Calendario</span>
+              </button>
+              <div style="width: 1px; background: rgba(255,255,255,0.25);"></div>
+              <button type="button" onclick="window.toggleDlTimelineDropdown(event)" class="m3-split-btn-toggle" style="background: #2d3e2c; color: #ffffff; border: none; padding: 7px 10px; border-top-right-radius: 20px; border-bottom-right-radius: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s ease;">
+                <span class="material-symbols-outlined" style="font-size: 18px;">arrow_drop_down</span>
+              </button>
+
+              <!-- Dropdown Menu inside Evolution View -->
+              <div id="dl-timeline-menu-evo" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 250px; background: #ffffff; border: 1px solid #e0e6de; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.14); z-index: 1000; overflow: hidden; padding: 6px 0;">
+                <div style="padding: 6px 14px 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px;">
+                  Vistas y Evolución
+                </div>
+                <div onclick="window.onSelectActividadEvolucion('cal'); window.closeDlTimelineDropdown();" class="dl-menu-item" style="padding: 8px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: #2d3e2c; cursor: pointer;">
+                  <span style="font-size: 16px;">📅</span>
+                  <span>Calendario de Labores</span>
+                </div>
+                <div style="height: 1px; background: #edf2ec; margin: 4px 0;"></div>
+                <div style="padding: 4px 14px 2px; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px;">
+                  Fotos por Actividad
+                </div>
+                ${Object.entries(typesSet).map(([tName, count]) => `
+                  <div onclick="window.onSelectActividadEvolucion('gallery:${escapeHtml(tName)}'); window.closeDlTimelineDropdown();" class="dl-menu-item" style="padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; font-weight: 600; color: #1a1a1a; cursor: pointer;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <span style="font-size: 15px;">${getTipoIcon(tName)}</span>
+                      <span>${escapeHtml(tName)}</span>
+                    </span>
+                    <span style="font-size: 11px; font-weight: 800; color: #2d3e2c; background: #eef4ec; padding: 2px 7px; border-radius: 10px;">
+                      ${count} ${count === 1 ? 'foto' : 'fotos'}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
         </div>
 
         ${filteredPhotosApps.length > 0 ? `
