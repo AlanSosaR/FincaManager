@@ -326,6 +326,11 @@ export async function renderPotreros() {
         gap: 4px;
         text-shadow: 0 1px 2px rgba(0,0,0,0.3);
       }
+      #mapa-container path.leaflet-interactive {
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
+        transition: stroke-width 0.15s ease, fill-opacity 0.15s ease;
+        cursor: pointer;
+      }
       .potrero-float-card {
         position: absolute;
         z-index: 1400;
@@ -817,7 +822,7 @@ export async function initPotreros() {
       const selected = potrero.id === id;
       if (selected) {
         if (!map.hasLayer(poly)) map.addLayer(poly);
-        poly.setStyle({ fillOpacity: 0.35, weight: 4, opacity: 1 });
+        poly.setStyle({ fillOpacity: 0.48, weight: 5, opacity: 1 });
       } else if (map.hasLayer(poly)) {
         map.removeLayer(poly);
       }
@@ -835,8 +840,9 @@ export async function initPotreros() {
     map.closePopup();
     Object.values(polyByPotrero).forEach(({ poly, potrero }) => {
       const { color } = parseCoordenadasJson(potrero.coordenadas_json);
+      const potreroColor = color || '#2e7d32';
       if (!map.hasLayer(poly)) map.addLayer(poly);
-      poly.setStyle({ fillOpacity: 0.18, weight: 2, opacity: 0.9, color, fillColor: color });
+      poly.setStyle({ fillOpacity: 0.30, weight: 3.5, opacity: 1, color: potreroColor, fillColor: potreroColor });
     });
     fitToParcels();
   }
@@ -866,16 +872,31 @@ export async function initPotreros() {
     const { coordinates, color } = parseCoordenadasJson(potrero.coordenadas_json);
     if (!coordinates || coordinates.length < 3) return;
     const latlngs = coordinates.map(c => [c.lat, c.lng]);
+    const potreroColor = color || '#2e7d32';
 
     const poly = L.polygon(latlngs, {
-      color: color,
-      fillColor: color,
-      fillOpacity: 0.18,
-      weight: 2,
-      opacity: 0.9
+      color: potreroColor,
+      fillColor: potreroColor,
+      fillOpacity: 0.30,
+      weight: 3.5,
+      opacity: 1,
+      lineJoin: 'round',
+      lineCap: 'round'
     }).addTo(map);
     allBounds.push(poly.getBounds());
     polyByPotrero[potrero.id] = { poly, potrero };
+
+    poly.on('mouseover', () => {
+      if (selectedPotreroId !== potrero.id) {
+        poly.setStyle({ weight: 5, fillOpacity: 0.45 });
+      }
+    });
+
+    poly.on('mouseout', () => {
+      if (selectedPotreroId !== potrero.id) {
+        poly.setStyle({ weight: 3.5, fillOpacity: 0.30 });
+      }
+    });
 
     poly.on('click', (e) => {
       selectPotrero(potrero.id);
@@ -886,7 +907,7 @@ export async function initPotreros() {
     L.marker([c.lat, c.lng], {
       icon: L.divIcon({
         className: 'potrero-label-wrap',
-        html: `<div class="potrero-label" style="background:${escapeHtml(color)};">
+        html: `<div class="potrero-label" style="background:${escapeHtml(potreroColor)};">
           <span class="material-icons" style="font-size:13px;color:#ffffff;">grass</span>
           <span>${escapeHtml(potrero.nombre || 'Potrero')}</span>
         </div>`,

@@ -350,7 +350,7 @@ const screens = {
     aceptar_invitacion: { title: 'Invitación', render: renderAceptarInvitacion, noAuth: true },
     recuperar: { title: 'Recuperar Contraseña', render: renderRecuperar, noAuth: true },
     restablecer: { title: 'Restablecer Contraseña', render: renderRestablecer },
-    plan_ifcafe: { title: 'Plan de Fertilización 2026', backTo: 'dashboard', render: renderPlanIfcafe },
+    plan_ifcafe: { title: 'Manejo del Cafetal', backTo: (id) => (id && id !== 'null' ? ['detalle_lote', id] : 'dashboard'), render: renderPlanIfcafe },
     mapa_lotes: { title: 'Mapa del Cafetal', backTo: 'dashboard', render: renderMapaLotes },
 };
 

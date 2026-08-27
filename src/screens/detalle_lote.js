@@ -1,63 +1,74 @@
 import { supabase } from '../supabase.js';
-import { showModal } from '../modals.js';
-
-function getInitiales(nombre) {
-  return nombre.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
-}
-
-function getAvatarColor(seed) {
-  const colors = ['var(--m3-primary)', 'var(--m3-tertiary)', '#7b4f9e', '#c75b39', '#2d3e2c', '#2c666e', '#6a1b9a'];
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
-}
+import { renderPlanIfcafe, initPlanIfcafe } from './plan_ifcafe.js';
 
 export async function renderDetalleLote(id) {
   try {
     const [
       { data: lote, error: loteErr },
-      { data: aplicaciones, error: appErr },
-      { data: asignaciones, error: asigErr },
-      { data: todoPersonal, error: personalErr }
+      planCalendarHtml
     ] = await Promise.all([
       supabase.from('lotes').select('*').eq('id', id).single(),
-      supabase.from('lote_aplicaciones').select('*').eq('lote_id', id).neq('estado', 'Programada').order('fecha', { ascending: false }),
-      supabase.from('lote_personal').select('id, personal:personal_id(*)').eq('lote_id', id),
-      supabase.from('personal').select('*').order('nombre', { ascending: true })
+      renderPlanIfcafe(id, { embedded: true })
     ]);
 
     if (loteErr) throw loteErr;
 
-    const fertilizantes = (aplicaciones || []).filter(a => a.tipo === 'Fertilizante');
-    const otrosApps = (aplicaciones || []).filter(a => a.tipo !== 'Fertilizante');
-    const asignados = (asignaciones || []).map(a => a.personal);
-    const asignadosIds = new Set(asignados.map(p => p.id));
-    const disponibles = (todoPersonal || []).filter(p => !asignadosIds.has(p.id));
+    const hasMap = Boolean(lote.coordenadas_json);
 
     return `
       <style>
-        @media (max-width: 768px) {
-          .dl-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
-          .dl-main-col { gap: 16px !important; }
-          .dl-screen-pad { padding: 0 0 120px 0 !important; }
-          .dl-map-grid-cell { grid-column: 1 !important; grid-row: auto !important; }
-          .dl-main-col { grid-column: 1 !important; grid-row: auto !important; }
-        }
-        .db-stat-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
+        .dl-screen-pad { padding: 0 0 100px 0 !important; max-width: 960px; margin: 0 auto; }
         .dl-variedad-name {
           font-size: 14px;
           font-weight: 700;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
+        }
+        .dl-fused-card {
+          display: grid;
+          grid-template-columns: ${hasMap ? '1.25fr 1fr' : '1fr'};
+          border-radius: 20px;
+          overflow: hidden;
+          background: var(--m3-primary, #2d3e2c);
+          box-shadow: 0 4px 20px rgba(45,62,44,0.22);
+          min-height: 185px;
+        }
+        .dl-fused-card .ganado-card-value {
+          color: #ffffff !important;
+          font-weight: 800 !important;
+        }
+        .dl-fused-card .ganado-tally-unit {
+          color: rgba(255, 255, 255, 0.88) !important;
+          font-weight: 600 !important;
+        }
+        .dl-fused-card .ganado-tally-label {
+          color: #ffffff !important;
+          opacity: 1 !important;
+        }
+        .dl-fused-map-col {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          min-height: 180px;
+          border-left: 1.5px solid rgba(255,255,255,0.15);
+          overflow: hidden;
+        }
+        @media (max-width: 720px) {
+          .dl-fused-card {
+            grid-template-columns: 1fr !important;
+          }
+          .dl-fused-map-col {
+            height: 220px !important;
+            min-height: 220px !important;
+            border-left: none !important;
+            border-top: 1.5px solid rgba(255,255,255,0.15) !important;
+            border-radius: 0 0 20px 20px !important;
+          }
+          #dl-map-container {
+            height: 220px !important;
+            min-height: 220px !important;
+          }
         }
         #dl-map-container,
         #dl-map-container .leaflet-container {
@@ -67,215 +78,100 @@ export async function renderDetalleLote(id) {
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dl-screen-pad">
         <!-- Header -->
         <section class="m3-mb-6">
-          <div class="m3-flex" style="gap: 24px; flex-wrap: wrap;">
-            <div class="m3-flex m3-flex-col m3-gap-4" style="flex: 1; min-width: 280px;">
-              <div class="m3-flex m3-mobile-flex-col m3-items-start m3-justify-between m3-gap-4">
-              <div class="m3-flex m3-items-center m3-gap-4 m3-flex-wrap">
-                <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope">${lote.nombre}</h1>
-              </div>
+          <div class="m3-flex m3-items-center m3-justify-between m3-gap-4 m3-flex-wrap">
+            <div>
+              <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--m3-primary); letter-spacing: 0.5px;">Lote de Café</span>
+              <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="margin: 2px 0 0;">${lote.nombre}</h1>
             </div>
-          </div>
+            <div class="m3-flex m3-items-center m3-gap-2" style="flex-wrap: wrap;">
+              <button onclick="window.navigateTo('nuevo_lote', '${lote.id}')" class="plan-btn-ghost" style="padding: 8px 14px; font-size: 12.5px;" title="Editar Lote">
+                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
+                <span>Editar</span>
+              </button>
+              <button onclick="window.confirmDeleteLoteFromDetalle('${lote.id}', '${lote.nombre}')" class="plan-btn-danger" style="padding: 8px 12px; font-size: 12.5px;" title="Eliminar Lote">
+                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+                <span>Eliminar</span>
+              </button>
+            </div>
           </div>
         </section>
 
+        <!-- Summary Banner + Map Fused Card -->
         <div class="m3-mb-6">
-          <div class="ganado-card ganado-card-primary ganado-tally">
-            <div class="ganado-tally-top" style="align-items: baseline;">
-              <span class="ganado-tally-label" style="color: #fff; opacity: 1;">Variedad&nbsp;<span class="dl-variedad-name">${lote.variedad || 'N/A'}</span></span>
-              <span class="ganado-tally-count">
-                <span class="ganado-card-value">${(lote.num_plantas || 0).toLocaleString()}</span>
-                <span class="ganado-tally-unit">plantas</span>
-              </span>
-            </div>
-            <div class="ganado-tally-divider"></div>
-            <div class="ganado-tally-row">
-              <div class="ganado-tag-stat">
-                <span class="ganado-tag-swatch w"><img src="area.png" alt="" style="width: 30px; height: 30px; object-fit: contain;"></span>
-                <span class="ganado-tag-info">
-                  <span class="ganado-tag-n">${lote.area_ha || 0}</span>
-                  <span class="ganado-tag-l">Hectáreas</span>
+          <div class="dl-fused-card">
+            <!-- Left Stats Column -->
+            <div style="padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px;">
+              <div class="ganado-tally-top" style="align-items: baseline; margin: 0;">
+                <span class="ganado-tally-label" style="color: #fff; opacity: 1;">Variedad&nbsp;<span class="dl-variedad-name">${lote.variedad || 'Café'}</span></span>
+                <span class="ganado-tally-count">
+                  <span class="ganado-card-value">${(lote.num_plantas || 0).toLocaleString()}</span>
+                  <span class="ganado-tally-unit">plantas</span>
                 </span>
               </div>
-              <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe', '${lote.id}')" class="ganado-tag-stat cafetal-ifcafe-btn" title="Abrir Plan de Fertilización">
-                <span class="ganado-tag-swatch w"><span style="font-size:20px;line-height:1;">📋</span></span>
-                <span class="ganado-tag-info">
-                  <span class="ganado-tag-n" style="font-size:14px;">Plan IFCAFE</span>
-                  <span class="ganado-tag-l">Ver</span>
-                </span>
-                <span class="material-icons ganado-tag-expand">chevron_right</span>
-              </a>
+
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.94); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+                  <span class="ganado-tag-swatch w"><img src="area.png" alt="" style="width: 22px; height: 22px; object-fit: contain;"></span>
+                  <span class="ganado-tag-info">
+                    <span class="ganado-tag-n" style="font-size: 14px;">${lote.area_ha || 0}</span>
+                    <span class="ganado-tag-l">Hectáreas</span>
+                  </span>
+                </div>
+                ${lote.edad_categoria ? `
+                  <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.94); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+                    <span class="ganado-tag-swatch w"><span style="font-size:16px;">🌱</span></span>
+                    <span class="ganado-tag-info">
+                      <span class="ganado-tag-n" style="font-size: 13px; font-weight:800;">${lote.edad_categoria}</span>
+                      <span class="ganado-tag-l">Edad / Etapa</span>
+                    </span>
+                  </div>
+                ` : ''}
+                ${lote.maderables_variedades ? `
+                  <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.94); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+                    <span class="ganado-tag-swatch w"><span style="font-size:16px;">🌲</span></span>
+                    <span class="ganado-tag-info">
+                      <span class="ganado-tag-n" style="font-size: 12.5px; font-weight:800;">${lote.maderables_variedades}</span>
+                      <span class="ganado-tag-l">Maderables</span>
+                    </span>
+                  </div>
+                ` : ''}
+                ${lote.musaceas_tipo ? `
+                  <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.94); border-radius: 12px; padding: 6px 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+                    <span class="ganado-tag-swatch w"><span style="font-size:16px;">🍌</span></span>
+                    <span class="ganado-tag-info">
+                      <span class="ganado-tag-n" style="font-size: 12.5px; font-weight:800;">${lote.musaceas_tipo}</span>
+                      <span class="ganado-tag-l">Plátanos / Mínimos</span>
+                    </span>
+                  </div>
+                ` : ''}
+              </div>
             </div>
+
+            <!-- Right Fused Map Column -->
+            ${hasMap ? `
+              <div class="dl-fused-map-col">
+                <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' style="width: 100%; height: 100%; min-height: 180px; border-radius: 0;"></div>
+                <div style="position: absolute; bottom: 8px; right: 10px; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); color: #fff; padding: 3px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 700; z-index: 400; pointer-events: none; display: flex; align-items: center; gap: 4px;">
+                  <span class="material-symbols-outlined" style="font-size: 13px;">location_on</span> ${lote.area_ha || 0} Ha
+                </div>
+              </div>
+            ` : ''}
           </div>
         </div>
 
-        <div class="m3-grid m3-grid-4 m3-gap-8 dl-grid" style="grid-template-columns: 3fr 2fr;">
-          <!-- Map + Personal -->
-          <div class="dl-map-grid-cell" style="grid-column: 2; grid-row: 1; ${lote.coordenadas_json ? '' : 'display: none;'}" id="dl-map-grid-wrapper">
-            <div class="m3-flex m3-items-center m3-gap-2 m3-text-on-surface-variant m3-label-medium m3-font-bold m3-mb-3" style="padding-left: 4px;">
-              <img src="area.png" alt="" style="width: 18px; height: 18px; object-fit: contain;"> ${lote.area_ha || 0} Hectáreas
-            </div>
-            <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' class="m3-card m3-p-8" style="border-radius: 12px; height: 240px; overflow: hidden;"></div>
-            <!-- Personal Asignado -->
-            <div class="m3-card m3-p-6" style="border-radius: 12px; margin-top: 24px; overflow: hidden;">
-              <h3 class="m3-title-large m3-font-bold m3-mb-6 m3-flex m3-items-center m3-gap-2" style="white-space: nowrap;">
-                <span class="material-symbols-outlined m3-text-primary">groups</span>
-                Personal Asignado
-                <span class="m3-label-medium m3-text-on-surface-variant" style="font-weight: 400; margin-left: 2px;">(${asignados.length})</span>
-              </h3>
-
-              <div class="m3-flex m3-flex-col" style="gap: 14px;" id="personal-list">
-                ${asignados.length > 0 ? asignados.map(p => `
-                <div class="m3-flex m3-items-center m3-justify-between" style="cursor: pointer; padding: 14px 18px; background: var(--m3-surface-container-low); border-radius: 12px; transition: background 0.2s;" onclick="window.navigateTo('detalle_personal', '${p.id}', 'detalle_lote', '${id}')" onmouseover="this.style.background='var(--m3-surface-container-highest)'" onmouseout="this.style.background='var(--m3-surface-container-low)'">
-                  <div class="m3-flex m3-items-center" style="gap: 14px;">
-                    <div class="m3-rounded-full m3-flex m3-items-center m3-justify-center m3-font-bold" style="font-size: 14px; width: 42px; height: 42px; background: ${getAvatarColor(p.nombre)}; color: white; flex-shrink: 0;">${p.iniciales || getInitiales(p.nombre)}</div>
-                    <div>
-                      <p class="m3-label-medium m3-font-bold m3-text-on-surface">${p.nombre}</p>
-                      <p class="m3-label-small m3-text-on-surface-variant" style="margin-top: 2px;">${p.rol || ''}</p>
-                    </div>
-                  </div>
-                  <div class="m3-flex m3-items-center" style="gap: 6px;">
-                    <span class="material-symbols-outlined m3-text-outline-variant" style="font-size: 20px; cursor: pointer; padding: 6px; border-radius: 50%;" onclick="event.stopPropagation(); window.removePersonalFromLote('${id}', '${p.id}')" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'">remove_circle_outline</span>
-                    <span class="material-symbols-outlined m3-text-outline-variant" style="font-size: 20px;">chevron_right</span>
-                  </div>
-                </div>
-                `).join('') : `
-                <div class="m3-p-8 m3-text-center m3-text-on-surface-variant m3-label-medium" style="background: var(--m3-surface-container-low); border-radius: 12px;">
-                  <span class="material-symbols-outlined" style="font-size: 32px; display: block; margin-bottom: 8px; opacity: 0.35;">group_off</span>
-                  Sin personal asignado
-                </div>
-                `}
-              </div>
-
-              <!-- Assign personnel -->
-              <div style="margin-top: 32px;">
-                <div class="m3-field" style="margin-bottom: 12px;">
-                  <select id="select-asignar-personal" style="width: 100%; box-sizing: border-box; padding: 14px 20px; border-radius: 12px; border: 1.5px solid var(--m3-outline); background: var(--m3-surface-container-low); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--m3-on-surface); cursor: pointer; outline: none; appearance: none;">
-                    <option value="" disabled selected>Seleccionar persona</option>
-                    ${disponibles.map(p => `
-                      <option value="${p.id}">${p.nombre}${p.rol ? ' — ' + p.rol : ''}</option>
-                    `).join('')}
-                  </select>
-                </div>
-                <button onclick="window.assignPersonalToLote('${id}')" class="m3-flex m3-items-center m3-gap-2" style="width: 100%; justify-content: center; box-sizing: border-box; padding: 14px 32px; border-radius: 12px; border: none; background: #2d3e2c; color: white; font-weight: 700; font-size: 14px; cursor: pointer; font-family: 'Work Sans', sans-serif; box-shadow: 0 4px 12px rgba(45,62,44,0.4);">
-                  <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
-                  Agregar
-                </button>
+        <!-- Manejo del Cafetal (Calendario Interactivo) -->
+        <div id="lote-calendario-section" class="m3-card m3-p-6" style="border-radius: 16px; background: #ffffff; box-shadow: 0 2px 12px rgba(0,0,0,0.04);">
+          <div class="m3-flex m3-items-center m3-justify-between m3-mb-4" style="border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div class="m3-flex m3-items-center m3-gap-3">
+              <span style="font-size: 24px;">🌿</span>
+              <div>
+                <h2 class="m3-title-large m3-font-bold m3-text-on-surface" style="margin: 0; font-size: 18px;">Manejo del Cafetal</h2>
+                <p style="margin: 2px 0 0; font-size: 12px; color: var(--m3-on-surface-variant);">Calendario de labores, abonadas, foliares y podas de este lote</p>
               </div>
             </div>
           </div>
-          <!-- Main Column -->
-          <div class="m3-flex m3-flex-col m3-gap-8 dl-main-col" style="margin-top: 8px; grid-column: 1;">
-
-            <!-- Fertilización Section -->
-            <div class="m3-card m3-p-8" style="border-radius: 12px;">
-              <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
-                <div class="m3-flex m3-items-center m3-gap-4">
-                  <img src="fertilizante.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
-                  <h2 class="m3-headline-small m3-font-bold m3-text-on-surface">Fertilización</h2>
-                </div>
-                <button onclick="window.showAddAplicacionModal('${lote.id}')" class="m3-text-primary m3-label-medium m3-font-bold m3-flex m3-items-center m3-gap-1 m3-bg-none m3-border-none m3-cursor-pointer" style="text-decoration: underline;">
-                  Histórico completo <span class="material-symbols-outlined" style="font-size: 14px;">open_in_new</span>
-                </button>
-              </div>
-              <div class="m3-flex m3-flex-col m3-gap-4">
-                ${fertilizantes.length > 0 ? fertilizantes.map(app => `
-                  <div class="m3-flex m3-items-center m3-justify-between m3-p-4 m3-bg-surface-container m3-rounded-2xl">
-                    <div class="m3-flex m3-items-center m3-gap-4">
-                      <div class="m3-size-12 m3-rounded-xl m3-bg-secondary-container m3-flex m3-items-center m3-justify-center m3-text-on-secondary-container">
-                        <img src="npk.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
-                      </div>
-                      <div>
-                        <p class="m3-label-large m3-font-bold m3-text-on-surface">${app.producto}</p>
-                        <p class="m3-label-small m3-text-on-surface-variant">Dosis: ${app.dosis}</p>
-                      </div>
-                    </div>
-                    <div class="m3-text-right">
-                      <span class="m3-text-primary m3-label-small m3-font-bold m3-px-2 m3-py-1 m3-rounded-full m3-uppercase" style="background: rgba(69,87,67,0.1); font-size: 10px;">Realizado</span>
-                      <p class="m3-label-small m3-font-medium m3-mt-1 m3-text-on-surface-variant">${new Date(app.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-                    </div>
-                  </div>
-                `).join('') : `
-                  <div class="m3-flex m3-items-center m3-justify-between m3-p-4 m3-rounded-2xl" style="border: 2px dashed var(--m3-outline-variant); opacity: 0.8;">
-                    <div class="m3-flex m3-items-center m3-gap-4">
-                      <div class="m3-size-12 m3-rounded-xl m3-bg-surface-container-highest m3-flex m3-items-center m3-justify-center m3-text-on-surface-variant">
-                        <span class="material-symbols-outlined">schedule</span>
-                      </div>
-                      <div>
-                        <p class="m3-label-large m3-font-bold m3-text-on-surface-variant">Sin fertilizantes registrados</p>
-                        <p class="m3-label-small m3-text-on-surface-variant">Agrega la primera aplicación</p>
-                      </div>
-                    </div>
-                  </div>
-                `}
-              </div>
-            </div>
-
-            <!-- Otras Aplicaciones Section -->
-            <div class="m3-card m3-p-8" style="border-radius: 12px;">
-              <div class="m3-flex m3-items-center m3-justify-between m3-mb-6">
-                <div class="m3-flex m3-items-center m3-gap-4">
-                  <img src="tijeras-de-podar.png" alt="" style="width: 24px; height: 24px; object-fit: contain;">
-                  <h2 class="m3-headline-small m3-font-bold m3-text-on-surface">Podas y Limpieza</h2>
-                </div>
-              </div>
-              <div class="dl-timeline">
-                ${otrosApps.length > 0 ? otrosApps.map((app, i) => `
-                  <div class="dl-timeline-item">
-                    <div class="dl-timeline-dot ${i === 0 ? 'dl-timeline-dot-primary' : 'dl-timeline-dot-tertiary'}"></div>
-                    <div class="dl-timeline-content">
-                      <h4 class="m3-label-large m3-font-bold m3-text-on-surface">${app.producto}</h4>
-                      ${app.dosis && app.dosis !== 'N/A' ? `<p class="m3-body-small m3-text-on-surface-variant m3-mt-1">${app.tipo} — ${app.dosis}</p>` : ''}
-                      <div class="m3-flex m3-items-center m3-gap-4 m3-mt-3">
-                        <span class="m3-flex m3-items-center m3-gap-1 m3-label-small m3-font-bold ${i === 0 ? 'm3-text-primary' : 'm3-text-tertiary'}">
-                          <span class="material-symbols-outlined" style="font-size: 12px;">${i === 0 ? 'event' : 'event_available'}</span>
-                          ${i === 0 ? 'Completado: ' : 'Realizado: '} ${new Date(app.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                        </span>
-                        ${app.operador ? `
-                        <span class="m3-label-small m3-text-on-surface-variant m3-flex m3-items-center m3-gap-1">
-                          <span class="material-symbols-outlined" style="font-size: 12px;">person</span>
-                          ${app.operador}
-                        </span>` : ''}
-                      </div>
-                    </div>
-                  </div>
-                `).join('') : `
-                  <div class="m3-flex m3-items-center m3-gap-4 m3-p-4 m3-bg-surface-container m3-rounded-2xl">
-                    <div class="m3-size-12 m3-rounded-xl m3-bg-surface-container-highest m3-flex m3-items-center m3-justify-center m3-text-on-surface-variant">
-                      <span class="material-symbols-outlined">eco</span>
-                    </div>
-                    <div>
-                      <p class="m3-label-large m3-font-bold m3-text-on-surface-variant">Sin actividades registradas</p>
-                      <p class="m3-body-small m3-text-on-surface-variant">No hay aplicaciones de fungicidas, insecticidas u otros tratamientos.</p>
-                    </div>
-                  </div>
-                `}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="m3-fab-speeddial" id="fab-speeddial">
-          <div class="m3-fab-actions" id="fab-actions">
-            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Limpieza')">
-              <span class="m3-fab-action-label">Limpieza</span>
-              <span class="m3-fab-action-icon"><img src="sale-de.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
-            </button>
-            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Fertilizante')">
-              <span class="m3-fab-action-label">Fertilizante</span>
-              <span class="m3-fab-action-icon"><img src="fertilizante.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
-            </button>
-            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Manejo de Tejido')">
-              <span class="m3-fab-action-label">Manejo de Tejido</span>
-              <span class="m3-fab-action-icon"><img src="tijeras-de-podar.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
-            </button>
-            <button class="m3-fab-action" onclick="window.showActivityForm('${lote.id}', 'Análisis de Suelo')">
-              <span class="m3-fab-action-label">Análisis de Suelo</span>
-              <span class="m3-fab-action-icon"><img src="analisis-de-suelo.png" alt="" style="width: 44px; height: 44px; object-fit: contain;"></span>
-            </button>
-          </div>
-          <button class="m3-fab-circle" id="fab-main" onclick="window.toggleFabMenu()">
-            <span class="material-symbols-outlined" id="fab-icon">add</span>
-          </button>
+          
+          ${planCalendarHtml}
         </div>
       </div>
     `;
@@ -286,99 +182,9 @@ export async function renderDetalleLote(id) {
 }
 
 export function initDetalleLote(id) {
-  window.showModal = showModal;
+  initPlanIfcafe();
 
-  window.showAddAplicacionModal = async (loteId) => {
-    const { data: apps, error } = await supabase.from('lote_aplicaciones')
-      .select('*')
-      .eq('lote_id', loteId)
-      .neq('estado', 'Programada')
-      .order('fecha', { ascending: false });
-    if (error) {
-      window.Snackbar?.show('Error: ' + error.message, { type: 'error' });
-      return;
-    }
-    const rows = (apps || []).map(a => `
-      <tr>
-        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.producto || '—'}</td>
-        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.tipo || '—'}</td>
-        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.dosis || '—'}</td>
-        <td style="padding:8px;border-bottom:1px solid #eef1ee;">${a.fecha ? new Date(a.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
-      </tr>`).join('');
-    const empty = '<tr><td colspan="4" style="text-align:center;padding:28px;color:#666;">Sin aplicaciones registradas</td></tr>';
-    showModal('Histórico completo', `
-      <div style="overflow-x:auto;max-height:60vh;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Work Sans',sans-serif;">
-          <thead>
-            <tr style="text-align:left;color:#555;">
-              <th style="padding:8px;">Producto</th><th style="padding:8px;">Tipo</th><th style="padding:8px;">Dosis</th><th style="padding:8px;">Fecha</th>
-            </tr>
-          </thead>
-          <tbody>${(apps && apps.length > 0) ? rows : empty}</tbody>
-        </table>
-      </div>
-    `);
-  };
-
-  window.assignPersonalToLote = async (loteId) => {
-    const select = document.getElementById('select-asignar-personal');
-    const personalId = select?.value;
-    if (!personalId) {
-      window.Snackbar?.show('Selecciona una persona', { type: 'warning' });
-      return;
-    }
-    const { error } = await supabase.from('lote_personal').insert([{ lote_id: loteId, personal_id: personalId }]);
-    if (error) {
-      window.Snackbar?.show('Error: ' + error.message, { type: 'error' });
-    } else {
-      window.Snackbar?.show('Personal asignado');
-      window.clearScreenCache?.('detalle_lote');
-      window.navigateTo('detalle_lote', loteId);
-    }
-  };
-
-  window.removePersonalFromLote = async (loteId, personalId) => {
-    window.Snackbar?.confirm('¿Quitar esta persona del lote?', async () => {
-      const { error } = await supabase.from('lote_personal')
-        .delete()
-        .eq('lote_id', loteId)
-        .eq('personal_id', personalId);
-      if (error) {
-        window.Snackbar?.show('Error: ' + error.message, { type: 'error' });
-      } else {
-        window.Snackbar?.show('Personal removido');
-        window.clearScreenCache?.('detalle_lote');
-        window.navigateTo('detalle_lote', loteId);
-      }
-    });
-  };
-
-  window.toggleFabMenu = () => {
-    const actions = document.getElementById('fab-actions');
-    const fabIcon = document.getElementById('fab-icon');
-    const overlay = document.getElementById('fab-overlay');
-    const isOpen = actions.classList.contains('open');
-    if (isOpen) {
-      actions.classList.remove('open');
-      fabIcon.textContent = 'add_task';
-      if (overlay) overlay.remove();
-    } else {
-      const ov = document.createElement('div');
-      ov.id = 'fab-overlay';
-      ov.className = 'fab-overlay';
-      ov.onclick = window.toggleFabMenu;
-      document.body.appendChild(ov);
-      actions.classList.add('open');
-      fabIcon.textContent = 'close';
-    }
-  };
-
-  window.showActivityForm = (loteId, tipo) => {
-    window.toggleFabMenu();
-    window.navigateTo('nueva_actividad', loteId, tipo);
-  };
-
-  // Initialize mini map with GPS polygon
+  // Initialize mini map with GPS polygon if exists
   const mapContainer = document.getElementById('dl-map-container');
   if (mapContainer && mapContainer.dataset.coords) {
     try {
@@ -401,34 +207,62 @@ export function initDetalleLote(id) {
             scrollWheelZoom: false,
             doubleClickZoom: false,
             touchZoom: false,
-            keyboard: false
+            keyboard: false,
+            maxZoom: 21
           });
-          const tileLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-            maxZoom: 22,
-            maxNativeZoom: 20,
-            attribution: 'Imagery &copy; Google'
+          const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 21,
+            maxNativeZoom: 17,
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri'
           }).addTo(map);
           L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
-            maxZoom: 22,
-            opacity: 0.8
+            maxZoom: 21,
+            maxNativeZoom: 17,
+            opacity: 0.85
           }).addTo(map);
-          tileLayer.on('tileerror', (e) => {
-            console.warn('[detalle_lote] Tile failed:', e.tile.src);
+          esriSatLayer.on('tileerror', (e) => {
+            console.warn('[detalle_lote] ESRI tile failed:', e.tile.src);
           });
           const polygon = L.polygon(latlngs, {
-            color: color,
-            fillColor: color,
-            fillOpacity: 0.2,
-            weight: 2
+            color: '#ffffff',
+            fillColor: color || '#2d3e2c',
+            fillOpacity: 0.35,
+            weight: 2.5
           }).addTo(map);
-          map.fitBounds(polygon.getBounds().pad(0.15));
-          setTimeout(() => map.invalidateSize(), 300);
-        }, 200);
+
+          const fitMapToPolygon = () => {
+            map.invalidateSize();
+            map.fitBounds(polygon.getBounds().pad(0.12));
+          };
+
+          fitMapToPolygon();
+          setTimeout(fitMapToPolygon, 200);
+          setTimeout(fitMapToPolygon, 500);
+          setTimeout(fitMapToPolygon, 1000);
+
+          if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => fitMapToPolygon());
+            ro.observe(mapContainer);
+          }
+        }, 150);
       }
     } catch (e) {
       console.warn('Error loading map:', e);
     }
   }
+
+  window.confirmDeleteLoteFromDetalle = (loteId, loteNombre) => {
+    window.Snackbar?.confirm(`¿Eliminar el lote "${loteNombre}"?`, async () => {
+      const { error } = await supabase.from('lotes').delete().eq('id', loteId);
+      if (error) {
+        window.Snackbar?.show('Error: ' + error.message, { type: 'error' });
+      } else {
+        window.Snackbar?.show('Lote eliminado exitosamente');
+        window.clearScreenCache?.('dashboard');
+        window.clearScreenCache?.('detalle_lote');
+        window.navigateTo('dashboard');
+      }
+    });
+  };
 }

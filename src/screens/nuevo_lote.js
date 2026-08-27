@@ -56,6 +56,11 @@ export async function renderNuevoLote(id) {
   const val = (field) => lote ? (lote[field] || '') : '';
   const selected = (field, value) => lote && lote[field] === value ? 'selected' : '';
 
+  const tieneMaderables = Boolean(lote?.tiene_maderables || (lote?.maderables_variedades && lote.maderables_variedades.trim()));
+  const maderablesVariedades = lote?.maderables_variedades || '';
+  const tieneMusaceas = Boolean(lote?.tiene_musaceas || (lote?.musaceas_tipo && lote.musaceas_tipo.trim()));
+  const musaceasTipo = lote?.musaceas_tipo || '';
+
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card">
@@ -159,6 +164,73 @@ export async function renderNuevoLote(id) {
           <div class="m3-field ${val('notas') ? 'has-value' : ''}">
             <textarea name="notas" placeholder=" " rows="3">${val('notas')}</textarea>
             <label>Notas Adicionales</label>
+          </div>
+
+          <!-- Segmento: Sombra y Cultivos Asociados (Sistema Agroforestal) -->
+          <div style="margin-top: 28px; margin-bottom: 24px; background: var(--m3-surface-container-low, #f7f9f6); border-radius: 16px; border: 1.5px solid #dbe5d8; padding: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">🌳</span>
+                <div>
+                  <h3 style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Sombra y Cultivos Asociados</h3>
+                  <p style="margin: 2px 0 0; font-size: 12px; color: var(--m3-on-surface-variant);">Árboles maderables y musáceas (plátanos / mínimos)</p>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <!-- 1. Árboles Maderables / Sombra -->
+              <div style="background: #ffffff; border-radius: 14px; border: 1px solid #d4dfd2; padding: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+                    <input type="checkbox" id="check-tiene-maderables" name="tiene_maderables" value="true" ${tieneMaderables ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--m3-primary, #2d3e2c); cursor: pointer;">
+                    <span style="font-size: 14px; font-weight: 700; color: var(--m3-on-surface);">🌲 ¿Tiene árboles maderables o de sombra?</span>
+                  </label>
+                </div>
+
+                <div id="maderables-details-container" style="${tieneMaderables ? 'display: block;' : 'display: none;'} margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e0e6df;">
+                  <p style="font-size: 12px; font-weight: 600; color: #444; margin: 0 0 8px;">Toca para seleccionar o alternar variedades presentes:</p>
+                  
+                  <div id="maderables-chips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+                    ${['Laurel', 'Cedro', 'Caoba', 'Guamo / Guama', 'Gravilea', 'Pino', 'Roble', 'Liquidámbar', 'Nogal', 'Macuelizo', 'San Juan', 'Ciprés'].map(varName => {
+                      const isSelected = maderablesVariedades.toLowerCase().includes(varName.toLowerCase());
+                      return `<button type="button" class="agro-chip ${isSelected ? 'active' : ''}" data-val="${varName}" style="padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid ${isSelected ? '#2d3e2c' : '#c8d4c6'}; background: ${isSelected ? '#2d3e2c' : '#ffffff'}; color: ${isSelected ? '#ffffff' : '#2d3e2c'}; transition: all 0.15s;">${isSelected ? '✓ ' : '+ '}${varName}</button>`;
+                    }).join('')}
+                  </div>
+
+                  <div class="m3-field ${maderablesVariedades ? 'has-value' : ''}">
+                    <input type="text" name="maderables_variedades" id="input-maderables-variedades" value="${maderablesVariedades}" placeholder=" ">
+                    <label>Variedades de maderables (ej: Laurel, Cedro, Guamo...)</label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Plátanos / Mínimos (Musáceas) -->
+              <div style="background: #ffffff; border-radius: 14px; border: 1px solid #d4dfd2; padding: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+                    <input type="checkbox" id="check-tiene-musaceas" name="tiene_musaceas" value="true" ${tieneMusaceas ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--m3-primary, #2d3e2c); cursor: pointer;">
+                    <span style="font-size: 14px; font-weight: 700; color: var(--m3-on-surface);">🍌 ¿Tiene plátano, banano o mínimos?</span>
+                  </label>
+                </div>
+
+                <div id="musaceas-details-container" style="${tieneMusaceas ? 'display: block;' : 'display: none;'} margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e0e6df;">
+                  <p style="font-size: 12px; font-weight: 600; color: #444; margin: 0 0 8px;">Selecciona el tipo de musáceas:</p>
+                  
+                  <div id="musaceas-chips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+                    ${['Plátano Macho', 'Mínimo / Banano Criollo', 'Guineo / Manzano', 'Plátano Curare', 'Cuadrado / Majoncho'].map(musaName => {
+                      const isSelected = musaceasTipo.toLowerCase().includes(musaName.toLowerCase());
+                      return `<button type="button" class="agro-chip ${isSelected ? 'active' : ''}" data-val="${musaName}" style="padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid ${isSelected ? '#2d3e2c' : '#c8d4c6'}; background: ${isSelected ? '#2d3e2c' : '#ffffff'}; color: ${isSelected ? '#ffffff' : '#2d3e2c'}; transition: all 0.15s;">${isSelected ? '✓ ' : '+ '}${musaName}</button>`;
+                    }).join('')}
+                  </div>
+
+                  <div class="m3-field ${musaceasTipo ? 'has-value' : ''}">
+                    <input type="text" name="musaceas_tipo" id="input-musaceas-tipo" value="${musaceasTipo}" placeholder=" ">
+                    <label>Tipo de plátano / mínimo (ej: Plátano macho, Mínimo criollo...)</label>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Map Section - Google Earth Style -->
@@ -1974,11 +2046,95 @@ export async function setupNuevoLoteListeners() {
     });
   }, 100);
 
+  // Interactive Agroforestry Toggles & Chips
+  const checkMaderables = document.getElementById('check-tiene-maderables');
+  const maderablesBox = document.getElementById('maderables-details-container');
+  const inputMaderables = document.getElementById('input-maderables-variedades');
+  const maderablesChips = document.getElementById('maderables-chips');
+
+  if (checkMaderables && maderablesBox) {
+    checkMaderables.addEventListener('change', () => {
+      maderablesBox.style.display = checkMaderables.checked ? 'block' : 'none';
+    });
+  }
+
+  if (maderablesChips && inputMaderables) {
+    maderablesChips.querySelectorAll('.agro-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.val;
+        let current = inputMaderables.value.split(',').map(s => s.trim()).filter(Boolean);
+        if (current.some(c => c.toLowerCase() === val.toLowerCase())) {
+          current = current.filter(c => c.toLowerCase() !== val.toLowerCase());
+          btn.style.background = '#ffffff';
+          btn.style.color = '#2d3e2c';
+          btn.style.borderColor = '#c8d4c6';
+          btn.textContent = '+ ' + val;
+        } else {
+          current.push(val);
+          btn.style.background = '#2d3e2c';
+          btn.style.color = '#ffffff';
+          btn.style.borderColor = '#2d3e2c';
+          btn.textContent = '✓ ' + val;
+        }
+        inputMaderables.value = current.join(', ');
+        if (inputMaderables.value) {
+          inputMaderables.closest('.m3-field')?.classList.add('has-value');
+        } else {
+          inputMaderables.closest('.m3-field')?.classList.remove('has-value');
+        }
+      });
+    });
+  }
+
+  const checkMusaceas = document.getElementById('check-tiene-musaceas');
+  const musaceasBox = document.getElementById('musaceas-details-container');
+  const inputMusaceas = document.getElementById('input-musaceas-tipo');
+  const musaceasChips = document.getElementById('musaceas-chips');
+
+  if (checkMusaceas && musaceasBox) {
+    checkMusaceas.addEventListener('change', () => {
+      musaceasBox.style.display = checkMusaceas.checked ? 'block' : 'none';
+    });
+  }
+
+  if (musaceasChips && inputMusaceas) {
+    musaceasChips.querySelectorAll('.agro-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.val;
+        let current = inputMusaceas.value.split(',').map(s => s.trim()).filter(Boolean);
+        if (current.some(c => c.toLowerCase() === val.toLowerCase())) {
+          current = current.filter(c => c.toLowerCase() !== val.toLowerCase());
+          btn.style.background = '#ffffff';
+          btn.style.color = '#2d3e2c';
+          btn.style.borderColor = '#c8d4c6';
+          btn.textContent = '+ ' + val;
+        } else {
+          current.push(val);
+          btn.style.background = '#2d3e2c';
+          btn.style.color = '#ffffff';
+          btn.style.borderColor = '#2d3e2c';
+          btn.textContent = '✓ ' + val;
+        }
+        inputMusaceas.value = current.join(', ');
+        if (inputMusaceas.value) {
+          inputMusaceas.closest('.m3-field')?.classList.add('has-value');
+        } else {
+          inputMusaceas.closest('.m3-field')?.classList.remove('has-value');
+        }
+      });
+    });
+  }
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     delete data.lote_id;
+
+    data.tiene_maderables = Boolean(document.getElementById('check-tiene-maderables')?.checked);
+    data.tiene_musaceas = Boolean(document.getElementById('check-tiene-musaceas')?.checked);
+    if (!data.tiene_maderables) data.maderables_variedades = '';
+    if (!data.tiene_musaceas) data.musaceas_tipo = '';
 
     console.log('[nuevo_lote] Submit - loteId:', loteId);
     console.log('[nuevo_lote] Submit - data:', data);
@@ -2000,21 +2156,49 @@ export async function setupNuevoLoteListeners() {
     try {
       let newLoteId = null;
       const submitLoteId = loteId || window.__currentLoteData?.id || null;
-      if (submitLoteId) {
-        console.log('[nuevo_lote] UPDATE - loteId:', submitLoteId);
-        await restFetch(`/rest/v1/lotes?id=eq.${submitLoteId}`, {
-          method: 'PATCH',
-          body: JSON.stringify(data)
-        });
-        newLoteId = submitLoteId;
-      } else {
-        console.log('[nuevo_lote] INSERT - creating new lote');
-        const inserted = await restInsert('/rest/v1/lotes', data);
-        newLoteId = inserted?.id;
-        // If restInsert didn't return an id (no Location header), query by name + empresa_id
-        if (!newLoteId && data.nombre) {
-          const busca = await restFetch(`/rest/v1/lotes?nombre=eq.${encodeURIComponent(data.nombre)}&empresa_id=eq.${data.empresa_id}&select=id&order=created_at.desc&limit=1`);
-          newLoteId = busca?.[0]?.id;
+
+      try {
+        if (submitLoteId) {
+          console.log('[nuevo_lote] UPDATE - loteId:', submitLoteId);
+          await restFetch(`/rest/v1/lotes?id=eq.${submitLoteId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data)
+          });
+          newLoteId = submitLoteId;
+        } else {
+          console.log('[nuevo_lote] INSERT - creating new lote');
+          const inserted = await restInsert('/rest/v1/lotes', data);
+          newLoteId = inserted?.id;
+          if (!newLoteId && data.nombre) {
+            const busca = await restFetch(`/rest/v1/lotes?nombre=eq.${encodeURIComponent(data.nombre)}&empresa_id=eq.${data.empresa_id}&select=id&order=created_at.desc&limit=1`);
+            newLoteId = busca?.[0]?.id;
+          }
+        }
+      } catch (saveErr) {
+        if (saveErr.message && (saveErr.message.includes('column') || saveErr.message.includes('schema cache'))) {
+          console.warn('[nuevo_lote] Retrying without new columns in case remote cache is pending:', saveErr);
+          const fallbackData = { ...data };
+          delete fallbackData.tiene_maderables;
+          delete fallbackData.maderables_variedades;
+          delete fallbackData.tiene_musaceas;
+          delete fallbackData.musaceas_tipo;
+          
+          if (submitLoteId) {
+            await restFetch(`/rest/v1/lotes?id=eq.${submitLoteId}`, {
+              method: 'PATCH',
+              body: JSON.stringify(fallbackData)
+            });
+            newLoteId = submitLoteId;
+          } else {
+            const inserted = await restInsert('/rest/v1/lotes', fallbackData);
+            newLoteId = inserted?.id;
+            if (!newLoteId && fallbackData.nombre) {
+              const busca = await restFetch(`/rest/v1/lotes?nombre=eq.${encodeURIComponent(fallbackData.nombre)}&empresa_id=eq.${fallbackData.empresa_id}&select=id&order=created_at.desc&limit=1`);
+              newLoteId = busca?.[0]?.id;
+            }
+          }
+        } else {
+          throw saveErr;
         }
       }
       

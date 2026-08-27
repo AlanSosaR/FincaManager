@@ -969,9 +969,11 @@ function initMap() {
         const poly = L.polygon(latlngs, {
           color: potreroColor,
           fillColor: potreroColor,
-          fillOpacity: 0.5,
-          weight: 2,
-          opacity: 0.9
+          fillOpacity: 0.35,
+          weight: 3.5,
+          opacity: 1,
+          lineJoin: 'round',
+          lineCap: 'round'
         }).addTo(existingPotrerosLayer);
 
         poly.bindPopup(buildExistingPotreroPopupHtml(potrero));

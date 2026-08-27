@@ -244,6 +244,11 @@ export async function renderMapaLotes() {
         align-items: center;
         gap: 4px;
       }
+      #mapa-container path.leaflet-interactive {
+        filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
+        transition: stroke-width 0.15s ease, fill-opacity 0.15s ease;
+        cursor: pointer;
+      }
     </style>
     <div class="mapa-page">
       <div class="mapa-summary" id="mapa-summary">
@@ -341,21 +346,21 @@ export async function initMapaLotes() {
   // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
   const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
-    maxZoom: 22,
-    maxNativeZoom: 18
+    maxZoom: 21,
+    maxNativeZoom: 17
   }).addTo(map);
 
   const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-    maxZoom: 22,
-    maxNativeZoom: 20
+    maxZoom: 21,
+    maxNativeZoom: 18
   });
 
   const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
-    maxZoom: 22,
-    maxNativeZoom: 19,
+    maxZoom: 21,
+    maxNativeZoom: 17,
     opacity: 0.8
   }).addTo(map);
 
@@ -685,14 +690,24 @@ export async function initMapaLotes() {
     if (!coordinates || coordinates.length < 3) return;
     const latlngs = coordinates.map(c => [c.lat, c.lng]);
 
+    const loteColor = color || '#2e7d32';
     const poly = L.polygon(latlngs, {
-      color: color,
-      fillColor: color,
-      fillOpacity: 0.18,
-      weight: 2,
-      opacity: 0.9
+      color: loteColor,
+      fillColor: loteColor,
+      fillOpacity: 0.30,
+      weight: 3.5,
+      opacity: 1,
+      lineJoin: 'round',
+      lineCap: 'round'
     }).addTo(map);
     allBounds.push(poly.getBounds());
+
+    poly.on('mouseover', () => {
+      poly.setStyle({ weight: 5, fillOpacity: 0.45 });
+    });
+    poly.on('mouseout', () => {
+      poly.setStyle({ weight: 3.5, fillOpacity: 0.30 });
+    });
 
     poly.bindPopup(buildPopupHtml(lote, appsByLote[lote.id] || []));
 
@@ -700,7 +715,7 @@ export async function initMapaLotes() {
     L.marker([c.lat, c.lng], {
       icon: L.divIcon({
         className: 'potrero-label-wrap',
-        html: `<div class="potrero-label" style="background:${escapeHtml(color)};">
+        html: `<div class="potrero-label" style="background:${escapeHtml(loteColor)};">
           <span class="material-icons" style="font-size:13px;color:#ffffff;">grass</span>
           <span>${escapeHtml(lote.nombre || 'Lote')}</span>
         </div>`,
