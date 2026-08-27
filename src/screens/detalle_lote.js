@@ -17,7 +17,7 @@ export async function renderDetalleLote(id) {
 
     return `
       <style>
-        .dl-screen-pad { padding: 0 0 100px 0 !important; max-width: 960px; margin: 0 auto; }
+        .dl-screen-pad { padding: 0 0 100px 0 !important; width: 100%; margin: 0; }
         .dl-variedad-name {
           font-size: 14px;
           font-weight: 700;

@@ -343,10 +343,10 @@ function showPlanDayDetails(day, dayEvents) {
   let actionButtonHtml = '';
   if (isPast) {
     actionButtonHtml = `
-      <div style="text-align:center; color:#888; font-size:12px; font-weight:600; padding:10px 14px; background:#f5f5f5; border-radius:12px; border:1px solid #e0e0e0; display:flex; align-items:center; justify-content:center; gap:6px;">
-        <span class="material-symbols-outlined" style="font-size:16px; color:#888;">history</span>
-        <span>Esta fecha ya pasó. No se pueden programar labores pasadas.</span>
-      </div>
+      <button type="button" class="plan-btn-add-inline" onclick="window.showInlineActividadForm('${dateStr}')" style="background:#eef7ee; border:1.5px solid #2d3e2c; color:#2d3e2c;">
+        <span class="material-symbols-outlined" style="font-size:18px; color:#2d3e2c;">post_add</span>
+        <span>Registrar Actividad Realizada en esta fecha</span>
+      </button>
     `;
   } else if (isToday) {
     actionButtonHtml = `
@@ -384,11 +384,7 @@ function showPlanDayDetails(day, dayEvents) {
 
 function showInlineActividadForm(defaultDate) {
   const todayStr = getLocalToday();
-  if (defaultDate < todayStr) {
-    window.Snackbar?.show('No se pueden programar labores en fechas pasadas', { type: 'warning' });
-    return;
-  }
-
+  const isPast = defaultDate < todayStr;
   const isToday = defaultDate === todayStr;
 
   // Calcular nombre del día
@@ -402,12 +398,25 @@ function showInlineActividadForm(defaultDate) {
   const isTomorrow = defaultDate === tomorrowStr;
 
   let estadoTextoDisplay = '';
-  if (isToday) {
+  let estadoValor = 'Programada';
+  let formTitle = 'Programar Labor Futura';
+
+  if (isPast) {
+    estadoTextoDisplay = `✅ Aplicada / Realizada (Registro histórico del ${dateObj.getDate()} de ${MESES_NOMBRE[dateObj.getMonth() + 1]})`;
+    estadoValor = 'Aplicada';
+    formTitle = 'Registrar Labor Realizada en Fecha Pasada';
+  } else if (isToday) {
     estadoTextoDisplay = `✅ Aplicada / Realizada hoy ${dayName}`;
+    estadoValor = 'Aplicada';
+    formTitle = 'Registrar Labor de Hoy';
   } else if (isTomorrow) {
     estadoTextoDisplay = `📅 Programada para realizarse mañana ${dayName}`;
+    estadoValor = 'Programada';
+    formTitle = 'Programar Labor para Mañana';
   } else {
     estadoTextoDisplay = `📅 Programada para realizarse el día ${dayName} (${dateObj.getDate()} de ${MESES_NOMBRE[dateObj.getMonth() + 1]})`;
+    estadoValor = 'Programada';
+    formTitle = 'Programar Labor Futura';
   }
 
   const panel = document.getElementById('plan-day-details');
@@ -423,7 +432,7 @@ function showInlineActividadForm(defaultDate) {
     <div class="da-day-details" style="animation: slideUp 0.2s ease-out;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1.5px solid #eef2ee; padding-bottom:8px;">
         <div>
-          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">${isToday ? 'Registrar Labor de Hoy' : isTomorrow ? 'Programar Labor para Mañana' : 'Programar Labor Futura'}</span>
+          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">${formTitle}</span>
           <h4 style="margin:2px 0 0; font-size:15px; font-weight:800; color:#1a1a1a; text-transform:capitalize;">${dateFormatted}</h4>
         </div>
         <button type="button" onclick="window.cancelInlineActividad('${defaultDate}')" style="background:none; border:none; color:#777; cursor:pointer; padding:4px;">
@@ -483,8 +492,8 @@ function showInlineActividadForm(defaultDate) {
           <label>Observaciones / Recomendación Técnica</label>
         </div>
 
-        <!-- 7. Foto de la Planta (Progreso y Evidencia - Solo cuando se realiza hoy) -->
-        <div id="inline-plan-foto-section" style="${isToday ? 'display:block;' : 'display:none;'} background: #fbfdfa; border: 1.5px dashed #c0d4be; border-radius: 14px; padding: 14px; text-align: center; margin: 16px 0 24px 0;">
+        <!-- 7. Foto de la Planta (Progreso y Evidencia - Disponible cuando ya se realizó) -->
+        <div id="inline-plan-foto-section" style="${(isToday || isPast) ? 'display:block;' : 'display:none;'} background: #fbfdfa; border: 1.5px dashed #c0d4be; border-radius: 14px; padding: 14px; text-align: center; margin: 16px 0 24px 0;">
           <input type="file" id="inline-plan-foto-input" accept="image/*" capture="environment" style="display: none;">
           <input type="hidden" name="foto_url" id="inline-plan-foto-data" value="">
           
@@ -504,8 +513,8 @@ function showInlineActividadForm(defaultDate) {
 
         <!-- 8. Estado con nombre del día -->
         <div class="m3-field" style="margin-bottom: 8px;">
-          <input type="text" value="${estadoTextoDisplay}" readonly style="font-size:13px; font-weight:700; background:${isToday ? '#f0f7e6' : '#fff9e6'}; color:${isToday ? '#2d3e2c' : '#b26a00'}; border-color:${isToday ? '#c8e6c9' : '#ffe9a8'};">
-          <input type="hidden" name="estado" value="${isToday ? 'Aplicada' : 'Programada'}">
+          <input type="text" value="${estadoTextoDisplay}" readonly style="font-size:13px; font-weight:700; background:${(isToday || isPast) ? '#f0f7e6' : '#fff9e6'}; color:${(isToday || isPast) ? '#2d3e2c' : '#b26a00'}; border-color:${(isToday || isPast) ? '#c8e6c9' : '#ffe9a8'};">
+          <input type="hidden" name="estado" value="${estadoValor}">
           <label>Estado de la labor</label>
         </div>
 
@@ -515,8 +524,8 @@ function showInlineActividadForm(defaultDate) {
             <span>Cancelar</span>
           </button>
           <button type="submit" class="plan-btn-primary">
-            <span class="material-symbols-outlined" style="font-size:18px;">save</span>
-            <span>${isToday ? 'Registrar Actividad' : 'Programar Actividad'}</span>
+            <span class="material-symbols-outlined" style="font-size:18px;">${(isToday || isPast) ? 'check_circle' : 'save'}</span>
+            <span>${isPast ? 'Registrar Actividad Realizada' : isToday ? 'Registrar Actividad' : 'Programar Actividad'}</span>
           </button>
         </div>
       </form>
@@ -656,6 +665,35 @@ function planStyles() {
     .plan-ev-badge { font-size: 10.5px; font-weight: 800; padding: 4px 12px; border-radius: 9999px; text-transform: uppercase; letter-spacing: .4px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .plan-ev-meta { font-size: 12px; color: #555; margin: 8px 0 0; display: flex; flex-direction: column; gap: 3px; }
     .plan-ev-purpose { font-size: 12px; color: #3a6b3a; margin: 8px 0 0; line-height: 1.4; background:#f4f9f3; padding:8px 12px; border-radius:10px; border-left:3px solid #3a6b3a; }
+
+    /* Lote Selector Chips */
+    .plan-lote-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 9999px;
+      border: 1.5px solid #d4dfd2;
+      background: #ffffff;
+      color: #2d3e2c;
+      font-family: 'Work Sans', sans-serif;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    }
+    .plan-lote-chip:hover {
+      background: #eef5eb;
+      border-color: #2d3e2c;
+      transform: translateY(-1px);
+    }
+    .plan-lote-chip.active {
+      background: #2d3e2c !important;
+      color: #ffffff !important;
+      border-color: #2d3e2c !important;
+      box-shadow: 0 3px 10px rgba(45,62,44,0.28);
+    }
     
     /* Material 3 Expressive Actions */
     .plan-ev-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -934,7 +972,7 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
     }
 
     return `
-      <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="max-width:960px;margin:0 auto;">
+      <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="width:100%;margin:0;">
         
         <!-- Header -->
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
@@ -949,6 +987,31 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
               <span class="material-symbols-outlined" style="font-size:16px;">apps</span> Ver todos los lotes
             </a>
           ` : ''}
+        </div>
+
+        <!-- Selector Interactivo de Lotes -->
+        <div style="background: #ffffff; border: 1.5px solid #dce6db; border-radius: 18px; padding: 14px 18px; margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <span style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #2d3e2c; display: flex; align-items: center; gap: 6px; letter-spacing: 0.4px;">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: #2d3e2c;">filter_alt</span>
+              Selecciona el Lote a Programar o Gestionar:
+            </span>
+            <span style="font-size: 12px; color: #666; font-weight: 600;">${_allLotes.length} lotes disponibles</span>
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" onclick="window.navigateTo('plan_ifcafe')" class="plan-lote-chip ${!activeLote ? 'active' : ''}">
+              <span class="material-symbols-outlined" style="font-size: 16px;">apps</span>
+              <span>Todos los Lotes</span>
+            </button>
+            ${_allLotes.map(l => `
+              <button type="button" onclick="window.navigateTo('plan_ifcafe', '${l.id}')" class="plan-lote-chip ${activeLote?.id === l.id ? 'active' : ''}">
+                <span class="material-symbols-outlined" style="font-size: 16px;">eco</span>
+                <span>${l.nombre}</span>
+                <span style="font-size: 11px; opacity: 0.85; margin-left: 2px;">(${(l.num_plantas || 0).toLocaleString()} p.)</span>
+              </button>
+            `).join('')}
+          </div>
         </div>
 
         ${activeLote ? `

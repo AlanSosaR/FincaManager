@@ -145,31 +145,20 @@ export async function renderDashboard() {
           transition: stroke-width 0.15s ease, fill-opacity 0.15s ease;
           cursor: pointer;
         }
-        .lote-float-card {
-          position: absolute;
-          z-index: 1400;
-          max-width: 340px;
-          width: 90%;
+        .lote-custom-popup .leaflet-popup-content-wrapper {
+          padding: 14px 16px;
+          border-radius: 18px;
+          box-shadow: 0 12px 36px rgba(0,0,0,0.32);
+          border: 1.5px solid #dce5da;
           background: #ffffff;
-          border-radius: 16px;
-          box-shadow: 0 12px 40px rgba(0,0,0,0.35);
-          border: 1px solid #dce5da;
-          padding: 16px;
-          left: 50%;
-          transform: translateX(-50%);
-          font-family: 'Work Sans', sans-serif;
         }
-        .lote-float-tip {
-          position: absolute;
-          bottom: -10px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 0;
-          height: 0;
-          border-left: 10px solid transparent;
-          border-right: 10px solid transparent;
-          border-top: 10px solid #ffffff;
-          filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15));
+        .lote-custom-popup .leaflet-popup-content {
+          margin: 0;
+          line-height: normal;
+        }
+        .lote-custom-popup .leaflet-popup-tip {
+          background: #ffffff;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         .lote-float-close {
           display: inline-flex;
@@ -312,17 +301,9 @@ export async function renderDashboard() {
                 <span class="material-icons" style="font-size:18px;">close</span>
               </button>
               <span class="ganado-split-ctrl-sep"></span>
-              <button class="ganado-split-ctrl-reg" onclick="window.toggleLotesSplitMenu(event)" title="Más opciones">
-                <span class="material-icons">arrow_drop_down</span>
+              <button class="ganado-split-ctrl-reg" onclick="window.navigateTo('nuevo_lote')" title="Nuevo Lote">
+                <span class="material-icons">add</span>
               </button>
-              <div class="ganado-split-menu" id="lotes-split-menu">
-                <button class="ganado-split-item" onclick="window.navigateTo('nuevo_lote'); document.getElementById('lotes-split-menu').classList.remove('open');">
-                  <span class="material-icons">add</span><span>Nuevo lote</span>
-                </button>
-                <button class="ganado-split-item" onclick="window.navigateTo('plan_ifcafe'); document.getElementById('lotes-split-menu').classList.remove('open');">
-                  <span class="material-icons">calendar_month</span><span>Manejo Cafetal</span>
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -386,7 +367,6 @@ export async function renderDashboard() {
               <p>Cargando mapa del cafetal...</p>
             </div>
           </div>
-          <div id="lote-float-card" class="lote-float-card" style="display:none;"></div>
         </div>
       </div>
     `;
@@ -533,6 +513,7 @@ export async function initDashboard() {
   const allBounds = [];
   const polyByLote = {};
   let selectedLoteId = null;
+  let activeLotePopup = null;
 
   function buildPopupCardHtml(lote, apps) {
     const dNow = new Date();
@@ -596,7 +577,6 @@ export async function initDashboard() {
           const isHoy = a.fecha === hoyStr;
           const isAtrasada = !isAplicada && a.fecha < hoyStr;
           const isParaHoy = !isAplicada && isHoy;
-          const isFutura = !isAplicada && a.fecha > hoyStr;
           const dias = calcDias(a.fecha);
 
           if (isAplicada && isHoy) {
@@ -704,56 +684,74 @@ export async function initDashboard() {
     `;
   }
 
-  function showLoteFloatCard(lote, apps) {
-    const card = document.getElementById('lote-float-card');
-    if (!card) return;
-    card.innerHTML = `
-      <div class="lote-float-tip"></div>
-      ${buildPopupCardHtml(lote, apps)}
+  function showLotePopup(lote, apps, center) {
+    if (activeLotePopup) {
+      map.closePopup(activeLotePopup);
+    }
+    const html = `
+      <div class="lote-leaflet-popup-content" style="min-width:280px; max-width:320px; font-family:'Work Sans', sans-serif;">
+        ${buildPopupCardHtml(lote, apps)}
+      </div>
     `;
-    card.style.display = 'block';
-    const containerRect = container.getBoundingClientRect();
-    const cardHeight = card.offsetHeight;
-    card.style.top = Math.max(10, (containerRect.height - cardHeight) / 2) + 'px';
-    document.getElementById('lote-float-close')?.addEventListener('click', clearLoteSelection);
-  }
+    activeLotePopup = L.popup({
+      closeButton: false,
+      autoPan: true,
+      autoPanPaddingTopLeft: [25, 30],
+      autoPanPaddingBottomRight: [25, 30],
+      offset: [0, -8],
+      className: 'lote-custom-popup'
+    })
+    .setLatLng(center)
+    .setContent(html)
+    .openOn(map);
 
-  function hideLoteFloatCard() {
-    const card = document.getElementById('lote-float-card');
-    if (card) card.style.display = 'none';
+    setTimeout(() => {
+      document.getElementById('lote-float-close')?.addEventListener('click', clearLoteSelection);
+    }, 50);
   }
 
   function selectLote(id) {
     selectedLoteId = id;
-    Object.values(polyByLote).forEach(({ poly, lote }) => {
+    Object.values(polyByLote).forEach(({ poly, labelMarker, lote }) => {
       const selected = lote.id === id;
       if (selected) {
         if (!map.hasLayer(poly)) map.addLayer(poly);
-        poly.setStyle({ fillOpacity: 0.50, weight: 5, color: '#ffffff', opacity: 1 });
-      } else if (map.hasLayer(poly)) {
-        poly.setStyle({ fillOpacity: 0.25, weight: 2.5 });
+        if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
+        poly.setStyle({ fillOpacity: 0.55, weight: 4.5, color: '#ffffff', opacity: 1 });
+      } else {
+        if (map.hasLayer(poly)) map.removeLayer(poly);
+        if (labelMarker && map.hasLayer(labelMarker)) map.removeLayer(labelMarker);
       }
     });
+
     const sel = polyByLote[id];
     if (sel) {
-      map.fitBounds(sel.poly.getBounds().pad(0.12));
-      showLoteFloatCard(sel.lote, appsByLote[id] || []);
+      const center = sel.poly.getBounds().getCenter();
+      map.panTo(center, { animate: true });
+      showLotePopup(sel.lote, appsByLote[id] || [], center);
     }
   }
 
   function clearLoteSelection() {
     selectedLoteId = null;
-    hideLoteFloatCard();
-    Object.values(polyByLote).forEach(({ poly, lote }) => {
+    if (activeLotePopup) {
+      map.closePopup(activeLotePopup);
+      activeLotePopup = null;
+    }
+    Object.values(polyByLote).forEach(({ poly, labelMarker, lote }) => {
       const { color } = parseCoordenadasJson(lote.coordenadas_json);
       const loteColor = color || '#2d3e2c';
       if (!map.hasLayer(poly)) map.addLayer(poly);
+      if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
       poly.setStyle({ fillOpacity: 0.35, weight: 3, opacity: 1, color: '#ffffff', fillColor: loteColor });
     });
-    if (allBounds.length > 0) {
-      map.fitBounds(L.featureGroup(allBounds.map(b => L.rectangle(b))).getBounds().pad(0.15));
-    }
   }
+
+  map.on('popupclose', () => {
+    if (selectedLoteId) {
+      clearLoteSelection();
+    }
+  });
 
   // Draw Lot Polygons
   withCoords.forEach(lote => {
@@ -773,7 +771,22 @@ export async function initDashboard() {
     }).addTo(map);
 
     allBounds.push(poly.getBounds());
-    polyByLote[lote.id] = { poly, lote };
+
+    const c = poly.getBounds().getCenter();
+    const labelMarker = L.marker([c.lat, c.lng], {
+      icon: L.divIcon({
+        className: 'lote-label-wrap',
+        html: `<div class="lote-label" style="background:${escapeHtml(loteColor)};">
+          <span style="font-size:12px;">🌿</span>
+          <span>${escapeHtml(lote.nombre || 'Lote')}</span>
+        </div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      }),
+      interactive: false
+    }).addTo(map);
+
+    polyByLote[lote.id] = { poly, labelMarker, lote };
 
     poly.on('mouseover', () => {
       if (selectedLoteId !== lote.id) {
@@ -791,20 +804,6 @@ export async function initDashboard() {
       selectLote(lote.id);
       L.DomEvent.stopPropagation(e);
     });
-
-    const c = poly.getBounds().getCenter();
-    L.marker([c.lat, c.lng], {
-      icon: L.divIcon({
-        className: 'lote-label-wrap',
-        html: `<div class="lote-label" style="background:${escapeHtml(loteColor)};">
-          <span style="font-size:12px;">🌿</span>
-          <span>${escapeHtml(lote.nombre || 'Lote')}</span>
-        </div>`,
-        iconSize: [0, 0],
-        iconAnchor: [0, 0]
-      }),
-      interactive: false
-    }).addTo(map);
   });
 
   map.on('click', () => {
