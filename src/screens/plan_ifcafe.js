@@ -161,6 +161,12 @@ function eventCardHtml(ev) {
 
   if (ev.isDb && ev.id) {
     acciones.push(`
+      <button class="plan-btn-ghost" onclick="window.editarAplicacionDirecta('${ev.id}')" title="Editar actividad" style="color: var(--m3-primary); border-color: #c0d4be; padding: 6px 12px;">
+        <span class="material-symbols-outlined" style="font-size:16px;">edit</span>
+        <span>Editar</span>
+      </button>
+    `);
+    acciones.push(`
       <button class="plan-btn-danger" onclick="window.eliminarAplicacionDirecta('${ev.id}')" title="Eliminar actividad">
         <span class="material-symbols-outlined" style="font-size:16px;">delete</span>
       </button>
@@ -382,26 +388,35 @@ function showPlanDayDetails(day, dayEvents) {
   `;
 }
 
-function showInlineActividadForm(defaultDate) {
+function showInlineActividadForm(defaultDate, editAppId = null) {
+  let editApp = null;
+  if (editAppId) {
+    editApp = _ifcafeEvents.find(e => e.id === editAppId) || null;
+  }
+
+  const actDate = editApp ? (editApp.fecha || defaultDate) : defaultDate;
   const todayStr = getLocalToday();
-  const isPast = defaultDate < todayStr;
-  const isToday = defaultDate === todayStr;
+  const isPast = actDate < todayStr;
+  const isToday = actDate === todayStr;
 
   // Calcular nombre del día
-  const dParts = defaultDate.split('-');
+  const dParts = actDate.split('-');
   const dateObj = new Date(parseInt(dParts[0]), parseInt(dParts[1]) - 1, parseInt(dParts[2]));
   const dayName = dateObj.toLocaleDateString('es-ES', { weekday: 'long' });
   
   const tomorrowObj = new Date();
   tomorrowObj.setDate(tomorrowObj.getDate() + 1);
   const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth() + 1).padStart(2, '0')}-${String(tomorrowObj.getDate()).padStart(2, '0')}`;
-  const isTomorrow = defaultDate === tomorrowStr;
+  const isTomorrow = actDate === tomorrowStr;
 
   let estadoTextoDisplay = '';
   let estadoValor = 'Programada';
   let formTitle = 'Programar Labor Futura';
 
-  if (isPast) {
+  if (editApp) {
+    formTitle = '✏️ Editar Actividad del Cafetal';
+    estadoValor = editApp.estado || (isPast || isToday ? 'Aplicada' : 'Programada');
+  } else if (isPast) {
     estadoTextoDisplay = `✅ Aplicada / Realizada (Registro histórico del ${dateObj.getDate()} de ${MESES_NOMBRE[dateObj.getMonth() + 1]})`;
     estadoValor = 'Aplicada';
     formTitle = 'Registrar Labor Realizada en Fecha Pasada';
@@ -422,11 +437,17 @@ function showInlineActividadForm(defaultDate) {
   const panel = document.getElementById('plan-day-details');
   if (!panel) return;
 
-  const dateFormatted = new Date(defaultDate + 'T12:00:00').toLocaleDateString('es-ES', {
+  const dateFormatted = new Date(actDate + 'T12:00:00').toLocaleDateString('es-ES', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
 
-  const targetLoteId = _ifcafeLoteId || (_allLotes.length > 0 ? _allLotes[0].id : '');
+  const targetLoteId = editApp ? (editApp.lote_id || editApp.loteId) : (_ifcafeLoteId || (_allLotes.length > 0 ? _allLotes[0].id : ''));
+  const currentTipo = editApp ? (editApp.tipo || 'Aplicación Foliar') : 'Aplicación Foliar';
+  const currentProducto = editApp ? (editApp.producto || '') : '';
+  const currentDosis = editApp ? (editApp.dosis || '') : '';
+  const currentOperador = editApp ? (editApp.operador || '') : '';
+  const currentObs = editApp ? (editApp.observaciones || '') : '';
+  const currentFoto = editApp ? (editApp.foto_url || editApp.notas || '') : '';
 
   panel.innerHTML = `
     <div class="da-day-details" style="animation: slideUp 0.2s ease-out;">
@@ -435,13 +456,14 @@ function showInlineActividadForm(defaultDate) {
           <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">${formTitle}</span>
           <h4 style="margin:2px 0 0; font-size:15px; font-weight:800; color:#1a1a1a; text-transform:capitalize;">${dateFormatted}</h4>
         </div>
-        <button type="button" onclick="window.cancelInlineActividad('${defaultDate}')" style="background:none; border:none; color:#777; cursor:pointer; padding:4px;">
+        <button type="button" onclick="window.cancelInlineActividad('${actDate}')" style="background:none; border:none; color:#777; cursor:pointer; padding:4px;">
           <span class="material-symbols-outlined" style="font-size:20px;">close</span>
         </button>
       </div>
 
       <form id="form-plan-inline-actividad" style="display:flex; flex-direction:column; gap:12px;">
-        <input type="hidden" name="fecha" value="${defaultDate}">
+        ${editAppId ? `<input type="hidden" name="id" value="${editAppId}">` : ''}
+        <input type="hidden" name="fecha" value="${actDate}">
 
         <!-- 1. Lote -->
         <div class="m3-field">
@@ -454,32 +476,32 @@ function showInlineActividadForm(defaultDate) {
         <!-- 2. Tipo de Labor -->
         <div class="m3-field">
           <select name="tipo" id="inline-plan-tipo" required style="font-size:13px; font-weight:600;">
-            <option value="Aplicación Foliar" selected>🍃 Aplicación Foliar (Nutrición / Estimulante)</option>
-            <option value="Fertilización al Suelo">🌿 Fertilización al Suelo (NPK / Abono)</option>
-            <option value="Control Fitosanitario">🛡️ Control Fitosanitario (Fungicida / Insecticida)</option>
-            <option value="Manejo de Tejido">✂️ Manejo de Tejido (Poda / Descope)</option>
-            <option value="Limpieza">🧹 Limpieza / Chapea</option>
-            <option value="Análisis de Suelo">🧪 Análisis de Suelo</option>
-            <option value="Otro">📌 Otra labor</option>
+            <option value="Aplicación Foliar" ${currentTipo === 'Aplicación Foliar' ? 'selected' : ''}>🍃 Aplicación Foliar (Nutrición / Estimulante)</option>
+            <option value="Fertilización al Suelo" ${currentTipo === 'Fertilización al Suelo' ? 'selected' : ''}>🌿 Fertilización al Suelo (NPK / Abono)</option>
+            <option value="Control Fitosanitario" ${currentTipo === 'Control Fitosanitario' ? 'selected' : ''}>🛡️ Control Fitosanitario (Fungicida / Insecticida)</option>
+            <option value="Manejo de Tejido" ${currentTipo === 'Manejo de Tejido' ? 'selected' : ''}>✂️ Manejo de Tejido (Poda / Descope)</option>
+            <option value="Limpieza" ${currentTipo === 'Limpieza' ? 'selected' : ''}>🧹 Limpieza / Chapea</option>
+            <option value="Análisis de Suelo" ${currentTipo === 'Análisis de Suelo' ? 'selected' : ''}>🧪 Análisis de Suelo</option>
+            <option value="Otro" ${currentTipo === 'Otro' ? 'selected' : ''}>📌 Otra labor</option>
           </select>
           <label>Tipo de Actividad</label>
         </div>
 
         <!-- 3. Producto / Tratamiento -->
         <div class="m3-field" id="field-plan-producto">
-          <input type="text" name="producto" id="inline-plan-producto" placeholder=" " required style="font-size:13px;">
+          <input type="text" name="producto" id="inline-plan-producto" value="${esc(currentProducto)}" placeholder=" " required style="font-size:13px;">
           <label id="label-plan-producto">Producto o Fórmula recomendada</label>
         </div>
 
         <!-- 4. Dosis (visible solo en Foliar, Suelo y Fitosanitario) -->
         <div class="m3-field" id="field-plan-dosis">
-          <input type="text" name="dosis" id="inline-plan-dosis" placeholder=" " required style="font-size:13px;">
+          <input type="text" name="dosis" id="inline-plan-dosis" value="${esc(currentDosis)}" placeholder=" " style="font-size:13px;">
           <label>Dosis (ej: 120g/planta, 50cc/bomba 20L)</label>
         </div>
 
         <!-- 5. Responsable / Operador -->
         <div class="m3-field">
-          <input type="text" name="operador" id="inline-plan-operador" list="operadores-plan-sugeridos" placeholder=" " style="font-size:13px;">
+          <input type="text" name="operador" id="inline-plan-operador" value="${esc(currentOperador)}" list="operadores-plan-sugeridos" placeholder=" " style="font-size:13px;">
           <label>Responsable / Aplicador</label>
           <datalist id="operadores-plan-sugeridos">
             ${_personalList.map(p => `<option value="${p.nombre}"></option>`).join('')}
@@ -488,17 +510,17 @@ function showInlineActividadForm(defaultDate) {
 
         <!-- 6. Observaciones y Recomendaciones del Técnico -->
         <div class="m3-field">
-          <textarea name="observaciones" id="inline-plan-obs" rows="2" placeholder=" " style="font-size:13px;"></textarea>
+          <textarea name="observaciones" id="inline-plan-obs" rows="2" placeholder=" " style="font-size:13px;">${esc(currentObs)}</textarea>
           <label>Observaciones / Recomendación Técnica</label>
         </div>
 
-        <!-- 7. Foto de la Planta (Progreso y Evidencia - Disponible cuando ya se realizó) -->
-        <div id="inline-plan-foto-section" style="${(isToday || isPast) ? 'display:block;' : 'display:none;'} background: #fbfdfa; border: 1.5px dashed #c0d4be; border-radius: 14px; padding: 14px; text-align: center; margin: 16px 0 24px 0;">
+        <!-- 7. Foto de la Planta (Progreso y Evidencia) -->
+        <div id="inline-plan-foto-section" style="background: #fbfdfa; border: 1.5px dashed #c0d4be; border-radius: 14px; padding: 14px; text-align: center; margin: 16px 0 24px 0;">
           <input type="file" id="inline-plan-foto-input" accept="image/*" capture="environment" style="display: none;">
-          <input type="hidden" name="foto_url" id="inline-plan-foto-data" value="">
+          <input type="hidden" name="foto_url" id="inline-plan-foto-data" value="${currentFoto || ''}">
           
-          <div id="inline-plan-foto-preview-box" style="display: none; position: relative; margin-bottom: 12px;">
-            <img id="inline-plan-foto-img" src="" alt="Foto de la planta" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; border: 1px solid #d4dfd2;">
+          <div id="inline-plan-foto-preview-box" style="${currentFoto ? 'display:block;' : 'display:none;'} position: relative; margin-bottom: 12px;">
+            <img id="inline-plan-foto-img" src="${currentFoto || ''}" alt="Foto de la planta" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; border: 1px solid #d4dfd2;">
             <button type="button" id="inline-plan-btn-quitar-foto" style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
               <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
             </button>
@@ -506,26 +528,33 @@ function showInlineActividadForm(defaultDate) {
 
           <button type="button" id="inline-plan-btn-take-photo" class="plan-btn-ghost" style="width: 100%; height: 42px; font-size: 13px; border-style: dashed; justify-content: center;">
             <span class="material-symbols-outlined" style="font-size: 20px; color: #2d3e2c;">photo_camera</span>
-            <span id="inline-plan-foto-btn-label">Tomar / Subir foto de la planta</span>
+            <span id="inline-plan-foto-btn-label">${currentFoto ? 'Cambiar foto de la planta' : 'Tomar / Subir foto de la planta'}</span>
           </button>
           <p style="font-size: 11.5px; color: #666; margin: 6px 0 0;">Opcional: Captura el estado foliar, brotes o avance de la planta</p>
         </div>
 
-        <!-- 8. Estado con nombre del día -->
+        <!-- 8. Estado -->
         <div class="m3-field" style="margin-bottom: 8px;">
-          <input type="text" value="${estadoTextoDisplay}" readonly style="font-size:13px; font-weight:700; background:${(isToday || isPast) ? '#f0f7e6' : '#fff9e6'}; color:${(isToday || isPast) ? '#2d3e2c' : '#b26a00'}; border-color:${(isToday || isPast) ? '#c8e6c9' : '#ffe9a8'};">
-          <input type="hidden" name="estado" value="${estadoValor}">
+          ${editApp ? `
+            <select name="estado" style="font-size:13px; font-weight:700;">
+              <option value="Aplicada" ${estadoValor === 'Aplicada' ? 'selected' : ''}>✅ Aplicada / Realizada</option>
+              <option value="Programada" ${estadoValor === 'Programada' ? 'selected' : ''}>📅 Programada / Pendiente</option>
+            </select>
+          ` : `
+            <input type="text" value="${estadoTextoDisplay}" readonly style="font-size:13px; font-weight:700; background:${(isToday || isPast) ? '#f0f7e6' : '#fff9e6'}; color:${(isToday || isPast) ? '#2d3e2c' : '#b26a00'}; border-color:${(isToday || isPast) ? '#c8e6c9' : '#ffe9a8'};">
+            <input type="hidden" name="estado" value="${estadoValor}">
+          `}
           <label>Estado de la labor</label>
         </div>
 
         <!-- Botones de Acción M3 Expressive -->
         <div style="display:flex; gap:14px; justify-content:flex-end; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid #eef2ee;">
-          <button type="button" class="plan-btn-ghost" onclick="window.cancelInlineActividad('${defaultDate}')">
+          <button type="button" class="plan-btn-ghost" onclick="window.cancelInlineActividad('${actDate}')">
             <span>Cancelar</span>
           </button>
           <button type="submit" class="plan-btn-primary">
-            <span class="material-symbols-outlined" style="font-size:18px;">${(isToday || isPast) ? 'check_circle' : 'save'}</span>
-            <span>${isPast ? 'Registrar Actividad Realizada' : isToday ? 'Registrar Actividad' : 'Programar Actividad'}</span>
+            <span class="material-symbols-outlined" style="font-size:18px;">${editApp ? 'save' : (isToday || isPast) ? 'check_circle' : 'save'}</span>
+            <span>${editApp ? 'Guardar Cambios' : isPast ? 'Registrar Actividad Realizada' : isToday ? 'Registrar Actividad' : 'Programar Actividad'}</span>
           </button>
         </div>
       </form>
@@ -584,17 +613,17 @@ function showInlineActividadForm(defaultDate) {
     const t = selectTipo.value;
     if (t === 'Manejo de Tejido') {
       if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; inputDosis.value = ''; }
+      if (inputDosis) { inputDosis.required = false; }
       if (labelProducto) labelProducto.textContent = 'Tipo de Poda o Manejo';
       inputProducto.placeholder = 'Ej: Poda de formación, Descope, Deschuponado...';
     } else if (t === 'Limpieza') {
       if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; inputDosis.value = ''; }
+      if (inputDosis) { inputDosis.required = false; }
       if (labelProducto) labelProducto.textContent = 'Tipo de Limpieza';
       inputProducto.placeholder = 'Ej: Chapea manual con machete, Desyerbe...';
     } else if (t === 'Análisis de Suelo') {
       if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; inputDosis.value = ''; }
+      if (inputDosis) { inputDosis.required = false; }
       if (labelProducto) labelProducto.textContent = 'Tipo de Análisis / Muestreo';
       inputProducto.placeholder = 'Ej: Muestreo compuesto de suelo, pH...';
     } else if (t === 'Control Fitosanitario') {
@@ -617,7 +646,7 @@ function showInlineActividadForm(defaultDate) {
       inputDosis.placeholder = 'Ej: 50 cc / bomba 20L';
     } else {
       if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; inputDosis.value = ''; }
+      if (inputDosis) { inputDosis.required = false; }
       if (labelProducto) labelProducto.textContent = 'Nombre de la Labor';
       inputProducto.placeholder = 'Ej: Nombre de la labor o insumo';
     }
@@ -1113,11 +1142,10 @@ export function initPlanIfcafe() {
       if (!empresaId) throw new Error('No se detectó empresa activa');
 
       const payload = {
-        empresa_id: empresaId,
         lote_id: data.lote_id,
         fecha: data.fecha,
         tipo: data.tipo || 'Fertilización al Suelo',
-        metodo: data.tipo === 'Aplicación Foliar' ? 'Foliar' : 'Al suelo',
+        metodo: data.metodo || (data.tipo === 'Aplicación Foliar' ? 'Foliar' : 'Al suelo'),
         producto: data.producto || 'Actividad programada',
         dosis: data.dosis || '',
         estado: data.estado || 'Programada',
@@ -1126,11 +1154,20 @@ export function initPlanIfcafe() {
         notas: data.foto_url || null
       };
 
-      const result = await restInsert('/rest/v1/lote_aplicaciones', payload);
-      if (!result) throw new Error('No se pudo guardar la actividad');
+      if (data.id) {
+        await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${data.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload)
+        });
+        window.Snackbar?.show('✅ Actividad actualizada exitosamente');
+      } else {
+        payload.empresa_id = empresaId;
+        const result = await restInsert('/rest/v1/lote_aplicaciones', payload);
+        if (!result) throw new Error('No se pudo guardar la actividad');
+        window.Snackbar?.show('✅ Actividad guardada correctamente');
+      }
 
       invalidateCache('lote_aplicaciones');
-      window.Snackbar?.show('✅ Actividad guardada correctamente');
       reloadCurrentView(data.lote_id);
     } catch (err) {
       console.error(err);
@@ -1266,6 +1303,13 @@ export function initPlanIfcafe() {
         }
       });
     }
+  };
+
+  window.editarAplicacionDirecta = function(appId) {
+    if (!appId) return;
+    const app = _ifcafeEvents.find(e => e.id === appId);
+    const fecha = app?.fecha || getLocalToday();
+    showInlineActividadForm(fecha, appId);
   };
 
   window.eliminarAplicacionDirecta = async function(appId) {
