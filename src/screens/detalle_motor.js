@@ -195,7 +195,7 @@ export async function renderDetalleMotor(motorId) {
           <div class="activity-list" style="margin-bottom: 32px;">
             ${sesiones && sesiones.length > 0 ? sesiones.map(s => `
               <div class="activity-item" style="padding: 16px; border-bottom: 1px solid var(--m3-outline-variant);">
-                <div class="activity-icon" style="background: var(--primary-container); color: var(--primary-container); border-radius: 12px; width: 44px; height: 44px;">
+                <div class="activity-icon" style="background: var(--primary-container); color: #ffffff; border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
                   <span class="material-icons" style="font-size: 20px;">history</span>
                 </div>
                 <div class="activity-content" style="flex: 1;">

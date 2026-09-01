@@ -8,11 +8,25 @@ let refMarker = null;
 
 function parseCoordenadasJson(json) {
   try {
-    const parsed = JSON.parse(json);
+    if (!json) return { coordinates: [], color: '#2d3e2c' };
+    let parsed = json;
+    while (typeof parsed === 'string') {
+      try {
+        const next = JSON.parse(parsed);
+        if (next == null) break;
+        parsed = next;
+      } catch {
+        break;
+      }
+    }
     if (Array.isArray(parsed)) {
       return { coordinates: parsed, color: '#2d3e2c' };
     }
-    return { coordinates: parsed.coordinates || [], color: parsed.color || '#2d3e2c' };
+    if (parsed && typeof parsed === 'object') {
+      const coords = Array.isArray(parsed.coordinates) ? parsed.coordinates : [];
+      return { coordinates: coords, color: parsed.color || '#2d3e2c', ...parsed };
+    }
+    return { coordinates: [], color: '#2d3e2c' };
   } catch {
     return { coordinates: [], color: '#2d3e2c' };
   }
@@ -443,7 +457,7 @@ export async function initDashboard() {
     appsByLote[a.lote_id].push(a);
   });
 
-  const withCoords = lotes.filter(l => l.coordenadas_json);
+  const withCoords = lotes.filter(l => l.coordenadas_json || l.coordenadas);
 
   container.innerHTML = `
     <div id="mapa-leaflet" style="width:100%;height:100%;"></div>
@@ -827,7 +841,7 @@ export async function initDashboard() {
 
   // Draw Lot Polygons
   withCoords.forEach(lote => {
-    const { coordinates, color } = parseCoordenadasJson(lote.coordenadas_json);
+    const { coordinates, color } = parseCoordenadasJson(lote.coordenadas_json || lote.coordenadas);
     if (!coordinates || coordinates.length < 3) return;
     const latlngs = coordinates.map(c => [c.lat, c.lng]);
     const loteColor = color || '#2d3e2c';

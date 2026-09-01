@@ -6,11 +6,25 @@ let refMarker = null;
 
 function parseCoordenadasJson(json) {
   try {
-    const parsed = JSON.parse(json);
+    if (!json) return { coordinates: [], color: '#2d3e2c' };
+    let parsed = json;
+    while (typeof parsed === 'string') {
+      try {
+        const next = JSON.parse(parsed);
+        if (next == null) break;
+        parsed = next;
+      } catch {
+        break;
+      }
+    }
     if (Array.isArray(parsed)) {
       return { coordinates: parsed, color: '#2d3e2c' };
     }
-    return { coordinates: parsed.coordinates || [], color: parsed.color || '#2d3e2c' };
+    if (parsed && typeof parsed === 'object') {
+      const coords = Array.isArray(parsed.coordinates) ? parsed.coordinates : [];
+      return { coordinates: coords, color: parsed.color || '#2d3e2c', ...parsed };
+    }
+    return { coordinates: [], color: '#2d3e2c' };
   } catch {
     return { coordinates: [], color: '#2d3e2c' };
   }
@@ -459,25 +473,33 @@ export async function initPotreros() {
     eventosByPotrero[ev.potrero_id].push(ev);
   });
 
-  const withCoords = potreros.filter(p => p.coordenadas_json);
+  const withCoords = potreros.filter(p => p.coordenadas_json || p.coordenadas);
   const totalHa = potreros.reduce((s, p) => s + (parseFloat(p.area) || 0), 0);
   document.getElementById('mapa-title-count').textContent = `(${potreros.length})`;
   document.getElementById('mapa-ha-text').textContent = `${totalHa.toFixed(2)} Hectáreas`;
 
-  container.innerHTML = `
-    <button id="mapa-layers-btn" class="mapa-layers-btn" title="Cambiar mapa base">
-      <span class="material-icons" style="font-size:16px;">layers</span>
-      <span id="mapa-layers-label">Esri Sat.</span>
-    </button>
-  `;
+  container.innerHTML = '';
 
   const map = L.map(container, {
-    center: [14.5, -88.5],
-    zoom: 9,
+    center: [14.08572, -86.17865],
+    zoom: 15,
     maxZoom: 22,
     zoomControl: false,
     attributionControl: false
   });
+
+  const btnLayers = document.createElement('button');
+  btnLayers.id = 'mapa-layers-btn';
+  btnLayers.className = 'mapa-layers-btn';
+  btnLayers.title = 'Cambiar mapa base';
+  btnLayers.style.background = '#1b5e20';
+  btnLayers.style.color = '#ffffff';
+  btnLayers.innerHTML = `
+    <span class="material-icons" style="font-size:16px;">layers</span>
+    <span id="mapa-layers-label">Esri Sat.</span>
+  `;
+  container.appendChild(btnLayers);
+
   // Si hay potreros con polígono, se ajusta la vista a ellos; si no, centra en el punto de referencia de la finca
   setTimeout(async () => {
     const ref = await loadPuntoReferencia(window._currentEmpresaId).catch(() => null);
@@ -501,13 +523,6 @@ export async function initPotreros() {
     }
     setTimeout(() => map.invalidateSize(), 200);
   }, 50);
-  L.control.attribution({
-    position: 'bottomleft',
-    prefix: false
-  }).addTo(map).addAttribution('Geocoding &copy; Geocode.XYZ');
-  const layersBtnEl = document.getElementById('mapa-layers-btn');
-  layersBtnEl.style.background = '#1b5e20';
-  layersBtnEl.style.color = '#ffffff';
 
   // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
   const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -567,7 +582,6 @@ export async function initPotreros() {
 
   // Layer toggle: 0 = Esri Satélite (Claridad), 1 = Google Satélite (Híbrido), 2 = Satélite Limpio
   let layerMode = 0;
-  const btnLayers = document.getElementById('mapa-layers-btn');
   const layersLabel = document.getElementById('mapa-layers-label');
   btnLayers.addEventListener('click', () => {
     layerMode = (layerMode + 1) % 3;
@@ -885,7 +899,7 @@ export async function initPotreros() {
   }
 
   withCoords.forEach(potrero => {
-    const { coordinates, color } = parseCoordenadasJson(potrero.coordenadas_json);
+    const { coordinates, color } = parseCoordenadasJson(potrero.coordenadas_json || potrero.coordenadas);
     if (!coordinates || coordinates.length < 3) return;
     const latlngs = coordinates.map(c => [c.lat, c.lng]);
     const potreroColor = color || '#2e7d32';
@@ -940,6 +954,8 @@ export async function initPotreros() {
       map.fitBounds(group.getBounds().pad(0.1));
     }
   };
+
+  fitToParcels();
 
   map.on('click', () => clearPotreroSelection());
 

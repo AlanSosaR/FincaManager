@@ -382,8 +382,13 @@ export async function saveWhatsAppConfig(empresaId, config) {
 }
 
 export async function loadWhatsAppConfig(empresaId) {
+  const targetId = empresaId || window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+  if (!targetId) {
+    window._empresaWhatsAppConfig = null;
+    return null;
+  }
   try {
-    const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}&select=*`);
+    const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}&select=*`);
     if (data && data.length > 0) {
       window._empresaWhatsAppConfig = data[0];
       if (data[0].whatsapp_group_jid) {
@@ -397,8 +402,13 @@ export async function loadWhatsAppConfig(empresaId) {
 }
 
 export async function loadPuntoReferencia(empresaId) {
+  const targetId = empresaId || window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+  if (!targetId) {
+    window._empresaPuntoRef = null;
+    return null;
+  }
   try {
-    const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}&select=punto_ref_nombre,punto_ref_lat,punto_ref_lng`);
+    const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}&select=punto_ref_nombre,punto_ref_lat,punto_ref_lng`);
     const row = data && data.length > 0 ? data[0] : null;
     const punto = row && row.punto_ref_lat != null && row.punto_ref_lng != null
       ? { nombre: row.punto_ref_nombre || '', lat: Number(row.punto_ref_lat), lng: Number(row.punto_ref_lng) }
@@ -412,20 +422,22 @@ export async function loadPuntoReferencia(empresaId) {
 }
 
 export async function savePuntoReferencia(empresaId, punto) {
+  const targetId = empresaId || window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+  if (!targetId) return;
   const payload = {
     punto_ref_nombre: punto.nombre || '',
     punto_ref_lat: punto.lat,
     punto_ref_lng: punto.lng,
     updated_at: new Date().toISOString(),
   };
-  const existing = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}&select=empresa_id`);
+  const existing = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}&select=empresa_id`);
   if (existing && existing.length > 0) {
-    await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}`, {
+    await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
   } else {
-    await restInsert('/rest/v1/empresa_config', { empresa_id: empresaId, ...payload });
+    await restInsert('/rest/v1/empresa_config', { empresa_id: targetId, ...payload });
   }
   window._empresaPuntoRef = { nombre: punto.nombre || '', lat: punto.lat, lng: punto.lng };
 }

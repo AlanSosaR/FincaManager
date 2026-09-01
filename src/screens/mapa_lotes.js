@@ -12,11 +12,25 @@ function escapeHtml(str) {
 
 function parseCoordenadasJson(json) {
   try {
-    const parsed = JSON.parse(json);
+    if (!json) return { coordinates: [], color: '#2d3e2c' };
+    let parsed = json;
+    while (typeof parsed === 'string') {
+      try {
+        const next = JSON.parse(parsed);
+        if (next == null) break;
+        parsed = next;
+      } catch {
+        break;
+      }
+    }
     if (Array.isArray(parsed)) {
       return { coordinates: parsed, color: '#2d3e2c' };
     }
-    return { coordinates: parsed.coordinates || [], color: parsed.color || '#2d3e2c' };
+    if (parsed && typeof parsed === 'object') {
+      const coords = Array.isArray(parsed.coordinates) ? parsed.coordinates : [];
+      return { coordinates: coords, color: parsed.color || '#2d3e2c', ...parsed };
+    }
+    return { coordinates: [], color: '#2d3e2c' };
   } catch {
     return { coordinates: [], color: '#2d3e2c' };
   }
@@ -292,25 +306,33 @@ export async function initMapaLotes() {
     appsByLote[a.lote_id].push(a);
   });
 
-  const withCoords = lotes.filter(l => l.coordenadas_json);
+  const withCoords = lotes.filter(l => l.coordenadas_json || l.coordenadas);
   const totalHa = lotes.reduce((s, l) => s + (parseFloat(l.area_ha) || 0), 0);
   document.getElementById('mapa-n-lotes').textContent = lotes.length;
   document.getElementById('mapa-n-ha').textContent = totalHa.toFixed(1);
 
-  container.innerHTML = `
-    <button id="mapa-layers-btn" class="mapa-layers-btn" title="Cambiar mapa base">
-      <span class="material-icons" style="font-size:16px;">layers</span>
-      <span id="mapa-layers-label">Esri Sat.</span>
-    </button>
-  `;
+  container.innerHTML = '';
 
   const map = L.map(container, {
-    center: [14.5, -88.5],
-    zoom: 9,
+    center: [14.08572, -86.17865],
+    zoom: 15,
     maxZoom: 22,
     zoomControl: false,
     attributionControl: false
   });
+
+  const btnLayers = document.createElement('button');
+  btnLayers.id = 'mapa-layers-btn';
+  btnLayers.className = 'mapa-layers-btn';
+  btnLayers.title = 'Cambiar mapa base';
+  btnLayers.style.background = '#1b5e20';
+  btnLayers.style.color = '#ffffff';
+  btnLayers.innerHTML = `
+    <span class="material-icons" style="font-size:16px;">layers</span>
+    <span id="mapa-layers-label">Esri Sat.</span>
+  `;
+  container.appendChild(btnLayers);
+
   // Si hay lotes con polígono, se ajusta la vista a ellos; si no, centra en el punto de referencia de la finca
   setTimeout(async () => {
     const ref = await loadPuntoReferencia(window._currentEmpresaId).catch(() => null);
@@ -335,13 +357,6 @@ export async function initMapaLotes() {
     }
     setTimeout(() => map.invalidateSize(), 200);
   }, 50);
-  L.control.attribution({
-    position: 'bottomleft',
-    prefix: false
-  }).addTo(map).addAttribution('Geocoding &copy; Geocode.XYZ');
-  const layersBtnEl = document.getElementById('mapa-layers-btn');
-  layersBtnEl.style.background = '#1b5e20';
-  layersBtnEl.style.color = '#ffffff';
 
   // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
   const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -401,7 +416,6 @@ export async function initMapaLotes() {
 
   // Layer toggle: 0 = Esri Satélite (Claridad), 1 = Google Satélite (Híbrido), 2 = Satélite Limpio
   let layerMode = 0;
-  const btnLayers = document.getElementById('mapa-layers-btn');
   const layersLabel = document.getElementById('mapa-layers-label');
   btnLayers.addEventListener('click', () => {
     layerMode = (layerMode + 1) % 3;
@@ -686,7 +700,7 @@ export async function initMapaLotes() {
   // Draw all parcels
   const allBounds = [];
   withCoords.forEach(lote => {
-    const { coordinates, color } = parseCoordenadasJson(lote.coordenadas_json);
+    const { coordinates, color } = parseCoordenadasJson(lote.coordenadas_json || lote.coordenadas);
     if (!coordinates || coordinates.length < 3) return;
     const latlngs = coordinates.map(c => [c.lat, c.lng]);
 
@@ -732,6 +746,8 @@ export async function initMapaLotes() {
       map.fitBounds(group.getBounds().pad(0.1));
     }
   };
+
+  fitToParcels();
 
   // ── Puntos guardados (persistentes por empresa) ──
   const puntosKey = 'finca_puntos_guardados_' + (window._currentEmpresaId || 'default');

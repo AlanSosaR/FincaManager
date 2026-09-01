@@ -1009,28 +1009,36 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
           ` : ''}
         </div>
 
-        <!-- Selector Interactivo de Lotes -->
-        <div style="background: #ffffff; border: 1.5px solid #dce6db; border-radius: 18px; padding: 14px 18px; margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
-            <span style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #2d3e2c; display: flex; align-items: center; gap: 6px; letter-spacing: 0.4px;">
-              <span class="material-symbols-outlined" style="font-size: 18px; color: #2d3e2c;">filter_alt</span>
-              Selecciona el Lote a Programar o Gestionar:
-            </span>
-            <span style="font-size: 12px; color: #666; font-weight: 600;">${_allLotes.length} lotes disponibles</span>
+        <!-- Selector de Lotes (Material 3 Expressive) -->
+        <div style="background: var(--m3-surface-container-lowest, #ffffff); border: 1.5px solid var(--m3-outline-variant, #c7cec3); border-radius: 20px; padding: 14px 18px; margin-bottom: 20px; box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 38px; height: 38px; border-radius: 12px; background: var(--m3-secondary-container, #daeed5); color: var(--m3-on-secondary-container, #101f10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <span class="material-symbols-outlined" style="font-size: 22px;">filter_alt</span>
+            </div>
+            <div>
+              <span style="display: block; font-size: 11px; font-weight: 800; color: var(--m3-secondary, #526350); text-transform: uppercase; letter-spacing: 0.6px; line-height: 1.2;">
+                Filtrar Cafetal
+              </span>
+              <label for="ifcafe-lote-select" style="font-size: 14px; font-weight: 700; color: var(--m3-primary, #2d3e2c); line-height: 1.2;">
+                Lote a gestionar
+              </label>
+            </div>
           </div>
-
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" onclick="window.navigateTo('plan_ifcafe')" class="plan-lote-chip ${!activeLote ? 'active' : ''}">
-              <span class="material-symbols-outlined" style="font-size: 16px;">apps</span>
-              <span>Todos los Lotes</span>
-            </button>
-            ${_allLotes.map(l => `
-              <button type="button" onclick="window.navigateTo('plan_ifcafe', '${l.id}')" class="plan-lote-chip ${activeLote?.id === l.id ? 'active' : ''}">
-                <span class="material-symbols-outlined" style="font-size: 16px;">eco</span>
-                <span>${l.nombre}</span>
-                <span style="font-size: 11px; opacity: 0.85; margin-left: 2px;">(${(l.num_plantas || 0).toLocaleString()} p.)</span>
-              </button>
-            `).join('')}
+          
+          <div style="flex: 1; min-width: 260px;">
+            <div style="position: relative; display: flex; align-items: center;">
+              <select id="ifcafe-lote-select" style="width: 100%; height: 48px; font-weight: 600; font-size: 14px; border-radius: 14px; border: 1.5px solid var(--m3-primary, #2d3e2c); background: #fdfdfc; color: #1a1c19; padding: 0 42px 0 16px; cursor: pointer; outline: none; transition: all 0.2s cubic-bezier(0.2, 0, 0, 1); box-shadow: 0 2px 6px rgba(0,0,0,0.02); -webkit-appearance: none; appearance: none;" onchange="if(this.value){window.navigateTo('plan_ifcafe', this.value)}else{window.navigateTo('plan_ifcafe')}">
+                <option value="" ${!activeLote ? 'selected' : ''}>🌾 Todos los Lotes (${_allLotes.length} disponibles)</option>
+                ${_allLotes.map(l => `
+                  <option value="${l.id}" ${activeLote?.id === l.id ? 'selected' : ''}>
+                    ☕ ${l.nombre} (${(l.num_plantas || 0).toLocaleString()} plantas${l.variedad ? ' · ' + l.variedad : ''})
+                  </option>
+                `).join('')}
+              </select>
+              <span class="material-symbols-outlined" style="position: absolute; right: 14px; pointer-events: none; color: var(--m3-primary, #2d3e2c); font-size: 24px;">
+                expand_more
+              </span>
+            </div>
           </div>
         </div>
 

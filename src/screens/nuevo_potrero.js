@@ -10,11 +10,25 @@ function escapeHtml(str) {
 
 function parseCoordenadasJson(json) {
   try {
-    const parsed = JSON.parse(json);
+    if (!json) return { coordinates: [], color: '#2d3e2c' };
+    let parsed = json;
+    while (typeof parsed === 'string') {
+      try {
+        const next = JSON.parse(parsed);
+        if (next == null) break;
+        parsed = next;
+      } catch {
+        break;
+      }
+    }
     if (Array.isArray(parsed)) {
       return { coordinates: parsed, color: '#2d3e2c' };
     }
-    return { coordinates: parsed.coordinates || [], color: parsed.color || '#2d3e2c' };
+    if (parsed && typeof parsed === 'object') {
+      const coords = Array.isArray(parsed.coordinates) ? parsed.coordinates : [];
+      return { coordinates: coords, color: parsed.color || '#2d3e2c', ...parsed };
+    }
+    return { coordinates: [], color: '#2d3e2c' };
   } catch {
     return { coordinates: [], color: '#2d3e2c' };
   }

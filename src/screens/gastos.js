@@ -4,7 +4,7 @@ import { getPaginationFooterHtml } from '../pagination.js';
 let currentGastosPage = 1;
 let totalGastosCount = 0;
 let currentGastosSearchQuery = '';
-let currentGastosPeriod = 'mes'; // 'mes' | 'mesAnterior' | 'todos'
+let currentGastosPeriod = 'todos'; // 'mes' | 'mesAnterior' | 'todos'
 const PAGE_SIZE = 8;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

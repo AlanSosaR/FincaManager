@@ -36,6 +36,7 @@ export async function renderConfiguracion() {
   const storedGroupName = localStorage.getItem('whatsapp_group_name') || '';
 
   const puntoRef = await loadPuntoReferencia(empresaId);
+  window._empresaPuntoRef = puntoRef;
   const refSet = !!puntoRef;
   const refNombre = refSet && puntoRef.nombre ? puntoRef.nombre : '';
 
@@ -576,7 +577,7 @@ export function initConfiguracion() {
   });
 }
 
-function initPuntoReferencia() {
+async function initPuntoReferencia() {
   const mapEl = document.getElementById('ref-map');
   if (!mapEl) return;
 
@@ -585,11 +586,15 @@ function initPuntoReferencia() {
   const btnClear = document.getElementById('btn-ref-clear');
   const inputNombre = document.getElementById('ref-nombre');
 
-  const initial = window._empresaPuntoRef || null;
-  const startLat = initial ? initial.lat : 14.5;
-  const startLng = initial ? initial.lng : -88.5;
+  const initial = (await loadPuntoReferencia().catch(() => null)) || window._empresaPuntoRef || null;
+  const startLat = initial ? initial.lat : 14.08572;
+  const startLng = initial ? initial.lng : -86.17865;
 
   let refPoint = initial ? { nombre: initial.nombre || '', lat: initial.lat, lng: initial.lng } : null;
+
+  if (inputNombre && initial?.nombre) {
+    inputNombre.value = initial.nombre;
+  }
 
   function escapeHtml(str) {
     return String(str || '')
@@ -599,7 +604,7 @@ function initPuntoReferencia() {
 
   const map = L.map(mapEl, {
     center: [startLat, startLng],
-    zoom: initial ? 15 : 8,
+    zoom: initial ? 16 : 14,
     zoomControl: false,
     attributionControl: false
   });
@@ -915,23 +920,30 @@ async function updateWhatsAppStatus() {
     connected = config?.whatsapp_status === 'connected' || localStorage.getItem('wa_connected') === 'true';
   }
   if (connected) {
-    el.innerHTML = '<span style="color:#2d3e2c;font-weight:600;">✓ Conectado</span>';
-    document.getElementById('wa-disconnected-area').style.display = 'none';
-    document.getElementById('wa-pairing-code-area').style.display = 'none';
+    if (el) el.innerHTML = '<span style="color:#2d3e2c;font-weight:600;">✓ Conectado</span>';
+    const discArea = document.getElementById('wa-disconnected-area');
+    if (discArea) discArea.style.display = 'none';
+    const pairArea = document.getElementById('wa-pairing-code-area');
+    if (pairArea) pairArea.style.display = 'none';
     if (config?.whatsapp_connected_by && config.whatsapp_connected_by !== currentUserId) {
-      document.getElementById('wa-shared-info').style.display = 'block';
+      const shared = document.getElementById('wa-shared-info');
+      if (shared) shared.style.display = 'block';
     }
-    document.getElementById('wa-connected-area').style.display = 'block';
+    const connArea = document.getElementById('wa-connected-area');
+    if (connArea) connArea.style.display = 'block';
     const disconnectBtn = document.getElementById('btn-wa-disconnect');
     if (disconnectBtn) {
       const canDisconnect = config?.whatsapp_connected_by === currentUserId || userRole === 'propietario';
       disconnectBtn.style.display = canDisconnect ? 'flex' : 'none';
     }
   } else {
-    el.innerHTML = '<span style="color:#ff4103;">✗ Desconectado</span>';
-    document.getElementById('wa-disconnected-area').style.display = 'block';
-    document.getElementById('wa-connected-area').style.display = 'none';
-    document.getElementById('wa-shared-info').style.display = 'none';
+    if (el) el.innerHTML = '<span style="color:#ff4103;">✗ Desconectado</span>';
+    const discArea = document.getElementById('wa-disconnected-area');
+    if (discArea) discArea.style.display = 'block';
+    const connArea = document.getElementById('wa-connected-area');
+    if (connArea) connArea.style.display = 'none';
+    const shared = document.getElementById('wa-shared-info');
+    if (shared) shared.style.display = 'none';
     switchWaTab('pairing');
   }
 }
