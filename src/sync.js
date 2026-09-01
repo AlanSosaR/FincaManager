@@ -28,7 +28,7 @@ const BUSINESS_TABLES = new Set([
 ]);
 
 export async function supabaseFetch(path, options = {}) {
-  const apikey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkaHVpemtxbm1raGxqbWV6emtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTM2MTYsImV4cCI6MjA5MTIyOTYxNn0.W9bJ1S8A45RUGaulhdVG6UohGmGNxGMjLBsc0Q7voPE';
+  const apikey = SUPABASE_KEY;
   const session = getAccessToken();
   const headers = {
     'apikey': apikey,

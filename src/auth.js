@@ -1,5 +1,5 @@
-export const SUPABASE_URL = 'https://udhuizkqnmkhljmezzkd.supabase.co';
-export const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkaHVpemtxbm1raGxqbWV6emtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTM2MTYsImV4cCI6MjA5MTIyOTYxNn0.W9bJ1S8A45RUGaulhdVG6UohGmGNxGMjLBsc0Q7voPE';
+export const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://bguzluqyxbgtsgjcncvm.supabase.co';
+export const SUPABASE_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJndXpsdXF5eGJndHNnamNuY3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNDk5MTUsImV4cCI6MjEwMzgyNTkxNX0.FrNo3kzUBbqOzAXpK1MmjxR9GeOfi5PkO7qWyIsOpbM';
 
 async function authFetch(path, options = {}) {
   const session = getSession();
