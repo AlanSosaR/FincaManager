@@ -321,7 +321,7 @@ export async function checkAplicacionesDelMes() {
   const notified = getLoteNotifiedSet();
   try {
     const lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*`);
-    const aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
+    let aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
     if (!Array.isArray(aplicadas)) aplicadas = [];
 
     for (const lote of (Array.isArray(lotes) ? lotes : [])) {
@@ -467,7 +467,7 @@ export async function actualizarSaludPorPlan() {
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
   try {
     const lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*`);
-    const aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
+    let aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
     if (!Array.isArray(aplicadas)) aplicadas = [];
 
     for (const lote of (Array.isArray(lotes) ? lotes : [])) {

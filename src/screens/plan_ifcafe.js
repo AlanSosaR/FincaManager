@@ -798,22 +798,37 @@ function planStyles() {
 
     .plan-btn-add-inline {
       width: 100%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex-direction: row !important;
+      gap: 10px !important;
       background: linear-gradient(135deg, #2d3e2c 0%, #3d563b 100%);
-      color: #ffffff;
+      color: #ffffff !important;
       border: none;
       border-radius: 9999px;
-      padding: 14px 20px;
+      padding: 14px 24px;
       font-family: 'Work Sans', sans-serif;
-      font-size: 14px;
-      font-weight: 800;
+      font-size: 14.5px;
+      font-weight: 700;
       letter-spacing: 0.2px;
       cursor: pointer;
       box-shadow: 0 4px 14px rgba(45, 62, 44, 0.28);
       transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .plan-btn-add-inline > * {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      vertical-align: middle;
+      line-height: 1.2;
+    }
+    .plan-btn-add-inline .material-symbols-outlined,
+    .plan-btn-add-inline .material-icons {
+      font-size: 22px !important;
+      flex-shrink: 0;
     }
     .plan-btn-add-inline:hover {
       background: linear-gradient(135deg, #233122 0%, #324731 100%);

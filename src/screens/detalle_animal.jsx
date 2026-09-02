@@ -140,8 +140,10 @@ let weightChange = 0;
 let weightTrend = 'neutral';
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
+let selectedDayVaccines = new Date().getDate();
 let currentYearFumig = new Date().getFullYear();
 let currentMonthFumig = new Date().getMonth();
+let selectedDayFumig = new Date().getDate();
 let weightChart = null;
 
 // Pagination state
@@ -360,114 +362,142 @@ function renderFullContent(container, animalId, flag) {
     };
     container.innerHTML = `
 
-        <div class="da-hero">
-            <div class="da-hero-img-wrap">
-                <img src="${currentAnimal.image_url || 'https://images.unsplash.com/photo-1546445317-29f4545e9d53?q=80&w=800'}" alt="${currentAnimal.nombre}">
-            </div>
-            <div class="da-hero-info">
-                <div>
-                    <div class="da-hero-name-row">
-                        <h2 class="da-hero-title">${currentAnimal.nombre || 'Sin Nombre'}</h2>
-                        <div class="da-hero-subtitle">${currentAnimal.raza || 'Raza no especificada'}</div>
+        <div class="da-hero da-hero-revamped">
+            <div class="da-hero-top-header">
+                <div class="da-hero-title-row">
+                    <h2 class="da-hero-title">${currentAnimal.nombre || 'Sin Nombre'}</h2>
+                    <div class="da-combo-pill">
+                        ${currentAnimal.raza ? `<span class="da-combo-raza">${currentAnimal.raza}</span>` : ''}
+                        ${currentAnimal.raza && currentAnimal.sexo ? `<span class="da-combo-divider">•</span>` : ''}
+                        ${currentAnimal.sexo ? `
+                        <span class="da-combo-sex ${currentAnimal.sexo === 'Macho' ? 'blue' : 'pink'}">
+                            <span class="ganado-sex-icon-img"></span>
+                            <span>${currentAnimal.sexo}</span>
+                        </span>` : ''}
                     </div>
                 </div>
-                
-                <div class="da-badge-row">
-                    ${currentAnimal.potreros?.nombre ? `
-                    <div class="da-badge da-badge-surface">
-                        <span class="da-badge-chip green"><span class="material-icons">location_on</span></span>
-                        Potrero: ${currentAnimal.potreros.nombre}
-                    </div>` : ''}
+
+                <div class="da-header-subrow">
                     ${currentAnimal.origen !== 'Comprado'
                         ? (currentAnimal.fecha_adquisicion ? `
-                    <div class="da-badge da-badge-surface">
-                        <span class="da-badge-chip sky"><img src="/cria.png"></span>
-                        Nacimiento: ${fmtFechaEdad(currentAnimal.fecha_adquisicion)}
+                    <div class="da-header-birth-text">
+                        <img src="/cria.png" class="da-header-birth-icon">
+                        <span>Nacimiento: <strong>${fmtFechaEdad(currentAnimal.fecha_adquisicion)}</strong></span>
                     </div>` : '')
-                        : `
-                    <div class="da-badge da-badge-surface">
-                        <span class="da-badge-chip amber"><span class="material-icons">cake</span></span>
-                        Adquisición: ${currentAnimal.fecha_adquisicion ? fmtFechaEdad(currentAnimal.fecha_adquisicion) : 'N/A'}
-                    </div>`}
-                    <div class="da-badge da-badge-surface da-badge-sex">
-                        <span class="da-badge-chip ${currentAnimal.sexo === 'Macho' ? 'blue' : 'pink'}"><span class="ganado-sex-icon-img"></span></span>
-                        ${currentAnimal.sexo || 'Sexo N/A'}
-                    </div>
-                    ${currentAnimal.madre ? `
-                    <div class="da-badge da-badge-surface">
-                        <span class="da-badge-chip sky"><img src="/cria.png"></span>
-                        Hija/o de: ${currentAnimal.madre.nombre}
-                    </div>` : ''}
-                    ${reproBadge}
-                    ${currentAnimal.origen === 'Comprado' ? `
-                    <div class="da-badge da-badge-surface">
-                        <span class="da-badge-chip red"><span class="material-icons">shopping_cart</span></span>
-                        Comprado${currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
-                    </div>` : ''}
-                </div>
+                        : (currentAnimal.fecha_adquisicion ? `
+                    <div class="da-header-birth-text">
+                        <span class="material-icons da-header-birth-icon" style="font-size:16px;">cake</span>
+                        <span>Adquisición: <strong>${fmtFechaEdad(currentAnimal.fecha_adquisicion)}</strong></span>
+                    </div>` : '')}
 
-                <div class="da-stat-grid da-stat-grid-inline">
-                    <div class="da-stat-card da-stat-tab active" data-tab="vacunas" style="cursor:pointer;" title="Ver Vacunas y Salud">
-                        <div class="da-stat-icon">
-                            <span class="material-icons">vaccines</span>
-                        </div>
-                        <div>
-                            <div class="da-stat-label">Total Vacunas</div>
-                            <div class="da-stat-value">${vaccines.length}</div>
-                            <div class="da-stat-sub">Aplicadas con éxito</div>
-                        </div>
-                    </div>
-
-                    <div class="da-stat-card da-stat-tab" data-tab="pesajes" style="cursor:pointer;" title="Ver Historial de Pesajes">
-                        <div class="da-stat-icon da-stat-icon-secondary">
-                            <span class="material-icons">monitor_weight</span>
-                        </div>
-                        <div>
-                            <div class="da-stat-label">${weights.length <= 1 ? 'Peso Inicial' : 'Último Pesaje'}</div>
-                            <div class="da-stat-value" style="font-size:22px; font-weight:800;">${lastWeight} <small class="da-stat-value-md" style="font-size:11px; font-weight:600; color:#555;">${currentAnimal.peso_unidad || 'kg'}</small></div>
-                            <div class="da-stat-sub">
-                                <span class="da-variation-pill ${weightTrend}">
-                                    <span class="material-icons">${weightTrend === 'positive' ? 'trending_up' : (weightTrend === 'negative' ? 'trending_down' : 'trending_flat')}</span>
-                                    ${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} ${currentAnimal.peso_unidad || 'kg'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="da-stat-card da-stat-tab" data-tab="fumigacion" style="cursor:pointer;" title="Ver Fumigación y Químicos">
-                        <div class="da-stat-icon" style="background: #e1f5fe; color: #2c666e;">
-                            <span class="material-icons">bug_report</span>
-                        </div>
-                        <div>
-                            <div class="da-stat-label">Fumigaciones</div>
-                            <div class="da-stat-value"><span class="material-icons" style="font-size:13px; vertical-align:middle; color:#2c666e;">check_circle</span> ${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length}</div>
-                            <div class="da-stat-sub">
-                                ${(() => {
-                                    const aplicadas = fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length;
-                                    const pend = fumigaciones.filter(f => f.estado === 'Programada').length;
-                                    return pend > 0 ? `<span class="da-variation-pill pending">
-                                        <span class="material-icons">schedule</span> ${pend} programada${pend > 1 ? 's' : ''}
-                                    </span>` : `aplicada${aplicadas === 1 ? '' : 's'}`;
-                                })()}
-                            </div>
-                        </div>
-                    </div>
-
-                    ${currentAnimal.sexo === 'Hembra' ? `
-                    <div class="da-stat-card da-stat-tab" data-tab="repro" style="cursor:pointer;" title="Ver Reproducción">
-                        <div class="da-stat-icon" style="background: #fff4e0; color: #b26a00;">
-                            <img src="/cow.png" style="width:26px; height:26px; object-fit:contain;">
-                        </div>
-                        <div>
-                            <div class="da-stat-label">Reproducción</div>
-                            <div class="da-stat-value">${currentAnimal.reproductivo || 'Vacía'}</div>
-                            <div class="da-stat-sub">${activePreg ? `Parto: ${new Date(activePreg.fecha_probable_parto + 'T00:00:00').toLocaleDateString()}` : pregnancies.length + (pregnancies.length === 1 ? ' gestación registrada' : ' gestaciones registradas')}</div>
-                        </div>
+                    ${currentAnimal.potreros?.nombre || currentAnimal.madre || reproBadge || currentAnimal.origen === 'Comprado' ? `
+                    <div class="da-badge-row da-header-badges">
+                        ${currentAnimal.potreros?.nombre ? `
+                        <div class="da-badge da-badge-surface">
+                            <span class="da-badge-chip green"><span class="material-icons">location_on</span></span>
+                            Potrero: ${currentAnimal.potreros.nombre}
+                        </div>` : ''}
+                        ${currentAnimal.madre ? `
+                        <div class="da-badge da-badge-surface">
+                            <span class="da-badge-chip sky"><img src="/cria.png"></span>
+                            Hija/o de: ${currentAnimal.madre.nombre}
+                        </div>` : ''}
+                        ${reproBadge}
+                        ${currentAnimal.origen === 'Comprado' ? `
+                        <div class="da-badge da-badge-surface">
+                            <span class="da-badge-chip red"><span class="material-icons">shopping_cart</span></span>
+                            Comprado${currentAnimal.precio_compra ? ` ($${currentAnimal.precio_compra})` : ''}
+                        </div>` : ''}
                     </div>` : ''}
                 </div>
+            </div>
 
-                ${isSold ? `
-                <div class="m3-card-filled">
+            <div class="da-hero-body-grid">
+                <div class="da-hero-img-card">
+                    <img src="${currentAnimal.image_url || 'https://images.unsplash.com/photo-1546445317-29f4545e9d53?q=80&w=800'}" alt="${currentAnimal.nombre}">
+                    <span class="da-hero-status-pill ${isSold ? 'sold' : 'active'}">
+                        ● ${isSold ? 'Vendido' : 'Activo'}
+                    </span>
+                </div>
+
+                <div class="da-hero-details-col">
+                    <div class="da-stat-grid da-stat-grid-inline">
+                        <div class="da-stat-card da-stat-tab active" data-tab="vacunas" style="cursor:pointer;" title="Ver Vacunas y Salud">
+                            <div class="da-stat-icon">
+                                <span class="material-symbols-outlined">vaccines</span>
+                            </div>
+                            <div>
+                                <div class="da-stat-label">Total Vacunas</div>
+                                <div class="da-stat-value">${vaccines.filter(v => (v.estado || 'Aplicada') === 'Aplicada').length}</div>
+                                <div class="da-stat-sub">
+                                    ${(() => {
+                                        const pendVac = vaccines.filter(v => v.estado === 'Programada');
+                                        if (pendVac.length > 0) {
+                                            return `<span class="da-variation-pill pending" title="${pendVac.length} programada${pendVac.length > 1 ? 's' : ''}. Clic para ver" onclick="event.stopPropagation(); window.goToVaccineDate('${pendVac[0].fecha}')" style="cursor:pointer;">
+                                                <span class="material-icons" style="font-size:12px;">schedule</span> ${pendVac.length} prog.
+                                            </span>`;
+                                        }
+                                        return 'Aplicadas con éxito';
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="da-stat-card da-stat-tab" data-tab="pesajes" style="cursor:pointer;" title="Ver Historial de Pesajes">
+                            <div class="da-stat-icon da-stat-icon-secondary">
+                                <span class="material-symbols-outlined">scale</span>
+                            </div>
+                            <div>
+                                <div class="da-stat-label">${weights.length <= 1 ? 'Peso Inicial' : 'Último Pesaje'}</div>
+                                <div class="da-stat-value">${lastWeight} <small class="da-stat-value-md">${currentAnimal.peso_unidad || 'kg'}</small></div>
+                                <div class="da-stat-sub">
+                                    <span class="da-variation-pill ${weightTrend}">
+                                        <span class="material-icons">${weightTrend === 'positive' ? 'trending_up' : (weightTrend === 'negative' ? 'trending_down' : 'trending_flat')}</span>
+                                        ${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} ${currentAnimal.peso_unidad || 'kg'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="da-stat-card da-stat-tab" data-tab="fumigacion" style="cursor:pointer;" title="Ver Fumigación y Químicos">
+                            <div class="da-stat-icon" style="background: #e1f5fe; color: #2c666e;">
+                                <span class="material-symbols-outlined">shield</span>
+                            </div>
+                            <div>
+                                <div class="da-stat-label">Fumigaciones</div>
+                                <div class="da-stat-value"><span class="material-icons" style="font-size:13px; vertical-align:middle; color:#2c666e;">check_circle</span> ${fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length}</div>
+                                <div class="da-stat-sub">
+                                    ${(() => {
+                                        const aplicadas = fumigaciones.filter(f => (f.estado || 'Aplicada') === 'Aplicada').length;
+                                        const pendFum = fumigaciones.filter(f => f.estado === 'Programada');
+                                        const pend = pendFum.length;
+                                        if (pend > 0) {
+                                            const firstPendFecha = pendFum[0].fecha;
+                                            return `<span class="da-variation-pill pending" title="${pend} programada${pend > 1 ? 's' : ''}. Clic para ver" onclick="event.stopPropagation(); window.goToFumigDate('${firstPendFecha}')" style="cursor:pointer;">
+                                                <span class="material-icons" style="font-size:12px;">schedule</span> ${pend} prog.
+                                            </span>`;
+                                        }
+                                        return `aplicada${aplicadas === 1 ? '' : 's'}`;
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        ${currentAnimal.sexo === 'Hembra' ? `
+                        <div class="da-stat-card da-stat-tab" data-tab="repro" style="cursor:pointer;" title="Ver Reproducción">
+                            <div class="da-stat-icon" style="background: #fff4e0; color: #b26a00;">
+                                <img src="/cow.png" style="width:24px; height:24px; object-fit:contain;">
+                            </div>
+                            <div>
+                                <div class="da-stat-label">Reproducción</div>
+                                <div class="da-stat-value">${currentAnimal.reproductivo || 'Vacía'}</div>
+                                <div class="da-stat-sub">${activePreg ? `Parto: ${new Date(activePreg.fecha_probable_parto + 'T00:00:00').toLocaleDateString()}` : pregnancies.length + (pregnancies.length === 1 ? ' gestación' : ' gestaciones')}</div>
+                            </div>
+                        </div>` : ''}
+                    </div>
+
+                    ${isSold ? `
+                    <div class="m3-card-filled" style="margin-top:14px;">
                 <div class="da-sell-card sold">
                     <div class="da-sell-header">
                         <span class="material-icons">payments</span>
@@ -516,12 +546,13 @@ function renderFullContent(container, animalId, flag) {
                     </form>
                 </div>
                 </div>` : '')}
+                </div>
             </div>
-        </div>
 
-        <div class="da-tabs-section">
+            <div class="da-tabs-unified-divider"></div>
 
-            <div class="da-tab-content active" id="da-tab-vacunas">
+            <div class="da-tabs-content-area">
+                <div class="da-tab-content active" id="da-tab-vacunas">
                 <div class="da-calendar-layout">
                     <div class="da-calendar-card">
                         <div class="da-calendar-header">
@@ -547,16 +578,18 @@ function renderFullContent(container, animalId, flag) {
                             <div class="da-cal-days-container" id="calendar-days"></div>
                         </div>
                         <div class="da-cal-legend">
-                            <div class="da-cal-dot"></div>
-                            <span>Días con vacunación</span>
+                            <div><span class="plan-legend-dot" style="background:#2d3e2c;"></span><span>Aplicada</span></div>
+                            <div><span class="plan-legend-dot" style="background:#c9a227;"></span><span>Programada</span></div>
+                            <div><span class="plan-legend-dot" style="background:#FF4103;"></span><span>Atrasada</span></div>
                         </div>
                     </div>
 
                     <div id="da-day-details-panel">
                         <div class="da-day-details">
-                            <div style="text-align: center; color: #aaa; padding: 20px;">
-                                <span class="material-icons" style="font-size: 40px; margin-bottom: 8px;">touch_app</span>
-                                <p>Selecciona un día en el calendario para ver detalles</p>
+                            <div style="text-align:center; color:#888; padding:24px 16px;">
+                                <span class="material-icons" style="font-size:44px; color:#2d3e2c; opacity:0.6; margin-bottom:8px;">calendar_month</span>
+                                <p style="font-size:14px; font-weight:700; color:#333; margin:0 0 6px;">Toca cualquier día en el calendario</p>
+                                <p style="font-size:12px; color:#777; margin:0;">Para ver o registrar vacunas del animal</p>
                             </div>
                         </div>
                     </div>
@@ -612,16 +645,18 @@ function renderFullContent(container, animalId, flag) {
                             <div class="da-cal-days-container" id="calendar-days-fumig"></div>
                         </div>
                         <div class="da-cal-legend">
-                            <div class="da-cal-dot" style="background: #2c666e;"></div>
-                            <span>Días con fumigación</span>
+                            <div><span class="plan-legend-dot" style="background:#2d3e2c;"></span><span>Aplicada</span></div>
+                            <div><span class="plan-legend-dot" style="background:#c9a227;"></span><span>Programada</span></div>
+                            <div><span class="plan-legend-dot" style="background:#FF4103;"></span><span>Atrasada</span></div>
                         </div>
                     </div>
 
                     <div id="da-day-details-panel-fumig">
                         <div class="da-day-details">
-                            <div style="text-align: center; color: #aaa; padding: 20px;">
-                                <span class="material-icons" style="font-size: 40px; margin-bottom: 8px;">touch_app</span>
-                                <p>Selecciona un día en el calendario para ver detalles</p>
+                            <div style="text-align:center; color:#888; padding:24px 16px;">
+                                <span class="material-icons" style="font-size:44px; color:#2d3e2c; opacity:0.6; margin-bottom:8px;">calendar_month</span>
+                                <p style="font-size:14px; font-weight:700; color:#333; margin:0 0 6px;">Toca cualquier día en el calendario</p>
+                                <p style="font-size:12px; color:#777; margin:0;">Para ver o registrar fumigaciones y baños del animal</p>
                             </div>
                         </div>
                     </div>
@@ -660,6 +695,7 @@ function renderFullContent(container, animalId, flag) {
                     ${renderPregnanciesHtml()}
                 </div>
             </div>` : ''}
+            </div>
         </div>
     `;
  
@@ -1117,6 +1153,7 @@ function renderCalendar() {
 
     for (let day = 1; day <= lastDay; day++) {
         const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
+        const isSelected = day === selectedDayVaccines;
         const dayVaccines = monthVaccines.filter(v => {
             const [, , d] = v.fecha.split('-').map(Number);
             return d === day;
@@ -1124,8 +1161,20 @@ function renderCalendar() {
         const hasEvent = dayVaccines.length > 0;
         const hasPending = dayVaccines.some(v => v.estado === 'Programada');
         
+        let cls = 'da-cal-day';
+        if (isToday) cls += ' da-cal-today';
+        if (isSelected) cls += ' da-cal-selected-day';
+        if (hasEvent) {
+            cls += ' da-cal-has-event';
+            if (hasPending) {
+                cls += ' da-cal-has-pending da-cal-day-pending-highlight';
+            } else {
+                cls += ' da-cal-day-done';
+            }
+        }
+        
         const dayEl = document.createElement('div');
-        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''} ${hasPending ? 'da-cal-day-pending-highlight' : (hasEvent ? 'da-cal-day-highlight' : '')}`;
+        dayEl.className = cls;
         let dotsHtml = '';
         if (hasEvent) {
             if (hasPending) {
@@ -1133,10 +1182,25 @@ function renderCalendar() {
             } else {
                 dotsHtml = '<div class="da-cal-event-dot"></div>';
             }
+            if (dayVaccines.length > 1) {
+                dotsHtml += `<span class="plan-cal-count">${dayVaccines.length}</span>`;
+            }
         }
         dayEl.innerHTML = `<span>${day}</span>${dotsHtml}`;
-        dayEl.onclick = () => showDayDetails(day, dayVaccines);
+        dayEl.onclick = () => {
+            selectedDayVaccines = day;
+            renderCalendar();
+            showDayDetails(day, dayVaccines);
+        };
         daysContainer.appendChild(dayEl);
+    }
+
+    if (selectedDayVaccines && selectedDayVaccines <= lastDay) {
+        const currentDayVaccines = monthVaccines.filter(v => {
+            const [, , d] = v.fecha.split('-').map(Number);
+            return d === selectedDayVaccines;
+        });
+        showDayDetails(selectedDayVaccines, currentDayVaccines);
     }
     renderVaccinesTable(monthVaccines, 1);
 }
@@ -1144,102 +1208,144 @@ function renderCalendar() {
 function showDayDetails(day, dayEvents) {
     const panel = document.getElementById('da-day-details-panel');
     if (!panel) return;
-    const dateStr = `${day} de ${new Date(currentYear, currentMonth, 1).toLocaleDateString('es-ES', { month: 'long' })}, ${currentYear}`;
     
     const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const isFuture = formattedDate > getLocalToday();
+    const dateFormatted = new Date(currentYear, currentMonth, day).toLocaleDateString('es-ES', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
     
-    const addBtnHtml = currentAnimal?.estado === 'Vendido' ? '' : `
-        <div style="margin-top: 16px; text-align: center;">
-            <select class="da-mobile-tab-select" style="width: auto; min-width: 200px; padding: 10px 36px 10px 16px;" id="da-add-vaccine-specific-date">
-                <option value="">Vacuna...</option>
-                <option value="Programar">Programar Vacuna</option>
-                ${isFuture ? '' : '<option value="Registrar">Registrar Vacuna</option>'}
-            </select>
-        </div>
-    `;
+    const todayStr = getLocalToday();
+    const isPast = formattedDate < todayStr;
+    const isToday = formattedDate === todayStr;
+    const isSold = currentAnimal?.estado === 'Vendido';
 
-    if (dayEvents.length === 0) {
-        panel.innerHTML = `
-            <div class="da-day-details">
-                <h4>${dateStr}</h4>
-                <div style="text-align: center; color: #aaa; padding: 20px;">
-                    <p>No hay eventos registrados para este día.</p>
-                </div>
-                ${addBtnHtml}
-            </div>
-        `;
-    } else {
-        panel.innerHTML = `
-            <div class="da-day-details">
-                <h4>${dateStr}</h4>
-                ${dayEvents.map(v => {
-                    const currentEstado = v.estado || 'Aplicada';
-                    const isPastOrToday = v.fecha <= getLocalToday();
-                    let iconColor = '#6b8245';
-                    let iconName = 'vaccines';
-                    let subtitle = 'Vacunación aplicada';
-                    let actionsHtml = '';
+    let actionButtonHtml = '';
+    if (!isSold) {
+        if (isPast) {
+            actionButtonHtml = `
+                <button type="button" class="plan-btn-add-inline" onclick="window.triggerInlineVaccine('${formattedDate}', 'Registrar')" style="background:#eef7ee; border:1.5px solid #2d3e2c; color:#2d3e2c; margin-top:12px;">
+                    <span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; vertical-align:middle;">post_add</span>
+                    <span>Registrar Vacuna Realizada en esta fecha</span>
+                </button>
+            `;
+        } else if (isToday) {
+            actionButtonHtml = `
+                <button type="button" class="plan-btn-add-inline" onclick="window.triggerInlineVaccine('${formattedDate}', 'Registrar')" style="margin-top:12px;">
+                    <span class="material-symbols-outlined" style="font-size:20px; vertical-align:middle;">add_circle</span>
+                    <span>Registrar Vacuna Realizada Hoy</span>
+                </button>
+            `;
+        } else {
+            actionButtonHtml = `
+                <button type="button" class="plan-btn-add-inline" onclick="window.triggerInlineVaccine('${formattedDate}', 'Programar')" style="margin-top:12px;">
+                    <span class="material-symbols-outlined" style="font-size:20px; vertical-align:middle;">calendar_add_on</span>
+                    <span>Programar Vacuna Futura</span>
+                </button>
+            `;
+        }
+    }
 
-                    if (currentEstado === 'Programada' && currentAnimal?.estado !== 'Vendido') {
-                        iconColor = '#f57c00';
-                        iconName = 'schedule';
-                        subtitle = 'Vacunación programada';
-                        actionsHtml = `
-                            <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff; flex: 1;" onclick="window.confirmVaccine('${v.id}')">
-                                    <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
-                                </button>
-                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelVaccine('${v.id}')">
-                                    <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
-                                </button>
-                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e; flex: 1;" onclick="window.editVaccine('${v.id}')">
-                                    <span class="material-icons" style="font-size: 16px;">edit</span> Editar
-                                </button>
-                            </div>
-                        `;
-                    } else if (currentEstado === 'Cancelada') {
-                        iconColor = '#ff4103';
-                        iconName = 'cancel';
-                        subtitle = 'Vacunación cancelada';
-                    }
+    const cardsHtml = (dayEvents && dayEvents.length > 0)
+        ? dayEvents.map(v => {
+            const currentEstado = v.estado || 'Aplicada';
+            const isPastOrToday = v.fecha <= todayStr;
+            const isRealizada = currentEstado === 'Aplicada';
+            const isCancelada = currentEstado === 'Cancelada';
+            const isProgramada = currentEstado === 'Programada';
 
-                    return `
-                    <div class="da-detail-item" style="display: block;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span class="material-icons" style="color: ${iconColor}">${iconName}</span>
+            let badgeBg = '#2d3e2c';
+            let badgeText = 'Aplicada';
+            if (isProgramada) {
+                badgeBg = '#c9a227';
+                badgeText = 'Programada';
+            } else if (isCancelada) {
+                badgeBg = '#ff4103';
+                badgeText = 'Cancelada';
+            }
+
+            let actionsHtml = '';
+            if (isProgramada && !isSold) {
+                actionsHtml = `
+                    <div class="plan-ev-actions" style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                        <button class="plan-btn-primary" style="padding:6px 14px; font-size:12px;" onclick="window.confirmVaccine('${v.id}')">
+                            <span class="material-icons" style="font-size:16px;">check</span> Aplicar
+                        </button>
+                        <button class="plan-btn-ghost" style="padding:6px 14px; font-size:12px;" onclick="window.editVaccine('${v.id}')">
+                            <span class="material-icons" style="font-size:16px;">edit</span> Editar
+                        </button>
+                        <button class="plan-btn-danger" style="padding:6px 12px; font-size:12px;" onclick="window.cancelVaccine('${v.id}')" title="Cancelar">
+                            <span class="material-icons" style="font-size:16px;">close</span> Cancelar
+                        </button>
+                    </div>
+                `;
+            } else if (!isSold) {
+                actionsHtml = `
+                    <div class="plan-ev-actions" style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
+                        <button class="plan-btn-ghost" style="padding:4px 10px; font-size:11.5px;" onclick="window.editVaccine('${v.id}')">
+                            <span class="material-icons" style="font-size:15px;">edit</span> Editar
+                        </button>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="plan-ev" style="border:1.5px solid ${isRealizada ? '#c8e6c9' : isProgramada ? '#ffe9a8' : '#ffcdd2'}; margin-bottom:12px;">
+                    <div class="plan-ev-head" style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:20px;">💉</span>
                             <div>
-                                <div style="font-weight: 700;">${v.nombre}</div>
-                                <div style="font-size: 12px; color: #666;">
-                                    ${currentEstado === 'Programada' ? '<span class="da-variation-pill pending" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Programada</span>' : ''}
-                                    ${currentEstado === 'Cancelada' ? '<span class="da-variation-pill negative" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Cancelada</span>' : ''}
-                                    ${subtitle}
-                                </div>
+                                <p class="plan-ev-producto" style="font-size:15px; font-weight:800; margin:0; color:#1a1a1a;">${v.nombre}</p>
+                                <div style="font-size:11px; color:#666; margin-top:2px;">Vacunación en ganado</div>
                             </div>
                         </div>
-                        ${v.dosis ? `<div style="margin-top: 4px; font-size: 12px; color: #555;">Dosis: ${v.dosis}</div>` : ''}
-                        ${v.observaciones ? `<div style="margin-top: 4px; font-size: 12px; color: #555; font-style: italic;">Obs: ${v.observaciones}</div>` : ''}
-                        ${actionsHtml}
+                        <span class="plan-ev-badge" style="background:${badgeBg}; color:#fff; font-size:10.5px; font-weight:800; padding:4px 10px; border-radius:9999px; text-transform:uppercase;">${badgeText}</span>
                     </div>
-                    `;
-                }).join('')}
-                ${addBtnHtml}
+
+                    <div class="plan-ev-meta" style="font-size:12px; color:#555; margin:8px 0 0; display:flex; flex-direction:column; gap:3px;">
+                        ${v.dosis ? `<div><strong>Dosis:</strong> ${v.dosis}</div>` : ''}
+                        ${v.observaciones ? `<div class="plan-ev-purpose" style="margin-top:6px; color:#444; background:#f9faf9; padding:6px 10px; border-radius:8px; font-size:12px;">💬 <strong>Obs:</strong> ${v.observaciones}</div>` : ''}
+                    </div>
+
+                    ${actionsHtml}
+                </div>
+            `;
+        }).join('')
+        : `
+            <div style="text-align:center; color:#888; padding:24px 12px; background:#f9fbf9; border-radius:14px; border:1px dashed #d0ded0; margin-bottom:14px;">
+                <span class="material-icons" style="font-size:36px; color:#2d3e2c; opacity:0.6; margin-bottom:6px;">event_available</span>
+                <p style="font-size:13.5px; font-weight:700; color:#444; margin:0;">Sin actividades ${isPast ? 'registradas' : 'programadas'}</p>
+                <p style="font-size:11.5px; color:#777; margin:4px 0 0;">${isPast ? 'Fecha pasada' : 'Usa el botón de abajo para agregar una vacuna'}</p>
             </div>
         `;
-    }
 
+    panel.innerHTML = `
+        <div class="da-day-details">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; border-bottom:1.5px solid #eef2ee; padding-bottom:10px;">
+                <div>
+                    <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">Actividades del día</span>
+                    <h4 style="margin:2px 0 0; font-size:16px; font-weight:800; color:#1a1a1a; text-transform:capitalize;">${dateFormatted}</h4>
+                </div>
+            </div>
 
-    const sel = document.getElementById('da-add-vaccine-specific-date');
-    if (sel) {
-        sel.onchange = () => {
-            const tipo = sel.value;
-            if (tipo && currentAnimal && currentAnimal.id) {
-                showInlineVaccineForm(currentAnimal.id, formattedDate, dayEvents, tipo);
-                sel.value = '';
-            }
-        };
-    }
+            <div style="margin-bottom:12px;">
+                ${cardsHtml}
+            </div>
+
+            ${actionButtonHtml}
+        </div>
+    `;
 }
+
+window.triggerInlineVaccine = (formattedDate, tipo) => {
+    if (currentAnimal && currentAnimal.id) {
+        const parts = formattedDate.split('-').map(Number);
+        const dayVaccines = vaccines.filter(v => {
+            const [y, m, d] = v.fecha.split('-').map(Number);
+            return y === parts[0] && (m - 1) === (parts[1] - 1) && d === parts[2];
+        });
+        showInlineVaccineForm(currentAnimal.id, formattedDate, dayVaccines, tipo);
+    }
+};
 
 function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo = 'Programar') {
     const panel = document.getElementById('da-day-details-panel');
@@ -1810,6 +1916,7 @@ function renderCalendarFumig() {
 
     for (let day = 1; day <= lastDay; day++) {
         const isToday = day === new Date().getDate() && currentMonthFumig === new Date().getMonth() && currentYearFumig === new Date().getFullYear();
+        const isSelected = day === selectedDayFumig;
         const dayFumigaciones = monthFumigaciones.filter(f => {
             const [, , d] = f.fecha.split('-').map(Number);
             return d === day;
@@ -1817,8 +1924,20 @@ function renderCalendarFumig() {
         const hasEvent = dayFumigaciones.length > 0;
         const hasPending = dayFumigaciones.some(f => f.estado === 'Programada');
         
+        let cls = 'da-cal-day';
+        if (isToday) cls += ' da-cal-today';
+        if (isSelected) cls += ' da-cal-selected-day';
+        if (hasEvent) {
+            cls += ' da-cal-has-event';
+            if (hasPending) {
+                cls += ' da-cal-has-pending da-cal-day-pending-highlight';
+            } else {
+                cls += ' da-cal-day-done';
+            }
+        }
+        
         const dayEl = document.createElement('div');
-        dayEl.className = `da-cal-day ${isToday ? 'da-cal-today' : ''} ${hasEvent ? 'da-cal-has-event' : ''} ${hasPending ? 'da-cal-has-pending' : ''} ${hasPending ? 'da-cal-day-pending-highlight' : (hasEvent ? 'da-cal-day-highlight' : '')}`;
+        dayEl.className = cls;
         let dotsHtml = '';
         if (hasEvent) {
             if (hasPending) {
@@ -1826,10 +1945,25 @@ function renderCalendarFumig() {
             } else {
                 dotsHtml = '<div class="da-cal-event-dot" style="background: #2c666e;"></div>';
             }
+            if (dayFumigaciones.length > 1) {
+                dotsHtml += `<span class="plan-cal-count">${dayFumigaciones.length}</span>`;
+            }
         }
         dayEl.innerHTML = `<span>${day}</span>${dotsHtml}`;
-        dayEl.onclick = () => showDayDetailsFumig(day, dayFumigaciones);
+        dayEl.onclick = () => {
+            selectedDayFumig = day;
+            renderCalendarFumig();
+            showDayDetailsFumig(day, dayFumigaciones);
+        };
         daysContainer.appendChild(dayEl);
+    }
+
+    if (selectedDayFumig && selectedDayFumig <= lastDay) {
+        const currentDayFumig = monthFumigaciones.filter(f => {
+            const [, , d] = f.fecha.split('-').map(Number);
+            return d === selectedDayFumig;
+        });
+        showDayDetailsFumig(selectedDayFumig, currentDayFumig);
     }
     renderFumigacionesTable(monthFumigaciones, 1);
 }
@@ -1837,103 +1971,196 @@ function renderCalendarFumig() {
 function showDayDetailsFumig(day, dayEvents) {
     const panel = document.getElementById('da-day-details-panel-fumig');
     if (!panel) return;
-    const dateStr = `${day} de ${new Date(currentYearFumig, currentMonthFumig, 1).toLocaleDateString('es-ES', { month: 'long' })}, ${currentYearFumig}`;
     
     const formattedDate = `${currentYearFumig}-${String(currentMonthFumig + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const isFuture = formattedDate > getLocalToday();
+    const dateFormatted = new Date(currentYearFumig, currentMonthFumig, day).toLocaleDateString('es-ES', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
     
-    const addBtnHtml = currentAnimal?.estado === 'Vendido' ? '' : `
-        <div style="margin-top: 16px; text-align: center;">
-            <select class="da-mobile-tab-select" style="width: auto; min-width: 200px; padding: 10px 36px 10px 16px;" id="da-add-fumigacion-specific-date">
-                <option value="">Aplicación...</option>
-                <option value="Programar">Programar Aplicación</option>
-                ${isFuture ? '' : '<option value="Registrar">Registrar Aplicación</option>'}
-            </select>
-        </div>
-    `;
+    const todayStr = getLocalToday();
+    const isPast = formattedDate < todayStr;
+    const isToday = formattedDate === todayStr;
+    const isSold = currentAnimal?.estado === 'Vendido';
 
-    if (dayEvents.length === 0) {
-        panel.innerHTML = `
-            <div class="da-day-details">
-                <h4>${dateStr}</h4>
-                <div style="text-align: center; color: #aaa; padding: 20px;">
-                    <p>No hay eventos registrados para este día.</p>
-                </div>
-                ${addBtnHtml}
-            </div>
-        `;
-    } else {
-        panel.innerHTML = `
-            <div class="da-day-details">
-                <h4>${dateStr}</h4>
-                ${dayEvents.map(f => {
-                    const currentEstado = f.estado || 'Aplicada';
-                    const isPastOrToday = f.fecha <= getLocalToday();
-                    let iconColor = '#2c666e';
-                    let iconName = 'bug_report';
-                    let subtitle = 'Fumigación aplicada';
-                    let actionsHtml = '';
+    let actionButtonHtml = '';
+    if (!isSold) {
+        if (isPast) {
+            actionButtonHtml = `
+                <button type="button" class="plan-btn-add-inline" onclick="window.triggerInlineFumig('${formattedDate}', 'Registrar')" style="background:#eef7ee; border:1.5px solid #2d3e2c; color:#2d3e2c; margin-top:12px;">
+                    <span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; vertical-align:middle;">post_add</span>
+                    <span>Registrar Fumigación en esta fecha</span>
+                </button>
+            `;
+        } else if (isToday) {
+            actionButtonHtml = `
+                <button type="button" class="plan-btn-add-inline" onclick="window.triggerInlineFumig('${formattedDate}', 'Registrar')" style="margin-top:12px;">
+                    <span class="material-symbols-outlined" style="font-size:20px; vertical-align:middle;">add_circle</span>
+                    <span>Registrar Fumigación Hoy</span>
+                </button>
+            `;
+        } else {
+            actionButtonHtml = `
+                <button type="button" class="plan-btn-add-inline" onclick="window.triggerInlineFumig('${formattedDate}', 'Programar')" style="margin-top:12px;">
+                    <span class="material-symbols-outlined" style="font-size:20px; vertical-align:middle;">calendar_add_on</span>
+                    <span>Programar Fumigación Futura</span>
+                </button>
+            `;
+        }
+    }
 
-                    if (currentEstado === 'Programada' && currentAnimal?.estado !== 'Vendido') {
-                        iconColor = '#f57c00';
-                        iconName = 'schedule';
-                        subtitle = 'Fumigación programada';
-                        const applyRowF = isPastOrToday ? `
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #2d3e2c; color: #ffffff; flex: 1;" onclick="window.confirmFumigacion('${f.id}')">
-                                <span class="material-icons" style="font-size: 16px;">check</span> Aplicar
-                            </button>
-                            <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #ffe2db; color: #ff4103; flex: 1;" onclick="window.cancelFumigacion('${f.id}')">
-                                <span class="material-icons" style="font-size: 16px;">close</span> Cancelar
-                            </button>` : '';
-                        actionsHtml = `
-                            <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-                                ${applyRowF}
-                                <button class="btn-m3-tonal" style="padding: 4px 12px; font-size: 12px; height: auto; background: #b9f2fb; color: #2c666e; flex: 1;" onclick="window.editFumigacion('${f.id}')">
-                                    <span class="material-icons" style="font-size: 16px;">edit</span> Editar
-                                </button>
-                            </div>
-                        `;
-                    } else if (currentEstado === 'Cancelada') {
-                        iconColor = '#ff4103';
-                        iconName = 'cancel';
-                        subtitle = 'Fumigación cancelada';
-                    }
+    const cardsHtml = (dayEvents && dayEvents.length > 0)
+        ? dayEvents.map(f => {
+            const currentEstado = f.estado || 'Aplicada';
+            const isPastOrToday = f.fecha <= todayStr;
+            const isRealizada = currentEstado === 'Aplicada';
+            const isCancelada = currentEstado === 'Cancelada';
+            const isProgramada = currentEstado === 'Programada';
 
-                    return `
-                    <div class="da-detail-item" style="display: block;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span class="material-icons" style="color: ${iconColor}">${iconName}</span>
+            let badgeBg = '#2d3e2c';
+            let badgeText = 'Aplicada';
+            if (isProgramada) {
+                badgeBg = '#c9a227';
+                badgeText = 'Programada';
+            } else if (isCancelada) {
+                badgeBg = '#ff4103';
+                badgeText = 'Cancelada';
+            }
+
+            let actionsHtml = '';
+            if (isProgramada && !isSold) {
+                const applyRowF = isPastOrToday ? `
+                    <button class="plan-btn-primary" style="padding:6px 14px; font-size:12px;" onclick="window.confirmFumigacion('${f.id}')">
+                        <span class="material-icons" style="font-size:16px;">check</span> Aplicar
+                    </button>
+                    <button class="plan-btn-danger" style="padding:6px 12px; font-size:12px;" onclick="window.cancelFumigacion('${f.id}')" title="Cancelar">
+                        <span class="material-icons" style="font-size:16px;">close</span> Cancelar
+                    </button>` : '';
+                actionsHtml = `
+                    <div class="plan-ev-actions" style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                        ${applyRowF}
+                        <button class="plan-btn-ghost" style="padding:6px 14px; font-size:12px;" onclick="window.editFumigacion('${f.id}')">
+                            <span class="material-icons" style="font-size:16px;">edit</span> Editar
+                        </button>
+                    </div>
+                `;
+            } else if (!isSold) {
+                actionsHtml = `
+                    <div class="plan-ev-actions" style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
+                        <button class="plan-btn-ghost" style="padding:4px 10px; font-size:11.5px;" onclick="window.editFumigacion('${f.id}')">
+                            <span class="material-icons" style="font-size:15px;">edit</span> Editar
+                        </button>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="plan-ev" style="border:1.5px solid ${isRealizada ? '#c8e6c9' : isProgramada ? '#ffe9a8' : '#ffcdd2'}; margin-bottom:12px;">
+                    <div class="plan-ev-head" style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:20px;">🛡️</span>
                             <div>
-                                <div style="font-weight: 700;">${f.producto}</div>
-                                <div style="font-size: 12px; color: #666;">
-                                    ${currentEstado === 'Programada' ? '<span class="da-variation-pill pending" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Programada</span>' : ''}
-                                    ${currentEstado === 'Cancelada' ? '<span class="da-variation-pill negative" style="padding: 2px 6px; font-size: 10px; margin-right: 6px;">Cancelada</span>' : ''}
-                                    ${subtitle}
-                                </div>
+                                <p class="plan-ev-producto" style="font-size:15px; font-weight:800; margin:0; color:#1a1a1a;">${f.producto}</p>
+                                <div style="font-size:11px; color:#666; margin-top:2px;">Fumigación / Tratamiento</div>
                             </div>
                         </div>
-                        ${f.dosis ? `<div style="margin-top: 4px; font-size: 12px; color: #555;">Dosis: ${f.dosis}</div>` : ''}
-                        ${f.observaciones ? `<div style="margin-top: 4px; font-size: 12px; color: #555; font-style: italic;">Obs: ${f.observaciones}</div>` : ''}
-                        ${actionsHtml}
+                        <span class="plan-ev-badge" style="background:${badgeBg}; color:#fff; font-size:10.5px; font-weight:800; padding:4px 10px; border-radius:9999px; text-transform:uppercase;">${badgeText}</span>
                     </div>
-                    `;
-                }).join('')}
-                ${addBtnHtml}
+
+                    <div class="plan-ev-meta" style="font-size:12px; color:#555; margin:8px 0 0; display:flex; flex-direction:column; gap:3px;">
+                        ${f.dosis ? `<div><strong>Dosis:</strong> ${f.dosis}</div>` : ''}
+                        ${f.observaciones ? `<div class="plan-ev-purpose" style="margin-top:6px; color:#444; background:#f9faf9; padding:6px 10px; border-radius:8px; font-size:12px;">💬 <strong>Obs:</strong> ${f.observaciones}</div>` : ''}
+                    </div>
+
+                    ${actionsHtml}
+                </div>
+            `;
+        }).join('')
+        : `
+            <div style="text-align:center; color:#888; padding:24px 12px; background:#f9fbf9; border-radius:14px; border:1px dashed #d0ded0; margin-bottom:14px;">
+                <span class="material-icons" style="font-size:36px; color:#2d3e2c; opacity:0.6; margin-bottom:6px;">event_available</span>
+                <p style="font-size:13.5px; font-weight:700; color:#444; margin:0;">Sin actividades ${isPast ? 'registradas' : 'programadas'}</p>
+                <p style="font-size:11.5px; color:#777; margin:4px 0 0;">${isPast ? 'Fecha pasada' : 'Usa el botón de abajo para agregar una fumigación'}</p>
             </div>
         `;
+
+    panel.innerHTML = `
+        <div class="da-day-details">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; border-bottom:1.5px solid #eef2ee; padding-bottom:10px;">
+                <div>
+                    <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">Actividades del día</span>
+                    <h4 style="margin:2px 0 0; font-size:16px; font-weight:800; color:#1a1a1a; text-transform:capitalize;">${dateFormatted}</h4>
+                </div>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                ${cardsHtml}
+            </div>
+
+            ${actionButtonHtml}
+        </div>
+    `;
+}
+
+window.triggerInlineFumig = (formattedDate, tipo) => {
+    if (currentAnimal && currentAnimal.id) {
+        const parts = formattedDate.split('-').map(Number);
+        const dayFumig = fumigaciones.filter(f => {
+            const [y, m, d] = f.fecha.split('-').map(Number);
+            return y === parts[0] && (m - 1) === (parts[1] - 1) && d === parts[2];
+        });
+        showInlineFumigForm(currentAnimal.id, formattedDate, dayFumig, tipo);
+    }
+};
+
+window.goToVaccineDate = (dateStr) => {
+    if (!dateStr) return;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    currentYear = y;
+    currentMonth = m - 1;
+    selectedDayVaccines = d;
+    
+    // Switch tab to vacunas
+    const container = document.getElementById('da-container');
+    if (container) {
+        const contents = container.querySelectorAll('.da-tab-content');
+        const statCards = container.querySelectorAll('.da-stat-tab');
+        contents.forEach(c => c.classList.remove('active'));
+        statCards.forEach(c => c.classList.remove('active'));
+        const card = Array.from(statCards).find(c => c.getAttribute('data-tab') === 'vacunas');
+        if (card) card.classList.add('active');
+        const panel = document.getElementById('da-tab-vacunas');
+        if (panel) panel.classList.add('active');
     }
 
-    const sel = document.getElementById('da-add-fumigacion-specific-date');
-    if (sel) {
-        sel.onchange = () => {
-            const tipo = sel.value;
-            if (tipo && currentAnimal && currentAnimal.id) {
-                showInlineFumigForm(currentAnimal.id, formattedDate, dayEvents, tipo);
-                sel.value = '';
-            }
-        };
+    renderCalendar();
+    const dayVacc = vaccines.filter(v => v.fecha === dateStr);
+    showDayDetails(d, dayVacc);
+};
+
+window.goToFumigDate = (dateStr) => {
+    if (!dateStr) return;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    currentYearFumig = y;
+    currentMonthFumig = m - 1;
+    selectedDayFumig = d;
+    
+    // Switch tab to fumigacion
+    const container = document.getElementById('da-container');
+    if (container) {
+        const contents = container.querySelectorAll('.da-tab-content');
+        const statCards = container.querySelectorAll('.da-stat-tab');
+        contents.forEach(c => c.classList.remove('active'));
+        statCards.forEach(c => c.classList.remove('active'));
+        const card = Array.from(statCards).find(c => c.getAttribute('data-tab') === 'fumigacion');
+        if (card) card.classList.add('active');
+        const panel = document.getElementById('da-tab-fumigacion');
+        if (panel) panel.classList.add('active');
     }
-}
+
+    renderCalendarFumig();
+    const dayFumig = fumigaciones.filter(f => f.fecha === dateStr);
+    showDayDetailsFumig(d, dayFumig);
+};
 
 function initChart() {
     const ctx = document.getElementById('weightChart');
