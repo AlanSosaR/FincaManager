@@ -75,6 +75,18 @@ export async function renderGanado(page = 1, filter = 'all') {
   } else if (currentFilter === 'fumigaciones') {
     const { data } = await supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada');
     activeFilterIds = (data || []).map(f => f.animal_id);
+  } else if (currentFilter === 'pendientes') {
+    const [vRes, pRes, fRes] = await Promise.all([
+      supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada'),
+      supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada'),
+      supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada')
+    ]);
+    const allIds = new Set([
+      ...(vRes.data || []).map(x => x.animal_id),
+      ...(pRes.data || []).map(x => x.animal_id),
+      ...(fRes.data || []).map(x => x.animal_id)
+    ]);
+    activeFilterIds = Array.from(allIds);
   }
 
   // Build the main query based on filter
@@ -86,7 +98,7 @@ export async function renderGanado(page = 1, filter = 'all') {
     query = query.ilike('sexo', 'hembra');
   } else if (currentFilter === 'macho') {
     query = query.ilike('sexo', 'macho');
-  } else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones') {
+  } else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones' || currentFilter === 'pendientes') {
     query = query.in('id', activeFilterIds.length ? activeFilterIds : ['00000000-0000-0000-0000-000000000000']);
   } else if (currentFilter === 'preñadas') {
     query = query.eq('reproductivo', 'Preñada');
@@ -125,6 +137,7 @@ export async function renderGanado(page = 1, filter = 'all') {
   // Stats for cards
   const hembrasRatio = totalAnimales ? Math.round((hembrasCount / totalAnimales) * 100) : 0;
   const machosRatio  = totalAnimales ? Math.round((machosCount  / totalAnimales) * 100) : 0;
+  const totalPendientesCount = (vacunasCount || 0) + (pesajesCount || 0) + (fumigPendGroupCount || 0);
 
   return `
     <div class="screen-ganado" style="padding-bottom: 80px;">
@@ -182,98 +195,141 @@ export async function renderGanado(page = 1, filter = 'all') {
               </div>
             </div>
           </div>
-
-          <div class="ganado-tag-stat ganado-fumig-mob ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''}" id="ganado-fumig-card" data-filter="fumigaciones" title="Abrir panel de fumigación" style="background: #fdfdfd; border-radius: 16px; padding: 15px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-top: 14px; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 14px;">
-              <span class="ganado-tag-swatch f" style="background: rgba(45,62,44,0.08); border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="color: #2d3e2c; font-size: 24px;">bug_report</span></span>
-              <span class="ganado-tag-info" style="display: flex; flex-direction: column;">
-                <span class="ganado-tag-n fumig-veces-value" style="font-size: 15.5px; font-weight: 800; color: #2d3e2c;">${vecesFumigadas}</span>
-                <span class="ganado-tag-l" style="font-size: 11.5px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.3px;">Fumigación aplicada</span>
-                <span class="ganado-fumig-chip fumig-pend-chip" style="margin-top: 4px;"><span class="material-icons" style="font-size:13px;">schedule</span> ${fumigPendGroupCount} pendientes</span>
-              </span>
-            </div>
-            <span class="material-icons ganado-tag-expand" style="color: #666; font-size: 24px;">expand_more</span>
-          </div>
-
-          ${vacunasCount > 0 ? `
-          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'vacunas' ? 'active' : ''}" data-filter="vacunas" style="border-left: 4px solid #f57c00;">
-            <div class="ganado-card-header">
-              <span class="material-icons" style="font-size:28px; color: #f57c00;">vaccines</span>
-              <span class="ganado-card-label" style="color: #f57c00;">Vacunas Pdtes.</span>
-            </div>
-            <div class="ganado-card-body"><h3 class="ganado-card-value">${vacunasCount}</h3></div>
-          </div>
-          ` : ''}
-
-          ${pesajesCount > 0 ? `
-          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'pesajes' ? 'active' : ''}" data-filter="pesajes" style="border-left: 4px solid #e65100;">
-            <div class="ganado-card-header">
-              <span class="material-icons" style="font-size:28px; color: #e65100;">monitor_weight</span>
-              <span class="ganado-card-label" style="color: #e65100;">Pesajes Pdtes.</span>
-            </div>
-            <div class="ganado-card-body"><h3 class="ganado-card-value">${pesajesCount}</h3></div>
-          </div>
-          ` : ''}
-
-          ${preñadasCount > 0 ? `
-          <div class="ganado-card ganado-card-surface ganado-card-filter ${currentFilter === 'preñadas' ? 'active' : ''}" data-filter="preñadas" style="border-left: 4px solid #b26a00;">
-            <div class="ganado-card-header">
-              <img src="/cow.png" alt="Preñadas" style="width:26px; height:26px; object-fit:contain;">
-              <span class="ganado-card-label" style="color: #b26a00;">Preñadas</span>
-            </div>
-            <div class="ganado-card-body"><h3 class="ganado-card-value">${preñadasCount}</h3></div>
-          </div>
-          ` : ''}
         </section>
 
-        <div class="ganado-fumig-panel" id="ganado-fumig-panel" style="display: none; margin-top: 20px;">
-          <div style="background: var(--surface-container-low, #fff); border-radius: 16px; padding: 20px; border: 1px solid rgba(44,102,110,0.25); box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
-            <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-              <span class="material-icons" style="font-size:22px; color:#2c666e;">bug_report</span>
-              <h4 style="margin:0; color:var(--on-surface,#222); font-size:17px; flex:1;">Fumigación masiva</h4>
-              <button type="button" id="ganado-fumig-close" class="m3-icon-btn" title="Cerrar" style="background:none; border:none; cursor:pointer; color:#666; display:flex; align-items:center; justify-content:center; padding:4px;">
-                <span class="material-icons" style="font-size:22px;">close</span>
-              </button>
-            </div>
-            <p style="margin:0 0 16px; font-size:13px; color:#666; line-height:1.5;">
-              Aplica la fumigación a <strong id="ganado-fumig-target-count">${totalAnimales}</strong> animales activos con la misma fecha.
-            </p>
-            <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
-              <div class="m3-field" style="min-width:180px; flex:1 1 200px;">
-                <input type="date" id="ganado-fumig-fecha" value="${getLocalToday()}" placeholder=" " required>
-                <label>Fecha</label>
+        <!-- Carrusel de tarjetas de estado (Estilo Detalle Animal) -->
+        <div class="ganado-carousel-container">
+          <div class="ganado-carousel-track" id="ganado-carousel-track">
+            
+            <!-- 1. Fumigación -->
+            <div class="ganado-carousel-card ganado-card-filter ${currentFilter === 'fumigaciones' ? 'active' : ''} ${fumigPendGroupCount > 0 ? 'is-pending' : ''}" id="ganado-fumig-card" data-filter="fumigaciones" title="Fumigación aplicada (clic para panel masivo)">
+              <div class="ganado-carousel-icon">
+                <span class="material-symbols-outlined" style="color: #185FA5;">shield</span>
               </div>
-              <div class="m3-field" style="flex:1 1 220px;">
-                <input type="text" id="ganado-fumig-producto" placeholder=" " required>
-                <label>Producto</label>
+              <div class="ganado-carousel-label">Fumig.</div>
+              <div class="ganado-carousel-value">${vecesFumigadas}</div>
+              ${fumigPendGroupCount > 0 ? `<div class="ganado-carousel-badge amber"><span class="material-icons" style="font-size:10px;">schedule</span>${fumigPendGroupCount} pdt.</div>` : '<div class="ganado-carousel-badge neutral">Al día</div>'}
+            </div>
+
+            <!-- 2. Vacunas -->
+            <div class="ganado-carousel-card ganado-card-filter ${currentFilter === 'vacunas' ? 'active' : ''} ${vacunasCount > 0 ? 'is-pending' : ''}" data-filter="vacunas" title="Vacunas pendientes">
+              <div class="ganado-carousel-icon">
+                <span class="material-symbols-outlined" style="color: #3B6D11;">vaccines</span>
+              </div>
+              <div class="ganado-carousel-label">Vacunas</div>
+              <div class="ganado-carousel-value">${vacunasCount}</div>
+              ${vacunasCount > 0 ? `<div class="ganado-carousel-badge amber"><span class="material-icons" style="font-size:10px;">schedule</span>${vacunasCount} pdt.</div>` : '<div class="ganado-carousel-badge neutral">Al día</div>'}
+            </div>
+
+            <!-- 3. Pendientes (Total) -->
+            ${totalPendientesCount > 0 ? `
+            <div class="ganado-carousel-card ganado-card-filter is-pending ${currentFilter === 'pendientes' ? 'active' : ''}" data-filter="pendientes" title="Tareas pendientes totales">
+              <div class="ganado-carousel-icon">
+                <span class="material-symbols-outlined" style="color: #854F0B;">schedule</span>
+              </div>
+              <div class="ganado-carousel-label" style="color: #854F0B;">Pendiente</div>
+              <div class="ganado-carousel-value" style="color: #854F0B;">${totalPendientesCount}</div>
+              <div class="ganado-carousel-badge amber" style="background:#ffd8a8; color:#7c3a00;">Total</div>
+            </div>` : ''}
+
+            <!-- 4. Pesajes -->
+            <div class="ganado-carousel-card ganado-card-filter ${currentFilter === 'pesajes' ? 'active' : ''} ${pesajesCount > 0 ? 'is-pending' : ''}" data-filter="pesajes" title="Pesajes pendientes">
+              <div class="ganado-carousel-icon">
+                <span class="material-symbols-outlined" style="color: #2d3e2c;">scale</span>
+              </div>
+              <div class="ganado-carousel-label">Pesajes</div>
+              <div class="ganado-carousel-value">${pesajesCount}</div>
+              ${pesajesCount > 0 ? `<div class="ganado-carousel-badge amber"><span class="material-icons" style="font-size:10px;">schedule</span>${pesajesCount} pdt.</div>` : '<div class="ganado-carousel-badge neutral">Al día</div>'}
+            </div>
+
+            <!-- 5. Preñadas -->
+            <div class="ganado-carousel-card ganado-card-filter ${currentFilter === 'preñadas' ? 'active' : ''}" data-filter="preñadas" title="Hembras preñadas">
+              <div class="ganado-carousel-icon">
+                <img src="/cow.png" style="width: 22px; height: 22px; object-fit: contain;">
+              </div>
+              <div class="ganado-carousel-label">Preñadas</div>
+              <div class="ganado-carousel-value">${preñadasCount}</div>
+              ${preñadasCount > 0 ? `<div class="ganado-carousel-badge green">Gestando</div>` : '<div class="ganado-carousel-badge neutral">0</div>'}
+            </div>
+
+            <!-- 6. Vendidos -->
+            <div class="ganado-carousel-card ganado-card-filter ${currentFilter === 'vendido' ? 'active' : ''}" data-filter="vendido" title="Animales vendidos">
+              <div class="ganado-carousel-icon">
+                <span class="material-symbols-outlined" style="color: #555;">payments</span>
+              </div>
+              <div class="ganado-carousel-label">Vendidos</div>
+              <div class="ganado-carousel-value">${vendidosCount}</div>
+              <div class="ganado-carousel-badge neutral">Historial</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Contenedor Fumigación masiva con banner colapsable -->
+        <div id="ganado-fumig-wrapper" style="display: ${currentFilter === 'fumigaciones' ? 'block' : 'none'}; margin-top: 16px;">
+          <div class="ganado-fumig-banner" style="background: #ffffff; border: 1.5px solid rgba(44,102,110,0.22); border-radius: 16px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.04); flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="material-icons" style="font-size: 24px; color: #2c666e;">bug_report</span>
+              <div>
+                <span style="font-size: 14.5px; font-weight: 700; color: #191c19;">Fumigación masiva</span>
+                <span style="display: block; font-size: 12px; color: #666;">Aplicación grupal a ${totalAnimales} animales e historial</span>
               </div>
             </div>
-            <div style="display:flex; gap:10px; margin-top:18px; justify-content:flex-end;">
-              <button type="button" class="btn-m3-tonal" id="ganado-fumig-cancel">Cancelar</button>
-              <button type="button" class="btn-m3-fill" id="ganado-fumig-apply" style="background:#2c666e; color:#fff;"><span id="ganado-fumig-apply-label">Aplicar</span></button>
-            </div>
+            <button type="button" id="ganado-fumig-toggle-btn" class="btn-m3-tonal" style="margin: 0; padding: 8px 16px; font-size: 13px; font-weight: 700; border-radius: 999px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #2c666e; background: #e0f2f1; border: none;">
+              <span id="ganado-fumig-toggle-icon" class="material-icons" style="font-size: 18px;">visibility</span>
+              <span id="ganado-fumig-toggle-text">Ver</span>
+            </button>
           </div>
 
-          <div style="margin-top:20px;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-              <span class="material-icons" style="font-size:18px; color:#2c666e;">list_alt</span>
-              <h4 style="margin:0; color:var(--on-surface,#222); font-size:15px; flex:1;">Registros de fumigación</h4>
-              <button type="button" id="ganado-fumig-apply-all" title="Aplicar todas las programadas" style="display:none; background:#2c666e; color:#fff; border:none; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; align-items:center; gap:4px;">
-                <span class="material-icons" style="font-size:15px;">check_circle</span> Aplicar todas
-              </button>
-              <button type="button" id="ganado-fumig-refresh" class="m3-icon-btn" title="Actualizar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; justify-content:center; padding:4px;">
-                <span class="material-icons" style="font-size:20px;">refresh</span>
-              </button>
+          <div class="ganado-fumig-panel" id="ganado-fumig-panel" style="display: none; margin-top: 12px;">
+            <div style="background: var(--surface-container-low, #fff); border-radius: 16px; padding: 20px; border: 1px solid rgba(44,102,110,0.25); box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                <span class="material-icons" style="font-size:22px; color:#2c666e;">bug_report</span>
+                <h4 style="margin:0; color:var(--on-surface,#222); font-size:17px; flex:1;">Fumigación masiva</h4>
+                <button type="button" id="ganado-fumig-close" class="m3-icon-btn" title="Cerrar" style="background:none; border:none; cursor:pointer; color:#666; display:flex; align-items:center; justify-content:center; padding:4px;">
+                  <span class="material-icons" style="font-size:22px;">close</span>
+                </button>
+              </div>
+              <p style="margin:0 0 16px; font-size:13px; color:#666; line-height:1.5;">
+                Aplica la fumigación a <strong id="ganado-fumig-target-count">${totalAnimales}</strong> animales activos con la misma fecha.
+              </p>
+              <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+                <div class="m3-field" style="min-width:180px; flex:1 1 200px;">
+                  <input type="date" id="ganado-fumig-fecha" value="${getLocalToday()}" placeholder=" " required>
+                  <label>Fecha</label>
+                </div>
+                <div class="m3-field" style="flex:1 1 220px;">
+                  <input type="text" id="ganado-fumig-producto" placeholder=" " required>
+                  <label>Producto</label>
+                </div>
+              </div>
+              <div style="display:flex; gap:10px; margin-top:18px; justify-content:flex-end;">
+                <button type="button" class="btn-m3-tonal" id="ganado-fumig-cancel">Cancelar</button>
+                <button type="button" class="btn-m3-fill" id="ganado-fumig-apply" style="background:#2c666e; color:#fff;"><span id="ganado-fumig-apply-label">Aplicar</span></button>
+              </div>
             </div>
-            <div id="ganado-fumig-records" style="max-height: 320px; overflow-y: auto;">
-              <p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Cargando...</p>
+
+            <div style="margin-top:20px;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                <span class="material-icons" style="font-size:18px; color:#2c666e;">list_alt</span>
+                <h4 style="margin:0; color:var(--on-surface,#222); font-size:15px; flex:1;">Registros de fumigación</h4>
+                <button type="button" id="ganado-fumig-apply-all" title="Aplicar todas las programadas" style="display:none; background:#2c666e; color:#fff; border:none; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; align-items:center; gap:4px;">
+                  <span class="material-icons" style="font-size:15px;">check_circle</span> Aplicar todas
+                </button>
+                <button type="button" id="ganado-fumig-refresh" class="m3-icon-btn" title="Actualizar" style="background:none; border:none; cursor:pointer; color:#2c666e; display:flex; align-items:center; justify-content:center; padding:4px;">
+                  <span class="material-icons" style="font-size:20px;">refresh</span>
+                </button>
+              </div>
+              <div id="ganado-fumig-records" style="max-height: 320px; overflow-y: auto;">
+                <p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Cargando...</p>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="ganado-list-header" style="margin-top: 32px;">
-          <h4>${currentFilter === 'all' ? 'Inventario Ganadero' : 'Resultados del Filtro'}</h4>
-          ${currentFilter !== 'all' ? `<span class="ganado-count-label" id="ganado-count-label">${totalGanadoCount} animales encontrados</span>` : ''}
+          <h4 id="ganado-list-title">${currentFilter === 'all' ? 'Inventario Ganadero' : 'Resultados del Filtro'}</h4>
+          <span class="ganado-count-label" id="ganado-count-label">${currentFilter !== 'all' ? `${totalGanadoCount} animales encontrados` : ''}</span>
         </div>
 
         <div class="ganado-list" id="ganado-list-container">
@@ -326,13 +382,25 @@ window.changeGanadoPage = async function(page) {
   } else if (currentFilter === 'fumigaciones') {
     const { data } = await supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada');
     activeFilterIds = (data || []).map(f => f.animal_id);
+  } else if (currentFilter === 'pendientes') {
+    const [vRes, pRes, fRes] = await Promise.all([
+      supabase.from('animal_vacunas').select('animal_id').eq('estado', 'Programada'),
+      supabase.from('animal_pesajes').select('animal_id').eq('estado', 'Programada'),
+      supabase.from('animal_fumigaciones').select('animal_id').eq('estado', 'Programada')
+    ]);
+    const allIds = new Set([
+      ...(vRes.data || []).map(x => x.animal_id),
+      ...(pRes.data || []).map(x => x.animal_id),
+      ...(fRes.data || []).map(x => x.animal_id)
+    ]);
+    activeFilterIds = Array.from(allIds);
   }
 
   let query = supabase.from('ganado').select('*', { count: 'exact' });
   if (currentFilter === 'all') query = query.neq('estado', 'Vendido');
   else if (currentFilter === 'hembra') query = query.ilike('sexo', 'hembra');
   else if (currentFilter === 'macho') query = query.ilike('sexo', 'macho');
-  else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones') {
+  else if (currentFilter === 'vacunas' || currentFilter === 'pesajes' || currentFilter === 'fumigaciones' || currentFilter === 'pendientes') {
     query = query.in('id', activeFilterIds.length ? activeFilterIds : ['00000000-0000-0000-0000-000000000000']);
   }
   else if (currentFilter === 'preñadas') query = query.eq('reproductivo', 'Preñada');
@@ -352,6 +420,10 @@ window.changeGanadoPage = async function(page) {
   }
 
   totalGanadoCount = count || 0;
+  const countEl = document.getElementById('ganado-count-label');
+  if (countEl) {
+    countEl.textContent = currentFilter !== 'all' ? `${totalGanadoCount} animales encontrados` : '';
+  }
 
   const visibleAnimalIds = (animales || []).map(a => a.id);
   const [visVacunas, visPesajes, visFumigaciones] = await Promise.all([
@@ -514,28 +586,54 @@ export function initGanado() {
     });
   };
 
-  // Filter cards logic
+  // Filter cards logic - In-place without refresh or carousel scroll reset
   document.querySelectorAll('.ganado-card-filter').forEach(card => {
     card.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (card.classList.contains('ganado-tag-fumig') || card.id === 'ganado-fumig-card') {
-        const panel = document.getElementById('ganado-fumig-panel');
-        if (panel) {
-          const isOpen = panel.style.display === 'block';
-          panel.style.display = isOpen ? 'none' : 'block';
-          if (!isOpen) {
-            if (fumigFecha && !fumigFecha.value) fumigFecha.value = getLocalToday();
-            if (typeof loadFumigRecords === 'function') loadFumigRecords();
-          }
-        }
-        return;
-      }
       const filter = card.dataset.filter;
-      window.navigateTo('ganado', 1, filter);
+      if (!filter) return;
+
+      const nextFilter = (currentFilter === filter && filter !== 'all') ? 'all' : filter;
+      currentFilter = nextFilter;
+
+      // Update active cards in place
+      document.querySelectorAll('.ganado-card-filter').forEach(c => {
+        if (c.dataset.filter === currentFilter) {
+          c.classList.add('active');
+        } else {
+          c.classList.remove('active');
+        }
+      });
+
+      // Handle fumigación banner & panel visibility without reload
+      const fumigWrapper = document.getElementById('ganado-fumig-wrapper');
+      if (fumigWrapper) {
+        fumigWrapper.style.display = currentFilter === 'fumigaciones' ? 'block' : 'none';
+        if (currentFilter !== 'fumigaciones' && fumigPanel) {
+          fumigPanel.style.display = 'none';
+          const toggleText = document.getElementById('ganado-fumig-toggle-text');
+          const toggleIcon = document.getElementById('ganado-fumig-toggle-icon');
+          if (toggleText) toggleText.textContent = 'Ver';
+          if (toggleIcon) toggleIcon.textContent = 'visibility';
+        }
+      }
+
+      // Update list header title
+      const titleEl = document.getElementById('ganado-list-title');
+      if (titleEl) {
+        titleEl.textContent = currentFilter === 'all' ? 'Inventario Ganadero' : 'Resultados del Filtro';
+      }
+
+      // Refresh list in-place (no scroll reset, no page reload)
+      window.changeGanadoPage(1);
     });
   });
 
-  // Fumigación masiva panel
+  // Fumigación masiva banner & panel
+  const fumigWrapper = document.getElementById('ganado-fumig-wrapper');
+  const fumigToggleBtn = document.getElementById('ganado-fumig-toggle-btn');
+  const fumigToggleText = document.getElementById('ganado-fumig-toggle-text');
+  const fumigToggleIcon = document.getElementById('ganado-fumig-toggle-icon');
   const fumigPanel = document.getElementById('ganado-fumig-panel');
   const fumigFecha = document.getElementById('ganado-fumig-fecha');
   const fumigProducto = document.getElementById('ganado-fumig-producto');
@@ -544,8 +642,23 @@ export function initGanado() {
   const cancelBtn = document.getElementById('ganado-fumig-cancel');
   const closeBtn = document.getElementById('ganado-fumig-close');
 
+  if (fumigToggleBtn && fumigPanel) {
+    fumigToggleBtn.addEventListener('click', () => {
+      const isOpen = fumigPanel.style.display === 'block';
+      fumigPanel.style.display = isOpen ? 'none' : 'block';
+      if (fumigToggleText) fumigToggleText.textContent = isOpen ? 'Ver' : 'Ocultar';
+      if (fumigToggleIcon) fumigToggleIcon.textContent = isOpen ? 'visibility' : 'visibility_off';
+      if (!isOpen) {
+        if (fumigFecha && !fumigFecha.value) fumigFecha.value = getLocalToday();
+        if (typeof loadFumigRecords === 'function') loadFumigRecords();
+      }
+    });
+  }
+
   const closeFumigPanel = () => {
     if (fumigPanel) fumigPanel.style.display = 'none';
+    if (fumigToggleText) fumigToggleText.textContent = 'Ver';
+    if (fumigToggleIcon) fumigToggleIcon.textContent = 'visibility';
   };
   const openFumigPanel = () => {
     if (fumigPanel) fumigPanel.style.display = 'block';
@@ -565,6 +678,7 @@ export function initGanado() {
   const loadFumigRecords = async () => {
     const recordsBox = document.getElementById('ganado-fumig-records');
     if (!recordsBox) return;
+    let groups = [];
     try {
       recordsBox.innerHTML = '<p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Cargando...</p>';
       const { data: recs, error } = await supabase.from('animal_fumigaciones')
@@ -575,7 +689,6 @@ export function initGanado() {
         recordsBox.innerHTML = '<p style="color:#999; font-size:13px; text-align:center; padding:12px 0;">Sin registros de fumigación.</p>';
         return;
       }
-      const groups = [];
       const groupMap = new Map();
       for (const r of list) {
         const key = `${r.producto || ''}\u0000${r.fecha || ''}`;
@@ -631,7 +744,7 @@ export function initGanado() {
     }
     const applyAllBtn = document.getElementById('ganado-fumig-apply-all');
     if (applyAllBtn) {
-      const pendingCount = groups.filter(g => g.estado !== 'Aplicada').length;
+      const pendingCount = (groups || []).filter(g => g.estado !== 'Aplicada').length;
       applyAllBtn.style.display = pendingCount > 0 ? 'inline-flex' : 'none';
     }
   };
@@ -705,9 +818,9 @@ export function initGanado() {
         const producto = decodeURIComponent(applyBtnRow.dataset.producto);
         const fecha = decodeURIComponent(applyBtnRow.dataset.fecha);
         const hoy = getLocalToday();
-        if (fecha !== hoy) {
+        if (fecha > hoy) {
           const fechaDia = fecha ? new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' }) : '';
-          window.Snackbar.show(`No se puede aplicar hoy: la fumigación es para el día ${fechaDia} y hoy no corresponde`, { type: 'error' });
+          window.Snackbar.show(`No se puede aplicar aún: está programada para una fecha futura (${fechaDia}, ${fecha})`, { type: 'error' });
           return;
         }
         const fechaDiaNombre = fecha ? new Date(fecha + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long' }) : '';
@@ -750,13 +863,13 @@ export function initGanado() {
   const applyAllBtn = document.getElementById('ganado-fumig-apply-all');
   if (applyAllBtn) applyAllBtn.onclick = () => {
     const hoy = getLocalToday();
-    window.Snackbar.confirm('¿Aplicar las fumigaciones programadas para hoy?', async () => {
+    window.Snackbar.confirm('¿Aplicar todas las fumigaciones pendientes (hoy y atrasadas)?', async () => {
       try {
-        let base = `/rest/v1/animal_fumigaciones?estado=eq.Programada&fecha=eq.${hoy}`;
+        let base = `/rest/v1/animal_fumigaciones?estado=eq.Programada&fecha=lte.${hoy}`;
         if (window._currentEmpresaId) base += `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`;
         await restFetch(base, { method: 'PATCH', body: JSON.stringify({ estado: 'Aplicada' }) });
-        window.Snackbar.show('Fumigaciones del día aplicadas ✓');
-        sendWhatsApp(`✅ Fumigaciones del día aplicadas\nFecha: ${hoy}\nFinca: ${window._empresaNombre || ''}`);
+        window.Snackbar.show('Fumigaciones aplicadas ✓');
+        sendWhatsApp(`✅ Fumigaciones aplicadas\nFecha: ${hoy}\nFinca: ${window._empresaNombre || ''}`);
         await refreshFumigAll();
       } catch (err) {
         window.Snackbar.show('Error: ' + (err.message || err), { type: 'error' });

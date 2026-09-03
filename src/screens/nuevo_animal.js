@@ -125,7 +125,7 @@ export async function renderNuevoAnimal(id) {
               </div>
               <div class="m3-field" id="precio-compra-field" style="display:none;">
                 <input type="number" step="0.01" name="precio_compra" placeholder=" ">
-                <label>Precio de compra ($)</label>
+                <label>Precio de compra (HNL)</label>
               </div>
 
               <div class="m3-field" style="margin-top:16px;">

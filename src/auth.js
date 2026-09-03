@@ -51,10 +51,16 @@ async function restFetch(path, options = {}) {
 async function restInsert(path, body) {
   const fullPath = path.startsWith('/') ? path : `/rest/v1/${path}`;
   const headers = buildHeaders();
+  let data = body;
+  if (data && typeof data === 'object' && !Array.isArray(data) && !data.empresa_id && window._currentEmpresaId) {
+    if (!fullPath.includes('/usuarios') && !fullPath.includes('/empresas') && !fullPath.includes('/usuario_empresas')) {
+      data = { ...data, empresa_id: window._currentEmpresaId };
+    }
+  }
   const res = await fetch(`${SUPABASE_URL}${fullPath}`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(body),
+    body: JSON.stringify(data),
   });
   if (!res.ok) {
     const errBody = res.headers.get('content-type')?.includes('application/json') ? await res.json().catch(() => ({})) : {};
