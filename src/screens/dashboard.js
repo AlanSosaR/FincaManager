@@ -362,23 +362,25 @@ export async function renderDashboard() {
                 </span>
               </div>
               <div class="ganado-tally-divider" style="border-top: 1px solid rgba(255,255,255,0.18); margin-bottom: 16px;"></div>
-              <div class="ganado-tally-row" style="display: flex; gap: 12px; flex-wrap: wrap;">
-                <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px;">
-                  <span class="ganado-tag-swatch w"><img src="mapa.png" alt="" style="width: 26px; height: 26px; object-fit: contain;"></span>
-                  <span class="ganado-tag-info">
-                    <span class="ganado-tag-n" style="font-size: 19px; font-weight: 800; color: #2d3e2c;">${allLotes.length}</span>
-                    <span class="ganado-tag-l" style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: 700;">Lotes</span>
+              <div class="ganado-tally-row" style="display: flex; gap: 10px; align-items: center;">
+                <div class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 12px; padding: 8px 12px; flex: 0 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 8px;">
+                  <span class="ganado-tag-swatch" style="background: #2d3e2c; color: #ffffff; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; flex-shrink: 0; box-shadow: 0 2px 5px rgba(45,62,44,0.22);">
+                    ${allLotes.length}
                   </span>
+                  <div style="display: flex; flex-direction: column; line-height: 1.15;">
+                    <span style="font-size: 13px; font-weight: 800; color: #2d3e2c; white-space: nowrap;">Lotes</span>
+                    <span style="font-size: 10.5px; font-weight: 700; color: #666; white-space: nowrap;">de Café</span>
+                  </div>
                 </div>
-                <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: inherit; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;" title="Abrir Manejo y Calendario del Cafetal">
-                  <div style="display: flex; align-items: center; gap: 12px;">
-                    <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 10px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 20px;">🌿</span>
-                    <span class="ganado-tag-info" style="display: flex; flex-direction: column;">
-                      <span style="font-size: 15px; font-weight: 800; color: #2d3e2c; line-height: 1.2;">Manejo Cafetal</span>
-                      <span style="font-size: 11px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.3px;">Registro / Plan</span>
+                <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 12px; padding: 10px 14px; flex: 1; min-width: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: inherit; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;" title="Abrir Manejo y Calendario del Cafetal">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden;">
+                    <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;">🌿</span>
+                    <span class="ganado-tag-info" style="display: flex; flex-direction: column; min-width: 0;">
+                      <span style="font-size: 14px; font-weight: 800; color: #2d3e2c; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Manejo Cafetal</span>
+                      <span style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.2px; white-space: nowrap;">Registro / Plan</span>
                     </span>
                   </div>
-                  <span class="material-icons" style="color: #2d3e2c; font-size: 22px;">chevron_right</span>
+                  <span class="material-icons" style="color: #2d3e2c; font-size: 19px; flex-shrink: 0; margin-left: 6px;">chevron_right</span>
                 </a>
               </div>
             </div>

@@ -2167,30 +2167,52 @@ input[id$="-search-input"]::placeholder {
   color: white;
 }
 
-/* Row content grid */
+/* Row content container */
 .ganado-row-content {
   flex: 1;
-  display: grid;
-  grid-template-columns: 2fr 1fr auto;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ganado-row-main-info {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.ganado-row-actions-box {
+  margin-left: auto;
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ganado-row-weight-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 @media (max-width: 650px) {
-  .ganado-row-content {
-    grid-template-columns: 1fr 1fr auto;
-    gap: 8px;
-    width: 100%;
+  .ganado-row {
+    align-items: flex-start;
   }
-}
-
-@media (max-width: 700px) {
-  .ganado-row-content {
-    grid-template-columns: 1.5fr 1fr auto;
-    gap: 8px;
+  .ganado-row-actions-box {
+    gap: 6px;
+    margin-top: 1px;
   }
-  .ganado-row-status {
-    display: none;
+  .ganado-col-weight {
+    margin: 0 4px;
+  }
+  .ganado-col-weight-value {
+    font-size: 16px;
   }
 }
 
@@ -2204,14 +2226,8 @@ input[id$="-search-input"]::placeholder {
     width: 52px;
     height: 52px;
   }
-  .ganado-row-content {
-    grid-template-columns: 1fr auto;
-    gap: 8px;
-    min-width: 0;
-  }
   .ganado-row-status,
-  .ganado-col-group:nth-child(2),
-  .ganado-col-weight {
+  .ganado-col-group:nth-child(2) {
     display: none;
   }
   .ganado-col-group {
@@ -2313,10 +2329,27 @@ input[id$="-search-input"]::placeholder {
 }
 
 .ganado-days-line {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--on-surface-variant);
-  opacity: 0.65;
+  opacity: 0.75;
   margin-top: 1px;
+}
+
+.btn-edad-chip {
+  background: #ffffff;
+  border: 1px solid rgba(45, 62, 44, 0.25);
+  color: #2d3e2c;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-edad-chip:hover {
+  background: #2d3e2c;
+  color: #ffffff;
 }
 
 .ganado-trend-info {
@@ -2348,6 +2381,104 @@ input[id$="-search-input"]::placeholder {
 .ganado-row-badge.sold {
   background: #ffcdd2;
   color: #d32f2f;
+}
+
+.ganado-row-badge.amber {
+  background-color: #d97706;
+}
+
+.ganado-row-badge.blue {
+  background-color: #0284c7;
+}
+
+/* Pending text tags on animal rows */
+.ganado-pending-tags {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.ganado-pending-tag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  line-height: 1.35;
+  letter-spacing: 0.2px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ganado-pending-tag.tag-ambas {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  font-weight: 800;
+}
+
+.ganado-pending-tag.tag-vacuna {
+  background: #e8f5e9;
+  color: #1b5e20;
+  border: 1px solid #c8e6c9;
+}
+
+.ganado-pending-tag.tag-fumig {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.ganado-pending-tag.tag-pesaje {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #ffedd5;
+}
+
+.ganado-pending-tag.tag-pesaje-requerido {
+  background: #fff3e0;
+  color: #b45309;
+  border: 1px solid #fed7aa;
+}
+
+.ganado-pending-timing {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.ganado-pending-timing .material-icons {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.ganado-pending-timing.late {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.ganado-pending-timing.today {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ganado-pending-timing.future {
+  background: #ecfdf5;
+  color: #065f46;
 }
 
 /* Status pill */
@@ -5447,7 +5578,7 @@ input[id$="-search-input"]::placeholder {
 
   /* Hero image card filling entire area */
   .da-hero-img-card {
-    height: 190px !important;
+    height: 295px !important;
     width: 100% !important;
     position: relative !important;
     border-radius: 0 !important;

@@ -1,6 +1,25 @@
 import { supabase } from '../supabase.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
+import { getUser, restFetch } from '../auth.js';
+
+async function getCurrentUserName() {
+  try {
+    const user = await getUser();
+    if (!user) return 'Admin';
+    if (user.user_metadata?.nombre) return user.user_metadata.nombre;
+    if (user.user_metadata?.name) return user.user_metadata.name;
+    if (user.user_metadata?.full_name) return user.user_metadata.full_name;
+    try {
+      const dbUser = await restFetch(`/rest/v1/usuarios?id=eq.${encodeURIComponent(user.id)}&select=nombre`);
+      if (dbUser?.[0]?.nombre) return dbUser[0].nombre;
+    } catch {}
+    if (user.email) return user.email.split('@')[0];
+    return 'Admin';
+  } catch {
+    return 'Admin';
+  }
+}
 
 export async function renderDetalleMotor(motorId) {
   if (!motorId) return '<div class="screen-detalle"><p>No se especificó un ID de motor.</p></div>';
@@ -19,6 +38,28 @@ export async function renderDetalleMotor(motorId) {
     .eq('motor_id', motorId)
     .order('fecha', { ascending: false });
 
+  // 1. Primero fijar legados: Admin → email conocido para poder resolver el nombre
+  if (sesiones && sesiones.length > 0) {
+    sesiones.forEach(s => {
+      if (!s.operador || s.operador === 'Admin') {
+        s.operador = 'rodezno137@gmail.com';
+      }
+    });
+  }
+  // 2. Recopilar todos los emails únicos y resolver nombres desde la tabla usuarios
+  const operadorEmailsSet = new Set((sesiones || []).map(s => s.operador).filter(o => o && o.includes('@')));
+  const operadorNombreMap = {};
+  if (operadorEmailsSet.size > 0) {
+    try {
+      const emailsArr = Array.from(operadorEmailsSet);
+      const emailFilter = emailsArr.map(e => `email.eq.${encodeURIComponent(e)}`).join(',');
+      const dbUsers = await restFetch(`/rest/v1/usuarios?or=(${emailFilter})&select=email,nombre`);
+      (dbUsers || []).forEach(u => {
+        if (u.email) operadorNombreMap[u.email] = u.nombre || u.email.split('@')[0];
+      });
+    } catch {}
+  }
+
   const { data: mants } = await supabase
     .from('motor_mantenimientos')
     .select('*')
@@ -31,6 +72,7 @@ export async function renderDetalleMotor(motorId) {
   const pct = Math.min(100, Math.round((totalHoras / maxHoras) * 100));
   const requiresAlert = horasRestantes <= 0;
   const today = new Date().toISOString().split('T')[0];
+  const currentUserName = await getCurrentUserName();
 
   return `
       <!-- Main Detail Card (GitHub/Vercel Design) -->
@@ -172,6 +214,12 @@ export async function renderDetalleMotor(motorId) {
                 </div>
               </div>
 
+              <div class="m3-field" style="margin-bottom: 16px;">
+                <input type="text" id="input-manual-operator" value="${currentUserName}" placeholder=" ">
+                <label>Operador / Responsable</label>
+                <span class="material-icons">badge</span>
+              </div>
+
               <div style="background: var(--surface-variant); padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px dashed #ccc;">
                 <div style="display: flex; flex-direction: column;">
                   <span style="font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase;">Duración Calculada</span>
@@ -193,7 +241,10 @@ export async function renderDetalleMotor(motorId) {
           </div>
           
           <div class="activity-list" style="margin-bottom: 32px;">
-            ${sesiones && sesiones.length > 0 ? sesiones.map(s => `
+            ${sesiones && sesiones.length > 0 ? sesiones.map(s => {
+              const rawOp = s.operador || '';
+              const opName = rawOp.includes('@') ? (operadorNombreMap[rawOp] || rawOp.split('@')[0]) : (rawOp || 'Sin operador');
+              return `
               <div class="activity-item" style="padding: 16px; border-bottom: 1px solid var(--m3-outline-variant);">
                 <div class="activity-icon" style="background: var(--primary-container); color: #ffffff; border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
                   <span class="material-icons" style="font-size: 20px;">history</span>
@@ -202,8 +253,11 @@ export async function renderDetalleMotor(motorId) {
                   <h4 style="font-size: 14px; margin: 0; font-weight: 700;">
                     ${new Date(s.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </h4>
-                  <p style="font-size: 12px; color: #666; margin: 4px 0;">
-                    ${s.hora_inicio || ''} - ${s.hora_fin || ''} • Operador: ${s.operador || 'Admin'}
+                  <p style="font-size: 12px; color: #666; margin: 4px 0 2px;">
+                    ${s.hora_inicio || ''} - ${s.hora_fin || ''}
+                  </p>
+                  <p style="font-size: 12px; color: #666; margin: 0 0 4px;">
+                    Operador: <strong style="color: #2d3e2c;">${opName}</strong>
                   </p>
                   <span class="history-date" style="font-weight: 800; color: var(--primary-container);">
                     ${s.duracion_mins ? Math.floor(s.duracion_mins / 60) + 'h ' + (s.duracion_mins % 60) + 'm' : s.total_horas + 'h'} trabajadas
@@ -214,7 +268,7 @@ export async function renderDetalleMotor(motorId) {
                    <span style="font-size: 14px; font-weight: 900; color: #444;">${s.total_horas || 0}H</span>
                 </div>
               </div>
-            `).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">No hay sesiones registradas.</p>'}
+            `;}).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">No hay sesiones registradas.</p>'}
           </div>
 
           <div class="section-title">
@@ -342,7 +396,8 @@ export function initDetalleMotor(motorId) {
     const dFin = new Date();
     const format12 = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    await saveSession(motorId, mins, null, format12(dInicio), format12(dFin));
+    const currentUserName = await getCurrentUserName();
+    await saveSession(motorId, mins, null, format12(dInicio), format12(dFin), currentUserName);
     resetTimer();
   };
 
@@ -395,7 +450,9 @@ export function initDetalleMotor(motorId) {
     btnSaveManual.onclick = async () => {
       const mins = calculateManual();
       btnSaveManual.disabled = true;
-      await saveSession(motorId, mins, manualDate.value, manualStart.value, manualEnd.value);
+      const opInput = document.getElementById('input-manual-operator');
+      const opVal = (opInput && opInput.value.trim()) ? opInput.value.trim() : await getCurrentUserName();
+      await saveSession(motorId, mins, manualDate.value, manualStart.value, manualEnd.value, opVal);
       window.navigateTo('detalle_motor', motorId);
     };
   }
@@ -420,18 +477,19 @@ export function initDetalleMotor(motorId) {
   });
 }
 
-async function saveSession(motorId, mins, customDate = null, horaInicio = null, horaFin = null) {
+async function saveSession(motorId, mins, customDate = null, horaInicio = null, horaFin = null, operador = null) {
   try {
     const { data: motor } = await supabase.from('motores').select('horas').eq('id', motorId).single();
     const newTotal = (parseFloat(motor.horas) || 0) + (mins / 60);
     const rounded = Math.round(newTotal * 10) / 10;
+    const finalOperador = (operador && operador.trim()) ? operador.trim() : await getCurrentUserName();
 
     await supabase.from('motor_sesiones').insert({
       motor_id: motorId,
       fecha: customDate ? new Date(customDate + 'T12:00:00').toISOString() : new Date().toISOString(),
       duracion_mins: mins,
       total_horas: rounded,
-      operador: 'Admin',
+      operador: finalOperador,
       hora_inicio: horaInicio,
       hora_fin: horaFin
     });

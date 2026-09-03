@@ -437,7 +437,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'detalle_animal','detalle_motor','detalle_potrero',
         'detalle_herramienta','detalle_lote','detalle_personal','mapa_lotes',
         // potreros: render() solo devuelve el shell del mapa; initPotreros() dibuja
-        'potreros'
+        'potreros',
+        'ganado'
     ]);
 
     window.clearScreenCache = (screenId) => {

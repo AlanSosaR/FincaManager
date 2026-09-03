@@ -137,19 +137,17 @@ export async function renderDetalleLote(id) {
           gap: 8px;
           overflow-x: auto;
           padding: 2px 2px 4px 2px;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.3) transparent;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
           -webkit-overflow-scrolling: touch;
           align-items: stretch;
           flex: 1;
           min-width: 0;
         }
         .dl-chips-carousel::-webkit-scrollbar {
-          height: 4px;
-        }
-        .dl-chips-carousel::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.35);
-          border-radius: 4px;
+          display: none;
+          width: 0;
+          height: 0;
         }
         .dl-chips-carousel .ganado-tag-stat {
           flex-shrink: 0;
@@ -158,10 +156,10 @@ export async function renderDetalleLote(id) {
         .dl-fused-card {
           display: grid;
           grid-template-columns: ${hasMap ? '1.25fr 1fr' : '1fr'};
-          border-radius: 20px;
+          border-radius: 0;
           overflow: hidden;
           background: var(--m3-primary, #2d3e2c);
-          box-shadow: 0 4px 20px rgba(45,62,44,0.22);
+          box-shadow: none;
           min-height: 185px;
         }
         .dl-fused-card .ganado-card-value {
@@ -247,7 +245,7 @@ export async function renderDetalleLote(id) {
             min-height: 220px !important;
             border-left: none !important;
             border-top: 1.5px solid rgba(255,255,255,0.15) !important;
-            border-radius: 0 0 20px 20px !important;
+            border-radius: 0 !important;
           }
           #dl-map-container {
             height: 220px !important;
@@ -261,36 +259,46 @@ export async function renderDetalleLote(id) {
       </style>
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dl-screen-pad">
         <!-- Header -->
-        <section class="m3-mb-6">
-          <div class="m3-flex m3-items-center m3-justify-between m3-gap-4 m3-flex-wrap">
-            <div>
-              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="margin: 0; line-height: 1.1;">
-                  ${lote.nombre}
-                </h1>
-                ${lote.edad_categoria ? `
-                  <span style="font-size: 12px; font-weight: 700; background: #eaf2e8; color: #2d3e2c; border: 1px solid #c8d4c6; padding: 4px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px;">
-                    🌱 ${formatEdadLabel(lote.edad_categoria)}
-                  </span>
-                ` : ''}
-              </div>
+        <section class="m3-mb-4" style="padding: 0 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0;">
+              <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="margin: 0; line-height: 1.1; font-size: 22px;">
+                ${lote.nombre}
+              </h1>
+              ${lote.edad_categoria ? `
+                <span style="font-size: 11.5px; font-weight: 700; background: #eaf2e8; color: #2d3e2c; border: 1px solid #c8d4c6; padding: 3px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
+                  🌱 ${formatEdadLabel(lote.edad_categoria)}
+                </span>
+              ` : ''}
             </div>
-            <div class="m3-flex m3-items-center m3-gap-2" style="flex-wrap: wrap;">
-              <button onclick="window.navigateTo('nuevo_lote', '${lote.id}')" class="plan-btn-ghost" style="padding: 8px 14px; font-size: 12.5px;" title="Editar Lote">
-                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span>
-                <span>Editar</span>
+
+            <!-- Botón de Configuración (Editar / Eliminar) -->
+            <div style="position: relative; flex-shrink: 0;">
+              <button type="button" onclick="window.toggleLoteConfigDropdown(event)" style="width: 40px; height: 40px; border-radius: 12px; background: #ffffff; border: 1.5px solid var(--m3-outline-variant, #c7cec3); color: var(--m3-primary, #2d3e2c); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: all 0.15s ease;" title="Opciones del Lote" aria-label="Opciones del Lote">
+                <span class="material-symbols-outlined" style="font-size: 21px;">settings</span>
               </button>
-              <button onclick="window.confirmDeleteLoteFromDetalle('${lote.id}', '${lote.nombre}')" class="plan-btn-danger" style="padding: 8px 12px; font-size: 12.5px;" title="Eliminar Lote">
-                <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
-                <span>Eliminar</span>
-              </button>
+
+              <!-- Dropdown Menu de Configuración -->
+              <div id="dl-config-dropdown" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 170px; background: #ffffff; border: 1.5px solid var(--m3-outline-variant, #c7cec3); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 1000; overflow: hidden; padding: 6px 0;">
+                <div onclick="window.navigateTo('nuevo_lote', '${lote.id}'); window.closeLoteConfigDropdown();" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: #1a1a1a; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#f0f5ee'" onmouseout="this.style.background='transparent'">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: #2d3e2c;">edit</span>
+                  <span>Editar Lote</span>
+                </div>
+                <div style="height: 1px; background: #edf1ec; margin: 4px 0;"></div>
+                <div onclick="window.confirmDeleteLoteFromDetalle('${lote.id}', '${lote.nombre}'); window.closeLoteConfigDropdown();" style="padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: #ba1a1a; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#ffedea'" onmouseout="this.style.background='transparent'">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: #ba1a1a;">delete</span>
+                  <span>Eliminar Lote</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <!-- Summary Banner + Map Fused Card -->
-        <div class="m3-mb-6">
-          <div class="dl-fused-card">
+        <!-- Tarjeta Unificada Completa del Lote (Hero/Mapa + Manejo del Cafetal en UNA SOLA TARJETA) -->
+        <div class="dl-unified-main-card" style="border-radius: 20px; border: 1.5px solid var(--m3-outline-variant, #c7cec3); background: var(--m3-surface-container-lowest, #ffffff); box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); overflow: hidden; width: 100%; box-sizing: border-box; margin-bottom: 24px;">
+
+          <!-- Top: Info del Lote, Variedad, Plantas, Árboles y Mapa Satelital -->
+          <div class="dl-fused-card" style="border-radius: 0; border: none; box-shadow: none;">
             <!-- Left Stats Column -->
             <div style="padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-width: 0; overflow: hidden;">
               <div class="ganado-tally-top" style="display: flex; align-items: baseline; justify-content: flex-start; gap: 18px; margin: 0; flex-wrap: wrap;">
@@ -367,10 +375,9 @@ export async function renderDetalleLote(id) {
               </div>
             ` : ''}
           </div>
-        </div>
 
-        <!-- Manejo del Cafetal / Galería de Evolución -->
-        <div id="lote-calendario-section" class="m3-card m3-p-6" style="border-radius: 16px; background: #ffffff; box-shadow: 0 2px 12px rgba(0,0,0,0.04);">
+          <!-- Bottom: Manejo del Cafetal / Galería de Evolución (Dentro de la Misma Tarjeta) -->
+          <div id="lote-calendario-section" style="border-radius: 0; border: none; box-shadow: none; padding: 20px 18px; width: 100%; box-sizing: border-box; background: #ffffff;">
           
           <!-- Vista 1: Calendario Interactivo -->
           <div id="dl-calendar-wrap">
@@ -434,6 +441,7 @@ export async function renderDetalleLote(id) {
           <div id="dl-evolucion-wrap" style="display: none;"></div>
 
         </div>
+        </div>
       </div>
     `;
   } catch (err) {
@@ -490,8 +498,30 @@ export function initDetalleLote(id) {
     menus.forEach(m => m.style.display = 'none');
   };
 
+  window.toggleLoteConfigDropdown = (e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    const menu = document.getElementById('dl-config-dropdown');
+    if (menu) {
+      const isVisible = menu.style.display === 'block';
+      window.closeLoteConfigDropdown();
+      if (!isVisible) {
+        menu.style.display = 'block';
+      }
+    }
+  };
+
+  window.closeLoteConfigDropdown = () => {
+    const menu = document.getElementById('dl-config-dropdown');
+    if (menu) menu.style.display = 'none';
+  };
+
   document.removeEventListener('click', window.closeDlTimelineDropdown);
   document.addEventListener('click', window.closeDlTimelineDropdown);
+  document.removeEventListener('click', window.closeLoteConfigDropdown);
+  document.addEventListener('click', window.closeLoteConfigDropdown);
 
   // Switcher between Calendar and Activity Photo Evolution
   window.onSelectActividadEvolucion = (val) => {

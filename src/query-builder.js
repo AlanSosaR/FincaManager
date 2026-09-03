@@ -33,6 +33,7 @@ export default class QueryBuilder {
     this._deleteMode = false;
     this._rangeFrom = null;
     this._rangeTo = null;
+    this._limit = null;
   }
 
   _ensureEmpresaFilter() {
@@ -119,6 +120,11 @@ export default class QueryBuilder {
   range(from, to) {
     this._rangeFrom = from;
     this._rangeTo = to;
+    return this;
+  }
+
+  limit(count) {
+    this._limit = count;
     return this;
   }
 
@@ -289,6 +295,8 @@ export default class QueryBuilder {
     if (this._rangeFrom != null) {
       p.append('offset', String(this._rangeFrom));
       if (this._rangeTo != null) p.append('limit', String(this._rangeTo - this._rangeFrom + 1));
+    } else if (this._limit != null) {
+      p.append('limit', String(this._limit));
     }
     return p;
   }
@@ -372,6 +380,8 @@ export default class QueryBuilder {
 
     if (this._rangeFrom != null && this._rangeTo != null) {
       results = results.slice(this._rangeFrom, this._rangeTo + 1);
+    } else if (this._limit != null) {
+      results = results.slice(0, this._limit);
     }
 
     if (this._count === 'exact' && this._head) {

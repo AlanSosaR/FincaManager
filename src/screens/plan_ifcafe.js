@@ -214,37 +214,212 @@ function eventCardHtml(ev) {
     </div>`;
 }
 
-function calendarShellHtml() {
+function calendarShellHtml(activeLote = null, isEmbedded = false, showLotesResumen = false) {
+  const cardStyle = isEmbedded
+    ? 'width: 100%; box-sizing: border-box; padding-top: 4px;'
+    : 'background: var(--m3-surface-container-lowest, #ffffff); border: 1.5px solid var(--m3-outline-variant, #c7cec3); border-radius: 20px; padding: 18px 16px; box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); width: 100%; box-sizing: border-box; margin-bottom: 20px;';
+
   return `
-    <div class="da-calendar-layout" style="align-items:start;">
-      <div class="da-calendar-card">
-        <div class="da-calendar-header">
-          <div class="da-cal-nav">
-            <button class="da-cal-nav-btn" onclick="window.changePlanCalMonth(-1)" aria-label="Mes anterior"><span class="material-icons">chevron_left</span></button>
-            <h3 id="plan-cal-month-display"></h3>
-            <button class="da-cal-nav-btn" onclick="window.changePlanCalMonth(1)" aria-label="Mes siguiente"><span class="material-icons">chevron_right</span></button>
+    <div class="cafetal-unified-card" style="${cardStyle}">
+      
+      ${!isEmbedded ? `
+      <!-- Selector de Lotes (Integrado dentro de la tarjeta) -->
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; border-radius: 10px; background: var(--m3-secondary-container, #daeed5); color: var(--m3-on-secondary-container, #101f10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">filter_alt</span>
+          </div>
+          <div>
+            <span style="display: block; font-size: 10.5px; font-weight: 800; color: var(--m3-secondary, #526350); text-transform: uppercase; letter-spacing: 0.6px; line-height: 1.1;">
+              Filtrar Cafetal
+            </span>
+            <label for="ifcafe-lote-select" style="font-size: 13.5px; font-weight: 700; color: var(--m3-primary, #2d3e2c); line-height: 1.2;">
+              Lote a gestionar
+            </label>
           </div>
         </div>
-        <div class="da-calendar-grid">
-          <div class="da-cal-day-name">Lun</div><div class="da-cal-day-name">Mar</div><div class="da-cal-day-name">Mié</div><div class="da-cal-day-name">Jue</div><div class="da-cal-day-name">Vie</div><div class="da-cal-day-name">Sáb</div><div class="da-cal-day-name">Dom</div>
-          <div class="da-cal-days-container" id="plan-cal-days"></div>
-        </div>
-        <div class="da-cal-legend">
-          <div><span class="plan-legend-dot" style="background:#2d3e2c;"></span><span>Realizada</span></div>
-          <div><span class="plan-legend-dot" style="background:#c9a227;"></span><span>Programada</span></div>
-          <div><span class="plan-legend-dot" style="background:#FF4103;"></span><span>Atrasada</span></div>
-        </div>
-      </div>
-      <div id="plan-day-details">
-        <div class="da-day-details">
-          <div style="text-align:center;color:#888;padding:24px 16px;">
-            <span class="material-symbols-outlined" style="font-size:44px;color:#2d3e2c;opacity:0.6;margin-bottom:8px;">calendar_month</span>
-            <p style="font-size:14px;font-weight:600;color:#333;margin:0 0 6px;">Toca cualquier día en el calendario</p>
-            <p style="font-size:12px;color:#777;margin:0;">Para ver las labores programadas o registrar una nueva actividad (foliar, abono, podas, etc.)</p>
+        
+        <div style="flex: 1; min-width: 220px;">
+          <div style="position: relative; display: flex; align-items: center;">
+            <select id="ifcafe-lote-select" style="width: 100%; height: 44px; font-weight: 600; font-size: 13.5px; border-radius: 12px; border: 1.5px solid var(--m3-primary, #2d3e2c); background: #fdfdfc; color: #1a1c19; padding: 0 38px 0 14px; cursor: pointer; outline: none; -webkit-appearance: none; appearance: none;" onchange="if(this.value){window.navigateTo('plan_ifcafe', this.value)}else{window.navigateTo('plan_ifcafe')}">
+              <option value="" ${!activeLote ? 'selected' : ''}>🌾 Todos los Lotes (${_allLotes.length} disponibles)</option>
+              ${_allLotes.map(l => `
+                <option value="${l.id}" ${activeLote?.id === l.id ? 'selected' : ''}>
+                  ☕ ${l.nombre} (${(l.num_plantas || 0).toLocaleString()} plantas${l.variedad ? ' · ' + l.variedad : ''})
+                </option>
+              `).join('')}
+            </select>
+            <span class="material-symbols-outlined" style="position: absolute; right: 12px; pointer-events: none; color: var(--m3-primary, #2d3e2c); font-size: 22px;">
+              expand_more
+            </span>
           </div>
         </div>
       </div>
+
+      <!-- Separador entre Selector y Calendario -->
+      <div style="border-top: 1.5px solid #edf1ec; margin: 14px 0 16px 0;"></div>
+      ` : ''}
+
+      <div class="da-calendar-header" style="margin-bottom: 12px; width: 100%;">
+        <div class="da-cal-nav">
+          <button type="button" class="da-cal-nav-btn" onclick="window.changePlanCalMonth(-1)" aria-label="Mes anterior"><span class="material-icons">chevron_left</span></button>
+          <h3 id="plan-cal-month-display"></h3>
+          <button type="button" class="da-cal-nav-btn" onclick="window.changePlanCalMonth(1)" aria-label="Mes siguiente"><span class="material-icons">chevron_right</span></button>
+        </div>
+        <div class="da-cal-mob-bar" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" class="da-cal-mob-arrow" onclick="window.navPlanCalPrev()" title="Semana o mes anterior">
+              <span class="material-icons">chevron_left</span>
+            </button>
+            <span class="da-cal-mob-date" id="plan-cal-mob-date">Fecha</span>
+            <button type="button" class="da-cal-mob-arrow" onclick="window.navPlanCalNext()" title="Semana o mes siguiente">
+              <span class="material-icons">chevron_right</span>
+            </button>
+          </div>
+          <button type="button" class="da-cal-mob-toggle" id="plan-cal-toggle-btn" onclick="window.togglePlanCalendarView()">
+            <span class="material-icons" id="plan-cal-toggle-icon" style="font-size:14px;">calendar_month</span>
+            <span id="plan-cal-toggle-text">Ver mes</span>
+          </button>
+        </div>
+      </div>
+      <div class="da-cal-week-strip" id="plan-cal-week-strip" style="width: 100%; box-sizing: border-box;"></div>
+      <div class="da-calendar-grid" id="plan-cal-month-grid" style="width: 100%; box-sizing: border-box;">
+        <div class="da-cal-day-name">Lun</div><div class="da-cal-day-name">Mar</div><div class="da-cal-day-name">Mié</div><div class="da-cal-day-name">Jue</div><div class="da-cal-day-name">Vie</div><div class="da-cal-day-name">Sáb</div><div class="da-cal-day-name">Dom</div>
+        <div class="da-cal-days-container" id="plan-cal-days"></div>
+      </div>
+      <div class="da-cal-legend" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e8ede8;">
+        <div><span class="plan-legend-dot" style="background:#2d3e2c;"></span><span>Realizada</span></div>
+        <div><span class="plan-legend-dot" style="background:#c9a227;"></span><span>Programada</span></div>
+        <div><span class="plan-legend-dot" style="background:#FF4103;"></span><span>Atrasada</span></div>
+      </div>
+
+      <div style="border-top: 1.5px solid #edf1ec; margin: 18px 0 16px 0;"></div>
+
+      <div id="plan-day-details" style="width: 100%; box-sizing: border-box;">
+        <div class="cafetal-day-details-inner" style="text-align:center;color:#888;padding:20px 12px;">
+          <span class="material-symbols-outlined" style="font-size:44px;color:#2d3e2c;opacity:0.6;margin-bottom:8px;">calendar_month</span>
+          <p style="font-size:14px;font-weight:600;color:#333;margin:0 0 6px;">Toca cualquier día en el calendario</p>
+          <p style="font-size:12px;color:#777;margin:0;">Para ver las labores programadas o registrar una nueva actividad (foliar, abono, podas, etc.)</p>
+        </div>
+      </div>
+
+      ${showLotesResumen ? `
+        <div style="border-top: 1.5px solid #edf1ec; margin: 20px 0 14px 0;"></div>
+        <div style="width: 100%; box-sizing: border-box;">
+          <div onclick="window.toggleResumenLotes()" style="display: flex; align-items: center; justify-content: space-between; padding: 4px 0; cursor: pointer; user-select: none;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="material-symbols-outlined" style="font-size: 20px; color: #2d3e2c;">eco</span>
+              <h3 style="font-size: 14.5px; font-weight: 800; color: #1a1a1a; margin: 0;">
+                Resumen por Lote
+              </h3>
+              <span style="font-size: 11px; font-weight: 700; color: #666; background: #f0f4ef; padding: 2px 8px; border-radius: 10px;">
+                ${_ifcafeLotes.length} lotes
+              </span>
+            </div>
+            
+            <button type="button" id="btn-toggle-resumen-lotes" style="background: #f0f5ee; border: 1px solid #c7d8c5; color: #2d3e2c; font-size: 11.5px; font-weight: 700; padding: 5px 12px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; pointer-events: none;">
+              <span id="txt-toggle-resumen-lotes">Ver lotes</span>
+              <span class="material-symbols-outlined" id="ico-toggle-resumen-lotes" style="font-size: 16px; transition: transform 0.2s;">expand_more</span>
+            </button>
+          </div>
+          
+          <div id="content-resumen-lotes" style="display: none; flex-direction: column; margin-top: 8px; border-top: 1px dashed #e8ede8; padding-top: 4px;">
+            ${_ifcafeLotes.map((l, idx) => `
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 0; ${idx !== _ifcafeLotes.length - 1 ? 'border-bottom: 1px solid #f2f5f1;' : ''}">
+                <div style="min-width: 140px;">
+                  <span style="font-size: 13.5px; font-weight: 700; color: #1a1a1a; display: block;">${l.nombre}</span>
+                  <span style="font-size: 11.5px; color: #777;">${l.variedad} · ${(l.numPlantas || 0).toLocaleString()} plantas</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span style="font-size: 11.5px; font-weight: 700; color: #2d3e2c; background: #e8f5e9; padding: 4px 10px; border-radius: 20px;">
+                    ${l.realizadas} labores realizadas
+                  </span>
+                  <a href="#" onclick="event.preventDefault();window.navigateTo('plan_ifcafe','${l.id}')" style="font-size: 11.5px; font-weight: 600; color: #2d3e2c; text-decoration: none; display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: #f0f7e6; border-radius: 20px; transition: background 0.15s;">
+                    Filtrar <span class="material-symbols-outlined" style="font-size: 13px;">filter_alt</span>
+                  </a>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
     </div>`;
+}
+
+function renderPlanWeekStrip() {
+  const container = document.getElementById('plan-cal-week-strip');
+  if (!container) return;
+
+  const monthEl = document.getElementById('plan-cal-month-grid');
+  const mobDateEl = document.getElementById('plan-cal-mob-date');
+  const isMonthOpen = monthEl && monthEl.classList.contains('open');
+
+  if (mobDateEl) {
+    if (isMonthOpen) {
+      const mDate = new Date(_calYear, _calMonth, 1);
+      const mName = mDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+      mobDateEl.textContent = mName.charAt(0).toUpperCase() + mName.slice(1);
+    } else {
+      const fullDate = new Date(_calYear, _calMonth, _selectedDay || 1);
+      const dayName = fullDate.toLocaleDateString('es-ES', { weekday: 'short' });
+      const dayCap = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const monthName = fullDate.toLocaleDateString('es-ES', { month: 'short' });
+      const monthCap = monthName.charAt(0).toUpperCase() + monthName.slice(1).replace('.', '');
+      mobDateEl.textContent = `${dayCap}, ${_selectedDay || 1} ${monthCap}`;
+    }
+  }
+
+  // Lunes de la semana que contiene a _selectedDay
+  const targetDate = new Date(_calYear, _calMonth, _selectedDay || 1);
+  const dayOfWeek = targetDate.getDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(targetDate);
+  monday.setDate(targetDate.getDate() + diffToMonday);
+
+  const dayLetters = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  let html = '';
+  const todayStr = getLocalToday();
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const dayNum = d.getDate();
+    const dMonth = d.getMonth();
+    const dYear = d.getFullYear();
+    const isSel = (dayNum === _selectedDay && dMonth === _calMonth && dYear === _calYear);
+
+    const dayEvents = _ifcafeEvents.filter(ev => {
+      if (!ev.matchFecha) return false;
+      return ev.matchFecha.getFullYear() === dYear &&
+             ev.matchFecha.getMonth() === dMonth &&
+             ev.matchFecha.getDate() === dayNum;
+    });
+
+    const hasEv = dayEvents.length > 0;
+    const hasAtrasada = dayEvents.some(ev => ev.estado === 'Atrasada' || (ev.estado === 'Programada' && ev.fecha < todayStr));
+    const hasPend = dayEvents.some(ev => ev.estado === 'Pendiente' || ev.estado === 'Programada');
+
+    let dotHtml = '';
+    if (hasEv) {
+      const dotColor = isSel ? '#ffffff' : (hasAtrasada ? '#ff4103' : (hasPend ? '#c9a227' : '#2d3e2c'));
+      dotHtml = `<div class="da-cal-strip-dot" style="background:${dotColor};"></div>`;
+    }
+
+    html += `
+      <div class="da-cal-strip-day ${isSel ? 'selected' : ''}" onclick="window.selectPlanCalendarDay(${dYear}, ${dMonth}, ${dayNum})">
+        <div class="da-cal-strip-name">${dayLetters[i]}</div>
+        <div class="da-cal-strip-num">${dayNum}</div>
+        ${dotHtml}
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+  if (monthEl && monthEl.classList.contains('open')) {
+    container.style.display = 'none';
+  } else {
+    container.style.display = 'flex';
+  }
 }
 
 function renderPlanCal() {
@@ -305,6 +480,8 @@ function renderPlanCal() {
     container.appendChild(el);
   }
 
+  renderPlanWeekStrip();
+
   // If a day was selected, show its details
   if (_selectedDay && _selectedDay <= lastDay) {
     const currentDayEvents = monthEvents.filter(ev => ev.matchFecha.getDate() === _selectedDay);
@@ -360,7 +537,7 @@ function showPlanDayDetails(day, dayEvents) {
   }
 
   panel.innerHTML = `
-    <div class="da-day-details">
+    <div class="cafetal-day-details-inner">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; border-bottom:1.5px solid #eef2ee; padding-bottom:10px;">
         <div>
           <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">Actividades del día</span>
@@ -439,7 +616,7 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   const currentFoto = editApp ? (editApp.foto_url || editApp.notas || '') : '';
 
   panel.innerHTML = `
-    <div class="da-day-details" style="animation: slideUp 0.2s ease-out;">
+    <div class="cafetal-day-details-inner" style="animation: slideUp 0.2s ease-out;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1.5px solid #eef2ee; padding-bottom:8px;">
         <div>
           <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">${formTitle}</span>
@@ -838,6 +1015,66 @@ function planStyles() {
     .plan-btn-add-inline:active {
       transform: scale(0.98);
     }
+
+    /* Tarjeta blanca unificada para el Cafetal */
+    .cafetal-unified-card {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      background: var(--m3-surface-container-lowest, #ffffff) !important;
+      border: 1.5px solid var(--m3-outline-variant, #c7cec3) !important;
+      border-radius: 20px !important;
+      padding: 18px 16px !important;
+      box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06) !important;
+      margin-bottom: 20px !important;
+    }
+    .cafetal-unified-card .da-cal-week-strip {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      display: flex !important;
+      gap: 6px !important;
+      margin-bottom: 4px !important;
+    }
+    .cafetal-unified-card .da-cal-strip-day {
+      flex: 1 1 0 !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
+    }
+    .cafetal-unified-card .da-calendar-grid {
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    .cafetal-unified-card .da-cal-mob-bar {
+      width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    .cafetal-day-details-inner {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+    }
+    .cafetal-selector-card {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+    }
+    .cafetal-day-details-inner .plan-ev {
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .cafetal-unified-card {
+        padding: 14px 12px !important;
+        border-radius: 18px !important;
+      }
+      .cafetal-selector-card {
+        padding: 12px 14px !important;
+        border-radius: 18px !important;
+      }
+    }
   </style>`;
 }
 
@@ -1000,14 +1237,14 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
     if (options.embedded) {
       return `
         <div class="m3-font-work-sans" style="width:100%;">
-          ${calendarShellHtml()}
+          ${calendarShellHtml(activeLote, true, false)}
         </div>
         ${planStyles()}
       `;
     }
 
     return `
-      <div class="app-screen m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans" style="width:100%;margin:0;">
+      <div class="app-screen m3-font-work-sans" style="width:100%;margin:0;padding:4px 0 80px 0;">
         
         <!-- Header -->
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
@@ -1022,39 +1259,6 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
               <span class="material-symbols-outlined" style="font-size:16px;">apps</span> Ver todos los lotes
             </a>
           ` : ''}
-        </div>
-
-        <!-- Selector de Lotes (Material 3 Expressive) -->
-        <div style="background: var(--m3-surface-container-lowest, #ffffff); border: 1.5px solid var(--m3-outline-variant, #c7cec3); border-radius: 20px; padding: 14px 18px; margin-bottom: 20px; box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 38px; height: 38px; border-radius: 12px; background: var(--m3-secondary-container, #daeed5); color: var(--m3-on-secondary-container, #101f10); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-              <span class="material-symbols-outlined" style="font-size: 22px;">filter_alt</span>
-            </div>
-            <div>
-              <span style="display: block; font-size: 11px; font-weight: 800; color: var(--m3-secondary, #526350); text-transform: uppercase; letter-spacing: 0.6px; line-height: 1.2;">
-                Filtrar Cafetal
-              </span>
-              <label for="ifcafe-lote-select" style="font-size: 14px; font-weight: 700; color: var(--m3-primary, #2d3e2c); line-height: 1.2;">
-                Lote a gestionar
-              </label>
-            </div>
-          </div>
-          
-          <div style="flex: 1; min-width: 260px;">
-            <div style="position: relative; display: flex; align-items: center;">
-              <select id="ifcafe-lote-select" style="width: 100%; height: 48px; font-weight: 600; font-size: 14px; border-radius: 14px; border: 1.5px solid var(--m3-primary, #2d3e2c); background: #fdfdfc; color: #1a1c19; padding: 0 42px 0 16px; cursor: pointer; outline: none; transition: all 0.2s cubic-bezier(0.2, 0, 0, 1); box-shadow: 0 2px 6px rgba(0,0,0,0.02); -webkit-appearance: none; appearance: none;" onchange="if(this.value){window.navigateTo('plan_ifcafe', this.value)}else{window.navigateTo('plan_ifcafe')}">
-                <option value="" ${!activeLote ? 'selected' : ''}>🌾 Todos los Lotes (${_allLotes.length} disponibles)</option>
-                ${_allLotes.map(l => `
-                  <option value="${l.id}" ${activeLote?.id === l.id ? 'selected' : ''}>
-                    ☕ ${l.nombre} (${(l.num_plantas || 0).toLocaleString()} plantas${l.variedad ? ' · ' + l.variedad : ''})
-                  </option>
-                `).join('')}
-              </select>
-              <span class="material-symbols-outlined" style="position: absolute; right: 14px; pointer-events: none; color: var(--m3-primary, #2d3e2c); font-size: 24px;">
-                expand_more
-              </span>
-            </div>
-          </div>
         </div>
 
         ${activeLote ? `
@@ -1076,32 +1280,8 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
           </div>
         ` : ''}
 
-        <!-- Calendar + Inline Details Layout -->
-        ${calendarShellHtml()}
-
-        <!-- Lotes list if in general view -->
-        ${!activeLote ? `
-          <div style="margin-top:28px;">
-            <h3 style="font-size:15px;font-weight:800;color:#1a1a1a;margin:0 0 10px;display:flex;align-items:center;gap:6px;">
-              <span class="material-symbols-outlined" style="font-size:18px;color:#2d3e2c;">eco</span> Resumen por Lote
-            </h3>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              ${_ifcafeLotes.map(l => `
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:white;border:1.5px solid #e8ede8;border-radius:14px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-                  <div>
-                    <span style="font-size:14px;font-weight:700;color:#1a1a1a;">${l.nombre}</span>
-                    <span style="font-size:12px;color:#777;margin-left:6px;">(${l.variedad} · ${(l.numPlantas || 0).toLocaleString()} plantas)</span>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:12px;font-weight:700;color:#2d3e2c;background:#e8f5e9;padding:4px 12px;border-radius:20px;">${l.realizadas} labores realizadas</span>
-                    <a href="#" onclick="event.preventDefault();window.navigateTo('plan_ifcafe','${l.id}')" style="font-size:12px;font-weight:600;color:#2d3e2c;text-decoration:none;display:flex;align-items:center;gap:4px;padding:6px 12px;background:#f0f7e6;border-radius:20px;">
-                      Filtrar <span class="material-symbols-outlined" style="font-size:14px;">filter_alt</span>
-                    </a>
-                  </div>
-                </div>`).join('')}
-            </div>
-          </div>
-        ` : ''}
+        <!-- Single Unified Card (Filter + Calendar + Day Activities + Resumen por Lote) -->
+        ${calendarShellHtml(activeLote, false, !activeLote && _ifcafeLotes.length > 0)}
 
       </div>
       ${planStyles()}
@@ -1134,6 +1314,104 @@ export function initPlanIfcafe() {
       _calYear++;
     }
     renderPlanCal();
+  };
+
+  window.togglePlanCalendarView = function() {
+    const weekEl = document.getElementById('plan-cal-week-strip');
+    const monthEl = document.getElementById('plan-cal-month-grid');
+    const textEl = document.getElementById('plan-cal-toggle-text');
+    const iconEl = document.getElementById('plan-cal-toggle-icon');
+    const mobDateEl = document.getElementById('plan-cal-mob-date');
+    if (!monthEl || !weekEl) return;
+
+    const isMonthVisible = monthEl.classList.contains('open');
+    if (isMonthVisible) {
+      monthEl.classList.remove('open');
+      weekEl.style.display = 'flex';
+      if (textEl) textEl.textContent = 'Ver mes';
+      if (iconEl) iconEl.textContent = 'calendar_month';
+      if (mobDateEl) {
+        const fullDate = new Date(_calYear, _calMonth, _selectedDay || 1);
+        const dayName = fullDate.toLocaleDateString('es-ES', { weekday: 'short' });
+        const dayCap = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+        const monthName = fullDate.toLocaleDateString('es-ES', { month: 'short' });
+        const monthCap = monthName.charAt(0).toUpperCase() + monthName.slice(1).replace('.', '');
+        mobDateEl.textContent = `${dayCap}, ${_selectedDay || 1} ${monthCap}`;
+      }
+    } else {
+      monthEl.classList.add('open');
+      weekEl.style.display = 'none';
+      if (textEl) textEl.textContent = 'Ver semana';
+      if (iconEl) iconEl.textContent = 'view_week';
+      if (mobDateEl) {
+        const mDate = new Date(_calYear, _calMonth, 1);
+        const mName = mDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+        mobDateEl.textContent = mName.charAt(0).toUpperCase() + mName.slice(1);
+      }
+    }
+  };
+
+  window.navPlanCalPrev = function() {
+    const monthEl = document.getElementById('plan-cal-month-grid');
+    const isMonthView = monthEl && monthEl.classList.contains('open');
+    if (isMonthView) {
+      _calMonth--;
+      if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+    } else {
+      const cur = new Date(_calYear, _calMonth, _selectedDay || 1);
+      cur.setDate(cur.getDate() - 7);
+      _calYear = cur.getFullYear();
+      _calMonth = cur.getMonth();
+      _selectedDay = cur.getDate();
+    }
+    renderPlanCal();
+  };
+
+  window.navPlanCalNext = function() {
+    const monthEl = document.getElementById('plan-cal-month-grid');
+    const isMonthView = monthEl && monthEl.classList.contains('open');
+    if (isMonthView) {
+      _calMonth++;
+      if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+    } else {
+      const cur = new Date(_calYear, _calMonth, _selectedDay || 1);
+      cur.setDate(cur.getDate() + 7);
+      _calYear = cur.getFullYear();
+      _calMonth = cur.getMonth();
+      _selectedDay = cur.getDate();
+    }
+    renderPlanCal();
+  };
+
+  window.selectPlanCalendarDay = function(y, m, d) {
+    _calYear = y;
+    _calMonth = m;
+    _selectedDay = d;
+    renderPlanCal();
+  };
+
+  window.toggleResumenLotes = function() {
+    const content = document.getElementById('content-resumen-lotes');
+    const txt = document.getElementById('txt-toggle-resumen-lotes');
+    const ico = document.getElementById('ico-toggle-resumen-lotes');
+    if (!content) return;
+
+    const isHidden = content.style.display === 'none' || !content.style.display;
+    if (isHidden) {
+      content.style.display = 'flex';
+      if (txt) txt.textContent = 'Ocultar';
+      if (ico) {
+        ico.textContent = 'expand_less';
+        ico.style.transform = 'rotate(180deg)';
+      }
+    } else {
+      content.style.display = 'none';
+      if (txt) txt.textContent = 'Ver lotes';
+      if (ico) {
+        ico.textContent = 'expand_more';
+        ico.style.transform = 'rotate(0deg)';
+      }
+    }
   };
 
   window.showInlineActividadForm = function(defaultDate) {

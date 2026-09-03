@@ -88,6 +88,7 @@ function saveSession(session) {
 }
 
 export { restFetch, restInsert };
+
 export async function signUp(email, password, nombre, invitationToken, empresaNombre) {
   const data = await authFetch('/auth/v1/signup', {
     method: 'POST',

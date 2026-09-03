@@ -49,13 +49,6 @@ export async function renderNuevoAnimal(id) {
                 </div>
               </div>
 
-              <div class="m3-pro-tip">
-                <span class="material-icons icon">info</span>
-                <div>
-                  <h4>INFO</h4>
-                  <p>Completa los campos para mantener tu inventario actualizado.</p>
-                </div>
-              </div>
             </div>
 
             <!-- Right Side: Fields -->
@@ -110,10 +103,38 @@ export async function renderNuevoAnimal(id) {
                   </div>
                 </div>
 
-                <div class="m3-field">
-                  <input type="date" name="fecha_adquisicion" placeholder=" ">
-                  <label>Fecha de Ingreso</label>
+                <div class="m3-field" style="grid-column: 1 / -1;">
+                  <input type="date" name="fecha_adquisicion" id="fecha-adquisicion-input" placeholder=" ">
+                  <label style="white-space: nowrap;">Fecha de Ingreso o Nacimiento</label>
                 </div>
+              </div>
+
+              <!-- Selector de edad Material 3 Expressive -->
+              <div class="m3-age-card" style="background: #f4f7f3; border: 1px solid rgba(45, 62, 44, 0.14); border-radius: 18px; padding: 16px; margin-top: -2px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                  <span class="material-icons" style="font-size: 20px; color: #2d3e2c; background: rgba(45, 62, 44, 0.08); padding: 7px; border-radius: 12px;">hourglass_top</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #2d3e2c; line-height: 1.2;">¿No recuerdas la fecha exacta?</div>
+                    <div style="font-size: 11.5px; color: #586857; margin-top: 2px;">Selecciona su edad actual y calcularemos su fecha:</div>
+                  </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div class="m3-field" style="margin-bottom: 0;">
+                    <select id="edad-rapida-anios">
+                      ${Array.from({length: 26}, (_, i) => `<option value="${i}">${i} ${i === 1 ? 'año' : 'años'}</option>`).join('')}
+                    </select>
+                    <label>Años</label>
+                  </div>
+                  <div class="m3-field" style="margin-bottom: 0;">
+                    <select id="edad-rapida-meses">
+                      ${Array.from({length: 12}, (_, i) => `<option value="${i}">${i} ${i === 1 ? 'mes' : 'meses'}</option>`).join('')}
+                    </select>
+                    <label>Meses</label>
+                  </div>
+                </div>
+
+                <div id="edad-calculada-preview" style="font-size: 12.5px; color: #2d3e2c; font-weight: 700; margin-top: 12px; display: none; align-items: center; gap: 6px; background: rgba(45, 62, 44, 0.08); padding: 8px 12px; border-radius: 10px;"></div>
               </div>
 
               <div class="m3-field" style="margin-top:16px;">
@@ -176,7 +197,10 @@ export function initNuevoAnimal(id) {
         form.nombre.value = data.nombre || '';
         form.raza.value = data.raza || '';
         form.sexo.value = data.sexo || '';
-        form.fecha_adquisicion.value = data.fecha_adquisicion || '';
+        const fechaIngreso = data.fecha_adquisicion ? data.fecha_adquisicion.split('T')[0] : (data.created_at ? data.created_at.split('T')[0] : '');
+        form.fecha_adquisicion.value = fechaIngreso;
+        updateEdadPreview();
+
         form.origen.value = data.origen || 'Criollo';
         form.precio_compra.value = data.precio_compra || '';
         if (data.madre_id) form.madre_id.value = data.madre_id;
@@ -190,12 +214,124 @@ export function initNuevoAnimal(id) {
         existingImageUrl = data.image_url;
 
         if (data.image_url) {
-          preview.innerHTML = `<img src="${data.image_url}" style="width: 100%; height: 100%; object-fit: cover;">`;
-          dropzone.style.border = 'none';
+          updatePhotoDisplay(data.image_url);
         }
       }
     });
   }
+
+  const selectAnios = document.getElementById('edad-rapida-anios');
+  const selectMeses = document.getElementById('edad-rapida-meses');
+
+  // Preview dinámico de edad y sincronización con fecha_adquisicion
+  const updateEdadPreview = (syncInputs = true) => {
+    const previewEl = document.getElementById('edad-calculada-preview');
+    if (!previewEl) return;
+    const fVal = form.fecha_adquisicion?.value;
+    if (!fVal) {
+      previewEl.style.display = 'none';
+      previewEl.innerHTML = '';
+      if (syncInputs) {
+        if (selectAnios) selectAnios.value = '0';
+        if (selectMeses) selectMeses.value = '0';
+      }
+      return;
+    }
+    const d = new Date(fVal + 'T00:00:00');
+    if (isNaN(d.getTime())) {
+      previewEl.style.display = 'none';
+      previewEl.innerHTML = '';
+      return;
+    }
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const diff = Math.floor((now - d) / 86400000);
+    if (diff < 0) {
+      previewEl.style.display = 'flex';
+      previewEl.innerHTML = '<span style="color:#b45309;">⚠️ Fecha en el futuro</span>';
+      return;
+    }
+    let anios = now.getFullYear() - d.getFullYear();
+    let meses = now.getMonth() - d.getMonth();
+    let dias = now.getDate() - d.getDate();
+
+    if (dias < 0) {
+      meses -= 1;
+      const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+      dias += prevMonthDays;
+    }
+    if (meses < 0) {
+      anios -= 1;
+      meses += 12;
+    }
+
+    let texto = '';
+    if (diff <= 1) texto = '1 día';
+    else if (diff < 30) texto = `${diff} días`;
+    else if (anios <= 0) {
+      const m = Math.max(1, meses);
+      if (dias > 0) {
+        texto = `${m} ${m === 1 ? 'mes' : 'meses'}, ${dias} ${dias === 1 ? 'día' : 'días'}`;
+      } else {
+        texto = `${m} ${m === 1 ? 'mes' : 'meses'}`;
+      }
+    } else {
+      let extra = '';
+      if (meses > 0 && dias > 0) {
+        extra = `, ${meses} ${meses === 1 ? 'mes' : 'meses'}, ${dias} d`;
+      } else if (meses > 0) {
+        extra = `, ${meses} ${meses === 1 ? 'mes' : 'meses'}`;
+      } else if (dias > 0) {
+        extra = `, ${dias} d`;
+      }
+      texto = `${anios} ${anios === 1 ? 'año' : 'años'}${extra}`;
+    }
+    previewEl.style.display = 'flex';
+    previewEl.innerHTML = `<span class="material-icons" style="font-size:16px; color:#2d3e2c;">cake</span> Edad calculada: <strong style="margin-left:2px;">${texto}</strong>`;
+
+    if (syncInputs) {
+      if (selectAnios) selectAnios.value = String(Math.min(25, Math.max(0, anios)));
+      if (selectMeses) selectMeses.value = String(Math.min(11, Math.max(0, meses)));
+    }
+  };
+
+  const aplicarEdadDesdeAniosMeses = () => {
+    const a = parseInt(selectAnios?.value, 10) || 0;
+    const m = parseInt(selectMeses?.value, 10) || 0;
+    if (a === 0 && m === 0) return;
+    const now = new Date();
+    // Restar años y meses desde hoy
+    const calculatedDate = new Date(now.getFullYear() - a, now.getMonth() - m, now.getDate());
+    const yyyy = calculatedDate.getFullYear();
+    const mm = String(calculatedDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(calculatedDate.getDate()).padStart(2, '0');
+    if (form.fecha_adquisicion) {
+      form.fecha_adquisicion.value = `${yyyy}-${mm}-${dd}`;
+      updateEdadPreview(false);
+    }
+  };
+
+  if (selectAnios) {
+    selectAnios.addEventListener('change', aplicarEdadDesdeAniosMeses);
+  }
+  if (selectMeses) {
+    selectMeses.addEventListener('change', aplicarEdadDesdeAniosMeses);
+  }
+
+  if (form.fecha_adquisicion) {
+    form.fecha_adquisicion.addEventListener('input', () => updateEdadPreview(true));
+    form.fecha_adquisicion.addEventListener('change', () => updateEdadPreview(true));
+  }
+
+  const updatePhotoDisplay = (url) => {
+    if (!url) return;
+    preview.innerHTML = `
+      <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #eef2ed; border-radius: 16px; overflow: hidden;">
+        <img id="main-uploaded-img" src="${url}" style="width: 100%; height: 100%; object-fit: contain;">
+      </div>
+    `;
+    dropzone.style.border = 'none';
+  };
 
   // Photo Selection
   if (dropzone && photoInput) {
@@ -221,8 +357,7 @@ export function initNuevoAnimal(id) {
         selectedFile = file;
         const reader = new FileReader();
         reader.onload = (re) => {
-          preview.innerHTML = `<img src="${re.target.result}" style="width: 100%; height: 100%; object-fit: cover;">`;
-          dropzone.style.border = 'none';
+          updatePhotoDisplay(re.target.result);
         };
         reader.readAsDataURL(file);
       }
@@ -300,8 +435,8 @@ export function initNuevoAnimal(id) {
         const hoy = new Date().toISOString().split('T')[0];
         if (id) {
           // Buscar último pesaje; si el peso cambió, crear uno nuevo
-          const ultimo = await supabase.from('animal_pesajes').select('peso').eq('animal_id', id).order('fecha', { ascending: false }).limit(1);
-          const ultimoPeso = ultimo.data?.[0]?.peso;
+          const ultimo = await supabase.from('animal_pesajes').select('peso').eq('animal_id', id).order('fecha', { ascending: false });
+          const ultimoPeso = Array.isArray(ultimo.data) ? ultimo.data[0]?.peso : ultimo.data?.peso;
           if (ultimoPeso !== String(pesoVal)) {
             await supabase.from('animal_pesajes').insert({
               animal_id: newId,

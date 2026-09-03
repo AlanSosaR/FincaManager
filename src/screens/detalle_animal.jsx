@@ -353,19 +353,49 @@ function renderFullContent(container, animalId, flag, targetTab) {
             </div>`;
         }
     }
-    const fmtFechaEdad = (fechaStr) => {
-        if (!fechaStr) return '';
-        const f = new Date(fechaStr);
-        const dias = Math.floor((Date.now() - f.getTime()) / 86400000);
-        const diasTxt = dias >= 0 ? ` <span class="da-dias-edad">(${dias} día${dias === 1 ? '' : 's'})</span>` : '';
-        return f.toLocaleDateString() + diasTxt;
-    };
+    const fechaEdad = currentAnimal.fecha_adquisicion || currentAnimal.created_at;
+    let edadTxt = '';
+    let fechaFormateada = '';
     let edadDiasSimple = '';
-    if (currentAnimal.fecha_adquisicion) {
-        const f = new Date(currentAnimal.fecha_adquisicion);
-        const dias = Math.floor((Date.now() - f.getTime()) / 86400000);
-        if (dias >= 0) {
-            edadDiasSimple = `${dias} días`;
+    if (fechaEdad) {
+        const f = new Date(fechaEdad.includes('T') ? fechaEdad : fechaEdad + 'T00:00:00');
+        if (!isNaN(f.getTime())) {
+            fechaFormateada = f.toLocaleDateString();
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            let anios = now.getFullYear() - f.getFullYear();
+            let meses = now.getMonth() - f.getMonth();
+            let dias = now.getDate() - f.getDate();
+            if (dias < 0) {
+                meses -= 1;
+                const prevMonthDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+                dias += prevMonthDays;
+            }
+            if (meses < 0) { anios -= 1; meses += 12; }
+
+            const diffDays = Math.floor((now - f) / 86400000);
+            if (diffDays >= 0) edadDiasSimple = `${diffDays} días`;
+
+            if (diffDays <= 1) {
+                edadTxt = '1 día';
+            } else if (diffDays < 30) {
+                edadTxt = `${diffDays} días`;
+            } else if (anios <= 0) {
+                const m = Math.max(1, meses);
+                if (dias > 0) {
+                    edadTxt = `${m} ${m === 1 ? 'mes' : 'meses'}, ${dias} ${dias === 1 ? 'día' : 'días'}`;
+                } else {
+                    edadTxt = `${m} ${m === 1 ? 'mes' : 'meses'}`;
+                }
+            } else if (meses > 0 && dias > 0) {
+                edadTxt = `${anios} ${anios === 1 ? 'año' : 'años'}, ${meses} m, ${dias} d`;
+            } else if (meses > 0) {
+                edadTxt = `${anios} ${anios === 1 ? 'año' : 'años'}, ${meses} m`;
+            } else if (dias > 0) {
+                edadTxt = `${anios} ${anios === 1 ? 'año' : 'años'}, ${dias} d`;
+            } else {
+                edadTxt = `${anios} ${anios === 1 ? 'año' : 'años'}`;
+            }
         }
     }
     const pendVacCount = vaccines.filter(v => v.estado === 'Programada').length;
@@ -410,17 +440,12 @@ function renderFullContent(container, animalId, flag, targetTab) {
                 </div>
 
                 <div class="da-header-subrow">
-                    ${currentAnimal.origen !== 'Comprado'
-                        ? (currentAnimal.fecha_adquisicion ? `
-                    <div class="da-header-birth-text">
-                        <img src="/cria.png" class="da-header-birth-icon">
-                        <span>Nacimiento: <strong>${fmtFechaEdad(currentAnimal.fecha_adquisicion)}</strong></span>
-                    </div>` : '')
-                        : (currentAnimal.fecha_adquisicion ? `
-                    <div class="da-header-birth-text">
-                        <span class="material-icons da-header-birth-icon" style="font-size:16px;">cake</span>
-                        <span>Adquisición: <strong>${fmtFechaEdad(currentAnimal.fecha_adquisicion)}</strong></span>
-                    </div>` : '')}
+                    ${edadTxt ? `
+                    <div class="da-header-birth-text" style="color: #ffffff; display: flex; align-items: center; gap: 5px;">
+                        <span class="material-icons da-header-birth-icon" style="font-size:16px; color:#ffffff;">cake</span>
+                        <span style="font-size:13.5px; color:#ffffff;">Edad: <strong style="color:#ffffff; font-weight:700;">${edadTxt}</strong></span>
+                        <span style="opacity: 0.8; font-size: 12px; margin-left: 6px; color:#ffffff;">• ${currentAnimal.origen === 'Comprado' ? 'Ingreso' : 'Nacimiento'}: ${fechaFormateada}</span>
+                    </div>` : ''}
 
                     ${currentAnimal.potreros?.nombre || currentAnimal.madre || reproBadge || currentAnimal.origen === 'Comprado' ? `
                     <div class="da-badge-row da-header-badges">
@@ -454,7 +479,7 @@ function renderFullContent(container, animalId, flag, targetTab) {
                         <span class="da-hero-status-pill comprado">HNL ${currentAnimal.precio_compra}</span>` : '')}
                     </div>
                     <div class="da-hero-img-info">
-                        <div class="da-hero-img-sub">${[currentAnimal.raza, currentAnimal.sexo, edadDiasSimple].filter(Boolean).join(' · ')}</div>
+                        <div class="da-hero-img-sub">${[currentAnimal.raza, currentAnimal.sexo, edadTxt].filter(Boolean).join(' · ')}</div>
                         <div class="da-hero-img-title">${currentAnimal.nombre || 'Sin Nombre'}</div>
                     </div>
                 </div>
@@ -887,6 +912,19 @@ function setupEventListeners(animalId, container, sellMode) {
                     method: 'PATCH',
                     body: JSON.stringify({ estado: 'Vendido' }),
                 });
+
+                // Eliminar registros de vacunas y fumigaciones del animal vendido
+                let delVacUrl = '/rest/v1/animal_vacunas?animal_id=eq.' + encodeURIComponent(animalId);
+                let delFumUrl = '/rest/v1/animal_fumigaciones?animal_id=eq.' + encodeURIComponent(animalId);
+                if (window._currentEmpresaId) {
+                    delVacUrl += '&empresa_id=eq.' + encodeURIComponent(window._currentEmpresaId);
+                    delFumUrl += '&empresa_id=eq.' + encodeURIComponent(window._currentEmpresaId);
+                }
+                await Promise.all([
+                    restFetch(delVacUrl, { method: 'DELETE' }).catch(() => []),
+                    restFetch(delFumUrl, { method: 'DELETE' }).catch(() => [])
+                ]);
+
                 showSnackbar('Venta registrada');
 
                 if (currentAnimal) {
