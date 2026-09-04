@@ -318,7 +318,8 @@ export async function initMapaLotes() {
     zoom: 15,
     maxZoom: 22,
     zoomControl: false,
-    attributionControl: false
+    attributionControl: false,
+    zoomSnap: 0.1
   });
 
   const btnLayers = document.createElement('button');
@@ -351,9 +352,16 @@ export async function initMapaLotes() {
     }
     if (allBounds.length > 0) {
       const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
-      map.fitBounds(group.getBounds().pad(0.1));
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+        const currentZoom = map.getZoom();
+        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19));
+      } else {
+        map.fitBounds(group.getBounds().pad(0.1));
+      }
     } else if (ref) {
-      map.setView([ref.lat, ref.lng], 15);
+      map.setView([ref.lat, ref.lng], 16);
     }
     setTimeout(() => map.invalidateSize(), 200);
   }, 50);
@@ -743,7 +751,14 @@ export async function initMapaLotes() {
   const fitToParcels = () => {
     if (allBounds.length > 0) {
       const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
-      map.fitBounds(group.getBounds().pad(0.1));
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+        const currentZoom = map.getZoom();
+        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19));
+      } else {
+        map.fitBounds(group.getBounds().pad(0.1));
+      }
     }
   };
 

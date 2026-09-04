@@ -154,6 +154,14 @@ export async function renderDashboard() {
           gap: 5px;
           text-shadow: 0 1px 2px rgba(0,0,0,0.4);
         }
+        @media (max-width: 600px) {
+          .lote-label {
+            font-size: 10.5px;
+            padding: 3px 8px 3px 6px;
+            border-width: 1.5px;
+            gap: 3px;
+          }
+        }
         #mapa-container path.leaflet-interactive {
           filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
           transition: stroke-width 0.15s ease, fill-opacity 0.15s ease;
@@ -474,7 +482,8 @@ export async function initDashboard() {
     zoomControl: false,
     attributionControl: false,
     maxZoom: 21,
-    minZoom: 3
+    minZoom: 3,
+    zoomSnap: 0.1
   }).setView([14.6349, -87.4526], 15);
 
   window._dbMapInstance = map;
@@ -898,10 +907,26 @@ export async function initDashboard() {
     clearLoteSelection();
   });
 
-  if (allBounds.length > 0) {
-    const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
-    map.fitBounds(group.getBounds().pad(0.15));
-  }
+  const adjustMapView = () => {
+    if (allBounds.length > 0) {
+      const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        // En móvil ajuste más holgado
+        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+        const currentZoom = map.getZoom();
+        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19));
+      } else {
+        map.fitBounds(group.getBounds().pad(0.12));
+      }
+    }
+  };
+
+  adjustMapView();
+  setTimeout(() => {
+    map.invalidateSize();
+    adjustMapView();
+  }, 120);
 
   // Search logic on map
   const searchToggle = document.getElementById('lotes-search-toggle');
