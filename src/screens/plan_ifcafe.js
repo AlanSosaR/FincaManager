@@ -173,6 +173,14 @@ function eventCardHtml(ev) {
   const isDosisType = tipoLower.includes('foliar') || tipoLower.includes('fertiliz') || tipoLower.includes('abono') || (tipoLower.includes('suelo') && !tipoLower.includes('análisis') && !tipoLower.includes('analisis')) || tipoLower.includes('fitosanit') || tipoLower.includes('fungic') || tipoLower.includes('insectic');
   const showDosis = ev.dosis && ev.dosis.trim() && ev.dosis !== 'N/A' && isDosisType;
 
+  const listaOperadores = ev.operador
+    ? String(ev.operador).split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
+  const cleanObs = (ev.observaciones || '')
+    .replace(/👤?\s*Responsables:\s*[^\n]+(\n+|$)/gi, '')
+    .trim();
+
   return `
     <div class="plan-ev" style="border:1.5px solid ${isRealizada ? '#c8e6c9' : isAtrasada ? '#ffcdd2' : '#ffe9a8'};">
       <div class="plan-ev-head">
@@ -189,17 +197,34 @@ function eventCardHtml(ev) {
       <div class="plan-ev-meta">
         <div><strong>Tipo:</strong> ${ev.tipo || 'General'}${ev.metodo ? ` · ${ev.metodo}` : ''}</div>
         ${showDosis ? `<div><strong>Dosis:</strong> ${ev.dosis}</div>` : ''}
-        ${ev.operador ? `<div><strong>Responsable:</strong> ${ev.operador}</div>` : ''}
+
+        ${listaOperadores.length > 0 ? `
+          <div style="grid-column: 1 / -1; margin-top: 6px;">
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #526350; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 14px; color: #2d3e2c;">badge</span>
+              <span>Responsable${listaOperadores.length > 1 ? 's' : ''}:</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              ${listaOperadores.map(op => `
+                <div style="display: flex; align-items: center; gap: 8px; background: #f2f7f1; border: 1px solid #d4dfd2; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 700; color: #1b5e20;">
+                  <span class="material-symbols-outlined" style="font-size: 15px; color: #2d3e2c;">person</span>
+                  <span>${esc(op)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
         ${isRealizada && diasTranscurridosTexto ? `
-          <div style="grid-column: 1 / -1; margin-top: 4px; color: #1b5e20; font-weight: 700; background: #f1f8f0; padding: 6px 10px; border-radius: 8px; border: 1px solid #d0e7ce; display: flex; align-items: center; gap: 6px; font-size: 12px;">
+          <div style="grid-column: 1 / -1; margin-top: 6px; color: #1b5e20; font-weight: 700; background: #f1f8f0; padding: 6px 10px; border-radius: 8px; border: 1px solid #d0e7ce; display: flex; align-items: center; gap: 6px; font-size: 12px;">
             <span class="material-symbols-outlined" style="font-size: 16px; color:#2d3e2c;">history</span>
             <span>Tiempo transcurrido: <strong>${diasTranscurridosTexto}</strong></span>
           </div>
         ` : ''}
       </div>
 
-      ${ev.observaciones ? `<div class="plan-ev-purpose" style="margin-top:6px; color:#444; background:#f9faf9; padding:6px 10px; border-radius:8px; font-size:12px;"><strong>💬 Obs:</strong> ${ev.observaciones}</div>` : ''}
-      ${ev.purpose && !ev.observaciones ? `<div class="plan-ev-purpose">🎯 ${ev.purpose}</div>` : ''}
+      ${cleanObs ? `<div class="plan-ev-purpose" style="margin-top:6px; color:#444; background:#f9faf9; padding:6px 10px; border-radius:8px; font-size:12px;"><strong>💬 Obs:</strong> ${esc(cleanObs)}</div>` : ''}
+      ${ev.purpose && !cleanObs ? `<div class="plan-ev-purpose">🎯 ${ev.purpose}</div>` : ''}
 
       ${ev.foto_url ? `
         <div style="margin-top:10px; position:relative; overflow:hidden; border-radius:12px; border:1px solid #d4dfd2; background:#f4f7f4;">
@@ -216,7 +241,7 @@ function eventCardHtml(ev) {
 
 function calendarShellHtml(activeLote = null, isEmbedded = false, showLotesResumen = false) {
   const cardStyle = isEmbedded
-    ? 'width: 100%; box-sizing: border-box; padding-top: 4px;'
+    ? 'width: 100%; box-sizing: border-box; padding: 0; background: transparent; border: none; box-shadow: none;'
     : 'background: var(--m3-surface-container-lowest, #ffffff); border: 1.5px solid var(--m3-outline-variant, #c7cec3); border-radius: 20px; padding: 18px 16px; box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); width: 100%; box-sizing: border-box; margin-bottom: 20px;';
 
   return `
@@ -260,46 +285,50 @@ function calendarShellHtml(activeLote = null, isEmbedded = false, showLotesResum
       <div style="border-top: 1.5px solid #edf1ec; margin: 14px 0 16px 0;"></div>
       ` : ''}
 
-      <div class="da-calendar-header" style="margin-bottom: 12px; width: 100%;">
-        <div class="da-cal-nav">
-          <button type="button" class="da-cal-nav-btn" onclick="window.changePlanCalMonth(-1)" aria-label="Mes anterior"><span class="material-icons">chevron_left</span></button>
-          <h3 id="plan-cal-month-display"></h3>
-          <button type="button" class="da-cal-nav-btn" onclick="window.changePlanCalMonth(1)" aria-label="Mes siguiente"><span class="material-icons">chevron_right</span></button>
-        </div>
-        <div class="da-cal-mob-bar" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <div style="display:flex; align-items:center; gap:6px;">
-            <button type="button" class="da-cal-mob-arrow" onclick="window.navPlanCalPrev()" title="Semana o mes anterior">
-              <span class="material-icons">chevron_left</span>
-            </button>
-            <span class="da-cal-mob-date" id="plan-cal-mob-date">Fecha</span>
-            <button type="button" class="da-cal-mob-arrow" onclick="window.navPlanCalNext()" title="Semana o mes siguiente">
-              <span class="material-icons">chevron_right</span>
-            </button>
+      <div class="da-calendar-layout">
+        <div class="da-calendar-card">
+          <div class="da-calendar-header">
+            <div class="da-cal-nav">
+              <button type="button" class="da-cal-nav-btn" onclick="window.changePlanCalMonth(-1)" aria-label="Mes anterior"><span class="material-icons">chevron_left</span></button>
+              <h3 id="plan-cal-month-display"></h3>
+              <button type="button" class="da-cal-nav-btn" onclick="window.changePlanCalMonth(1)" aria-label="Mes siguiente"><span class="material-icons">chevron_right</span></button>
+            </div>
+            <div class="da-cal-mob-bar">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button type="button" class="da-cal-mob-arrow" onclick="window.navPlanCalPrev()" title="Semana o mes anterior">
+                  <span class="material-icons">chevron_left</span>
+                </button>
+                <span class="da-cal-mob-date" id="plan-cal-mob-date">Fecha</span>
+                <button type="button" class="da-cal-mob-arrow" onclick="window.navPlanCalNext()" title="Semana o mes siguiente">
+                  <span class="material-icons">chevron_right</span>
+                </button>
+              </div>
+              <button type="button" class="da-cal-mob-toggle" id="plan-cal-toggle-btn" onclick="window.togglePlanCalendarView()">
+                <span class="material-icons" id="plan-cal-toggle-icon" style="font-size:14px;">calendar_month</span>
+                <span id="plan-cal-toggle-text">Ver mes</span>
+              </button>
+            </div>
           </div>
-          <button type="button" class="da-cal-mob-toggle" id="plan-cal-toggle-btn" onclick="window.togglePlanCalendarView()">
-            <span class="material-icons" id="plan-cal-toggle-icon" style="font-size:14px;">calendar_month</span>
-            <span id="plan-cal-toggle-text">Ver mes</span>
-          </button>
+          <div class="da-cal-week-strip" id="plan-cal-week-strip" style="width: 100%; box-sizing: border-box;"></div>
+          <div class="da-calendar-grid" id="plan-cal-month-grid" style="width: 100%; box-sizing: border-box;">
+            <div class="da-cal-day-name">Lun</div><div class="da-cal-day-name">Mar</div><div class="da-cal-day-name">Mié</div><div class="da-cal-day-name">Jue</div><div class="da-cal-day-name">Vie</div><div class="da-cal-day-name">Sáb</div><div class="da-cal-day-name">Dom</div>
+            <div class="da-cal-days-container" id="plan-cal-days"></div>
+          </div>
+          <div class="da-cal-legend" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e8ede8;">
+            <div><span class="plan-legend-dot" style="background:#2d3e2c;"></span><span>Realizada</span></div>
+            <div><span class="plan-legend-dot" style="background:#c9a227;"></span><span>Programada</span></div>
+            <div><span class="plan-legend-dot" style="background:#FF4103;"></span><span>Atrasada</span></div>
+          </div>
         </div>
-      </div>
-      <div class="da-cal-week-strip" id="plan-cal-week-strip" style="width: 100%; box-sizing: border-box;"></div>
-      <div class="da-calendar-grid" id="plan-cal-month-grid" style="width: 100%; box-sizing: border-box;">
-        <div class="da-cal-day-name">Lun</div><div class="da-cal-day-name">Mar</div><div class="da-cal-day-name">Mié</div><div class="da-cal-day-name">Jue</div><div class="da-cal-day-name">Vie</div><div class="da-cal-day-name">Sáb</div><div class="da-cal-day-name">Dom</div>
-        <div class="da-cal-days-container" id="plan-cal-days"></div>
-      </div>
-      <div class="da-cal-legend" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e8ede8;">
-        <div><span class="plan-legend-dot" style="background:#2d3e2c;"></span><span>Realizada</span></div>
-        <div><span class="plan-legend-dot" style="background:#c9a227;"></span><span>Programada</span></div>
-        <div><span class="plan-legend-dot" style="background:#FF4103;"></span><span>Atrasada</span></div>
-      </div>
 
-      <div style="border-top: 1.5px solid #edf1ec; margin: 18px 0 16px 0;"></div>
-
-      <div id="plan-day-details" style="width: 100%; box-sizing: border-box;">
-        <div class="cafetal-day-details-inner" style="text-align:center;color:#888;padding:20px 12px;">
-          <span class="material-symbols-outlined" style="font-size:44px;color:#2d3e2c;opacity:0.6;margin-bottom:8px;">calendar_month</span>
-          <p style="font-size:14px;font-weight:600;color:#333;margin:0 0 6px;">Toca cualquier día en el calendario</p>
-          <p style="font-size:12px;color:#777;margin:0;">Para ver las labores programadas o registrar una nueva actividad (foliar, abono, podas, etc.)</p>
+        <div id="plan-day-details-panel">
+          <div class="da-day-details" id="plan-day-details" style="width: 100%; box-sizing: border-box;">
+            <div class="cafetal-day-details-inner" style="text-align:center;color:#888;padding:24px 16px;">
+              <span class="material-symbols-outlined" style="font-size:44px;color:#2d3e2c;opacity:0.6;margin-bottom:8px;">calendar_month</span>
+              <p style="font-size:14px;font-weight:700;color:#333;margin:0 0 6px;">Toca cualquier día en el calendario</p>
+              <p style="font-size:12px;color:#777;margin:0;">Para ver las labores programadas o registrar una nueva actividad (foliar, abono, podas, etc.)</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -416,9 +445,15 @@ function renderPlanWeekStrip() {
 
   container.innerHTML = html;
   if (monthEl && monthEl.classList.contains('open')) {
-    container.style.display = 'none';
+    container.classList.add('open-month-hidden');
+    container.style.setProperty('display', 'none', 'important');
   } else {
-    container.style.display = 'flex';
+    container.classList.remove('open-month-hidden');
+    if (window.innerWidth <= 768) {
+      container.style.setProperty('display', 'flex', 'important');
+    } else {
+      container.style.removeProperty('display');
+    }
   }
 }
 
@@ -612,15 +647,23 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   const currentProducto = editApp ? (editApp.producto || '') : '';
   const currentDosis = editApp ? (editApp.dosis || '') : '';
   const currentOperador = editApp ? (editApp.operador || '') : '';
-  const currentObs = editApp ? (editApp.observaciones || '') : '';
+  let cleanObs = editApp ? (editApp.observaciones || '') : '';
+  let resolvedOperador = currentOperador;
+  if (!resolvedOperador && cleanObs.includes('Responsables:')) {
+    const m = cleanObs.match(/Responsables:\s*([^\n]+)/);
+    if (m) resolvedOperador = m[1].trim();
+  }
+  if (cleanObs.includes('Responsables:')) {
+    cleanObs = cleanObs.replace(/👤?\s*Responsables:\s*[^\n]+\n*/g, '').trim();
+  }
   const currentFoto = editApp ? (editApp.foto_url || editApp.notas || '') : '';
 
   panel.innerHTML = `
     <div class="cafetal-day-details-inner" style="animation: slideUp 0.2s ease-out;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1.5px solid #eef2ee; padding-bottom:8px;">
         <div>
-          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">${formTitle}</span>
-          <h4 style="margin:2px 0 0; font-size:15px; font-weight:800; color:#1a1a1a; text-transform:capitalize;">${dateFormatted}</h4>
+          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;" id="inline-plan-form-title">${formTitle}</span>
+          <h4 style="margin:2px 0 0; font-size:15px; font-weight:800; color:#1a1a1a; text-transform:capitalize;" id="inline-plan-date-heading">${dateFormatted}</h4>
         </div>
         <button type="button" onclick="window.cancelInlineActividad('${actDate}')" style="background:none; border:none; color:#777; cursor:pointer; padding:4px;">
           <span class="material-symbols-outlined" style="font-size:20px;">close</span>
@@ -629,9 +672,14 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
 
       <form id="form-plan-inline-actividad" style="display:flex; flex-direction:column; gap:12px;">
         ${editAppId ? `<input type="hidden" name="id" value="${editAppId}">` : ''}
-        <input type="hidden" name="fecha" value="${actDate}">
 
-        <!-- 1. Lote -->
+        <!-- 1. Fecha de la Actividad (Editable para registrar en fecha pasada o futura) -->
+        <div class="m3-field">
+          <input type="date" name="fecha" id="inline-plan-fecha" value="${actDate}" required style="font-size:13px; font-weight:600; color-scheme: light;">
+          <label>Fecha de la Actividad</label>
+        </div>
+
+        <!-- 2. Lote -->
         <div class="m3-field">
           <select name="lote_id" id="inline-plan-lote" required style="font-size:13px; font-weight:600;">
             ${_allLotes.map(l => `<option value="${l.id}" ${l.id === targetLoteId ? 'selected' : ''}>${l.nombre} (${l.variedad || 'Café'} - ${l.num_plantas || 0} plantas)</option>`).join('')}
@@ -639,7 +687,7 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           <label>Lote de Café</label>
         </div>
 
-        <!-- 2. Tipo de Labor -->
+        <!-- 3. Tipo de Labor -->
         <div class="m3-field">
           <select name="tipo" id="inline-plan-tipo" required style="font-size:13px; font-weight:600;">
             <option value="Aplicación Foliar" ${currentTipo === 'Aplicación Foliar' ? 'selected' : ''}>🍃 Aplicación Foliar (Nutrición / Estimulante)</option>
@@ -653,74 +701,116 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           <label>Tipo de Actividad</label>
         </div>
 
-        <!-- 3. Producto / Tratamiento -->
+        <!-- 4. Producto / Tratamiento -->
         <div class="m3-field" id="field-plan-producto">
           <input type="text" name="producto" id="inline-plan-producto" value="${esc(currentProducto)}" placeholder=" " required style="font-size:13px;">
           <label id="label-plan-producto">Producto o Fórmula recomendada</label>
         </div>
 
-        <!-- 4. Dosis (visible solo en Foliar, Suelo y Fitosanitario) -->
+        <!-- 5. Dosis (visible solo en Foliar, Suelo y Fitosanitario) -->
         <div class="m3-field" id="field-plan-dosis">
           <input type="text" name="dosis" id="inline-plan-dosis" value="${esc(currentDosis)}" placeholder=" " style="font-size:13px;">
           <label>Dosis (ej: 120g/planta, 50cc/bomba 20L)</label>
         </div>
 
-        <!-- 5. Responsable / Operador -->
-        <div class="m3-field">
-          <input type="text" name="operador" id="inline-plan-operador" value="${esc(currentOperador)}" list="operadores-plan-sugeridos" placeholder=" " style="font-size:13px;">
-          <label>Responsable / Aplicador</label>
-          <datalist id="operadores-plan-sugeridos">
-            ${_personalList.map(p => `<option value="${p.nombre}"></option>`).join('')}
-          </datalist>
+        <!-- 6. Responsables / Aplicadores (Buscador Inteligente) -->
+        <div style="background: #f8faf8; border: 1.5px solid #d4ded3; border-radius: 14px; padding: 14px; position: relative;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <label style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #2d3e2c; letter-spacing: 0.5px;">
+              👥 Responsables / Aplicadores
+            </label>
+            <span style="font-size: 11px; color: #666;">Buscar en personal</span>
+          </div>
+
+          <!-- Buscador con dropdown interactivo -->
+          <div style="position: relative;">
+            <div style="position: relative; display: flex; align-items: center;">
+              <span class="material-symbols-outlined" style="position: absolute; left: 12px; font-size: 20px; color: #5a7357; pointer-events: none;">search</span>
+              <input type="text" id="inline-plan-operador-custom-input" placeholder="Buscar responsable (ej: David, Erick)..." autocomplete="off" style="width: 100%; box-sizing: border-box; border: 1.5px solid #c2d8c0; border-radius: 12px; padding: 11px 14px 11px 38px; font-size: 13.5px; outline: none; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            </div>
+
+            <!-- Lista desplegable flotante de resultados -->
+            <div id="inline-plan-operador-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1.5px solid #2d3e2c; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.16); z-index: 1050; max-height: 220px; overflow-y: auto;"></div>
+          </div>
+
+          <!-- Contenedor de responsables seleccionados (uno sobre otro) -->
+          <div id="inline-plan-selected-chips-wrap" style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px; min-height: 24px;"></div>
+          <input type="hidden" name="operador" id="inline-plan-operador-hidden" value="${esc(resolvedOperador)}">
         </div>
 
-        <!-- 6. Observaciones y Recomendaciones del Técnico -->
+        <!-- 7. Observaciones y Recomendaciones del Técnico -->
         <div class="m3-field">
-          <textarea name="observaciones" id="inline-plan-obs" rows="2" placeholder=" " style="font-size:13px;">${esc(currentObs)}</textarea>
+          <textarea name="observaciones" id="inline-plan-obs" rows="2" placeholder=" " style="font-size:13px;">${esc(cleanObs)}</textarea>
           <label>Observaciones / Recomendación Técnica</label>
         </div>
 
-        <!-- 7. Foto de la Planta (Progreso y Evidencia) -->
-        <div id="inline-plan-foto-section" style="background: #fbfdfa; border: 1.5px dashed #c0d4be; border-radius: 14px; padding: 14px; text-align: center; margin: 16px 0 24px 0;">
-          <input type="file" id="inline-plan-foto-input" accept="image/*" capture="environment" style="display: none;">
+        <!-- 8. Foto de la Planta (Cámara o Galería) -->
+        <div id="inline-plan-foto-section" style="background: #fbfdfa; border: 1.5px dashed #c0d4be; border-radius: 14px; padding: 14px; text-align: center; margin: 12px 0 16px 0;">
+          <!-- Input específico para Cámara (móvil abre directo cámara) -->
+          <input type="file" id="inline-plan-foto-camera-input" accept="image/*" capture="environment" style="display: none;">
+          <!-- Input específico para Galería / Archivos -->
+          <input type="file" id="inline-plan-foto-gallery-input" accept="image/*" style="display: none;">
           <input type="hidden" name="foto_url" id="inline-plan-foto-data" value="${currentFoto || ''}">
           
-          <div id="inline-plan-foto-preview-box" style="${currentFoto ? 'display:block;' : 'display:none;'} position: relative; margin-bottom: 12px;">
-            <img id="inline-plan-foto-img" src="${currentFoto || ''}" alt="Foto de la planta" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; border: 1px solid #d4dfd2;">
-            <button type="button" id="inline-plan-btn-quitar-foto" style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-              <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
-            </button>
+          <div id="inline-plan-foto-prompt" style="display: ${currentFoto ? 'none' : 'flex'}; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: #eaf2e8; display: flex; align-items: center; justify-content: center; color: #2d3e2c;">
+              <span class="material-symbols-outlined" style="font-size: 22px; color: #2d3e2c;">photo_camera</span>
+            </div>
+            <div style="font-weight: 800; font-size: 13px; color: #1a1a1a;">Foto de la Planta (Evidencia o avance)</div>
+            <div style="font-size: 11.5px; color: #666; margin-bottom: 8px;">Selecciona si deseas tomar la foto con la cámara o elegirla de la galería</div>
+
+            <!-- 2 Botones independientes Cámara vs Galería -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 320px; margin: 0 auto;">
+              <button type="button" id="inline-plan-btn-trigger-camera" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 8px; background: #2d3e2c; color: #ffffff; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 2px 6px rgba(45,62,44,0.2);">
+                <span class="material-symbols-outlined" style="font-size: 22px; color: #ffffff;">photo_camera</span>
+                <span style="font-size: 12px; font-weight: 800; color: #ffffff;">Tomar Foto</span>
+                <span style="font-size: 10px; color: #d4e2d2;">Cámara</span>
+              </button>
+
+              <button type="button" id="inline-plan-btn-trigger-gallery" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 8px; background: #ffffff; color: #2d3e2c; border: 1.5px solid #c2d8c0; border-radius: 12px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.05);">
+                <span class="material-symbols-outlined" style="font-size: 22px; color: #2d3e2c;">photo_library</span>
+                <span style="font-size: 12px; font-weight: 800; color: #2d3e2c;">Ver Galería</span>
+                <span style="font-size: 10px; color: #666;">De tu teléfono</span>
+              </button>
+            </div>
           </div>
 
-          <button type="button" id="inline-plan-btn-take-photo" class="plan-btn-ghost" style="width: 100%; height: 42px; font-size: 13px; border-style: dashed; justify-content: center;">
-            <span class="material-symbols-outlined" style="font-size: 20px; color: #2d3e2c;">photo_camera</span>
-            <span id="inline-plan-foto-btn-label">${currentFoto ? 'Cambiar foto de la planta' : 'Tomar / Subir foto de la planta'}</span>
-          </button>
-          <p style="font-size: 11.5px; color: #666; margin: 6px 0 0;">Opcional: Captura el estado foliar, brotes o avance de la planta</p>
+          <div id="inline-plan-foto-preview-box" style="${currentFoto ? 'display:block;' : 'display:none;'} position: relative; width: 100%;">
+            <img id="inline-plan-foto-img" src="${currentFoto || ''}" alt="Foto de la planta" style="width: 100%; max-height: 200px; object-fit: cover; border-radius: 12px; box-shadow: 0 3px 10px rgba(0,0,0,0.1);">
+            <div style="margin-top: 10px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+              <button type="button" id="inline-plan-btn-retake-camera" style="padding: 6px 12px; font-size: 11.5px; font-weight: 700; border-radius: 9999px; background: #2d3e2c; color: #fff; border: none; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: #fff;">photo_camera</span>
+                <span>Tomar otra</span>
+              </button>
+              <button type="button" id="inline-plan-btn-retake-gallery" style="padding: 6px 12px; font-size: 11.5px; font-weight: 700; border-radius: 9999px; background: #eaf2e8; color: #2d3e2c; border: 1px solid #c2d8c0; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: #2d3e2c;">photo_library</span>
+                <span>Elegir otra</span>
+              </button>
+              <button type="button" id="inline-plan-btn-quitar-foto" style="padding: 6px 12px; font-size: 11.5px; font-weight: 700; border-radius: 9999px; background: #fff; color: #ba1a1a; border: 1px solid #ffdad6; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                <span class="material-symbols-outlined" style="font-size: 15px; color: #ba1a1a;">delete</span>
+                <span>Quitar</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- 8. Estado -->
+        <!-- 9. Estado de la labor -->
         <div class="m3-field" style="margin-bottom: 8px;">
-          ${editApp ? `
-            <select name="estado" style="font-size:13px; font-weight:700;">
-              <option value="Aplicada" ${estadoValor === 'Aplicada' ? 'selected' : ''}>✅ Aplicada / Realizada</option>
-              <option value="Programada" ${estadoValor === 'Programada' ? 'selected' : ''}>📅 Programada / Pendiente</option>
-            </select>
-          ` : `
-            <input type="text" value="${estadoTextoDisplay}" readonly style="font-size:13px; font-weight:700; background:${(isToday || isPast) ? '#f0f7e6' : '#fff9e6'}; color:${(isToday || isPast) ? '#2d3e2c' : '#b26a00'}; border-color:${(isToday || isPast) ? '#c8e6c9' : '#ffe9a8'};">
-            <input type="hidden" name="estado" value="${estadoValor}">
-          `}
+          <select name="estado" id="inline-plan-estado" style="font-size:13px; font-weight:700;">
+            <option value="Aplicada" ${estadoValor === 'Aplicada' ? 'selected' : ''}>✅ Aplicada / Realizada (Histórico o realizada)</option>
+            <option value="Programada" ${estadoValor === 'Programada' ? 'selected' : ''}>📅 Programada / Pendiente</option>
+          </select>
           <label>Estado de la labor</label>
         </div>
 
         <!-- Botones de Acción M3 Expressive -->
-        <div style="display:flex; gap:14px; justify-content:flex-end; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid #eef2ee;">
+        <div style="display:flex; gap:14px; justify-content:flex-end; align-items:center; margin-top:16px; padding-top:16px; border-top:1px solid #eef2ee;">
           <button type="button" class="plan-btn-ghost" onclick="window.cancelInlineActividad('${actDate}')">
             <span>Cancelar</span>
           </button>
-          <button type="submit" class="plan-btn-primary">
-            <span class="material-symbols-outlined" style="font-size:18px;">${editApp ? 'save' : (isToday || isPast) ? 'check_circle' : 'save'}</span>
-            <span>${editApp ? 'Guardar Cambios' : isPast ? 'Registrar Actividad Realizada' : isToday ? 'Registrar Actividad' : 'Programar Actividad'}</span>
+          <button type="submit" id="inline-plan-btn-submit" class="plan-btn-primary">
+            <span class="material-symbols-outlined" id="inline-plan-submit-icon" style="font-size:18px;">${editApp ? 'save' : (isToday || isPast) ? 'check_circle' : 'save'}</span>
+            <span id="inline-plan-submit-text">${editApp ? 'Guardar Cambios' : isPast ? 'Registrar Actividad Realizada' : isToday ? 'Registrar Actividad' : 'Programar Actividad'}</span>
           </button>
         </div>
       </form>
@@ -733,46 +823,287 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   const fieldDosis = document.getElementById('field-plan-dosis');
   const labelProducto = document.getElementById('label-plan-producto');
 
-  // Photo handlers
-  const fotoInput = document.getElementById('inline-plan-foto-input');
-  const fotoData = document.getElementById('inline-plan-foto-data');
-  const fotoPreviewBox = document.getElementById('inline-plan-foto-preview-box');
-  const fotoImg = document.getElementById('inline-plan-foto-img');
-  const btnTakePhoto = document.getElementById('inline-plan-btn-take-photo');
-  const btnQuitarFoto = document.getElementById('inline-plan-btn-quitar-foto');
-  const fotoBtnLabel = document.getElementById('inline-plan-foto-btn-label');
+  // Multi-operator management
+  let selectedOperadores = resolvedOperador ? resolvedOperador.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-  if (btnTakePhoto && fotoInput) {
-    btnTakePhoto.addEventListener('click', () => fotoInput.click());
-  }
+  const hiddenOperador = document.getElementById('inline-plan-operador-hidden');
+  const selectedChipsWrap = document.getElementById('inline-plan-selected-chips-wrap');
+  const customOperadorInput = document.getElementById('inline-plan-operador-custom-input');
+  const dropdownMenu = document.getElementById('inline-plan-operador-dropdown');
 
-  if (fotoInput) {
-    fotoInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        if (fotoBtnLabel) fotoBtnLabel.textContent = 'Subiendo foto...';
-        const localPreview = await compressImage(file, 1000, 0.75);
-        fotoImg.src = localPreview;
-        fotoPreviewBox.style.display = 'block';
+  const updateOperadoresUI = () => {
+    if (hiddenOperador) {
+      hiddenOperador.value = selectedOperadores.join(', ');
+    }
 
-        const hostedUrl = await uploadImage(file);
-        fotoData.value = hostedUrl || localPreview;
-        if (fotoBtnLabel) fotoBtnLabel.textContent = 'Cambiar foto de la planta';
-      } catch (err) {
-        console.error('Error procesando imagen:', err);
-        window.Snackbar?.show('Error al procesar la foto', { type: 'error' });
+    if (selectedChipsWrap) {
+      if (selectedOperadores.length === 0) {
+        selectedChipsWrap.innerHTML = `
+          <span style="font-size: 11.5px; color: #888; font-style: italic; display: flex; align-items: center; gap: 4px;">
+            <span class="material-symbols-outlined" style="font-size: 15px;">info</span>
+            Ningún responsable seleccionado aún (opcional)
+          </span>
+        `;
+      } else {
+        selectedChipsWrap.innerHTML = selectedOperadores.map((name, idx) => `
+          <div style="display: flex; align-items: center; justify-content: space-between; background: #eaf2e8; color: #1b5e20; border: 1.5px solid #b8d4b4; padding: 6px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: #1b5e20;">person</span>
+              <span>${esc(name)}</span>
+            </div>
+            <button type="button" data-index="${idx}" class="btn-remove-selected-op" style="background: none; border: none; padding: 0; color: #1b5e20; cursor: pointer; display: flex; align-items: center; border-radius: 50%;" title="Quitar">
+              <span class="material-symbols-outlined" style="font-size: 18px;">cancel</span>
+            </button>
+          </div>
+        `).join('');
+
+        selectedChipsWrap.querySelectorAll('.btn-remove-selected-op').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index);
+            selectedOperadores.splice(index, 1);
+            updateOperadoresUI();
+          });
+        });
+      }
+    }
+  };
+
+  const highlightMatch = (text, query) => {
+    if (!query) return esc(text);
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return esc(text).replace(new RegExp(`(${escapedQuery})`, 'gi'), '<strong style="color:#1b5e20; text-decoration: underline;">$1</strong>');
+  };
+
+  const addOperatorToSelection = (rawName) => {
+    const val = (rawName || '').trim();
+    if (!val) return;
+
+    // Buscar si coincide parcial o totalmente con el personal registrado para traer SIEMPRE el nombre completo
+    const exactMatch = _personalList.find(p => p.nombre.trim().toLowerCase() === val.toLowerCase());
+    const partialMatch = !exactMatch ? _personalList.find(p => p.nombre.trim().toLowerCase().includes(val.toLowerCase())) : null;
+    
+    // Nombre completo oficial si está en la empresa, o el texto introducido
+    const finalName = exactMatch ? exactMatch.nombre : (partialMatch ? partialMatch.nombre : val);
+
+    if (!selectedOperadores.some(n => n.toLowerCase() === finalName.toLowerCase())) {
+      selectedOperadores.push(finalName);
+      updateOperadoresUI();
+    }
+    if (customOperadorInput) {
+      customOperadorInput.value = '';
+    }
+    if (dropdownMenu) {
+      dropdownMenu.style.display = 'none';
+      dropdownMenu.innerHTML = '';
+    }
+  };
+
+  const renderDropdown = (text) => {
+    if (!dropdownMenu) return;
+    const term = (text || '').trim().toLowerCase();
+
+    if (!term) {
+      dropdownMenu.style.display = 'none';
+      dropdownMenu.innerHTML = '';
+      return;
+    }
+
+    // Filtrar personal registrado en la empresa que coincida en nombre o rol
+    const matches = _personalList.filter(p => {
+      const name = (p.nombre || '').toLowerCase();
+      const rol = (p.rol || '').toLowerCase();
+      const alreadySelected = selectedOperadores.some(sel => sel.toLowerCase() === (p.nombre || '').toLowerCase());
+      return (name.includes(term) || rol.includes(term)) && !alreadySelected;
+    });
+
+    if (matches.length === 0) {
+      dropdownMenu.innerHTML = `
+        <div style="padding: 10px 14px; font-size: 12px; color: #666; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <span>No registrado en personal de la empresa</span>
+          <button type="button" id="btn-add-external-op" style="background: #eaf2e8; border: 1px solid #c2d8c0; border-radius: 8px; padding: 4px 10px; font-size: 11.5px; font-weight: 700; color: #2d3e2c; cursor: pointer; white-space: nowrap;">
+            + Agregar "${esc(text.trim())}"
+          </button>
+        </div>
+      `;
+      const btnExt = dropdownMenu.querySelector('#btn-add-external-op');
+      if (btnExt) {
+        btnExt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          addOperatorToSelection(text.trim());
+        });
+      }
+      dropdownMenu.style.display = 'block';
+      return;
+    }
+
+    dropdownMenu.innerHTML = `
+      <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 800; color: #5a7357; text-transform: uppercase; letter-spacing: 0.5px; background: #f8faf8; border-bottom: 1px solid #eef2ee; display: flex; justify-content: space-between;">
+        <span>Personal de la Finca (${matches.length})</span>
+        <span style="font-weight: 600; text-transform: none; color: #888;">Toca para seleccionar</span>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+        ${matches.map(p => `
+          <div class="op-dropdown-row" data-fullname="${esc(p.nombre)}" style="padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; border-bottom: 1px solid #f0f4f0; background: #ffffff;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: #2d3e2c; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                ${esc((p.nombre || 'U').charAt(0).toUpperCase())}
+              </div>
+              <div>
+                <div style="font-size: 13px; font-weight: 700; color: #1a1a1a;">
+                  ${highlightMatch(p.nombre, term)}
+                </div>
+                ${p.rol ? `<div style="font-size: 11px; color: #666;">${esc(p.rol)}</div>` : ''}
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px; color: #2d3e2c; font-size: 11.5px; font-weight: 700;">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: #2d3e2c;">add_circle</span>
+              <span class="hide-on-mobile">Seleccionar</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    dropdownMenu.querySelectorAll('.op-dropdown-row').forEach(row => {
+      row.addEventListener('mouseover', () => { row.style.background = '#f0f6ef'; });
+      row.addEventListener('mouseout', () => { row.style.background = '#ffffff'; });
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const fullName = row.dataset.fullname;
+        addOperatorToSelection(fullName);
+      });
+    });
+
+    dropdownMenu.style.display = 'block';
+  };
+
+  if (customOperadorInput) {
+    // Al escribir, mostrar inmediatamente las sugerencias en tiempo real
+    customOperadorInput.addEventListener('input', () => {
+      renderDropdown(customOperadorInput.value);
+    });
+
+    customOperadorInput.addEventListener('focus', () => {
+      if (customOperadorInput.value.trim()) {
+        renderDropdown(customOperadorInput.value);
+      }
+    });
+
+    customOperadorInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addOperatorToSelection(customOperadorInput.value);
+      } else if (e.key === 'Escape') {
+        if (dropdownMenu) dropdownMenu.style.display = 'none';
       }
     });
   }
 
+  // Cerrar el dropdown al hacer clic fuera
+  const closeDropdownHandler = (e) => {
+    if (dropdownMenu && !dropdownMenu.contains(e.target) && e.target !== customOperadorInput) {
+      dropdownMenu.style.display = 'none';
+    }
+  };
+  document.addEventListener('click', closeDropdownHandler);
+
+  updateOperadoresUI();
+
+  // Date change and auto-state listener
+  const inputFecha = document.getElementById('inline-plan-fecha');
+  const selectEstado = document.getElementById('inline-plan-estado');
+  const submitText = document.getElementById('inline-plan-submit-text');
+  const submitIcon = document.getElementById('inline-plan-submit-icon');
+  const headingDate = document.getElementById('inline-plan-date-heading');
+  const headingTitle = document.getElementById('inline-plan-form-title');
+
+  if (inputFecha) {
+    inputFecha.addEventListener('change', () => {
+      const newDate = inputFecha.value;
+      if (!newDate) return;
+      const isPastNow = newDate < todayStr;
+      const isTodayNow = newDate === todayStr;
+
+      const newDateFormatted = new Date(newDate + 'T12:00:00').toLocaleDateString('es-ES', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+      if (headingDate) headingDate.textContent = newDateFormatted;
+
+      if (!editApp && selectEstado) {
+        if (isPastNow || isTodayNow) {
+          selectEstado.value = 'Aplicada';
+          if (headingTitle) headingTitle.textContent = isPastNow ? 'Registrar Labor Realizada en Fecha Pasada' : 'Registrar Labor de Hoy';
+          if (submitText) submitText.textContent = isPastNow ? 'Registrar Actividad Realizada' : 'Registrar Actividad';
+          if (submitIcon) submitIcon.textContent = 'check_circle';
+        } else {
+          selectEstado.value = 'Programada';
+          if (headingTitle) headingTitle.textContent = 'Programar Labor Futura';
+          if (submitText) submitText.textContent = 'Programar Actividad Futura';
+          if (submitIcon) submitIcon.textContent = 'calendar_add_on';
+        }
+      }
+    });
+  }
+
+  // Photo handlers (Cámara y Galería independientes)
+  const cameraInput = document.getElementById('inline-plan-foto-camera-input');
+  const galleryInput = document.getElementById('inline-plan-foto-gallery-input');
+  const fotoData = document.getElementById('inline-plan-foto-data');
+  const fotoPrompt = document.getElementById('inline-plan-foto-prompt');
+  const fotoPreviewBox = document.getElementById('inline-plan-foto-preview-box');
+  const fotoImg = document.getElementById('inline-plan-foto-img');
+  const btnTriggerCamera = document.getElementById('inline-plan-btn-trigger-camera');
+  const btnTriggerGallery = document.getElementById('inline-plan-btn-trigger-gallery');
+  const btnRetakeCamera = document.getElementById('inline-plan-btn-retake-camera');
+  const btnRetakeGallery = document.getElementById('inline-plan-btn-retake-gallery');
+  const btnQuitarFoto = document.getElementById('inline-plan-btn-quitar-foto');
+
+  if (btnTriggerCamera && cameraInput) {
+    btnTriggerCamera.addEventListener('click', () => cameraInput.click());
+  }
+  if (btnTriggerGallery && galleryInput) {
+    btnTriggerGallery.addEventListener('click', () => galleryInput.click());
+  }
+  if (btnRetakeCamera && cameraInput) {
+    btnRetakeCamera.addEventListener('click', () => cameraInput.click());
+  }
+  if (btnRetakeGallery && galleryInput) {
+    btnRetakeGallery.addEventListener('click', () => galleryInput.click());
+  }
+
+  const handleFotoFile = async (file) => {
+    if (!file) return;
+    try {
+      window.Snackbar?.show('Optimizando fotografía...');
+      const localPreview = await compressImage(file, 1000, 0.75);
+      if (fotoImg) fotoImg.src = localPreview;
+      if (fotoPreviewBox) fotoPreviewBox.style.display = 'block';
+      if (fotoPrompt) fotoPrompt.style.display = 'none';
+
+      const hostedUrl = await uploadImage(file);
+      if (fotoData) fotoData.value = hostedUrl || localPreview;
+    } catch (err) {
+      console.error('Error procesando imagen:', err);
+      window.Snackbar?.show('Error al procesar la foto: ' + err.message, { type: 'error' });
+    }
+  };
+
+  if (cameraInput) {
+    cameraInput.addEventListener('change', (e) => handleFotoFile(e.target.files?.[0]));
+  }
+  if (galleryInput) {
+    galleryInput.addEventListener('change', (e) => handleFotoFile(e.target.files?.[0]));
+  }
+
   if (btnQuitarFoto) {
     btnQuitarFoto.addEventListener('click', () => {
-      fotoData.value = '';
-      fotoImg.src = '';
-      if (fotoInput) fotoInput.value = '';
-      fotoPreviewBox.style.display = 'none';
-      if (fotoBtnLabel) fotoBtnLabel.textContent = 'Tomar / Subir foto de la planta';
+      if (fotoData) fotoData.value = '';
+      if (fotoImg) fotoImg.src = '';
+      if (cameraInput) cameraInput.value = '';
+      if (galleryInput) galleryInput.value = '';
+      if (fotoPreviewBox) fotoPreviewBox.style.display = 'none';
+      if (fotoPrompt) fotoPrompt.style.display = 'flex';
     });
   }
 
@@ -1021,17 +1352,16 @@ function planStyles() {
       width: 100% !important;
       max-width: 100% !important;
       box-sizing: border-box !important;
-      background: var(--m3-surface-container-lowest, #ffffff) !important;
-      border: 1.5px solid var(--m3-outline-variant, #c7cec3) !important;
-      border-radius: 20px !important;
-      padding: 18px 16px !important;
-      box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06) !important;
-      margin-bottom: 20px !important;
+      background: var(--m3-surface-container-lowest, #ffffff);
+      border: 1.5px solid var(--m3-outline-variant, #c7cec3);
+      border-radius: 20px;
+      padding: 18px 16px;
+      box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06);
+      margin-bottom: 20px;
     }
     .cafetal-unified-card .da-cal-week-strip {
       width: 100% !important;
       box-sizing: border-box !important;
-      display: flex !important;
       gap: 6px !important;
       margin-bottom: 4px !important;
     }
@@ -1047,6 +1377,22 @@ function planStyles() {
     .cafetal-unified-card .da-cal-mob-bar {
       width: 100% !important;
       box-sizing: border-box !important;
+    }
+    .da-calendar-card:has(.da-calendar-grid.open) .da-cal-week-strip,
+    .da-cal-week-strip.open-month-hidden {
+      display: none !important;
+    }
+    #plan-day-details-panel {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #plan-day-details-panel .da-day-details {
+      margin-top: 0;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.07);
+      background: #ffffff;
+      padding: 16px 14px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
     }
     .cafetal-day-details-inner {
       width: 100% !important;
@@ -1162,8 +1508,17 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
         metodo: app.metodo || '',
         producto: app.producto || 'Actividad registrada',
         dosis: app.dosis || '',
-        operador: app.operador || '',
-        observaciones: app.observaciones || '',
+        operador: (() => {
+          let op = app.operador || '';
+          if (!op && app.observaciones && app.observaciones.includes('Responsables:')) {
+            const m = app.observaciones.match(/Responsables:\s*([^\n]+)/);
+            if (m) op = m[1].trim();
+          }
+          return op;
+        })(),
+        observaciones: (app.observaciones || '')
+          .replace(/👤?\s*Responsables:\s*[^\n]+(\n+|$)/gi, '')
+          .trim(),
         foto_url: plantPhoto,
         estado: estadoCalculado,
         purpose: ''
@@ -1327,7 +1682,9 @@ export function initPlanIfcafe() {
     const isMonthVisible = monthEl.classList.contains('open');
     if (isMonthVisible) {
       monthEl.classList.remove('open');
-      weekEl.style.display = 'flex';
+      monthEl.style.setProperty('display', 'none', 'important');
+      weekEl.classList.remove('open-month-hidden');
+      weekEl.style.setProperty('display', 'flex', 'important');
       if (textEl) textEl.textContent = 'Ver mes';
       if (iconEl) iconEl.textContent = 'calendar_month';
       if (mobDateEl) {
@@ -1340,7 +1697,9 @@ export function initPlanIfcafe() {
       }
     } else {
       monthEl.classList.add('open');
-      weekEl.style.display = 'none';
+      monthEl.style.setProperty('display', 'grid', 'important');
+      weekEl.classList.add('open-month-hidden');
+      weekEl.style.setProperty('display', 'none', 'important');
       if (textEl) textEl.textContent = 'Ver semana';
       if (iconEl) iconEl.textContent = 'view_week';
       if (mobDateEl) {
@@ -1353,7 +1712,7 @@ export function initPlanIfcafe() {
 
   window.navPlanCalPrev = function() {
     const monthEl = document.getElementById('plan-cal-month-grid');
-    const isMonthView = monthEl && monthEl.classList.contains('open');
+    const isMonthView = monthEl && (monthEl.classList.contains('open') || window.innerWidth > 768);
     if (isMonthView) {
       _calMonth--;
       if (_calMonth < 0) { _calMonth = 11; _calYear--; }
@@ -1369,7 +1728,7 @@ export function initPlanIfcafe() {
 
   window.navPlanCalNext = function() {
     const monthEl = document.getElementById('plan-cal-month-grid');
-    const isMonthView = monthEl && monthEl.classList.contains('open');
+    const isMonthView = monthEl && (monthEl.classList.contains('open') || window.innerWidth > 768);
     if (isMonthView) {
       _calMonth++;
       if (_calMonth > 11) { _calMonth = 0; _calYear++; }
@@ -1433,6 +1792,11 @@ export function initPlanIfcafe() {
       const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
       if (!empresaId) throw new Error('No se detectó empresa activa');
 
+      const obsFinal = (data.observaciones || '').trim()
+        .replace(/👤?\s*Responsables:\s*[^\n]+(\n+|$)/gi, '')
+        .trim();
+      const operadores = (data.operador || '').trim();
+
       const payload = {
         lote_id: data.lote_id,
         fecha: data.fecha,
@@ -1440,10 +1804,10 @@ export function initPlanIfcafe() {
         metodo: data.metodo || (data.tipo === 'Aplicación Foliar' ? 'Foliar' : 'Al suelo'),
         producto: data.producto || 'Actividad programada',
         dosis: data.dosis || '',
+        operador: operadores || null,
         estado: data.estado || 'Programada',
-        operador: data.operador || '',
-        observaciones: data.observaciones || '',
-        notas: data.foto_url || null
+        observaciones: obsFinal,
+        foto_url: data.foto_url || null
       };
 
       if (data.id) {
@@ -1482,7 +1846,7 @@ export function initPlanIfcafe() {
 
         <!-- Foto de la Planta (Evidencia al Finalizar) -->
         <div style="background: #fbfdfa; border: 1.5px dashed #c0d4be; border-radius: 14px; padding: 14px; text-align: center; margin: 14px 0 20px 0;">
-          <input type="file" id="modal-finalizar-foto-input" accept="image/*" capture="environment" style="display: none;">
+          <input type="file" id="modal-finalizar-foto-input" accept="image/*" style="display: none;">
           <input type="hidden" id="modal-finalizar-foto-data" value="">
           
           <div id="modal-finalizar-foto-preview-box" style="display: none; position: relative; margin-bottom: 12px;">
@@ -1566,7 +1930,7 @@ export function initPlanIfcafe() {
           if (appId && appId !== 'null' && appId !== 'undefined' && appId !== '') {
             const updatePayload = { estado: 'Aplicada', fecha: todayStr };
             if (fotoUrl) {
-              updatePayload.notas = fotoUrl;
+              updatePayload.foto_url = fotoUrl;
             }
             await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${appId}`, {
               method: 'PATCH',
@@ -1581,8 +1945,7 @@ export function initPlanIfcafe() {
               dosis: dosis || '',
               metodo,
               estado: 'Aplicada',
-              notas: fotoUrl,
-              operador: _currentUser?.email || '',
+              foto_url: fotoUrl,
               empresa_id: empresaId
             });
           }

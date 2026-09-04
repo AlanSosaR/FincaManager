@@ -5970,7 +5970,8 @@ input[id$="-search-input"]::placeholder {
     margin-top: 4px !important;
   }
 
-  .da-calendar-card:has(.da-calendar-grid.open) .da-cal-week-strip {
+  .da-calendar-card:has(.da-calendar-grid.open) .da-cal-week-strip,
+  .da-cal-week-strip.open-month-hidden {
     display: none !important;
   }
 
@@ -6032,7 +6033,8 @@ input[id$="-search-input"]::placeholder {
   }
 
   #da-day-details-panel,
-  #da-day-details-panel-fumig {
+  #da-day-details-panel-fumig,
+  #plan-day-details-panel {
     margin-top: 2px !important;
     width: 100% !important;
   }

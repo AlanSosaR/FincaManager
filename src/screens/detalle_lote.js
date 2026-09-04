@@ -1,5 +1,18 @@
 import { supabase } from '../supabase.js';
 import { renderPlanIfcafe, initPlanIfcafe } from './plan_ifcafe.js';
+import { showModal, closeModal } from '../modals.js';
+import { uploadImage, compressImage } from '../utils/image_uploader.js';
+import { restInsert, restFetch } from '../auth.js';
+import { invalidateCache } from '../sync.js';
+import db from '../db.js';
+
+function getLocalToday() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -8,6 +21,14 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function getAppPhoto(a) {
+  return a?.foto_url || a?.notas || '';
+}
+
+function isPhotoValid(src) {
+  return Boolean(src && (src.startsWith('data:image') || src.startsWith('http')));
 }
 
 export async function renderDetalleLote(id) {
@@ -25,7 +46,7 @@ export async function renderDetalleLote(id) {
     if (loteErr) throw loteErr;
 
     const hasMap = Boolean(lote.coordenadas_json);
-    const appsWithPhotos = (aplicaciones || []).filter(a => a.notas && (a.notas.startsWith('data:image') || a.notas.startsWith('http')));
+    const appsWithPhotos = (aplicaciones || []).filter(a => isPhotoValid(getAppPhoto(a)));
 
     // Store in window for instant interactive switching
     window._dlCurrentApps = aplicaciones || [];
@@ -39,7 +60,7 @@ export async function renderDetalleLote(id) {
         tiposMap[t] = { count: 0, photoCount: 0 };
       }
       tiposMap[t].count++;
-      if (a.notas && (a.notas.startsWith('data:image') || a.notas.startsWith('http'))) {
+      if (isPhotoValid(getAppPhoto(a))) {
         tiposMap[t].photoCount++;
       }
     });
@@ -252,6 +273,32 @@ export async function renderDetalleLote(id) {
             min-height: 220px !important;
           }
         }
+        @media (max-width: 768px) {
+          .dl-header-cafetal {
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center !important;
+          }
+          .dl-header-title-box {
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center !important;
+          }
+          .dl-header-btn-wrap {
+            width: 100% !important;
+            justify-content: center !important;
+            margin-top: 4px !important;
+          }
+          .dl-evo-header {
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center !important;
+          }
+          .dl-evo-header-btns {
+            width: 100% !important;
+            justify-content: center !important;
+          }
+        }
         #dl-map-container,
         #dl-map-container .leaflet-container {
           touch-action: pan-y !important;
@@ -381,8 +428,8 @@ export async function renderDetalleLote(id) {
           
           <!-- Vista 1: Calendario Interactivo -->
           <div id="dl-calendar-wrap">
-            <div class="m3-flex m3-items-center m3-justify-between m3-mb-4" style="border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
-              <div class="m3-flex m3-items-center m3-gap-3">
+            <div class="m3-flex m3-items-center m3-justify-between m3-mb-4 dl-header-cafetal" style="border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+              <div class="m3-flex m3-items-center m3-gap-3 dl-header-title-box">
                 <span style="font-size: 24px;">🌿</span>
                 <div>
                   <h2 class="m3-title-large m3-font-bold m3-text-on-surface" style="margin: 0; font-size: 18px;">Manejo del Cafetal</h2>
@@ -390,7 +437,7 @@ export async function renderDetalleLote(id) {
                 </div>
               </div>
 
-              <div class="m3-flex m3-items-center m3-gap-2">
+              <div class="m3-flex m3-items-center m3-gap-2 dl-header-btn-wrap">
                 <!-- Split Button for Timeline & Photos -->
                 <div class="m3-split-button-container" style="position: relative; display: inline-flex; align-items: stretch; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);">
                   <button type="button" onclick="window.onSelectActividadEvolucion('gallery:all')" class="m3-split-btn-main" style="background: #2d3e2c; color: #ffffff; border: none; padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-top-left-radius: 20px; border-bottom-left-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s ease;">
@@ -540,9 +587,9 @@ export function initDetalleLote(id) {
     if (val.startsWith('gallery')) {
       const filterTipo = val.includes(':') ? val.split(':')[1] : 'all';
       
-      const allPhotosApps = apps.filter(a => a.notas && (a.notas.startsWith('data:image') || a.notas.startsWith('http')));
+      const allPhotosApps = apps.filter(a => isPhotoValid(getAppPhoto(a)));
       // Sort chronologically (oldest to newest for timeline evolution)
-      const sortedPhotos = [...allPhotosApps].sort((a, b) => new Date(a.fecha) - new Date(a.fecha));
+      const sortedPhotos = [...allPhotosApps].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
       // Collect available types with photos
       const typesSet = {};
@@ -551,13 +598,11 @@ export function initDetalleLote(id) {
         typesSet[t] = (typesSet[t] || 0) + 1;
       });
 
-      const typesList = Object.keys(typesSet);
-      let targetTipo = filterTipo;
-      if (targetTipo === 'all' || !targetTipo) {
-        targetTipo = typesList.length > 0 ? typesList[0] : '';
-      }
-
-      const filteredPhotosApps = sortedPhotos.filter(a => (a.tipo || 'Labor de campo') === targetTipo);
+      const isAll = filterTipo === 'all' || !filterTipo;
+      const targetTipo = isAll ? 'all' : filterTipo;
+      const filteredPhotosApps = isAll
+        ? sortedPhotos
+        : sortedPhotos.filter(a => (a.tipo || 'Labor de campo') === targetTipo);
 
       calWrap.style.display = 'none';
       evoWrap.style.display = 'block';
@@ -571,17 +616,23 @@ export function initDetalleLote(id) {
       };
 
       evoWrap.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px;">
+        <div class="dl-evo-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px;">
           <div>
             <h2 style="margin: 0; font-size: 18px; font-weight: 800; color: #2d3e2c; display: flex; align-items: center; gap: 8px;">
-              <span>📸</span> Línea de Tiempo: ${targetTipo || 'Evolución'}
+              <span>📸</span> Línea de Tiempo: ${targetTipo === 'all' ? 'Todas las Fotos' : escapeHtml(targetTipo)}
             </h2>
             <p style="margin: 3px 0 0; font-size: 12.5px; color: #666;">
-              Mostrando la evolución y fotos registradas de <b>${targetTipo}</b> (${filteredPhotosApps.length} fotos)
+              Mostrando la evolución y fotos registradas ${targetTipo === 'all' ? 'del lote' : `de <b>${escapeHtml(targetTipo)}</b>`} (${filteredPhotosApps.length} ${filteredPhotosApps.length === 1 ? 'foto' : 'fotos'})
             </p>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div class="dl-evo-header-btns" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <!-- Botón Subir Foto Directa -->
+            <button type="button" id="dl-btn-subir-foto-top" onclick="window.abrirModalSubirFotoEvolucion('${targetTipo === 'all' ? '' : escapeHtml(targetTipo)}')" class="plan-btn-primary" style="background: #2d3e2c; color: #ffffff; border-radius: 9999px; padding: 7px 16px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: none; box-shadow: 0 2px 8px rgba(45,62,44,0.25); transition: all 0.15s ease;">
+              <span class="material-symbols-outlined" style="font-size: 18px;">add_a_photo</span>
+              <span>Subir Foto</span>
+            </button>
+
             <!-- Split button in Timeline View -->
             <div class="m3-split-button-container" style="position: relative; display: inline-flex; align-items: stretch; border-radius: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);">
               <button type="button" onclick="window.onSelectActividadEvolucion('cal')" class="m3-split-btn-main" style="background: #2d3e2c; color: #ffffff; border: none; padding: 7px 14px; font-size: 12.5px; font-weight: 700; border-top-left-radius: 20px; border-bottom-left-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s ease;">
@@ -602,9 +653,18 @@ export function initDetalleLote(id) {
                   <span style="font-size: 16px;">📅</span>
                   <span>Calendario de Labores</span>
                 </div>
+                <div onclick="window.onSelectActividadEvolucion('gallery:all'); window.closeDlTimelineDropdown();" class="dl-menu-item" style="padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; font-weight: 700; color: #1a1a1a; cursor: pointer;">
+                  <span style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 15px;">📸</span>
+                    <span>Todas las Fotos</span>
+                  </span>
+                  <span style="font-size: 11px; font-weight: 800; color: #2d3e2c; background: #eef4ec; padding: 2px 7px; border-radius: 10px;">
+                    ${allPhotosApps.length}
+                  </span>
+                </div>
                 <div style="height: 1px; background: #edf2ec; margin: 4px 0;"></div>
                 <div style="padding: 4px 14px 2px; font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px;">
-                  Fotos por Actividad
+                  Fotos por Categoría
                 </div>
                 ${Object.entries(typesSet).map(([tName, count]) => `
                   <div onclick="window.onSelectActividadEvolucion('gallery:${escapeHtml(tName)}'); window.closeDlTimelineDropdown();" class="dl-menu-item" style="padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; font-weight: 600; color: #1a1a1a; cursor: pointer;">
@@ -622,24 +682,28 @@ export function initDetalleLote(id) {
           </div>
         </div>
 
+        <!-- Contenedor Integrado del Formulario de Fotografía (Material 3 Expressive) -->
+        <div id="dl-foto-evo-inline-card" style="display: none; margin-bottom: 24px;"></div>
+
         ${filteredPhotosApps.length > 0 ? `
           <div class="dl-evolution-grid">
             ${filteredPhotosApps.map((a, idx) => {
               const prev = idx > 0 ? filteredPhotosApps[idx - 1] : null;
               const daysPassed = prev ? calcDaysBetween(prev.fecha, a.fecha) : null;
+              const photoUrl = getAppPhoto(a);
 
               return `
                 <div class="dl-evo-card">
                   <!-- Photo Container with Badges -->
-                  <div style="position: relative; height: 230px; background: #1a1a1a; cursor: pointer;" onclick="window.verFotoPlantaModal('${a.notas}', '${a.producto || a.tipo} - ${a.fecha}')">
-                    <img src="${a.notas}" alt="${a.producto || 'Labor'}" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+                  <div style="position: relative; height: 230px; background: #1a1a1a; cursor: pointer;" onclick="window.verFotoPlantaModal('${photoUrl}', '${escapeHtml(a.producto || a.tipo || 'Foto')} - ${a.fecha}')">
+                    <img src="${photoUrl}" alt="${escapeHtml(a.producto || 'Foto')}" style="width: 100%; height: 100%; object-fit: cover; display: block;">
                     
                     <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 800;">
                       📅 ${a.fecha}
                     </div>
 
                     <div style="position: absolute; top: 10px; right: 10px; background: rgba(45,62,44,0.9); backdrop-filter: blur(4px); color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 800;">
-                      Etapa ${idx + 1}
+                      Foto ${idx + 1}
                     </div>
 
                     ${daysPassed ? `
@@ -658,32 +722,37 @@ export function initDetalleLote(id) {
                     <div>
                       <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
                         <span style="font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 12px; background: #eef7ee; color: #1b5e20;">
-                          ${getTipoIcon(a.tipo)} ${a.tipo || 'Labor de campo'}
+                          ${getTipoIcon(a.tipo)} ${escapeHtml(a.tipo || 'Labor de campo')}
                         </span>
                       </div>
 
                       <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #1a1a1a;">
-                        ${a.producto || 'Labor agrícola'}
+                        ${escapeHtml(a.producto || 'Fotografía de evolución')}
                       </h3>
 
-                      <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 12.5px; color: #555;">
-                        ${a.dosis ? `<div>⚖️ <b>Dosis:</b> ${a.dosis}</div>` : ''}
-                        ${a.metodo ? `<div>💧 <b>Método:</b> ${a.metodo}</div>` : ''}
-                        ${a.operador ? `<div>👤 <b>Aplicador:</b> ${a.operador}</div>` : ''}
-                      </div>
+                      ${(a.dosis || (a.metodo && a.metodo !== 'Fotografía / Monitoreo') || (a.operador && a.operador !== 'Monitoreo')) ? `
+                        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 12.5px; color: #555;">
+                          ${a.dosis ? `<div>⚖️ <b>Dosis:</b> ${escapeHtml(a.dosis)}</div>` : ''}
+                          ${a.metodo && a.metodo !== 'Fotografía / Monitoreo' ? `<div>💧 <b>Método:</b> ${escapeHtml(a.metodo)}</div>` : ''}
+                          ${a.operador && a.operador !== 'Monitoreo' ? `<div>👤 <b>Aplicador:</b> ${escapeHtml(a.operador)}</div>` : ''}
+                        </div>
+                      ` : ''}
 
                       ${a.observaciones ? `
-                        <div style="margin-top: 10px; padding: 8px 12px; background: #ffffff; border: 1px solid #e0e6df; border-radius: 10px; font-size: 12px; color: #444; line-height: 1.4;">
-                          <span style="font-weight: 700; color: #2d3e2c;">Obs:</span> "${a.observaciones}"
+                        <div style="margin-top: 10px; padding: 10px 12px; background: #ffffff; border: 1.5px solid #e0e6df; border-radius: 12px; font-size: 12.5px; color: #333; line-height: 1.45;">
+                          <div style="font-weight: 800; color: #2d3e2c; font-size: 11px; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px;">Motivo / Qué ocurrió:</div>
+                          ${escapeHtml(a.observaciones)}
                         </div>
                       ` : ''}
                     </div>
 
-                    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #eef2ee; font-size: 11px; color: #888; display: flex; align-items: center; justify-content: space-between;">
-                      <span>Registro verificado ✅</span>
-                      <button type="button" onclick="window.onSelectActividadEvolucion('cal'); setTimeout(() => { window.showInlineActividadForm('${a.fecha}', '${a.id}'); }, 50);" class="plan-btn-ghost" style="padding: 3px 8px; font-size: 11px; border: none; color: #2d3e2c; font-weight: 700; cursor: pointer;">
-                        ✏️ Editar
-                      </button>
+                    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #eef2ee; font-size: 11.5px; color: #888; display: flex; align-items: center; justify-content: space-between;">
+                      <span>Registrado ✅</span>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <button type="button" onclick="window.confirmEliminarFotoEvolucion('${a.id}', '${escapeHtml(a.producto || a.tipo || 'Foto')}', '${targetTipo}')" style="background: none; border: none; color: #ba1a1a; font-weight: 700; cursor: pointer; font-size: 11.5px; padding: 3px 6px;">
+                          🗑️ Eliminar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -691,15 +760,341 @@ export function initDetalleLote(id) {
             }).join('')}
           </div>
         ` : `
-          <div style="text-align: center; padding: 40px 20px; background: #f9fbf9; border-radius: 16px; border: 1.5px dashed #c0d4be;">
-            <span class="material-symbols-outlined" style="font-size: 40px; color: #8a9e88;">photo_camera</span>
-            <h4 style="margin: 10px 0 4px; font-size: 15px; color: #2d3e2c;">Sin fotografías registradas en esta categoría</h4>
-            <p style="margin: 0; font-size: 12px; color: #666;">Al registrar labores en el calendario, adjunta fotos para ver aquí la línea de tiempo de evolución.</p>
+          <div id="dl-foto-evo-empty-state" style="text-align: center; padding: 44px 20px; background: #f9fbf9; border-radius: 18px; border: 1.5px dashed #c0d4be;">
+            <div style="width: 56px; height: 56px; border-radius: 50%; background: #eaf2e8; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; color: #2d3e2c;">
+              <span class="material-symbols-outlined" style="font-size: 32px;">photo_camera</span>
+            </div>
+            <h4 style="margin: 0 0 6px; font-size: 16px; font-weight: 800; color: #2d3e2c;">
+              ${targetTipo !== 'all' && targetTipo ? `Sin fotografías en "${escapeHtml(targetTipo)}"` : 'Sin fotografías registradas en este lote'}
+            </h4>
+            <p style="margin: 0 auto 16px; font-size: 13px; color: #666; max-width: 420px; line-height: 1.45;">
+              Puedes subir fotos directamente para registrar la evolución de las plantas, floración, brotes, síntomas o cualquier novedad ocurrida en este lote, con una breve descripción.
+            </p>
+            <button type="button" onclick="window.abrirModalSubirFotoEvolucion('${targetTipo === 'all' ? '' : escapeHtml(targetTipo)}')" style="background: #2d3e2c; color: #ffffff; border: none; border-radius: 9999px; padding: 10px 22px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 8px rgba(45,62,44,0.25); transition: all 0.15s;">
+              <span class="material-symbols-outlined" style="font-size: 20px;">add_a_photo</span>
+              <span>Subir Fotografía</span>
+            </button>
           </div>
         `}
       `;
       return;
     }
+  };
+
+  // Direct Photo Upload Form & Handlers (Adapted to Material 3 Expressive)
+  window.abrirModalSubirFotoEvolucion = (defaultTipo = '') => {
+    const evoWrap = document.getElementById('dl-evolucion-wrap');
+    if (!evoWrap || evoWrap.style.display === 'none') {
+      window.onSelectActividadEvolucion(defaultTipo ? `gallery:${defaultTipo}` : 'gallery:all');
+    }
+
+    const emptyState = document.getElementById('dl-foto-evo-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+
+    const topBtn = document.getElementById('dl-btn-subir-foto-top');
+    if (topBtn) topBtn.style.display = 'none';
+
+    const todayStr = getLocalToday();
+    const resolvedTipo = defaultTipo || (window._dlLastSelectedTipo && window._dlLastSelectedTipo !== 'all' ? window._dlLastSelectedTipo : 'Monitoreo / Inspección');
+
+    const formInnerHtml = `
+      <div class="da-inline-form-card" style="border: 1.5px solid #d4ded3; border-radius: 20px; padding: 22px; background: #ffffff; box-shadow: 0 4px 20px rgba(45,62,44,0.06); animation: fadeIn 0.2s ease;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #eef2ee;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 40px; height: 40px; border-radius: 12px; background: #eaf2e8; display: flex; align-items: center; justify-content: center; color: #2d3e2c;">
+              <span class="material-symbols-outlined" style="font-size: 24px;">add_a_photo</span>
+            </div>
+            <div>
+              <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #2d3e2c;">Subir Foto de Evolución</h3>
+              <p style="margin: 2px 0 0; font-size: 12px; color: #666;">Registra el avance visual de las plantas, novedades o síntomas</p>
+            </div>
+          </div>
+          <button type="button" onclick="window.cerrarFormularioFotoEvolucion()" style="background: none; border: none; color: #666; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; border-radius: 50%;" title="Cerrar">
+            <span class="material-symbols-outlined" style="font-size: 22px;">close</span>
+          </button>
+        </div>
+
+        <form id="form-subir-foto-evo" class="m3-form" onsubmit="event.preventDefault(); window.guardarFotoEvolucion('${defaultTipo || 'all'}');">
+          <input type="hidden" id="evo-foto-data" value="">
+
+          <!-- Selector / Dropzone de Fotografía Material 3 con Cámara y Galería independientes -->
+          <div id="evo-foto-dropzone" style="background: #f7faf6; border: 2px dashed #b8cbb6; border-radius: 18px; padding: 22px 16px; margin-bottom: 22px; text-align: center;">
+            <!-- Input específico para Cámara (fuerza cámara nativa en móvil) -->
+            <input type="file" id="evo-foto-camera-input" accept="image/*" capture="environment" style="display: none;" onchange="window.handleEvoFotoChange(this)">
+            <!-- Input específico para Galería / Archivos -->
+            <input type="file" id="evo-foto-gallery-input" accept="image/*" style="display: none;" onchange="window.handleEvoFotoChange(this)">
+            
+            <div id="evo-foto-prompt" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+              <div style="width: 48px; height: 48px; border-radius: 50%; background: #eaf2e8; display: flex; align-items: center; justify-content: center; color: #2d3e2c; margin-bottom: 2px;">
+                <span class="material-symbols-outlined" style="font-size: 26px; color: #2d3e2c;">photo_camera</span>
+              </div>
+              <div style="font-weight: 800; font-size: 15px; color: #1a1a1a;">¿Cómo deseas subir la fotografía?</div>
+              <div style="font-size: 12px; color: #666; margin-bottom: 12px;">Selecciona una opción para capturar o adjuntar la imagen</div>
+
+              <!-- 2 Tarjetas claras y bien diferenciadas -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 380px; margin: 0 auto;">
+                <!-- Opción 1: Cámara -->
+                <button type="button" onclick="document.getElementById('evo-foto-camera-input').click();" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px 10px; background: #2d3e2c; color: #ffffff; border: none; border-radius: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(45,62,44,0.25); transition: transform 0.15s ease;">
+                  <span class="material-symbols-outlined" style="font-size: 26px; color: #ffffff;">photo_camera</span>
+                  <span style="font-size: 13px; font-weight: 800; color: #ffffff; line-height: 1.2;">Tomar Foto</span>
+                  <span style="font-size: 11px; color: #d4e2d2; font-weight: 500;">Abrir cámara</span>
+                </button>
+
+                <!-- Opción 2: Galería -->
+                <button type="button" onclick="document.getElementById('evo-foto-gallery-input').click();" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px 10px; background: #ffffff; color: #2d3e2c; border: 1.5px solid #c2d8c0; border-radius: 14px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.06); transition: transform 0.15s ease;">
+                  <span class="material-symbols-outlined" style="font-size: 26px; color: #2d3e2c;">photo_library</span>
+                  <span style="font-size: 13px; font-weight: 800; color: #2d3e2c; line-height: 1.2;">Ver Galería</span>
+                  <span style="font-size: 11px; color: #666; font-weight: 500;">De tu teléfono</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="evo-foto-preview-wrap" style="display: none; position: relative; width: 100%;">
+              <img id="evo-foto-preview-img" src="" alt="Vista previa" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);">
+              <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                <button type="button" onclick="document.getElementById('evo-foto-camera-input').click();" style="padding: 7px 14px; font-size: 12px; font-weight: 700; border-radius: 9999px; background: #2d3e2c; color: #fff; border: none; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+                  <span class="material-symbols-outlined" style="font-size: 16px; color: #fff;">photo_camera</span>
+                  <span style="color: #fff;">Tomar otra</span>
+                </button>
+                <button type="button" onclick="document.getElementById('evo-foto-gallery-input').click();" style="padding: 7px 14px; font-size: 12px; font-weight: 700; border-radius: 9999px; background: #eaf2e8; color: #2d3e2c; border: 1px solid #c2d8c0; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+                  <span class="material-symbols-outlined" style="font-size: 16px; color: #2d3e2c;">photo_library</span>
+                  <span style="color: #2d3e2c;">Elegir otra</span>
+                </button>
+                <button type="button" onclick="window.limpiarEvoFoto();" style="padding: 7px 12px; font-size: 12px; font-weight: 700; border-radius: 9999px; background: #fce8e6; color: #ba1a1a; border: 1px solid #f5c2be; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+                  <span class="material-symbols-outlined" style="font-size: 16px; color: #ba1a1a;">delete</span>
+                  <span style="color: #ba1a1a;">Quitar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Campos M3 Expressive: Fecha y Categoría -->
+          <div class="m3-grid-2col">
+            <div class="m3-field has-value">
+              <input type="date" id="evo-fecha" value="${todayStr}" placeholder=" " required>
+              <label>Fecha</label>
+            </div>
+            <div class="m3-field has-value">
+              <select id="evo-tipo" required>
+                <option value="Monitoreo / Inspección" ${resolvedTipo === 'Monitoreo / Inspección' ? 'selected' : ''}>🔍 Monitoreo / Inspección</option>
+                <option value="Floración y Cuaje" ${resolvedTipo === 'Floración y Cuaje' ? 'selected' : ''}>🌸 Floración y Cuaje</option>
+                <option value="Crecimiento y Follaje" ${resolvedTipo === 'Crecimiento y Follaje' ? 'selected' : ''}>🍃 Crecimiento y Follaje</option>
+                <option value="Maduración y Cosecha" ${resolvedTipo === 'Maduración y Cosecha' ? 'selected' : ''}>🍒 Maduración y Cosecha</option>
+                <option value="Plaga o Enfermedad" ${resolvedTipo === 'Plaga o Enfermedad' ? 'selected' : ''}>🐛 Plaga o Enfermedad</option>
+                <option value="Deficiencia Nutricional" ${resolvedTipo === 'Deficiencia Nutricional' ? 'selected' : ''}>🍂 Deficiencia Nutricional</option>
+                <option value="Poda o Tejido" ${resolvedTipo === 'Poda o Tejido' ? 'selected' : ''}>✂️ Poda o Tejido</option>
+                <option value="Labor de campo" ${resolvedTipo === 'Labor de campo' ? 'selected' : ''}>🌱 Labor de campo</option>
+                <option value="Otro acontecimiento">📌 Otro acontecimiento</option>
+              </select>
+              <label>Categoría</label>
+            </div>
+          </div>
+
+          <!-- Título / Novedad (Floating label) -->
+          <div class="m3-field">
+            <input type="text" id="evo-titulo" placeholder=" " required>
+            <label>Título / Novedad (¿Qué muestra la foto?)</label>
+          </div>
+
+          <!-- ¿Por qué se tomó la foto? / ¿Qué ha ocurrido? (Floating label) -->
+          <div class="m3-field" style="margin-bottom: 8px;">
+            <textarea id="evo-observaciones" placeholder=" " rows="3"></textarea>
+            <label>¿Por qué se tomó la foto? / ¿Qué ha ocurrido?</label>
+          </div>
+
+          <!-- Botones de Acción adaptados a M3 Expressive -->
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #eef2ee;">
+            <button type="button" onclick="window.cerrarFormularioFotoEvolucion()" class="plan-btn-ghost">
+              <span>Cancelar</span>
+            </button>
+            <button type="submit" id="btn-submit-evo-foto" class="plan-btn-primary">
+              <span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span>
+              <span>Guardar Fotografía</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    const targetInline = document.getElementById('dl-foto-evo-inline-card');
+    if (targetInline) {
+      targetInline.innerHTML = formInnerHtml;
+      targetInline.style.display = 'block';
+      targetInline.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const tit = document.getElementById('evo-titulo');
+      if (tit) tit.focus();
+    } else {
+      showModal('📸 Subir Foto de Evolución', formInnerHtml);
+    }
+  };
+
+  window.cerrarFormularioFotoEvolucion = () => {
+    const targetInline = document.getElementById('dl-foto-evo-inline-card');
+    if (targetInline) {
+      targetInline.innerHTML = '';
+      targetInline.style.display = 'none';
+    }
+    const emptyState = document.getElementById('dl-foto-evo-empty-state');
+    if (emptyState) emptyState.style.display = 'block';
+
+    const topBtn = document.getElementById('dl-btn-subir-foto-top');
+    if (topBtn) topBtn.style.display = 'inline-flex';
+
+    closeModal();
+  };
+
+  window.handleEvoFotoChange = async (input) => {
+    const file = input?.files?.[0];
+    if (!file) return;
+    try {
+      window.Snackbar?.show('Optimizando fotografía...');
+      const compressedDataUrl = await compressImage(file, 1200, 0.75);
+      const dataInput = document.getElementById('evo-foto-data');
+      const promptEl = document.getElementById('evo-foto-prompt');
+      const previewWrap = document.getElementById('evo-foto-preview-wrap');
+      const previewImg = document.getElementById('evo-foto-preview-img');
+
+      if (dataInput) dataInput.value = compressedDataUrl;
+      if (previewImg) previewImg.src = compressedDataUrl;
+      if (promptEl) promptEl.style.display = 'none';
+      if (previewWrap) previewWrap.style.display = 'block';
+    } catch (err) {
+      console.error(err);
+      window.Snackbar?.show('Error al procesar foto: ' + err.message, { type: 'error' });
+    }
+  };
+
+  window.limpiarEvoFoto = () => {
+    const camInput = document.getElementById('evo-foto-camera-input');
+    const galInput = document.getElementById('evo-foto-gallery-input');
+    const dataInput = document.getElementById('evo-foto-data');
+    const promptEl = document.getElementById('evo-foto-prompt');
+    const previewWrap = document.getElementById('evo-foto-preview-wrap');
+    const previewImg = document.getElementById('evo-foto-preview-img');
+
+    if (camInput) camInput.value = '';
+    if (galInput) galInput.value = '';
+    if (dataInput) dataInput.value = '';
+    if (previewImg) previewImg.src = '';
+    if (previewWrap) previewWrap.style.display = 'none';
+    if (promptEl) promptEl.style.display = 'flex';
+  };
+
+  window.guardarFotoEvolucion = async (currentFilterTipo) => {
+    const btnSubmit = document.getElementById('btn-submit-evo-foto');
+    const dataInput = document.getElementById('evo-foto-data');
+    const fechaInput = document.getElementById('evo-fecha');
+    const tipoInput = document.getElementById('evo-tipo');
+    const tituloInput = document.getElementById('evo-titulo');
+    const obsInput = document.getElementById('evo-observaciones');
+
+    const photoData = dataInput?.value?.trim();
+    if (!photoData) {
+      window.Snackbar?.show('Por favor toma o selecciona una fotografía', { type: 'error' });
+      return;
+    }
+
+    const fecha = fechaInput?.value || getLocalToday();
+    const tipo = tipoInput?.value || 'Monitoreo / Inspección';
+    const titulo = tituloInput?.value?.trim() || 'Registro fotográfico';
+    const obs = obsInput?.value?.trim() || '';
+
+    if (!titulo) {
+      window.Snackbar?.show('Por favor ingresa un título o motivo breve', { type: 'error' });
+      return;
+    }
+
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">progress_activity</span> Guardando...';
+    }
+
+    try {
+      const loteId = window._dlCurrentLote?.id;
+      if (!loteId) throw new Error('No se detectó el lote activo');
+
+      let finalPhotoUrl = photoData;
+      try {
+        const uploadedUrl = await uploadImage(photoData);
+        if (uploadedUrl) finalPhotoUrl = uploadedUrl;
+      } catch (uploadErr) {
+        console.warn('ImgBB upload fallback:', uploadErr);
+      }
+
+      const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || window._dlCurrentLote?.empresa_id;
+
+      const payload = {
+        lote_id: loteId,
+        fecha: fecha,
+        tipo: tipo,
+        metodo: 'Fotografía / Monitoreo',
+        producto: titulo,
+        dosis: '',
+        estado: 'Aplicada',
+        observaciones: obs,
+        foto_url: finalPhotoUrl,
+        empresa_id: empresaId
+      };
+
+      const result = await restInsert('/rest/v1/lote_aplicaciones', payload);
+      if (!result) throw new Error('No se pudo guardar la fotografía en el servidor');
+
+      const newId = result.id || crypto.randomUUID();
+      const newRecord = {
+        id: newId,
+        ...payload,
+        notas: finalPhotoUrl,
+        created_at: new Date().toISOString()
+      };
+
+      // Guardar también en Dexie local para disponibilidad inmediata y offline
+      try {
+        await db.lote_aplicaciones.put(newRecord);
+      } catch (dexieErr) {
+        console.warn('Dexie put error:', dexieErr);
+      }
+
+      invalidateCache('lote_aplicaciones');
+
+      window.Snackbar?.show('✅ Fotografía guardada exitosamente');
+      window.cerrarFormularioFotoEvolucion?.();
+
+      if (!window._dlCurrentApps) window._dlCurrentApps = [];
+      window._dlCurrentApps.unshift(newRecord);
+
+      window.clearScreenCache?.('detalle_lote');
+      window.clearScreenCache?.('plan_ifcafe');
+
+      const viewToOpen = currentFilterTipo && currentFilterTipo !== 'all' ? `gallery:${currentFilterTipo}` : 'gallery:all';
+      window.onSelectActividadEvolucion(viewToOpen);
+    } catch (err) {
+      console.error('Error al guardar foto:', err);
+      window.Snackbar?.show('Error al guardar: ' + err.message, { type: 'error' });
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span> Guardar Fotografía';
+      }
+    }
+  };
+
+  window.confirmEliminarFotoEvolucion = (id, nombre, currentFilter) => {
+    window.Snackbar?.confirm(`¿Eliminar la fotografía "${nombre}"?`, async () => {
+      try {
+        await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${id}`, { method: 'DELETE' });
+        try {
+          await db.lote_aplicaciones.delete(id);
+        } catch (dexieErr) {}
+        invalidateCache('lote_aplicaciones');
+
+        window.Snackbar?.show('Fotografía eliminada');
+        window._dlCurrentApps = (window._dlCurrentApps || []).filter(a => a.id !== id);
+        window.clearScreenCache?.('detalle_lote');
+        window.clearScreenCache?.('plan_ifcafe');
+        window.onSelectActividadEvolucion('gallery:' + (currentFilter || 'all'));
+      } catch (err) {
+        window.Snackbar?.show('Error: ' + err.message, { type: 'error' });
+      }
+    });
   };
 
   // Initialize mini map with GPS polygon if exists

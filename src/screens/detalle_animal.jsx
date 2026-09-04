@@ -805,6 +805,10 @@ function renderFullContent(container, animalId, flag, targetTab) {
                             <span class="material-symbols-outlined">add_circle</span>
                             <span>Registrar preñez</span>
                         </button>` : `
+                        <button type="button" class="m3-btn-expressive-tonal" id="da-edit-pregnancy" style="background:#e8f0e6; color:#2d3e2c; border:1px solid #c5d8c3;">
+                            <span class="material-symbols-outlined">edit</span>
+                            <span>Editar preñez</span>
+                        </button>
                         <button type="button" class="m3-btn-expressive-primary" id="da-register-parto">
                             <span class="material-symbols-outlined">child_care</span>
                             <span>Registrar parto</span>
@@ -823,16 +827,22 @@ function renderFullContent(container, animalId, flag, targetTab) {
                             <img src="/cow.png" style="width:16px; height:16px; object-fit:contain;">
                             <span>Gestación en Curso</span>
                         </span>
-                        <span class="da-repro-countdown">
-                            ${(() => {
-                                const fParto = activePreg.fecha_probable_parto ? new Date(activePreg.fecha_probable_parto + 'T00:00:00') : null;
-                                if (!fParto) return '';
-                                const diffDias = Math.ceil((fParto - new Date()) / (1000 * 60 * 60 * 24));
-                                return diffDias > 0 
-                                    ? `<strong>${diffDias}</strong> días restantes para parto` 
-                                    : (diffDias === 0 ? `<strong>¡Fecha de parto hoy!</strong>` : `Parto sobre fecha prevista (+${Math.abs(diffDias)}d)`);
-                            })()}
-                        </span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="da-repro-countdown">
+                                ${(() => {
+                                    const fParto = activePreg.fecha_probable_parto ? new Date(activePreg.fecha_probable_parto + 'T00:00:00') : null;
+                                    if (!fParto) return '';
+                                    const diffDias = Math.ceil((fParto - new Date()) / (1000 * 60 * 60 * 24));
+                                    return diffDias > 0 
+                                        ? `<strong>${diffDias}</strong> días restantes para parto` 
+                                        : (diffDias === 0 ? `<strong>¡Fecha de parto hoy!</strong>` : `Parto sobre fecha prevista (+${Math.abs(diffDias)}d)`);
+                                })()}
+                            </span>
+                            <button type="button" class="btn-m3-tonal" onclick="window.handleEditPregnancy('${activePreg.id}', '${currentAnimal.id}')" title="Editar preñez" style="padding:4px 10px; font-size:12px; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; gap:4px; background:#ffffff; border:1px solid #c5d8c3; color:#2d3e2c; cursor:pointer;">
+                                <span class="material-symbols-outlined" style="font-size:16px;">edit</span>
+                                <span>Editar</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="da-repro-active-grid">
                         <div class="da-repro-active-item">
@@ -1130,6 +1140,10 @@ function setupEventListeners(animalId, container, sellMode) {
 
     // Reproduction Actions
     document.getElementById('da-add-pregnancy')?.addEventListener('click', () => handleAddPregnancy(animalId));
+    document.getElementById('da-edit-pregnancy')?.addEventListener('click', () => {
+        const active = pregnancies.find(p => p.estado === 'Preñada');
+        if (active) handleEditPregnancy(active.id, animalId);
+    });
     document.getElementById('da-register-parto')?.addEventListener('click', () => handleRegistrarParto(animalId));
     document.getElementById('da-register-abort')?.addEventListener('click', () => handleAbortPregnancy(animalId));
 
@@ -3491,6 +3505,7 @@ window.editFumigacion = (id) => handleEditFumigacion(id);
 function renderPregnanciesHtml() {
     const isSold = currentAnimal?.estado === 'Vendido';
     const activePreg = pregnancies.find(p => p.estado === 'Preñada');
+    const pastPregnancies = (pregnancies || []).filter(p => p.estado !== 'Preñada');
 
     if (!pregnancies || pregnancies.length === 0) {
         return `
@@ -3509,55 +3524,63 @@ function renderPregnanciesHtml() {
         `;
     }
 
+    if (pastPregnancies.length === 0) {
+        return '';
+    }
+
     return `
-        <div class="da-repro-list">
-            ${pregnancies.map(p => {
-                const fechaMonta = p.fecha_monta ? new Date(p.fecha_monta + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-                const fechaParto = p.fecha_parto 
-                    ? new Date(p.fecha_parto + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) 
-                    : (p.fecha_probable_parto ? new Date(p.fecha_probable_parto + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) + ' (Est.)' : '—');
-                
-                let estadoBadge = '';
-                if (p.estado === 'Preñada') {
-                    estadoBadge = `
-                        <span style="background:#fff3e0; color:#b26a00; border:1.5px solid #ffe0b2; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
-                            <img src="/cow.png" style="width:15px; height:15px; object-fit:contain;"> Preñada
-                        </span>`;
-                } else if (p.estado === 'Parida') {
-                    estadoBadge = `
-                        <span style="background:#e8f5e9; color:#2e7d32; border:1.5px solid #c8e6c9; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
-                            <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span> Parida
-                        </span>`;
-                } else {
-                    estadoBadge = `
-                        <span style="background:#ffebee; color:#c62828; border:1.5px solid #ffcdd2; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
-                            <span class="material-symbols-outlined" style="font-size:16px;">cancel</span> Aborto
-                        </span>`;
-                }
+        <div style="margin-top:20px;">
+            <h5 style="margin:0 0 10px; font-size:12px; font-weight:800; color:#5c6b5d; text-transform:uppercase; letter-spacing:0.5px;">Gestaciones anteriores (${pastPregnancies.length})</h5>
+            <div class="da-repro-list">
+                ${pastPregnancies.map(p => {
+                    const fechaMonta = p.fecha_monta ? new Date(p.fecha_monta + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+                    const fechaParto = p.fecha_parto 
+                        ? new Date(p.fecha_parto + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) 
+                        : (p.fecha_probable_parto ? new Date(p.fecha_probable_parto + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) + ' (Est.)' : '—');
+                    
+                    let estadoBadge = '';
+                    if (p.estado === 'Parida') {
+                        estadoBadge = `
+                            <span style="background:#e8f5e9; color:#2e7d32; border:1.5px solid #c8e6c9; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+                                <span class="material-symbols-outlined" style="font-size:16px;">check_circle</span> Parida
+                            </span>`;
+                    } else {
+                        estadoBadge = `
+                            <span style="background:#ffebee; color:#c62828; border:1.5px solid #ffcdd2; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:5px;">
+                                <span class="material-symbols-outlined" style="font-size:16px;">cancel</span> Aborto
+                            </span>`;
+                    }
 
-                return `
-                    <div class="da-repro-card">
-                        <div class="da-repro-card-top">
-                            ${estadoBadge}
-                            <div class="da-repro-card-date">
-                                <span class="material-symbols-outlined" style="font-size:16px; color:#2d3e2c;">calendar_today</span>
-                                <span>Monta: <strong>${fechaMonta}</strong></span>
+                    return `
+                        <div class="da-repro-card">
+                            <div class="da-repro-card-top" style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    ${estadoBadge}
+                                    <div class="da-repro-card-date">
+                                        <span class="material-symbols-outlined" style="font-size:16px; color:#2d3e2c;">calendar_today</span>
+                                        <span>Monta: <strong>${fechaMonta}</strong></span>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn-m3-tonal" onclick="window.handleEditPregnancy('${p.id}', '${currentAnimal.id}')" title="Editar registro" style="padding:4px 10px; font-size:12px; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; gap:4px; background:#f4f7f3; border:1px solid #d4ded3; color:#2d3e2c; cursor:pointer;">
+                                    <span class="material-symbols-outlined" style="font-size:16px;">edit</span>
+                                    <span>Editar</span>
+                                </button>
+                            </div>
+
+                            <div class="da-repro-card-body">
+                                <div class="da-repro-metric">
+                                    <span class="da-repro-metric-label">Parto Efectivo</span>
+                                    <span class="da-repro-metric-value">${fechaParto}</span>
+                                </div>
+                                <div class="da-repro-metric">
+                                    <span class="da-repro-metric-label">Crías Nacidas</span>
+                                    <span class="da-repro-metric-value">${p.num_crias ? `${p.num_crias} cría${p.num_crias > 1 ? 's' : ''}` : '—'}</span>
+                                </div>
                             </div>
                         </div>
-
-                        <div class="da-repro-card-body">
-                            <div class="da-repro-metric">
-                                <span class="da-repro-metric-label">Parto ${p.estado === 'Preñada' ? 'Estimado' : 'Efectivo'}</span>
-                                <span class="da-repro-metric-value">${fechaParto}</span>
-                            </div>
-                            <div class="da-repro-metric">
-                                <span class="da-repro-metric-label">Crías Nacidas</span>
-                                <span class="da-repro-metric-value">${p.num_crias ? `${p.num_crias} cría${p.num_crias > 1 ? 's' : ''}` : (p.estado === 'Preñada' ? 'En espera' : '—')}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('')}
+                    `;
+                }).join('')}
+            </div>
         </div>
     `;
 }
@@ -3578,13 +3601,20 @@ function handleAddPregnancy(animalId) {
                 <h4 style="margin:0; font-size:16px; font-weight:800; color:#1a1a1a;">Registrar Preñez</h4>
             </div>
             <form id="form-add-pregnancy" style="display:flex; flex-direction:column; gap:16px;">
-                <div class="m3-field">
-                    <input type="date" name="fecha_monta" id="pregnancy-fecha-monta" value="${today}" placeholder=" " required>
-                    <label>Fecha de Monta</label>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <div class="m3-field">
+                        <input type="number" id="pregnancy-dias-gestacion" min="0" max="290" placeholder=" " value="0">
+                        <label>Días de preñez (gestación)</label>
+                    </div>
+                    <div class="m3-field">
+                        <input type="date" name="fecha_monta" id="pregnancy-fecha-monta" value="${today}" placeholder=" " required>
+                        <label>Fecha de Monta</label>
+                    </div>
                 </div>
+
                 <div style="background:#f9fbf9; border:1.5px solid #e2ece1; border-radius:14px; padding:12px 16px; color:#2d3e2c; font-size:13.5px; display:flex; align-items:center; gap:8px;">
                     <span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; flex-shrink:0;">event_available</span>
-                    <span>Fecha estimada de parto: <strong id="pregnancy-fecha-probable" style="color:#1b5e20;">${addDays(today, 283)}</strong> <span style="color:#666; font-size:12px;">(283 días)</span></span>
+                    <span>Fecha estimada de parto: <strong id="pregnancy-fecha-probable" style="color:#1b5e20;">${addDays(today, 283)}</strong> <span id="pregnancy-dias-restantes" style="color:#666; font-size:12px;">(283 días restantes)</span></span>
                 </div>
                 <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:4px;">
                     <button type="button" class="m3-btn-expressive-tonal" id="cancel-inline-pregnancy" style="background:#f0f4ef; color:#2d3e2c; border:1px solid #d0ddd0;">Cancelar</button>
@@ -3594,12 +3624,40 @@ function handleAddPregnancy(animalId) {
         </div>
     `;
 
+    const diasInput = document.getElementById('pregnancy-dias-gestacion');
     const fechaMontaInput = document.getElementById('pregnancy-fecha-monta');
     const fechaProbableEl = document.getElementById('pregnancy-fecha-probable');
-    if (fechaMontaInput && fechaProbableEl) {
-        fechaMontaInput.addEventListener('change', () => {
-            fechaProbableEl.textContent = addDays(fechaMontaInput.value || today, 283);
-        });
+    const diasRestantesEl = document.getElementById('pregnancy-dias-restantes');
+
+    function updatePartoDisplay(fMonta) {
+        if (!fMonta) return;
+        const fParto = addDays(fMonta, 283);
+        if (fechaProbableEl) fechaProbableEl.textContent = fParto;
+        const restantes = Math.ceil((new Date(fParto + 'T12:00:00') - new Date(today + 'T12:00:00')) / 86400000);
+        if (diasRestantesEl) {
+            diasRestantesEl.textContent = restantes > 0 ? `(${restantes} días restantes)` : (restantes === 0 ? '(¡Parto previsto hoy!)' : `(Parto sobrepasó hace ${Math.abs(restantes)} días)`);
+        }
+    }
+
+    function syncFromDias(dias) {
+        const d = Math.max(0, parseInt(dias, 10) || 0);
+        const fMonta = addDays(today, -d);
+        if (fechaMontaInput) fechaMontaInput.value = fMonta;
+        updatePartoDisplay(fMonta);
+    }
+
+    function syncFromFechaMonta(fMonta) {
+        if (!fMonta) return;
+        const diff = Math.max(0, Math.floor((new Date(today + 'T12:00:00') - new Date(fMonta + 'T12:00:00')) / 86400000));
+        if (diasInput) diasInput.value = isNaN(diff) ? 0 : diff;
+        updatePartoDisplay(fMonta);
+    }
+
+    if (diasInput) {
+        diasInput.addEventListener('input', () => syncFromDias(diasInput.value));
+    }
+    if (fechaMontaInput) {
+        fechaMontaInput.addEventListener('change', () => syncFromFechaMonta(fechaMontaInput.value));
     }
 
     document.getElementById('cancel-inline-pregnancy').onclick = () => {
@@ -3639,12 +3697,226 @@ function handleAddPregnancy(animalId) {
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {
             btn.disabled = false;
-            btn.innerHTML = 'Guardar';
+            btn.innerHTML = 'Guardar preñez';
             showSnackbar(err.message, 'error');
         }
     };
 }
 window.handleAddPregnancy = handleAddPregnancy;
+
+async function handleEditPregnancy(pregId, animalId) {
+    const preg = pregnancies.find(p => p.id === pregId);
+    if (!preg) {
+        showSnackbar('No se encontró el registro de preñez', 'error');
+        return;
+    }
+
+    const container = document.getElementById('da-pregnancy-inline');
+    const addBtn = document.getElementById('da-add-pregnancy');
+    const editBtn = document.getElementById('da-edit-pregnancy');
+    if (!container) return;
+
+    if (addBtn) addBtn.style.display = 'none';
+    if (editBtn) editBtn.style.display = 'none';
+
+    const today = getLocalToday();
+    const initDias = preg.fecha_monta
+        ? Math.max(0, Math.floor((new Date(today + 'T12:00:00') - new Date(preg.fecha_monta + 'T12:00:00')) / 86400000))
+        : 0;
+
+    const fechaProbableVal = preg.fecha_probable_parto || (preg.fecha_monta ? addDays(preg.fecha_monta, 283) : addDays(today, 283));
+
+    container.innerHTML = `
+        <div class="da-inline-form-card" style="border:1.5px solid #d4ded3; border-radius:20px; padding:20px; margin-bottom:18px; background:#ffffff; box-shadow:0 4px 16px rgba(0,0,0,0.05);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+                <div style="width:36px; height:36px; border-radius:10px; background:#f0f6ef; display:flex; align-items:center; justify-content:center;">
+                    <img src="/cow.png" style="width:20px; height:20px; object-fit:contain;">
+                </div>
+                <h4 style="margin:0; font-size:16px; font-weight:800; color:#1a1a1a;">Editar Preñez</h4>
+            </div>
+            <form id="form-edit-pregnancy" style="display:flex; flex-direction:column; gap:16px;">
+                <div class="m3-field">
+                    <select name="estado" id="edit-preg-estado" required>
+                        <option value="Preñada" ${preg.estado === 'Preñada' ? 'selected' : ''}>Preñada (Gestación activa)</option>
+                        <option value="Parida" ${preg.estado === 'Parida' ? 'selected' : ''}>Parida</option>
+                        <option value="Abortada" ${preg.estado === 'Abortada' ? 'selected' : ''}>Abortada</option>
+                    </select>
+                    <label>Estado del ciclo</label>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <div class="m3-field">
+                        <input type="number" id="edit-preg-dias-gestacion" min="0" max="300" placeholder=" " value="${initDias}">
+                        <label>Días de preñez (gestación)</label>
+                    </div>
+                    <div class="m3-field">
+                        <input type="date" name="fecha_monta" id="edit-preg-fecha-monta" value="${preg.fecha_monta || today}" placeholder=" " required>
+                        <label>Fecha de Monta</label>
+                    </div>
+                </div>
+
+                <div style="background:#f9fbf9; border:1.5px solid #e2ece1; border-radius:14px; padding:12px 16px; color:#2d3e2c; font-size:13.5px; display:flex; align-items:center; gap:8px;">
+                    <span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; flex-shrink:0;">event_available</span>
+                    <span>Fecha estimada de parto: <strong id="edit-preg-fecha-probable-text" style="color:#1b5e20;">${fechaProbableVal}</strong> <span id="edit-preg-dias-restantes" style="color:#666; font-size:12px;"></span></span>
+                </div>
+                <input type="hidden" name="fecha_probable_parto" id="edit-preg-fecha-probable" value="${fechaProbableVal}">
+
+                <div id="edit-parto-extra-fields" style="display:${preg.estado === 'Parida' ? 'grid' : 'none'}; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <div class="m3-field">
+                        <input type="date" name="fecha_parto" id="edit-preg-fecha-parto" value="${preg.fecha_parto || today}" placeholder=" ">
+                        <label>Fecha real de parto</label>
+                    </div>
+                    <div class="m3-field">
+                        <input type="number" name="num_crias" min="1" max="5" value="${preg.num_crias || 1}" placeholder=" ">
+                        <label>Número de crías</label>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; gap:10px; flex-wrap:wrap;">
+                    <button type="button" id="btn-delete-pregnancy" class="m3-btn-expressive-tonal" style="background:#ffebee; color:#c62828; border:1px solid #ffcdd2;">
+                        <span class="material-symbols-outlined" style="font-size:18px; vertical-align:middle;">delete</span>
+                        Eliminar preñez
+                    </button>
+                    <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+                        <button type="button" class="m3-btn-expressive-tonal" id="btn-cancel-edit-preg" style="background:#f0f4ef; color:#2d3e2c; border:1px solid #d0ddd0;">Cancelar</button>
+                        <button type="submit" class="m3-btn-expressive-primary">Guardar cambios</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    `;
+
+    container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    const editDiasInput = document.getElementById('edit-preg-dias-gestacion');
+    const editFechaMontaInput = document.getElementById('edit-preg-fecha-monta');
+    const editFechaProbableInput = document.getElementById('edit-preg-fecha-probable');
+    const editFechaProbableText = document.getElementById('edit-preg-fecha-probable-text');
+    const editDiasRestantesEl = document.getElementById('edit-preg-dias-restantes');
+    const editEstadoSelect = document.getElementById('edit-preg-estado');
+    const extraPartoFields = document.getElementById('edit-parto-extra-fields');
+
+    function updateEditPartoDisplay(fMonta) {
+        if (!fMonta) return;
+        const fParto = addDays(fMonta, 283);
+        if (editFechaProbableInput) editFechaProbableInput.value = fParto;
+        if (editFechaProbableText) editFechaProbableText.textContent = fParto;
+        const restantes = Math.ceil((new Date(fParto + 'T12:00:00') - new Date(today + 'T12:00:00')) / 86400000);
+        if (editDiasRestantesEl) {
+            editDiasRestantesEl.textContent = restantes > 0 ? `(${restantes} días restantes)` : (restantes === 0 ? '(¡Parto previsto hoy!)' : `(Parto sobrepasó hace ${Math.abs(restantes)} días)`);
+        }
+    }
+
+    function syncEditDias(dias) {
+        const d = Math.max(0, parseInt(dias, 10) || 0);
+        const fMonta = addDays(today, -d);
+        if (editFechaMontaInput) editFechaMontaInput.value = fMonta;
+        updateEditPartoDisplay(fMonta);
+    }
+
+    function syncEditFechaMonta(fMonta) {
+        if (!fMonta) return;
+        const diff = Math.max(0, Math.floor((new Date(today + 'T12:00:00') - new Date(fMonta + 'T12:00:00')) / 86400000));
+        if (editDiasInput) editDiasInput.value = isNaN(diff) ? 0 : diff;
+        updateEditPartoDisplay(fMonta);
+    }
+
+    updateEditPartoDisplay(preg.fecha_monta || today);
+
+    if (editDiasInput) {
+        editDiasInput.addEventListener('input', () => syncEditDias(editDiasInput.value));
+    }
+    if (editFechaMontaInput) {
+        editFechaMontaInput.addEventListener('change', () => syncEditFechaMonta(editFechaMontaInput.value));
+    }
+
+    if (editEstadoSelect && extraPartoFields) {
+        editEstadoSelect.addEventListener('change', (e) => {
+            extraPartoFields.style.display = e.target.value === 'Parida' ? 'grid' : 'none';
+        });
+    }
+
+    const restoreButtons = () => {
+        container.innerHTML = '';
+        if (addBtn) addBtn.style.display = '';
+        if (editBtn) editBtn.style.display = '';
+    };
+
+    document.getElementById('btn-cancel-edit-preg').onclick = restoreButtons;
+
+    document.getElementById('btn-delete-pregnancy').onclick = () => {
+        window.Snackbar.confirm('¿Deseas eliminar este registro de preñez permanentemente?', async () => {
+            try {
+                await restFetch('/rest/v1/animal_preñez?id=eq.' + pregId, { method: 'DELETE' });
+                
+                const remainingActive = pregnancies.find(p => p.id !== pregId && p.estado === 'Preñada');
+                if (!remainingActive && preg.estado === 'Preñada') {
+                    await restFetch('/rest/v1/ganado?id=eq.' + animalId, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ reproductivo: 'Vacía' }),
+                    });
+                }
+                restoreButtons();
+                showSnackbar('Registro de preñez eliminado');
+                await loadAllData(animalId, document.getElementById('da-container'));
+            } catch (err) {
+                showSnackbar(err.message, 'error');
+            }
+        }, { confirmLabel: 'Eliminar', cancelLabel: 'Cancelar' });
+    };
+
+    document.getElementById('form-edit-pregnancy').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const nuevoEstado = fd.get('estado');
+        const fechaMonta = fd.get('fecha_monta');
+        const fechaProbable = fd.get('fecha_probable_parto') || addDays(fechaMonta, 283);
+        const fechaParto = nuevoEstado === 'Parida' ? (fd.get('fecha_parto') || null) : null;
+        const numCrias = nuevoEstado === 'Parida' ? (parseInt(fd.get('num_crias'), 10) || 1) : 1;
+
+        const btn = document.querySelector('#form-edit-pregnancy button[type="submit"]');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> Guardando...';
+
+        try {
+            await restFetch('/rest/v1/animal_preñez?id=eq.' + pregId, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    estado: nuevoEstado,
+                    fecha_monta: fechaMonta,
+                    fecha_probable_parto: fechaProbable,
+                    fecha_parto: fechaParto,
+                    num_crias: numCrias
+                })
+            });
+
+            let nuevoReproductivo = null;
+            if (nuevoEstado === 'Preñada') {
+                nuevoReproductivo = 'Preñada';
+            } else if (nuevoEstado === 'Parida') {
+                nuevoReproductivo = 'Lactando';
+            } else if (nuevoEstado === 'Abortada') {
+                const otherActive = pregnancies.find(p => p.id !== pregId && p.estado === 'Preñada');
+                nuevoReproductivo = otherActive ? 'Preñada' : 'Vacía';
+            }
+            if (nuevoReproductivo) {
+                await restFetch('/rest/v1/ganado?id=eq.' + animalId, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ reproductivo: nuevoReproductivo }),
+                });
+            }
+
+            restoreButtons();
+            showSnackbar('Preñez actualizada');
+            await loadAllData(animalId, document.getElementById('da-container'));
+        } catch (err) {
+            btn.disabled = false;
+            btn.innerHTML = 'Guardar cambios';
+            showSnackbar(err.message, 'error');
+        }
+    };
+}
+window.handleEditPregnancy = handleEditPregnancy;
 
 function renderPartoCriaFields(count) {
     let html = '';
