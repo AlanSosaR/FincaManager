@@ -2,7 +2,7 @@ import { supabase } from '../supabase.js';
 import { renderPlanIfcafe, initPlanIfcafe } from './plan_ifcafe.js';
 import { showModal, closeModal } from '../modals.js';
 import { uploadImage, compressImage } from '../utils/image_uploader.js';
-import { restInsert, restFetch } from '../auth.js';
+import { restInsert, restFetch, getUser } from '../auth.js';
 import { invalidateCache } from '../sync.js';
 import db from '../db.js';
 
@@ -36,14 +36,19 @@ export async function renderDetalleLote(id) {
     const [
       { data: lote, error: loteErr },
       { data: aplicaciones = [] },
-      planCalendarHtml
+      planCalendarHtml,
+      currentUser
     ] = await Promise.all([
       supabase.from('lotes').select('*').eq('id', id).single(),
       supabase.from('lote_aplicaciones').select('*').eq('lote_id', id).order('fecha', { ascending: false }),
-      renderPlanIfcafe(id, { embedded: true })
+      renderPlanIfcafe(id, { embedded: true }),
+      getUser().catch(() => null)
     ]);
 
     if (loteErr) throw loteErr;
+
+    const loggedInUserName = currentUser?.user_metadata?.nombre || (currentUser?.email ? currentUser.email.split('@')[0] : 'Usuario');
+    window._dlCurrentUserName = loggedInUserName;
 
     const hasMap = Boolean(lote.coordenadas_json);
     const appsWithPhotos = (aplicaciones || []).filter(a => isPhotoValid(getAppPhoto(a)));
@@ -691,6 +696,9 @@ export function initDetalleLote(id) {
               const prev = idx > 0 ? filteredPhotosApps[idx - 1] : null;
               const daysPassed = prev ? calcDaysBetween(prev.fecha, a.fecha) : null;
               const photoUrl = getAppPhoto(a);
+              const registeredByName = (a.operador && a.operador !== 'Monitoreo' && a.operador !== 'Sin especificar')
+                ? a.operador
+                : (window._dlCurrentUserName || 'Usuario');
 
               return `
                 <div class="dl-evo-card">
@@ -730,11 +738,10 @@ export function initDetalleLote(id) {
                         ${escapeHtml(a.producto || 'Fotografía de evolución')}
                       </h3>
 
-                      ${(a.dosis || (a.metodo && a.metodo !== 'Fotografía / Monitoreo') || (a.operador && a.operador !== 'Monitoreo')) ? `
+                      ${(a.dosis || (a.metodo && a.metodo !== 'Fotografía / Monitoreo')) ? `
                         <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 12.5px; color: #555;">
                           ${a.dosis ? `<div>⚖️ <b>Dosis:</b> ${escapeHtml(a.dosis)}</div>` : ''}
                           ${a.metodo && a.metodo !== 'Fotografía / Monitoreo' ? `<div>💧 <b>Método:</b> ${escapeHtml(a.metodo)}</div>` : ''}
-                          ${a.operador && a.operador !== 'Monitoreo' ? `<div>👤 <b>Aplicador:</b> ${escapeHtml(a.operador)}</div>` : ''}
                         </div>
                       ` : ''}
 
@@ -746,8 +753,11 @@ export function initDetalleLote(id) {
                       ` : ''}
                     </div>
 
-                    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #eef2ee; font-size: 11.5px; color: #888; display: flex; align-items: center; justify-content: space-between;">
-                      <span>Registrado ✅</span>
+                    <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #eef2ee; font-size: 11.5px; color: #888; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 6px; color: #2d3e2c; font-weight: 700; font-size: 11.5px; background: #f0f6ef; padding: 4px 10px; border-radius: 8px; border: 1px solid #d4dfd2;">
+                        <span class="material-symbols-outlined" style="font-size: 16px; color: #1b5e20;">person</span>
+                        <span>Registrado por: <strong style="color: #1b5e20;">${escapeHtml(registeredByName)}</strong></span>
+                      </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <button type="button" onclick="window.confirmEliminarFotoEvolucion('${a.id}', '${escapeHtml(a.producto || a.tipo || 'Foto')}', '${targetTipo}')" style="background: none; border: none; color: #ba1a1a; font-weight: 700; cursor: pointer; font-size: 11.5px; padding: 3px 6px;">
                           🗑️ Eliminar
@@ -1023,6 +1033,9 @@ export function initDetalleLote(id) {
 
       const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || window._dlCurrentLote?.empresa_id;
 
+      const currentUser = await getUser().catch(() => null);
+      const userName = currentUser?.user_metadata?.nombre || (currentUser?.email ? currentUser.email.split('@')[0] : (window._dlCurrentUserName || 'Usuario'));
+
       const payload = {
         lote_id: loteId,
         fecha: fecha,
@@ -1030,6 +1043,7 @@ export function initDetalleLote(id) {
         metodo: 'Fotografía / Monitoreo',
         producto: titulo,
         dosis: '',
+        operador: userName,
         estado: 'Aplicada',
         observaciones: obs,
         foto_url: finalPhotoUrl,
@@ -1043,6 +1057,7 @@ export function initDetalleLote(id) {
       const newRecord = {
         id: newId,
         ...payload,
+        operador: userName,
         notas: finalPhotoUrl,
         created_at: new Date().toISOString()
       };
