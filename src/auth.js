@@ -375,15 +375,19 @@ export async function sendRecoveryEmail(email) {
 }
 
 export async function saveWhatsAppConfig(empresaId, config) {
-  const existing = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}&select=empresa_id`);
-  const payload = { ...config, updated_at: new Date().toISOString() };
-  if (existing && existing.length > 0) {
-    await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    });
-  } else {
-    await restInsert('/rest/v1/empresa_config', { empresa_id: empresaId, ...payload });
+  try {
+    const existing = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}&select=empresa_id`);
+    const payload = { ...config, updated_at: new Date().toISOString() };
+    if (existing && existing.length > 0) {
+      await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(empresaId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await restInsert('/rest/v1/empresa_config', { empresa_id: empresaId, ...payload });
+    }
+  } catch (e) {
+    console.warn('saveWhatsAppConfig Supabase sync notice:', e?.message || e);
   }
   window._empresaWhatsAppConfig = { ...(window._empresaWhatsAppConfig || {}), ...config };
 }

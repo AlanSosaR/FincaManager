@@ -96,12 +96,35 @@ export async function checkConnection() {
 
 export async function listGroups() {
   const name = getInstanceName();
-  const res = await waFetch(`chat/findChats/${name}`, {
-    method: 'POST',
-    body: '{}',
-  });
-  const allChats = await res.json();
-  return (allChats || []).filter(c => c.remoteJid?.endsWith('@g.us'));
+  try {
+    const res = await waFetch(`group/fetchAllGroups/${name}?getParticipants=false`);
+    const groups = await res.json();
+    if (Array.isArray(groups) && groups.length > 0) {
+      return groups.map(g => ({
+        remoteJid: g.id || g.remoteJid,
+        name: g.subject || g.name || g.pushName || g.id,
+      }));
+    }
+  } catch (e) {
+    console.warn('fetchAllGroups error, trying fallback:', e);
+  }
+
+  try {
+    const res = await waFetch(`chat/findChats/${name}`, {
+      method: 'POST',
+      body: '{}',
+    });
+    const allChats = await res.json();
+    return (allChats || [])
+      .filter(c => (c.remoteJid || c.id)?.endsWith('@g.us'))
+      .map(c => ({
+        remoteJid: c.remoteJid || c.id,
+        name: c.subject || c.pushName || c.name || c.remoteJid || c.id,
+      }));
+  } catch (e) {
+    console.error('listGroups fallback error:', e);
+    return [];
+  }
 }
 
 export async function joinGroup(inviteCode) {

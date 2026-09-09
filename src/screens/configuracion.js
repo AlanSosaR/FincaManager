@@ -436,7 +436,7 @@ async function handleListGroupsClick() {
       groups.forEach(g => {
         const opt = document.createElement('option');
         opt.value = g.remoteJid;
-        opt.textContent = g.pushName || g.name || g.remoteJid;
+        opt.textContent = g.name || g.pushName || g.subject || g.remoteJid;
         if (g.remoteJid === (window._empresaWhatsAppConfig?.whatsapp_group_jid || localStorage.getItem('whatsapp_group_jid'))) {
           opt.selected = true;
         }
@@ -447,10 +447,12 @@ async function handleListGroupsClick() {
       btn.style.display = 'none';
     } else {
       if (window.Snackbar) window.Snackbar.show('No se encontraron grupos. Asegurate de tener grupos en WhatsApp.', 'error');
+      btn.innerHTML = '<span class="material-icons">group</span> Buscar grupos';
     }
   } catch (e) {
     console.error('listGroups error:', e);
     if (window.Snackbar) window.Snackbar.show('Error al buscar grupos: ' + (e.message || e), 'error');
+    btn.innerHTML = '<span class="material-icons">group</span> Buscar grupos';
   }
   btn.disabled = false;
 }
