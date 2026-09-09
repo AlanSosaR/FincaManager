@@ -48,6 +48,7 @@
                 </a>
             </div>
             <ul class="nav-links">
+                <li><a href="#asistente" class="nav-link" data-screen="asistente"><span class="material-icons">smart_toy</span> <span class="nav-text">Asistente Virtual</span></a></li>
                 <li><a href="#dashboard" class="nav-link" data-screen="dashboard"><img src="/planta-de-cafe.png" alt="Cafetal" class="nav-icon-img"> <span class="nav-text">Cafetal</span></a></li>
                 <li><a href="#ganado" class="nav-link" data-screen="ganado"><img src="/vaca.png" alt="Ganado" class="nav-icon-img"> <span class="nav-text">Ganado</span></a></li>
                 <li><a href="#potreros" class="nav-link" data-screen="potreros"><span class="material-icons">landscape</span> <span class="nav-text">Potreros</span></a></li>
@@ -83,12 +84,17 @@
                   <span id="empresa-selector-name" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;"></span>
                   <span class="material-icons" style="font-size:16px;">arrow_drop_down</span>
                 </span>
-                <div class="user-actions" id="sync-status-area" style="position:relative;">
-                    <span style="position:relative;display:inline-flex;">
-                        <span id="sync-icon" class="material-icons" style="cursor:pointer;">notifications</span>
-                        <span id="sync-badge" style="position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;border-radius:9px;background:#ff4103;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--m3-surface,#f0ede4);transition:all .3s;padding:0 4px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.2);"></span>
-                    </span>
-                    <div id="notif-dropdown" style="display:none;position:absolute;top:100%;right:0;width:340px;max-height:400px;overflow-y:auto;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);z-index:1000;margin-top:8px;padding:8px 0;"></div>
+                <div class="user-actions" style="display:flex;align-items:center;">
+                    <button id="btn-topbar-asistente" onclick="window.navigateTo('asistente')" class="m3-icon-btn" title="Asistente Virtual" style="background:rgba(45,62,44,0.08);border:none;border-radius:50%;width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#2d3e2c;margin-right:8px;transition:background 0.2s;">
+                        <span class="material-icons" style="font-size:20px;">smart_toy</span>
+                    </button>
+                    <div id="sync-status-area" style="position:relative;">
+                        <span style="position:relative;display:inline-flex;">
+                            <span id="sync-icon" class="material-icons" style="cursor:pointer;">notifications</span>
+                            <span id="sync-badge" style="position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;border-radius:9px;background:#ff4103;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--m3-surface,#f0ede4);transition:all .3s;padding:0 4px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,0.2);"></span>
+                        </span>
+                        <div id="notif-dropdown" style="display:none;position:absolute;top:100%;right:0;width:340px;max-height:400px;overflow-y:auto;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);z-index:1000;margin-top:8px;padding:8px 0;"></div>
+                    </div>
                 </div>
             </header>
 

@@ -2,6 +2,7 @@ import './style.css';
 import './components.css';
 import './pickers.css';
 import './detalle_motor.css';
+import './asistente.css';
 import './snackbar.js';
 
 import { registerSW } from 'virtual:pwa-register';
@@ -339,6 +340,7 @@ import { renderEquipo, initEquipo } from './screens/equipo.js';
 import { renderAceptarInvitacion } from './screens/aceptar_invitacion.js';
 import { renderRecuperar, initRecuperar } from './screens/recuperar.js';
 import { renderRestablecer, initRestablecer } from './screens/restablecer.js';
+import { renderAsistente, initAsistente } from './screens/asistente.js';
 import { showModal } from './modals.js';
 
 const screens = {
@@ -380,6 +382,7 @@ const screens = {
     restablecer: { title: 'Restablecer Contraseña', render: renderRestablecer },
     plan_ifcafe: { title: 'Manejo del Cafetal', backTo: (id) => (id && id !== 'null' ? ['detalle_lote', id] : 'dashboard'), render: renderPlanIfcafe },
     mapa_lotes: { title: 'Mapa del Cafetal', backTo: 'dashboard', render: renderMapaLotes },
+    asistente: { title: 'Asistente Virtual', render: renderAsistente },
 };
 
 window.navigateTo = function(screenId, ...args) {
@@ -438,7 +441,8 @@ document.addEventListener('DOMContentLoaded', () => {
         'detalle_herramienta','detalle_lote','detalle_personal','mapa_lotes',
         // potreros: render() solo devuelve el shell del mapa; initPotreros() dibuja
         'potreros',
-        'ganado'
+        'ganado',
+        'asistente'
     ]);
 
     window.clearScreenCache = (screenId) => {
@@ -506,6 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'configuracion') initConfiguracion();
         if (screenId === 'recuperar') initRecuperar();
         if (screenId === 'restablecer') initRestablecer();
+        if (screenId === 'asistente') initAsistente();
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
