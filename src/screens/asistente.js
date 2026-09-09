@@ -351,14 +351,15 @@ async function executeQuery(cmd, label) {
 
     // 2. VACUNAS
     if (clean.includes('vacun')) {
-      const { data: vacs } = await supabase.from('animal_vacunas').select('*').order('fecha', { ascending: false });
-      const { data: animales } = await supabase.from('ganado').select('id, nombre, numero_arete');
+      const { data: animales } = await supabase.from('ganado').select('id, nombre, numero_arete, estado').neq('estado', 'Vendido');
       const aMap = new Map((animales || []).map(a => [a.id, a]));
+      const { data: vacs } = await supabase.from('animal_vacunas').select('*').order('fecha', { ascending: false });
 
       removeTypingIndicator();
 
-      const aplicadas = (vacs || []).filter(v => v.estado === 'Aplicada');
-      const pendientes = (vacs || []).filter(v => v.estado === 'Programada');
+      const vacsActivas = (vacs || []).filter(v => aMap.has(v.animal_id));
+      const aplicadas = vacsActivas.filter(v => v.estado === 'Aplicada');
+      const pendientes = vacsActivas.filter(v => v.estado === 'Programada');
 
       let listHtml = '';
       if (pendientes.length > 0) {
@@ -425,15 +426,17 @@ async function executeQuery(cmd, label) {
       } catch (e) {
         console.warn('Error fetching preñez:', e);
       }
-      const { data: animales } = await supabase.from('ganado').select('id, nombre, numero_arete');
+      const { data: animales } = await supabase.from('ganado').select('id, nombre, numero_arete, estado').neq('estado', 'Vendido');
       const aMap = new Map((animales || []).map(a => [a.id, a]));
 
       removeTypingIndicator();
 
-      if (!preneces || preneces.length === 0) {
+      const prenecesActivas = (preneces || []).filter(p => aMap.has(p.animal_id));
+
+      if (!prenecesActivas || prenecesActivas.length === 0) {
         appendBotBubble(`
           <div class="asistente-card-title">🐄 Control de Reproducción</div>
-          <p>No hay hembras registradas en estado de preñez en este momento.</p>
+          <p>No hay hembras activas registradas en estado de preñez en este momento.</p>
         `);
         return;
       }
@@ -441,7 +444,7 @@ async function executeQuery(cmd, label) {
       const hoy = new Date();
       hoy.setHours(12, 0, 0, 0);
 
-      const items = preneces.map(p => {
+      const items = prenecesActivas.map(p => {
         let dias = null;
         if (p.fecha_probable_parto) {
           const fp = new Date(p.fecha_probable_parto + 'T12:00:00');
@@ -474,7 +477,7 @@ async function executeQuery(cmd, label) {
 
       appendBotBubble(`
         <div class="asistente-card-title">🤰 Control de Reproducción y Partos</div>
-        <p style="font-size:13px; margin-bottom:8px;">Total de hembras gestando: <strong>${preneces.length}</strong></p>
+        <p style="font-size:13px; margin-bottom:8px;">Total de hembras gestando: <strong>${prenecesActivas.length}</strong></p>
         ${rows}
       `);
       return;
@@ -482,15 +485,17 @@ async function executeQuery(cmd, label) {
 
     // 5. PESAJES
     if (clean.includes('pesaj') || clean.includes('peso')) {
+      const { data: ganado } = await supabase.from('ganado').select('id, nombre, numero_arete, peso_actual, estado').neq('estado', 'Vendido');
+      const aMap = new Map((ganado || []).map(a => [a.id, a]));
       const { data: pesajes } = await supabase.from('animal_pesajes').select('*').order('fecha', { ascending: false });
-      const { data: ganado } = await supabase.from('ganado').select('id, nombre, numero_arete, peso_actual');
+      const pesajesActivos = (pesajes || []).filter(p => aMap.has(p.animal_id));
       removeTypingIndicator();
 
       appendBotBubble(`
         <div class="asistente-card-title">⚖️ Control de Pesajes</div>
         <div class="asistente-summary-strip">
-          <span class="pill green">🐄 ${(ganado || []).length} Animales en Padrón</span>
-          <span class="pill blue">📝 ${(pesajes || []).length} Registros Históricos</span>
+          <span class="pill green">🐄 ${(ganado || []).length} Animales en Padrón Activo</span>
+          <span class="pill blue">📝 ${pesajesActivos.length} Registros de Animales Activos</span>
         </div>
         <p style="font-size:13px; color:#4a5548; margin-top:8px;">
           Puedes ver y registrar pesajes completos desde el módulo de <strong>Ganado</strong>.
@@ -541,13 +546,14 @@ async function executeQuery(cmd, label) {
 
     // 7. RESUMEN GENERAL
     if (clean.includes('resumen') || clean.includes('general') || clean.includes('finca') || clean.includes('hoy') || clean.includes('todo')) {
-      const { data: ganado } = await supabase.from('ganado').select('id, sexo');
+      const { data: ganado } = await supabase.from('ganado').select('id, sexo, estado').neq('estado', 'Vendido');
+      const aMap = new Map((ganado || []).map(a => [a.id, a]));
       const { data: vacs } = await supabase.from('animal_vacunas').select('*');
       const { data: fumigs } = await supabase.from('animal_fumigaciones').select('*');
       const { data: motores } = await supabase.from('motores').select('*');
       let preneces = [];
       try {
-        preneces = await restFetch('/rest/v1/animal_pre%C3%B1ez?estado=eq.Pre%C3%B1ada&select=id');
+        preneces = await restFetch('/rest/v1/animal_pre%C3%B1ez?estado=eq.Pre%C3%B1ada&select=id,animal_id');
       } catch (e) {}
 
       removeTypingIndicator();
@@ -556,8 +562,9 @@ async function executeQuery(cmd, label) {
       const hembras = (ganado || []).filter(a => (a.sexo || '').toLowerCase().startsWith('h')).length;
       const machos = (ganado || []).filter(a => (a.sexo || '').toLowerCase().startsWith('m')).length;
 
-      const vacPendientes = (vacs || []).filter(v => v.estado === 'Programada').length;
+      const vacPendientes = (vacs || []).filter(v => v.estado === 'Programada' && aMap.has(v.animal_id)).length;
       const fumigPendientes = (fumigs || []).filter(f => f.estado === 'Programada').length;
+      const gestandoActivas = (preneces || []).filter(p => aMap.has(p.animal_id)).length;
 
       let motorStatus = 'Sin motores';
       if (motores && motores.length > 0) {
@@ -579,7 +586,7 @@ async function executeQuery(cmd, label) {
           <div class="asistente-grid-stat">
             <span class="stat-icon">🤰</span>
             <div class="stat-info">
-              <span class="stat-num">${(preneces || []).length}</span>
+              <span class="stat-num">${gestandoActivas}</span>
               <span class="stat-label">Vacas Preñadas</span>
             </div>
           </div>

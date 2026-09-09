@@ -11,7 +11,7 @@
   max-width: 100%;
   margin: 0;
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 22px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.06);
   border: 1.5px solid #dce5da;
   position: relative;
@@ -20,13 +20,14 @@
 
 @media (max-width: 768px) {
   .asistente-screen-wrapper {
-    height: calc(100dvh - 64px);
-    height: calc(100vh - 64px);
+    height: calc(100dvh - 84px);
+    height: calc(100vh - 84px);
     min-height: 0;
-    border-radius: 16px 16px 0 0;
+    border-radius: 22px;
     max-width: 100%;
-    border: none;
-    box-shadow: none;
+    border: 1.5px solid #dce5da;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+    overflow: hidden;
   }
 }
 
@@ -533,6 +534,7 @@
   padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)) 14px;
   box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
   z-index: 10;
+  border-radius: 0 0 22px 22px;
 }
 
 .asistente-input-inner {
