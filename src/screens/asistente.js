@@ -49,7 +49,7 @@ export function renderAsistente() {
       <div class="asistente-input-bar">
         <div class="asistente-input-inner">
           <button type="button" id="btn-asistente-reset-menu" class="asistente-menu-shortcut-btn" title="Ver Menú Principal">
-            <span class="material-icons">menu_book</span>
+            <span class="material-icons">smart_toy</span>
             <span class="asistente-menu-shortcut-text">Menú</span>
           </button>
           <input 
