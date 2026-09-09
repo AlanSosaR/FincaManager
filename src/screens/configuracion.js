@@ -31,8 +31,9 @@ export async function renderConfiguracion() {
     } catch {}
   }
 
-  const isConnected = config?.whatsapp_status === 'connected';
-  const connectedByMe = config?.whatsapp_connected_by === currentUserId;
+  const isConnectedLocally = localStorage.getItem('wa_connected') === 'true' || !!localStorage.getItem('wa_instance_name');
+  const isConnected = config?.whatsapp_status === 'connected' || isConnectedLocally;
+  const connectedByMe = config?.whatsapp_connected_by === currentUserId || isConnectedLocally;
   const storedGroupName = localStorage.getItem('whatsapp_group_name') || '';
 
   const puntoRef = await loadPuntoReferencia(empresaId);
@@ -52,7 +53,7 @@ export async function renderConfiguracion() {
         <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:16px;">WhatsApp</h3>
 
         <div id="wa-status" style="margin-bottom:12px;font-size:14px;color:#666;">
-          <span id="wa-status-text">Verificando conexión...</span>
+          <span id="wa-status-text">${isConnected ? '<span style="color:#2d3e2c;font-weight:600;">✓ Conectado</span>' : '<span style="color:#ff4103;">✗ Desconectado</span>'}</span>
         </div>
 
         <div id="wa-shared-info" style="${isConnected && !connectedByMe ? 'display:block;' : 'display:none;'}margin-bottom:16px;padding:12px;background:#f0f8f0;border-radius:12px;font-size:13px;color:#2d3e2c;">
@@ -104,7 +105,7 @@ export async function renderConfiguracion() {
 
         <div id="wa-connected-area" style="${isConnected ? 'display:block;' : 'display:none;'}">
           <div id="wa-group-select-area" style="margin-bottom:12px;">
-            ${config?.whatsapp_group_jid && storedGroupName ? `
+            ${storedGroupName ? `
             <div style="display:flex;align-items:center;gap:8px;padding:12px;background:#f0f8f0;border-radius:12px;">
               <span class="material-icons" style="color:#2d3e2c;font-size:20px;">check_circle</span>
               <div>
