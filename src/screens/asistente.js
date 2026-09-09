@@ -116,9 +116,13 @@ export function initAsistente() {
 
 function scrollToBottom() {
   setTimeout(() => {
+    const historyEl = document.getElementById('asistente-chat-history');
+    if (historyEl) {
+      historyEl.scrollTo({ top: historyEl.scrollHeight, behavior: 'smooth' });
+    }
     const anchor = document.getElementById('asistente-bottom-anchor');
-    if (anchor) anchor.scrollIntoView({ behavior: 'smooth' });
-  }, 50);
+    if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, 80);
 }
 
 function appendUserBubble(text) {
