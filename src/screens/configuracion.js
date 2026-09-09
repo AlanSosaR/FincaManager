@@ -938,6 +938,26 @@ async function updateWhatsAppStatus() {
       const canDisconnect = config?.whatsapp_connected_by === currentUserId || userRole === 'propietario';
       disconnectBtn.style.display = canDisconnect ? 'flex' : 'none';
     }
+    const groupStatus = document.getElementById('wa-selected-group');
+    let groupName = localStorage.getItem('whatsapp_group_name');
+    if (!groupName) {
+      try {
+        const groups = await listGroups();
+        const savedJid = localStorage.getItem('whatsapp_group_jid') || config?.whatsapp_group_jid;
+        const match = savedJid ? groups.find(g => (g.remoteJid || g.id) === savedJid) : groups.find(g => g.name === 'Finca Manager') || groups[0];
+        if (match) {
+          groupName = match.name || match.subject || 'Finca Manager';
+          localStorage.setItem('whatsapp_group_jid', match.remoteJid || match.id);
+          localStorage.setItem('whatsapp_group_name', groupName);
+        }
+      } catch {}
+    }
+    if (groupName && groupStatus) {
+      groupStatus.textContent = `✓ Grupo: ${groupName}`;
+      const btnList = document.getElementById('btn-wa-list-groups');
+      const sel = document.getElementById('wa-group-select');
+      if (btnList && !config?.whatsapp_group_jid) btnList.textContent = 'Cambiar grupo';
+    }
   } else {
     if (el) el.innerHTML = '<span style="color:#ff4103;">✗ Desconectado</span>';
     const discArea = document.getElementById('wa-disconnected-area');

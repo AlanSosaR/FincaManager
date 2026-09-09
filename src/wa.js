@@ -9,6 +9,8 @@ const NOTIFIED_FUMIG_KEY = 'wa_notified_fumigaciones';
 const SENT_FUMIG_TODAY_KEY = 'wa_sent_fumig_today';
 
 function getInstanceName() {
+  const savedInstance = localStorage.getItem('wa_instance_name') || window._activeWaInstance;
+  if (savedInstance) return savedInstance;
   const empresaId = window._currentEmpresaId || 'default';
   return `finca_mgr_${empresaId.substring(0, 8)}`;
 }
@@ -54,6 +56,8 @@ export async function createInstance(number) {
 
 export async function deleteInstance() {
   const name = getInstanceName();
+  localStorage.removeItem('wa_instance_name');
+  window._activeWaInstance = null;
   try {
     const res = await waFetch(`instance/delete/${name}`, { method: 'DELETE' });
     return res.json();
@@ -88,10 +92,22 @@ export async function checkConnection() {
   try {
     const res = await waFetch(`instance/connectionState/${name}`);
     const data = await res.json();
-    return data?.instance?.state === 'open';
-  } catch {
-    return false;
-  }
+    if (data?.instance?.state === 'open') return true;
+  } catch {}
+
+  // Fallback: Si el nombre de instancia difiere por origen/ID de empresa, buscar si hay una instancia de finca_mgr activa en el servidor
+  try {
+    const res = await waFetch('instance/fetchInstances');
+    const instances = await res.json();
+    const openInstance = (instances || []).find(i => i.connectionStatus === 'open' && i.name?.startsWith('finca_mgr_'));
+    if (openInstance) {
+      window._activeWaInstance = openInstance.name;
+      localStorage.setItem('wa_instance_name', openInstance.name);
+      return true;
+    }
+  } catch {}
+
+  return false;
 }
 
 export async function listGroups() {
