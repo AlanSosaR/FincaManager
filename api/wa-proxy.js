@@ -1,4 +1,4 @@
-const TARGET = 'http://132.145.42.123:8080';
+const TARGET = 'http://140.238.65.234:8080';
 const API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
 
 export default async function handler(req, res) {
