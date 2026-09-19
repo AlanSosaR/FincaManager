@@ -4086,7 +4086,8 @@ input[id$="-search-input"]::placeholder {
 
 .screen-ganado .da-tabs-section,
 .screen-cafetal .da-tabs-section,
-.screen-potreros .da-tabs-section {
+.screen-potreros .da-tabs-section,
+.screen-gastos .da-tabs-section {
   background: white;
   border-radius: 18px;
   padding: 20px 12px;
@@ -4096,7 +4097,8 @@ input[id$="-search-input"]::placeholder {
 @media (max-width: 600px) {
   .screen-ganado .da-tabs-section,
   .screen-cafetal .da-tabs-section,
-  .screen-potreros .da-tabs-section {
+  .screen-potreros .da-tabs-section,
+  .screen-gastos .da-tabs-section {
     padding: 12px 6px;
   }
 }

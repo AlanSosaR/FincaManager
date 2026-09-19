@@ -106,16 +106,19 @@ export async function renderNuevaActividad(loteId, tipo) {
             <input type="text" id="operador-input" list="operadores-sugeridos" placeholder=" " style="padding-right: 60px;">
             <label>Operador / Responsable</label>
             <datalist id="operadores-sugeridos">
-              ${(personal || []).map(p => `<option value="${p.nombre}"></option>`).join('')}
+              ${(personal || []).map(p => `<option value="${p.nombre}" data-id="${p.id}"></option>`).join('')}
             </datalist>
+            <!-- Store personal map as JSON for ID lookup -->
+            <script type="application/json" id="personal-map-json">${JSON.stringify((personal||[]).reduce((acc,p)=>{acc[p.nombre]=p.id;return acc;},{}))}<\/script>
             <button type="button" id="btn-add-operador" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #2d3e2c; border: none; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; transition: all 0.2s; z-index: 2;">
               <span class="material-symbols-outlined" style="font-size: 20px;">add</span>
             </button>
           </div>
           <!-- Container for dynamic operator chips -->
           <div id="operadores-chips-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: -12px; margin-bottom: 24px; min-height: 24px;"></div>
-          <!-- Hidden field to hold comma-separated string for Supabase -->
+          <!-- Hidden fields: comma-separated names and JSON array of IDs -->
           <input type="hidden" name="operador" id="operador-hidden-input">
+          <input type="hidden" name="personal_ids" id="personal-ids-hidden-input">
 
           <!-- 7. Observaciones -->
           <div class="m3-field" id="field-observaciones">
@@ -437,16 +440,25 @@ export function initNuevaActividad(loteId, tipo) {
   }
 
   // 2. MULTIPLE OPERATORS UX LOGIC
+  // listOperadores: [{name, id}] — id may be null for free-text entries
   const listOperadores = [];
   const inputOperador = document.getElementById('operador-input');
   const btnAddOperador = document.getElementById('btn-add-operador');
   const chipsContainer = document.getElementById('operadores-chips-container');
   const hiddenOperador = document.getElementById('operador-hidden-input');
+  const hiddenPersonalIds = document.getElementById('personal-ids-hidden-input');
+
+  // Build name→id lookup from embedded JSON
+  let personalNameMap = {};
+  try {
+    const mapEl = document.getElementById('personal-map-json');
+    if (mapEl) personalNameMap = JSON.parse(mapEl.textContent || '{}');
+  } catch(e) { /* ignore */ }
 
   const updateChips = () => {
-    chipsContainer.innerHTML = listOperadores.map(name => `
-      <div class="m3-chip" style="background: rgba(62, 111, 57, 0.08); border: 1px solid var(--m3-primary); border-radius: 12px; padding: 6px 12px; display: flex; align-items: center; gap: 6px; font-family: 'Work Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--m3-primary); cursor: pointer; transition: all 0.2s;" data-name="${name}">
-        <span>${name}</span>
+    chipsContainer.innerHTML = listOperadores.map(op => `
+      <div class="m3-chip" style="background: rgba(62, 111, 57, 0.08); border: 1px solid var(--m3-primary); border-radius: 12px; padding: 6px 12px; display: flex; align-items: center; gap: 6px; font-family: 'Work Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--m3-primary); cursor: pointer; transition: all 0.2s;" data-name="${op.name}">
+        <span>${op.name}</span>
         <span class="material-symbols-outlined" style="font-size: 16px; color: var(--m3-primary);">close</span>
       </div>
     `).join('');
@@ -455,7 +467,7 @@ export function initNuevaActividad(loteId, tipo) {
     chipsContainer.querySelectorAll('.m3-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const name = chip.getAttribute('data-name');
-        const idx = listOperadores.indexOf(name);
+        const idx = listOperadores.findIndex(o => o.name === name);
         if (idx > -1) {
           listOperadores.splice(idx, 1);
           updateChips();
@@ -463,14 +475,17 @@ export function initNuevaActividad(loteId, tipo) {
       });
     });
 
-    // Update the hidden input
-    hiddenOperador.value = listOperadores.join(', ');
+    // Update hidden inputs
+    hiddenOperador.value = listOperadores.map(o => o.name).join(', ');
+    const ids = listOperadores.map(o => o.id).filter(Boolean);
+    hiddenPersonalIds.value = ids.length ? JSON.stringify(ids) : '';
   };
 
   const addOperador = () => {
     const val = inputOperador.value.trim();
-    if (val && !listOperadores.includes(val)) {
-      listOperadores.push(val);
+    if (val && !listOperadores.find(o => o.name === val)) {
+      const id = personalNameMap[val] || null;
+      listOperadores.push({ name: val, id });
       updateChips();
       inputOperador.value = '';
       inputOperador.focus();
@@ -494,8 +509,9 @@ export function initNuevaActividad(loteId, tipo) {
     // If there is still a typed name in the operator input, add it
     if (inputOperador && inputOperador.value.trim()) {
       const val = inputOperador.value.trim();
-      if (!listOperadores.includes(val)) {
-        listOperadores.push(val);
+      if (!listOperadores.find(o => o.name === val)) {
+        const id = personalNameMap[val] || null;
+        listOperadores.push({ name: val, id });
         updateChips();
       }
       inputOperador.value = '';

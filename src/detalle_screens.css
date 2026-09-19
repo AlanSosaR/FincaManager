@@ -38,6 +38,15 @@
 .cal-day-num { font-size: 14px; font-weight: 700; color: var(--m3-on-surface); line-height: 1; }
 .cal-day-label { font-size: 10px; margin-top: 2px; line-height: 1; }
 
+/* Cafetal activity indicator */
+.cal-day-actividad { outline: 2px solid rgba(45,62,44,0.35); outline-offset: -2px; }
+.cal-day-actividad.cal-day-work { background: rgba(69,87,67,0.22); }
+
+/* Badges container: allows ✔ and 🌱 side by side */
+.cal-day-badges { display: flex; gap: 2px; align-items: center; justify-content: center; margin-top: 2px; flex-wrap: wrap; }
+.cal-badge-asistencia { font-size: 10px; line-height: 1; }
+.cal-badge-actividad { font-size: 11px; line-height: 1; }
+
 .btn-back {
   display: inline-flex;
   align-items: center;

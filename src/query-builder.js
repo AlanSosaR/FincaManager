@@ -273,9 +273,17 @@ export default class QueryBuilder {
       const result = await this._execute();
       resolve(result);
     } catch (err) {
-      reject(err);
+      if (reject) {
+        reject(err);
+      } else {
+        throw err;
+      }
     }
     return this;
+  }
+
+  catch(reject) {
+    return this.then(undefined, reject);
   }
 
   _buildRestParams() {

@@ -39,13 +39,24 @@ class SnackbarSystem {
 
     const current = this.queue.shift();
     const snackbar = document.createElement('div');
-    snackbar.className = `m3-snackbar ${current.type || 'info'} ${current.confirm ? 'expressive' : ''}`;
+    snackbar.className = `m3-snackbar ${current.type || 'info'} ${current.confirm || current.actions ? 'expressive' : ''}`;
     
+    if (current.theme === 'white') {
+      snackbar.style.background = '#ffffff';
+      snackbar.style.color = '#1a2e1a';
+      snackbar.style.border = '1px solid rgba(45,62,44,0.18)';
+      snackbar.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
+    }
+
     snackbar.innerHTML = `
       <div class="m3-snackbar-content">
         <span class="m3-snackbar-text">${current.message}</span>
-        <div class="m3-snackbar-actions">
-          ${current.confirm ? `
+        <div class="m3-snackbar-actions" style="flex-wrap:wrap; gap:8px;">
+          ${current.actions ? `
+            ${current.actions.map((act, i) => `
+              <button class="m3-snackbar-btn ${act.type || ''}" data-action-idx="${i}" style="${act.style || ''}">${act.text}</button>
+            `).join('')}
+          ` : current.confirm ? `
             ${current.cancelText !== false ? `<button class="m3-snackbar-btn cancel">${current.cancelText || 'Cancelar'}</button>` : ''}
             <button class="m3-snackbar-btn confirm">${current.confirmText || 'Confirmar'}</button>
           ` : `
@@ -71,7 +82,18 @@ class SnackbarSystem {
         }, 300);
       };
 
-      if (current.confirm) {
+      if (current.actions) {
+        snackbar.querySelectorAll('[data-action-idx]').forEach(btn => {
+          btn.onclick = async () => {
+            const idx = Number(btn.getAttribute('data-action-idx'));
+            const act = current.actions[idx];
+            if (act && act.onClick) {
+              await act.onClick();
+            }
+            close();
+          };
+        });
+      } else if (current.confirm) {
         const cancelBtn = snackbar.querySelector('.cancel');
         if (cancelBtn) {
           cancelBtn.onclick = () => {
@@ -85,7 +107,12 @@ class SnackbarSystem {
         };
       } else {
         const closeBtn = snackbar.querySelector('.close');
-        closeBtn.onclick = close;
+        if (closeBtn) {
+          closeBtn.onclick = () => {
+            if (current.onAction) current.onAction();
+            close();
+          };
+        }
         
         // Auto close after 5s if not confirm
         if (!current.persist) {

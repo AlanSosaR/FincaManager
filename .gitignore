@@ -18,3 +18,4 @@ scratch/
 
 .vscode/
 vite.config.js.timestamp-*
+.agents/
