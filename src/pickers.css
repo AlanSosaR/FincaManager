@@ -149,7 +149,7 @@
 
 .m3-time-box.active {
   background: #2d3e2c;
-  color: #0f1f0f;
+  color: #ffffff !important;
 }
 
 .m3-time-col {

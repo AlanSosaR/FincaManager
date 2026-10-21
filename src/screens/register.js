@@ -1,7 +1,7 @@
-import { validateInvitation, signUp, getUser, acceptInvitation, isAuthenticated, loadEmpresaId, getAccessToken } from '../auth.js';
+import { validateInvitation, signUp, getUser, acceptInvitation, isAuthenticated, loadEmpresaId, getAccessToken, SUPABASE_URL, SUPABASE_KEY } from '../auth.js';
 
-const SUPABASE_URL = 'https://udhuizkqnmkhljmezzkd.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkaHVpemtxbm1raGxqbWV6emtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTM2MTYsImV4cCI6MjA5MTIyOTYxNn0.W9bJ1S8A45RUGaulhdVG6UohGmGNxGMjLBsc0Q7voPE';
+
+
 
 let _pendingToken = null;
 let _empresaNombre = '';

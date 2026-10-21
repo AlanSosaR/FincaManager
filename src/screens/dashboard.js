@@ -32,6 +32,13 @@ function parseCoordenadasJson(json) {
   }
 }
 
+function formatFechaStr(fecha) {
+  if (!fecha) return '';
+  const d = new Date((fecha.length === 10 ? fecha + 'T12:00:00' : fecha));
+  if (isNaN(d.getTime())) return fecha;
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, m => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -146,13 +153,18 @@ export async function renderDashboard() {
           box-shadow: 0 2px 8px rgba(0,0,0,0.35);
           white-space: nowrap;
           border: 2px solid #ffffff;
-          pointer-events: none;
+          pointer-events: auto !important;
+          cursor: pointer !important;
           z-index: 500;
           font-family: 'Work Sans', sans-serif;
           display: flex;
           align-items: center;
           gap: 5px;
           text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+        .lote-label-wrap {
+          pointer-events: auto !important;
+          cursor: pointer !important;
         }
         @media (max-width: 600px) {
           .lote-label {
@@ -167,6 +179,8 @@ export async function renderDashboard() {
           transition: stroke-width 0.15s ease, fill-opacity 0.15s ease;
           cursor: pointer;
         }
+        
+        /* En PC: el popup nativo de Leaflet exactamente como estaba */
         .lote-custom-popup .leaflet-popup-content-wrapper {
           padding: 14px 16px;
           border-radius: 18px;
@@ -182,6 +196,174 @@ export async function renderDashboard() {
           background: #ffffff;
           box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
+
+        /* Bottom Sheet Material 3 Expressive para todos los tamaños */
+        .lote-sheet-scrim {
+          position: fixed !important;
+          inset: 0 !important;
+          background: rgba(0, 0, 0, 0.35) !important;
+          backdrop-filter: blur(2px);
+          z-index: 99998 !important;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.3s cubic-bezier(0.2, 0, 0, 1), background 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+        }
+        .lote-sheet-scrim.open {
+          opacity: 1 !important;
+          pointer-events: auto !important;
+        }
+        .lote-sheet-scrim.expanded {
+          background: rgba(0, 0, 0, 0.6) !important;
+        }
+
+        .lote-m3-sheet {
+          position: fixed !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          margin: 0 auto !important;
+          width: 100% !important;
+          max-width: 520px !important;
+          z-index: 99999 !important;
+          background: #ffffff !important;
+          border-top-left-radius: 28px !important;
+          border-top-right-radius: 28px !important;
+          border-top: 1.5px solid rgba(45, 62, 44, 0.16) !important;
+          box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.28) !important;
+          transform: translateY(105%) !important;
+          transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.35s ease !important;
+          will-change: transform;
+          padding: 8px 18px 28px !important;
+          box-sizing: border-box !important;
+          height: calc(100vh - 20px) !important;
+          max-height: calc(100vh - 20px) !important;
+          overflow: hidden !important;
+          scrollbar-width: none !important;
+          -webkit-overflow-scrolling: touch;
+          font-family: 'Plus Jakarta Sans', 'Work Sans', sans-serif !important;
+          color: #1e3e2b !important;
+          overscroll-behavior: contain;
+        }
+        .lote-m3-sheet::-webkit-scrollbar {
+          display: none !important;
+        }
+        /* Abrir a la mitad de la pantalla de forma suave */
+        .lote-m3-sheet.open {
+          transform: translateY(50%) !important;
+        }
+        /* Expandido a pantalla completa */
+        .lote-m3-sheet.expanded {
+          transform: translateY(0) !important;
+          overflow-y: auto !important;
+          border-top-left-radius: 22px !important;
+          border-top-right-radius: 22px !important;
+          padding-bottom: 44px !important;
+        }
+
+        .lote-sheet-handle-box {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 4px 0 8px;
+          cursor: pointer;
+          touch-action: none;
+          user-select: none;
+        }
+        .lote-sheet-handle {
+          width: 48px;
+          height: 5px;
+          border-radius: 4px;
+          background: rgba(30, 62, 43, 0.28);
+          transition: background 0.2s, width 0.2s;
+        }
+        .lote-sheet-handle-box:hover .lote-sheet-handle {
+          background: rgba(30, 62, 43, 0.5);
+        }
+        .lote-m3-sheet.expanded .lote-sheet-handle {
+          background: rgba(30, 62, 43, 0.4);
+          width: 54px;
+        }
+        .lote-sheet-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+        .lote-sheet-title {
+          margin: 0 0 6px 0;
+          color: #1e3e2b;
+          font-size: 20px;
+          font-weight: 800;
+          letter-spacing: -0.3px;
+        }
+        .lote-sheet-stats {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          font-size: 13px;
+          color: #2d3e2c;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+        .lote-sheet-stats span {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .lote-sheet-stats img {
+          width: 17px !important;
+          height: 17px !important;
+          object-fit: contain;
+        }
+        .lote-sheet-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .lote-sheet-btn-main {
+          flex: 1;
+          padding: 12px 18px;
+          border-radius: 14px;
+          background: #1e3e2b;
+          color: #ffffff;
+          font-weight: 800;
+          font-size: 13.5px;
+          border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          cursor: pointer;
+          box-shadow: 0 4px 14px rgba(30,62,43,0.25);
+          transition: background 0.15s, transform 0.15s;
+        }
+        .lote-sheet-btn-main:active {
+          transform: scale(0.97);
+        }
+        .lote-sheet-btn-expand {
+          width: 44px;
+          height: 44px;
+          border-radius: 14px;
+          background: rgba(30,62,43,0.08);
+          border: 1px solid rgba(30,62,43,0.15);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #1e3e2b;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .lote-sheet-btn-expand:hover {
+          background: rgba(30,62,43,0.14);
+        }
+        .lote-sheet-expanded-sec {
+          margin-top: 14px;
+          padding-top: 14px;
+          border-top: 1px solid rgba(30,62,43,0.12);
+        }
+
         .lote-float-close {
           display: inline-flex;
           align-items: center;
@@ -395,7 +577,11 @@ export async function renderDashboard() {
           </div>
           ` : ''}
 
-          <!-- 2. Interactive ESRI Satellite Map of Lotes (Directly Below Banner) -->
+          <!-- Material 3 Mobile Bottom Sheet for Lotes -->
+        <div id="lote-sheet-scrim" class="lote-sheet-scrim"></div>
+        <div id="lote-bottom-sheet" class="lote-m3-sheet"></div>
+
+        <!-- 2. Interactive ESRI Satellite Map of Lotes (Directly Below Banner) -->
           <div style="position: relative;">
             <div class="ganado-tag-stat" style="background: #fdfdfd; border-radius: 16px; padding: 13px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; cursor: default;">
               <div style="display: flex; align-items: center; gap: 14px;">
@@ -442,6 +628,9 @@ export async function initDashboard() {
   });
 
   // Map Initialization
+  document.getElementById('lote-sheet-scrim')?.addEventListener('click', () => {
+    clearLoteSelection();
+  });
   const container = document.getElementById('mapa-container');
   if (!container) return;
 
@@ -564,16 +753,10 @@ export async function initDashboard() {
   let selectedLoteId = null;
   let activeLotePopup = null;
 
-  function buildPopupCardHtml(lote, apps) {
-    const dNow = new Date();
-    const hoyStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-    const dHoy = new Date(hoyStr + 'T00:00:00');
-
-    const formatFechaStr = (fStr) => {
-      if (!fStr) return '';
-      const d = new Date(fStr.length === 10 ? fStr + 'T00:00:00' : fStr);
-      return isNaN(d.getTime()) ? fStr : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-    };
+  function buildLoteBottomSheetHtml(lote, apps) {
+    const dHoy = new Date();
+    dHoy.setHours(0, 0, 0, 0);
+    const hoyStr = dHoy.toISOString().slice(0, 10);
 
     const calcDias = (fStr) => {
       if (!fStr) return 0;
@@ -623,7 +806,224 @@ export async function initDashboard() {
       return edad;
     };
 
-    // Ordenar todas las labores de la más reciente a la más antigua
+    const sortedApps = [...(apps || [])].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const recentApps = sortedApps.slice(0, 3);
+    const extraCount = Math.max(0, sortedApps.length - 3);
+
+    return `
+      <!-- Drag Handle para modo Peek / Pantalla Completa -->
+      <div class="lote-sheet-handle-box" id="lote-sheet-handle-box" title="Desliza o toca para cambiar tamaño">
+        <div class="lote-sheet-handle"></div>
+        <div id="lote-sheet-drag-cue" style="font-size:10.5px; font-weight:700; color:#5a7056; margin-top:4px; display:flex; align-items:center; gap:3px;">
+          <span>Desliza hacia arriba para pantalla completa</span>
+          <span class="material-symbols-outlined" style="font-size:14px;">expand_less</span>
+        </div>
+      </div>
+
+      <!-- Cabecera: Variedad + Botón Cerrar -->
+      <div class="lote-sheet-head">
+        <span class="mapa-pop-badge" style="display:inline-flex; align-items:center; gap:6px; background:#eef7ee; color:#1b5e20; border:1px solid #c8e6c9; font-weight:800; font-size:12px; padding:4px 10px; border-radius:12px;">
+          ${escapeHtml(lote.variedad || 'Café')}${lote.edad_categoria ? ` · 🌱 ${escapeHtml(formatEdadLabel(lote.edad_categoria))}` : ''}
+        </span>
+        <button class="lote-float-close" id="lote-sheet-close" title="Cerrar">
+          <span class="material-symbols-outlined" style="font-size:18px;">close</span>
+        </button>
+      </div>
+
+      <!-- Nombre del Lote -->
+      <h3 class="lote-sheet-title">${escapeHtml(lote.nombre)}</h3>
+
+      <!-- Métricas Principales (Plantas y Hectáreas) -->
+      <div class="lote-sheet-stats">
+        <span><img src="sprouts.png" alt="" style="width:17px;height:17px;object-fit:contain;"> <b>${(lote.num_plantas || 0).toLocaleString()}</b> plantas de café</span>
+        <span><img src="area.png" alt="" style="width:17px;height:17px;object-fit:contain;"> <b>${lote.area_ha ? parseFloat(lote.area_ha).toFixed(2) : '0.00'}</b> ha</span>
+      </div>
+
+      <!-- Agroforestería / Sombra (Maderables / Musáceas) -->
+      ${maderablesList.length > 0 || musaceasList.length > 0 ? `
+        <div class="mapa-pop-chips-carousel" style="margin: 4px 0 10px;">
+          ${maderablesList.map(m => `
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:#1b5e20; background:#eef7ee; border:1px solid #c8e6c9; border-radius:8px; padding:4px 9px; flex-shrink:0; white-space:nowrap;">
+              <span>🌲</span>
+              <span>${m.qty !== null ? `<b>${m.qty.toLocaleString()}</b> ${escapeHtml(m.name)}` : escapeHtml(m.name)}</span>
+            </span>
+          `).join('')}
+          ${musaceasList.map(m => `
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:700; color:#7a6000; background:#fff8e1; border:1px solid #ffe082; border-radius:8px; padding:4px 9px; flex-shrink:0; white-space:nowrap;">
+              <span>🍌</span>
+              <span>${m.qty !== null ? `<b>${m.qty.toLocaleString()}</b> ${escapeHtml(m.name)}` : escapeHtml(m.name)}</span>
+            </span>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Botones de Acción (Modo Peek) -->
+      <div class="lote-sheet-actions">
+        <button class="lote-sheet-btn-main" onclick="window.navigateTo('detalle_lote', '${lote.id}')">
+          <span class="material-symbols-outlined" style="font-size:19px;">visibility</span>
+          <span>Ver Detalle del Lote</span>
+        </button>
+        <button class="lote-sheet-btn-expand" id="lote-sheet-expand-btn" title="Pantalla completa">
+          <span class="material-symbols-outlined" id="lote-sheet-expand-icon" style="font-size:24px;">keyboard_arrow_up</span>
+        </button>
+      </div>
+
+      <!-- Sección Expandida: Actividades Recientes y Acciones Adicionales -->
+      <div class="lote-sheet-expanded-sec">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#4a5d48; letter-spacing:0.4px;">Actividades Recientes</span>
+          <span style="font-size:11px; font-weight:700; color:#555;">${sortedApps.length} en total</span>
+        </div>
+
+        ${recentApps.length > 0 ? recentApps.map(a => {
+          const isAplicada = a.estado === 'Aplicada' || a.estado === 'Realizada';
+          const isHoy = a.fecha === hoyStr;
+          const isAtrasada = !isAplicada && a.fecha < hoyStr;
+          const isParaHoy = !isAplicada && isHoy;
+          const dias = calcDias(a.fecha);
+
+          if (isAplicada && isHoy) {
+            return `
+              <div style="background:#eef7ee; border-left:4px solid #2e7d32; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#1b5e20;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#2e7d32;">check_circle</span>
+                    ${escapeHtml(a.producto || a.tipo)}
+                  </span>
+                  <span style="font-size:10.5px; font-weight:800; color:#1b5e20; background:rgba(46,125,50,0.15); padding:2px 7px; border-radius:6px; white-space:nowrap;">
+                    🟢 Aplicada hoy
+                  </span>
+                </div>
+              </div>
+            `;
+          } else if (isAplicada) {
+            return `
+              <div style="background:#ffffff; border-left:4px solid #2d3e2c; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:#2d3e2c;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#2d3e2c;">eco</span>
+                    ${escapeHtml(a.producto || a.tipo)}
+                  </span>
+                  <span style="font-size:11px; color:#555; white-space:nowrap; font-weight:600;">
+                    ${formatFechaStr(a.fecha)}
+                  </span>
+                </div>
+                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
+                  Aplicada ${dias === 1 ? 'ayer' : `hace ${dias} días`}
+                </div>
+              </div>
+            `;
+          } else if (isParaHoy) {
+            return `
+              <div style="background:#fffbe6; border-left:4px solid #f57f17; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#e65100;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#f57f17;">today</span>
+                    ${escapeHtml(a.producto || a.tipo)}
+                  </span>
+                  <span style="font-size:10.5px; font-weight:800; color:#e65100; background:rgba(245,127,23,0.15); padding:2px 7px; border-radius:6px; white-space:nowrap;">
+                    📅 Para hoy
+                  </span>
+                </div>
+              </div>
+            `;
+          } else if (isAtrasada) {
+            return `
+              <div style="background:#fff2f0; border-left:4px solid #d32f2f; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:800; color:#c62828;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#d32f2f;">warning</span>
+                    ${escapeHtml(a.producto || a.tipo)}
+                  </span>
+                  <span style="font-size:10.5px; font-weight:800; color:#d32f2f; background:rgba(211,47,47,0.12); padding:2px 7px; border-radius:6px; white-space:nowrap;">
+                    Atrasada
+                  </span>
+                </div>
+              </div>
+            `;
+          } else {
+            return `
+              <div style="background:#f0f7ff; border-left:4px solid #1976d2; border-radius:8px; padding:9px 12px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                  <span style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:#0d47a1;">
+                    <span class="material-symbols-outlined" style="font-size:17px; color:#1976d2;">event</span>
+                    ${escapeHtml(a.producto || a.tipo)}
+                  </span>
+                  <span style="font-size:11px; font-weight:700; color:#1976d2; white-space:nowrap;">
+                    ${formatFechaStr(a.fecha)}
+                  </span>
+                </div>
+              </div>
+            `;
+          }
+        }).join('') : `
+          <div style="font-size:12px; color:#777; font-style:italic; padding:8px 0; text-align:center;">
+            Sin labores registradas en este lote
+          </div>
+        `}
+
+        ${extraCount > 0 ? `
+          <div style="font-size:11px; color:#4a5d48; text-align:center; font-weight:700; padding:6px 0 4px;">
+            +${extraCount} labores anteriores registradas
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function buildPopupCardHtml(lote, apps) {
+    const dHoy = new Date();
+    dHoy.setHours(0, 0, 0, 0);
+    const hoyStr = dHoy.toISOString().slice(0, 10);
+
+    const calcDias = (fStr) => {
+      if (!fStr) return 0;
+      const d = new Date(fStr.length === 10 ? fStr + 'T00:00:00' : fStr);
+      return Math.floor((dHoy - d) / (1000 * 60 * 60 * 24));
+    };
+
+    let maderablesVariedades = lote.maderables_variedades || '';
+    let musaceasTipo = lote.musaceas_tipo || '';
+
+    if (lote.coordenadas_json) {
+      try {
+        const parsedCoords = JSON.parse(lote.coordenadas_json);
+        if (parsedCoords && typeof parsedCoords === 'object' && !Array.isArray(parsedCoords)) {
+          if (parsedCoords.maderables_variedades && !maderablesVariedades) {
+            maderablesVariedades = parsedCoords.maderables_variedades;
+          }
+          if (parsedCoords.musaceas_tipo && !musaceasTipo) {
+            musaceasTipo = parsedCoords.musaceas_tipo;
+          }
+        }
+      } catch {}
+    }
+
+    const parseAgroItems = (str) => {
+      if (!str) return [];
+      return str.split(',').map(item => {
+        const trimmed = item.trim();
+        if (!trimmed) return null;
+        const match = trimmed.match(/^(.+?)(?:\s*\((\d+)\))?$/);
+        if (match) {
+          return { name: match[1].trim(), qty: match[2] ? parseInt(match[2], 10) : null };
+        }
+        return { name: trimmed, qty: null };
+      }).filter(Boolean);
+    };
+
+    const maderablesList = parseAgroItems(maderablesVariedades);
+    const musaceasList = parseAgroItems(musaceasTipo);
+
+    const formatEdadLabel = (edad) => {
+      if (!edad) return '';
+      if (edad === '1_anio') return '1 año · Café Tiernito';
+      if (edad === '2_anios') return '2 años · Creciendo';
+      if (edad === '3_mas') return '3+ años · En Producción';
+      if (edad === 'carga_alta') return 'Carga Muy Alta';
+      return edad;
+    };
+
     const sortedApps = [...(apps || [])].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
     const recentApps = sortedApps.slice(0, 3);
     const extraCount = Math.max(0, sortedApps.length - 3);
@@ -662,7 +1062,6 @@ export async function initDashboard() {
         </div>
       ` : ''}
 
-      <!-- Actividades Más Recientes del Lote -->
       <div class="mapa-pop-sec" style="padding: 12px 14px; border-radius: 12px; margin-bottom: 10px; background: #fbfdfa; border: 1px solid #e2ebe0;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <span class="mapa-pop-sec-t" style="margin:0; font-size:11px; font-weight:800; text-transform:uppercase; color:#4a5d48; letter-spacing:0.3px;">Actividades Recientes</span>
@@ -719,9 +1118,6 @@ export async function initDashboard() {
                     📅 Para hoy
                   </span>
                 </div>
-                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
-                  Programada para hoy
-                </div>
               </div>
             `;
           } else if (isAtrasada) {
@@ -736,9 +1132,6 @@ export async function initDashboard() {
                     Atrasada
                   </span>
                 </div>
-                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
-                  Venció el ${formatFechaStr(a.fecha)} (hace ${dias} días)
-                </div>
               </div>
             `;
           } else {
@@ -752,9 +1145,6 @@ export async function initDashboard() {
                   <span style="font-size:11px; font-weight:700; color:#1976d2; white-space:nowrap;">
                     ${formatFechaStr(a.fecha)}
                   </span>
-                </div>
-                <div style="font-size:11px; color:#666; margin-top:3px; padding-left:23px;">
-                  Programada
                 </div>
               </div>
             `;
@@ -807,45 +1197,158 @@ export async function initDashboard() {
     }, 50);
   }
 
+  function showLoteBottomSheet(lote, apps) {
+    const sheet = document.getElementById('lote-bottom-sheet');
+    const scrim = document.getElementById('lote-sheet-scrim');
+    if (!sheet) return;
+
+    sheet.classList.remove('expanded');
+    if (scrim) scrim.classList.remove('expanded');
+    sheet.scrollTop = 0;
+    sheet.innerHTML = buildLoteBottomSheetHtml(lote, apps);
+    sheet.classList.add('open');
+    if (scrim) scrim.classList.add('open');
+
+    // Attach close button
+    document.getElementById('lote-sheet-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearLoteSelection();
+    });
+
+    // Function to expand/collapse
+    const setSheetExpanded = (expand) => {
+      if (expand) {
+        sheet.classList.add('expanded');
+        if (scrim) scrim.classList.add('expanded');
+      } else {
+        sheet.classList.remove('expanded');
+        if (scrim) scrim.classList.remove('expanded');
+      }
+      const icon = document.getElementById('lote-sheet-expand-icon');
+      if (icon) icon.textContent = expand ? 'keyboard_arrow_down' : 'keyboard_arrow_up';
+      const cue = document.getElementById('lote-sheet-drag-cue');
+      if (cue) {
+        cue.innerHTML = expand 
+          ? `<span>Desliza hacia abajo para contraer</span><span class="material-symbols-outlined" style="font-size:14px;">expand_more</span>`
+          : `<span>Desliza hacia arriba para pantalla completa</span><span class="material-symbols-outlined" style="font-size:14px;">expand_less</span>`;
+      }
+    };
+
+    const toggleExpand = (e) => {
+      e?.stopPropagation();
+      setSheetExpanded(!sheet.classList.contains('expanded'));
+    };
+
+    document.getElementById('lote-sheet-handle-box')?.addEventListener('click', toggleExpand);
+    document.getElementById('lote-sheet-expand-btn')?.addEventListener('click', toggleExpand);
+
+    // Gestos táctiles nativos para deslizar arriba (pantalla completa) o abajo (contraer / cerrar)
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let touchCurrentY = 0;
+    let isTrackingTouch = false;
+
+    sheet.ontouchstart = (e) => {
+      if (e.touches.length !== 1) return;
+      const target = e.target;
+      if (target.closest('button') || target.closest('a') || target.closest('input')) {
+        isTrackingTouch = false;
+        return;
+      }
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+      touchCurrentY = touchStartY;
+      isTrackingTouch = true;
+    };
+
+    sheet.ontouchmove = (e) => {
+      if (!isTrackingTouch || e.touches.length !== 1) return;
+      touchCurrentY = e.touches[0].clientY;
+    };
+
+    sheet.ontouchend = (e) => {
+      if (!isTrackingTouch) return;
+      isTrackingTouch = false;
+
+      const deltaY = touchCurrentY - touchStartY;
+      const deltaX = Math.abs((e.changedTouches[0]?.clientX || touchStartX) - touchStartX);
+
+      // Solo procesar si el movimiento es vertical predominante
+      if (Math.abs(deltaY) < 30 || Math.abs(deltaY) < deltaX * 1.2) {
+        return;
+      }
+
+      // Swipe hacia ARRIBA (deltaY negativo) -> Abrir pantalla completa
+      if (deltaY < -35) {
+        setSheetExpanded(true);
+      }
+      // Swipe hacia ABAJO (deltaY positivo)
+      else if (deltaY > 40) {
+        if (sheet.classList.contains('expanded')) {
+          // Si está scrolleado hacia abajo dentro del contenido, permitir scroll interno
+          if (sheet.scrollTop > 15) return;
+          setSheetExpanded(false);
+        } else {
+          // En modo peek, swipe down cierra el bottom sheet
+          clearLoteSelection();
+        }
+      }
+    };
+  }
+
+  let lastLoteSelectTime = 0;
+
   function selectLote(id) {
+    lastLoteSelectTime = Date.now();
     selectedLoteId = id;
+    
+    // Resaltar el lote seleccionado y mantener todos los demás visibles y clickeables
     Object.values(polyByLote).forEach(({ poly, labelMarker, lote }) => {
+      const { color } = parseCoordenadasJson(lote.coordenadas_json || lote.coordenadas);
+      const loteColor = color || '#2d3e2c';
       const selected = lote.id === id;
       if (selected) {
-        if (!map.hasLayer(poly)) map.addLayer(poly);
-        if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
-        poly.setStyle({ fillOpacity: 0.55, weight: 4.5, color: '#ffffff', opacity: 1 });
+        poly.setStyle({ fillOpacity: 0.65, weight: 4.5, color: '#ffffff', fillColor: loteColor });
+        poly.bringToFront();
+        if (labelMarker) labelMarker.setZIndexOffset(1000);
       } else {
-        if (map.hasLayer(poly)) map.removeLayer(poly);
-        if (labelMarker && map.hasLayer(labelMarker)) map.removeLayer(labelMarker);
+        poly.setStyle({ fillOpacity: 0.35, weight: 2.5, color: '#ffffff', fillColor: loteColor });
+        if (labelMarker) labelMarker.setZIndexOffset(100);
       }
     });
 
     const sel = polyByLote[id];
     if (sel) {
-      const center = sel.poly.getBounds().getCenter();
-      map.panTo(center, { animate: true });
-      showLotePopup(sel.lote, appsByLote[id] || [], center);
+      map.flyToBounds(sel.poly.getBounds(), {
+        paddingBottomRight: [0, 260],
+        maxZoom: 18,
+        animate: true,
+        duration: 0.6
+      });
+      showLoteBottomSheet(sel.lote, appsByLote[id] || []);
     }
   }
 
   function clearLoteSelection() {
     selectedLoteId = null;
+    const sheet = document.getElementById('lote-bottom-sheet');
+    const scrim = document.getElementById('lote-sheet-scrim');
+    if (sheet) sheet.classList.remove('open', 'expanded');
+    if (scrim) scrim.classList.remove('open', 'expanded');
     if (activeLotePopup) {
       map.closePopup(activeLotePopup);
       activeLotePopup = null;
     }
     Object.values(polyByLote).forEach(({ poly, labelMarker, lote }) => {
-      const { color } = parseCoordenadasJson(lote.coordenadas_json);
+      const { color } = parseCoordenadasJson(lote.coordenadas_json || lote.coordenadas);
       const loteColor = color || '#2d3e2c';
-      if (!map.hasLayer(poly)) map.addLayer(poly);
-      if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
       poly.setStyle({ fillOpacity: 0.35, weight: 3, opacity: 1, color: '#ffffff', fillColor: loteColor });
     });
   }
 
   map.on('popupclose', () => {
-    if (selectedLoteId) {
+    // Solo en escritorio cerramos al cerrar el popup nativo de Leaflet
+    if (window.innerWidth > 768 && selectedLoteId) {
       clearLoteSelection();
     }
   });
@@ -864,7 +1367,8 @@ export async function initDashboard() {
       weight: 3,
       opacity: 1,
       lineJoin: 'round',
-      lineCap: 'round'
+      lineCap: 'round',
+      bubblingMouseEvents: false
     }).addTo(map);
 
     allBounds.push(poly.getBounds());
@@ -880,7 +1384,8 @@ export async function initDashboard() {
         iconSize: [0, 0],
         iconAnchor: [0, 0]
       }),
-      interactive: false
+      interactive: true,
+      bubblingMouseEvents: false
     }).addTo(map);
 
     polyByLote[lote.id] = { poly, labelMarker, lote };
@@ -897,13 +1402,21 @@ export async function initDashboard() {
       }
     });
 
-    poly.on('click', (e) => {
+    const onLoteClick = (e) => {
+      if (e && e.originalEvent) {
+        L.DomEvent.stopPropagation(e.originalEvent);
+      }
+      if (e) L.DomEvent.stopPropagation(e);
       selectLote(lote.id);
-      L.DomEvent.stopPropagation(e);
-    });
+    };
+
+    poly.on('click', onLoteClick);
+    labelMarker.on('click', onLoteClick);
   });
 
   map.on('click', () => {
+    // Evitar que el clic táctil en móvil cierre la selección inmediatamente
+    if (Date.now() - lastLoteSelectTime < 450) return;
     clearLoteSelection();
   });
 

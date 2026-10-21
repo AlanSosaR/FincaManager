@@ -6,7 +6,7 @@ Sistema multi-empresa colaborativo (PWA): ganado, motores, herramientas, potrero
 - `npm run dev` — servidor Vite (proxy `/api/*` → Evolution API con apikey en `vite.config.js`).
 - `npm run build` — única verificación (no hay lint ni tests). `vite preview` para probar el build.
 - Deploy automático a Vercel con cada push a `main` (`.github/workflows/deploy.yml`). No desplegar manualmente.
-- Migraciones SQL: aplicar a Supabase (proyecto `udhuizkqnmkhljmezzkd`) vía herramientas de management (MCP configurado en `opencode.json` con `SUPABASE_ACCESS_TOKEN` de env). `supabase/config.toml` es config local opcional.
+- Migraciones SQL: aplicar a Supabase (proyecto `bguzluqyxbgtsgjcncvm`) vía herramientas de management (MCP configurado en `opencode.json` con `SUPABASE_ACCESS_TOKEN` de env). `supabase/config.toml` es config local opcional.
 
 ## Acceso a datos — reglas críticas
 

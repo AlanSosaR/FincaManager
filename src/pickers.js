@@ -168,11 +168,24 @@ export const m3Pickers = {
         pmBtn.className = `m3-ampm-btn ${isPM ? 'active' : ''}`;
       };
       
+      const setActiveField = (field) => {
+        if (field === 'hour') {
+          hrBox.classList.add('active');
+          minBox.classList.remove('active');
+        } else {
+          minBox.classList.add('active');
+          hrBox.classList.remove('active');
+        }
+      };
+
+      hrBox.onclick = () => setActiveField('hour');
+      minBox.onclick = () => setActiveField('min');
+
       // Arrow logic
-      overlay.querySelector('#m3-h-up').onclick = () => { h12 = (h12 % 12) + 1; updateUI(); };
-      overlay.querySelector('#m3-h-down').onclick = () => { h12 = h12 - 1 || 12; updateUI(); };
-      overlay.querySelector('#m3-m-up').onclick = () => { m = (m + 1) % 60; updateUI(); };
-      overlay.querySelector('#m3-m-down').onclick = () => { m = m - 1 < 0 ? 59 : m - 1; updateUI(); };
+      overlay.querySelector('#m3-h-up').onclick = () => { setActiveField('hour'); h12 = (h12 % 12) + 1; updateUI(); };
+      overlay.querySelector('#m3-h-down').onclick = () => { setActiveField('hour'); h12 = h12 - 1 || 12; updateUI(); };
+      overlay.querySelector('#m3-m-up').onclick = () => { setActiveField('min'); m = (m + 1) % 60; updateUI(); };
+      overlay.querySelector('#m3-m-down').onclick = () => { setActiveField('min'); m = m - 1 < 0 ? 59 : m - 1; updateUI(); };
 
       overlay.querySelector('#m3-set-am').onclick = () => { isPM = false; updateUI(); };
       overlay.querySelector('#m3-set-pm').onclick = () => { isPM = true; updateUI(); };

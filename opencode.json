@@ -3,7 +3,7 @@
   "mcp": {
     "supabase": {
       "type": "local",
-      "command": ["npx", "-y", "@supabase/mcp-server-supabase", "--project-ref", "udhuizkqnmkhljmezzkd"],
+      "command": ["npx", "-y", "@supabase/mcp-server-supabase", "--project-ref", "bguzluqyxbgtsgjcncvm"],
       "env": {
         "SUPABASE_ACCESS_TOKEN": "{env:SUPABASE_ACCESS_TOKEN}"
       }

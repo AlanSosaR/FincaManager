@@ -358,11 +358,31 @@ const screens = {
     detalle_potrero: { title: 'Detalle de Potrero', backTo: 'potreros', render: renderDetallePotrero },
     detalle_animal: { title: 'Detalle de Animal', backTo: 'ganado', render: renderDetalleAnimal },
     detalle_herramienta: { title: 'Detalle de Herramienta', backTo: 'herramientas', render: renderDetalleHerramienta },
-    nueva_herramienta: { title: 'Nueva Herramienta', backTo: 'herramientas', render: renderNuevaHerramienta },
-    nuevo_motor: { title: 'Agregar Nuevo Equipo', backTo: 'motores', render: renderNuevoMotor },
-    nuevo_animal: { title: 'Registrar Animal', backTo: 'ganado', render: renderNuevoAnimal },
-    nuevo_potrero: { title: 'Nuevo Potrero', backTo: 'potreros', render: renderNuevoPotrero },
-    nuevo_lote:    { title: 'Nuevo Lote de Cafetal', backTo: 'dashboard', render: (id) => renderNuevoLote(id) },
+    nueva_herramienta: { 
+        title: 'Nueva Herramienta', 
+        backTo: (id) => (id && id !== 'null' && id !== 'undefined') ? ['detalle_herramienta', id] : 'herramientas', 
+        render: renderNuevaHerramienta 
+    },
+    nuevo_motor: { 
+        title: 'Nuevo Equipo', 
+        backTo: (id) => (id && id !== 'null' && id !== 'undefined') ? ['detalle_motor', id] : 'motores', 
+        render: renderNuevoMotor 
+    },
+    nuevo_animal: { 
+        title: 'Registrar Animal', 
+        backTo: (id) => (id && id !== 'null' && id !== 'undefined') ? ['detalle_animal', id] : 'ganado', 
+        render: renderNuevoAnimal 
+    },
+    nuevo_potrero: { 
+        title: 'Nuevo Potrero', 
+        backTo: (id) => (id && id !== 'null' && id !== 'undefined') ? ['detalle_potrero', id] : 'potreros', 
+        render: renderNuevoPotrero 
+    },
+    nuevo_lote:    { 
+        title: 'Nuevo Lote de Cafetal', 
+        backTo: (id) => (id && id !== 'null' && id !== 'undefined') ? ['detalle_lote', id] : 'dashboard', 
+        render: (id) => renderNuevoLote(id) 
+    },
     detalle_lote:  { title: 'Detalle de Lote', backTo: 'dashboard', render: renderDetalleLote },
     nueva_actividad: { 
         title: 'Nueva Actividad', 
@@ -516,7 +536,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
     const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad','nueva_herramienta','nuevo_gasto','nuevo_cultivo']);
 
+    const navHistoryStack = [];
+    let isNavigatingBack = false;
+
+    window.navigateBack = function() {
+        if (navHistoryStack.length > 1) {
+            navHistoryStack.pop(); // Remove current screen
+            const prev = navHistoryStack.pop(); // Pop previous to re-navigate
+            isNavigatingBack = true;
+            window.navigateTo(prev.screenId, ...(prev.args || []));
+            return;
+        }
+        const hashParts = getHashParts();
+        const currentScreenId = hashParts[0] || 'dashboard';
+        const currentArgs = hashParts.slice(1);
+        const screenCfg = screens[currentScreenId];
+        if (screenCfg && screenCfg.backTo) {
+            const backTarget = typeof screenCfg.backTo === 'function' ? screenCfg.backTo(...currentArgs) : screenCfg.backTo;
+            const targetArr = Array.isArray(backTarget) ? backTarget : [backTarget];
+            window.navigateTo(...targetArr);
+        } else {
+            window.navigateTo('dashboard');
+        }
+    };
+
     async function navigate(screenId, ...args) {
+        if (!isNavigatingBack) {
+            const last = navHistoryStack[navHistoryStack.length - 1];
+            if (!last || last.screenId !== screenId || JSON.stringify(last.args) !== JSON.stringify(args)) {
+                navHistoryStack.push({ screenId, args });
+            }
+        }
+        isNavigatingBack = false;
         if (DETAIL_SCREENS.has(screenId) && (!args || args.length === 0 || !args[0])) {
             const screenCfg = screens[screenId];
             if (screenCfg && screenCfg.backTo) {
@@ -560,26 +611,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (screen.backTo) {
             const backTarget = typeof screen.backTo === 'function' ? screen.backTo(...args) : screen.backTo;
-            const onClick = Array.isArray(backTarget) 
+            const onClickFallback = Array.isArray(backTarget) 
                 ? backTarget.map(s => `'${s}'`).join(', ')
                 : `'${backTarget}'`;
             const title = screenId === 'nuevo_animal' && args.length > 0 && args[0]
                 ? 'Editar Animal'
+                : screenId === 'nuevo_motor' && args.length > 0 && args[0]
+                ? 'Actualizar Equipo'
+                : screenId === 'nueva_herramienta' && args.length > 0 && args[0]
+                ? 'Editar Herramienta'
+                : screenId === 'nuevo_potrero' && args.length > 0 && args[0]
+                ? 'Editar Potrero'
+                : screenId === 'nuevo_lote' && args.length > 0 && args[0]
+                ? 'Editar Lote'
                 : screenId === 'nuevo_gasto' && args.length > 0 && args[0]
                 ? 'Editar Gasto'
                 : screenId === 'nuevo_cultivo' && args.length > 0 && args[0]
                 ? 'Editar Cultivo'
-                : screen.title;
+                : (screenId === 'nuevo_motor' ? 'Nuevo Equipo' : screen.title);
             titleElement.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <button onclick="window.navigateTo(${onClick})" style="background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px; border-radius: 50%; color: #333; margin-left: -8px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'" aria-label="Atras">
+                <div class="topbar-title-row">
+                    <button type="button" class="topbar-back-btn" onclick="window.navigateTo(${onClickFallback})" aria-label="Volver atrás" title="Volver atrás">
                         <span class="material-icons">arrow_back</span>
                     </button>
-                    <span>${title}</span>
+                    <span class="topbar-title-text">${title}</span>
                 </div>
             `;
         } else {
-            titleElement.textContent = screen.title;
+            titleElement.innerHTML = `<span class="topbar-title-text">${screen.title}</span>`;
         }
 
         const key = cacheKey(screenId, args);

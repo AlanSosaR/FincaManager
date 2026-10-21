@@ -424,9 +424,14 @@ export default class QueryBuilder {
         return this._processLocally(localData);
       }
 
-      const result = await this._executeOnline();
-      this._updateLocalCache(result.data);
-      return result;
+      try {
+        const result = await this._executeOnline();
+        this._updateLocalCache(result.data);
+        return result;
+      } catch (err) {
+        console.warn('Online fetch failed, falling back to local:', err);
+        return this._processLocally(localData);
+      }
     }
 
     return this._processLocally(localData);

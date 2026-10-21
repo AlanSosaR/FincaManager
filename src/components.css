@@ -12,6 +12,11 @@
   font-weight: 700;
   color: #2d3e2c;
 }
+@media (max-width: 768px) {
+  .section-title h3 {
+    font-size: 20px;
+  }
+}
 .section-subtitle {
   font-size: 16px;
   color: #666;
