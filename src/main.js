@@ -535,6 +535,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'restablecer') initRestablecer();
         if (screenId === 'asistente') initAsistente();
         promoteSplitCtrlToTopbar(screenId);
+        const topBar = document.querySelector('.top-bar');
+        if (topBar) {
+            const h = topBar.getBoundingClientRect().height;
+            document.documentElement.style.setProperty('--top-bar-height', `${Math.round(h)}px`);
+        }
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);

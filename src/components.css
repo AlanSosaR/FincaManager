@@ -1338,6 +1338,318 @@ input:focus, textarea:focus, select:focus {
   font-size: 20px;
 }
 
+/* ---- Ganado Sticky Header (Pills + Carousel) ---- */
+.ganado-sticky-header {
+  position: static;
+  background: transparent;
+  width: 100%;
+}
+
+/* Default Desktop Styles for Tally Card & Pills */
+.screen-ganado .ganado-card.ganado-card-primary.ganado-tally {
+  background: var(--m3-primary, #2d3e2c);
+  border-radius: 20px;
+  padding: 24px 22px 20px;
+  box-shadow: 0 6px 24px rgba(45,62,44,0.22);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.screen-ganado .ganado-tally-top {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.screen-ganado .ganado-tally-label {
+  color: rgba(255,255,255,0.92);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 13.5px;
+}
+
+.screen-ganado .ganado-tally-count .ganado-card-value {
+  color: #ffffff !important;
+  font-size: 38px;
+  font-weight: 800;
+}
+
+.screen-ganado .ganado-tally-divider {
+  border-top: 1px solid rgba(255,255,255,0.18);
+  margin-bottom: 16px;
+}
+
+.screen-ganado .ganado-tally-row {
+    box-shadow: none !important;
+    filter: none !important;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.screen-ganado .ganado-tag-stat {
+  background: rgba(255,255,255,0.95);
+  border-radius: 14px;
+  padding: 14px 18px;
+  flex: 1;
+  min-width: 130px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.screen-ganado .ganado-tag-stat .ganado-tag-n {
+  font-size: 19px;
+  font-weight: 800;
+  color: #2d3e2c;
+}
+
+.screen-ganado .ganado-tag-stat .ganado-tag-l {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #666;
+  font-weight: 700;
+}
+
+/* Hide Total pill on Desktop */
+.screen-ganado .ganado-tag-stat-total {
+  display: none !important;
+}
+
+/* Swatch for Total */
+.ganado-tag-swatch.t {
+  background: #e5ede4;
+  color: #2d3e2c;
+}
+
+.ganado-total-icon-img {
+  width: 20px;
+  height: 20px;
+  background-color: #2d3e2c;
+  -webkit-mask-image: url('/vaca.png');
+  mask-image: url('/vaca.png');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  display: block;
+}
+
+/* ---- Mobile Styles (<= 768px) ---- */
+@media (max-width: 768px) {
+  :root {
+    --top-bar-height: 60px;
+  }
+
+  /* Attach to top on mobile: eliminate top gap */
+  .screen-ganado {
+    margin-top: -10px !important;
+  }
+
+  .screen-ganado .ganado-page-title {
+    display: none !important;
+  }
+
+  .screen-ganado .da-tabs-section {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-top: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Make header sticky flush below the top-bar */
+  .screen-ganado .ganado-sticky-header {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 60px !important;
+    z-index: 40 !important;
+    background: #ffffff !important;
+    margin-left: -6px !important;
+    margin-right: -6px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1.5px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* Shield extension above sticky header to prevent any gap/peeking during scroll */
+  .screen-ganado .ganado-sticky-header::before {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 100% !important;
+    left: -10px !important;
+    right: -10px !important;
+    height: 60px !important;
+    background: #ffffff !important;
+    pointer-events: none !important;
+  }
+
+  .screen-ganado .ganado-top-cards {
+    margin-bottom: 6px !important;
+    gap: 0 !important;
+  }
+
+  /* Hide the big desktop header and divider on mobile */
+  .screen-ganado .ganado-tally-top,
+  .screen-ganado .ganado-tally-divider {
+    display: none !important;
+  }
+
+  /* Reset the green box on mobile into a neutral transparent container */
+  .screen-ganado .ganado-card.ganado-card-primary.ganado-tally {
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    min-height: auto !important;
+    transform: none !important;
+  }
+
+  /* Show Total pill in the carousel row on mobile */
+  .screen-ganado .ganado-tag-stat-total {
+    display: flex !important;
+  }
+
+  /* Horizontal carousel track for pills: Total, Hembras, Machos */
+  .screen-ganado .ganado-tally-row {
+    box-shadow: none !important;
+    filter: none !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 8px !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding: 2px 1px 4px 1px !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .screen-ganado .ganado-tally-row::-webkit-scrollbar {
+    display: none !important;
+    width: 0;
+    height: 0;
+  }
+
+  /* Pills with app green background and white text (no white border) */
+  .screen-ganado .ganado-tag-stat {
+    flex: 1 0 calc((100% - 16px) / 3) !important;
+    min-width: 96px !important;
+    max-width: 140px !important;
+    padding: 6px 8px !important;
+    gap: 7px !important;
+    border-radius: 12px !important;
+    background: var(--m3-primary, #2d3e2c) !important;
+    border: none !important;
+    outline: none !important;
+    opacity: 0.85;
+    box-shadow: none !important;
+    scroll-snap-align: start !important;
+    margin: 0 !important;
+    color: #ffffff !important;
+  }
+
+  .screen-ganado .ganado-tally-row .ganado-tag-swatch {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.18) !important;
+  }
+
+  .screen-ganado .ganado-tally-row .ganado-tag-swatch .ganado-sex-icon-img,
+  .screen-ganado .ganado-tally-row .ganado-tag-swatch .ganado-total-icon-img {
+    width: 16px !important;
+    height: 16px !important;
+    background-color: #ffffff !important;
+  }
+
+  .screen-ganado .ganado-tally-row .ganado-tag-n {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #ffffff !important;
+    line-height: 1.1 !important;
+  }
+
+  .screen-ganado .ganado-tally-row .ganado-tag-l {
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.2px !important;
+    line-height: 1.1 !important;
+  }
+
+  .screen-ganado .ganado-tag-stat.active {
+    background: #142013 !important;
+    border: none !important;
+    outline: none !important;
+    opacity: 1 !important;
+    box-shadow: none !important;
+    position: relative !important;
+  }
+
+  .screen-ganado .ganado-carousel-container {
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .screen-ganado .ganado-carousel-track {
+    padding: 8px 4px 8px 4px !important;
+  }
+
+  .screen-ganado .ganado-carousel-card {
+    padding: 6px 2px !important;
+    transform: none !important;
+  }
+
+  .screen-ganado .ganado-carousel-card:hover,
+  .screen-ganado .ganado-carousel-card:focus,
+  .screen-ganado .ganado-carousel-card:active,
+  .screen-ganado .ganado-carousel-card.active {
+    transform: none !important;
+    outline: none !important;
+  }
+
+  /* List Header inside Sticky Header on Mobile */
+  .screen-ganado .ganado-list-header {
+    margin-top: 6px !important;
+    margin-bottom: 2px !important;
+    padding: 2px 2px 0 2px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  .screen-ganado .ganado-list-header h4 {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+    color: var(--on-surface, #191c19) !important;
+  }
+
+  .screen-ganado .ganado-count-label {
+    font-size: 11px !important;
+    color: #666 !important;
+    margin: 0 !important;
+  }
+}
+
 /* ---- Top Summary Cards ---- */
 .ganado-top-cards {
   display: flex;
@@ -1360,7 +1672,7 @@ input:focus, textarea:focus, select:focus {
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding: 4px 1px 10px 1px;
+  padding: 8px 4px 8px 4px !important;
   scrollbar-width: none;
   -ms-overflow-style: none;
   width: 100%;
@@ -1395,7 +1707,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .ganado-carousel-card:active {
-  transform: scale(0.95);
+  transform: none !important;
 }
 
 .ganado-carousel-card.active {
@@ -1548,6 +1860,22 @@ input:focus, textarea:focus, select:focus {
 .ganado-card-filter:hover {
   transform: translateY(-4px);
   box-shadow: 0 14px 36px rgba(0,0,0,0.12);
+}
+
+/* Ensure carousel cards and pills never translate or have external outlines that get clipped by scroll containers */
+.ganado-carousel-card.ganado-card-filter,
+.ganado-carousel-card.ganado-card-filter:hover,
+.ganado-carousel-card.ganado-card-filter:focus,
+.ganado-carousel-card.ganado-card-filter:active,
+.ganado-carousel-card.ganado-card-filter.active,
+.ganado-tag-stat.ganado-card-filter,
+.ganado-tag-stat.ganado-card-filter:hover,
+.ganado-tag-stat.ganado-card-filter:focus,
+.ganado-tag-stat.ganado-card-filter:active,
+.ganado-tag-stat.ganado-card-filter.active {
+  transform: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Green card — Total Animales */

@@ -316,33 +316,41 @@ export async function renderGanado(page = 1, filter = 'all') {
 
   return `
     <div class="screen-ganado" style="padding-bottom: 80px;">
-      <div class="ganado-page-title" style="margin-top: 4px; margin-bottom: 20px;">
+      <div class="ganado-page-title">
         <h2>Ganado</h2>
       </div>
 
-      <div class="da-tabs-section" style="margin-top: 16px;">
+      <div class="da-tabs-section">
+        <div class="ganado-sticky-header">
         <section class="ganado-top-cards">
-          <div class="ganado-card ganado-card-primary ganado-tally ganado-card-filter ${currentFilter === 'all' ? 'active' : ''}" data-filter="all" style="background: var(--m3-primary, #2d3e2c); border-radius: 20px; padding: 24px 22px 20px; box-shadow: 0 6px 24px rgba(45,62,44,0.22); width: 100%; box-sizing: border-box;">
-            <div class="ganado-tally-top" style="margin-bottom: 16px;">
-              <span class="ganado-tally-label" style="color: rgba(255,255,255,0.92); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13.5px;">Total Animales</span>
+          <div class="ganado-card ganado-card-primary ganado-tally ganado-card-filter ${currentFilter === 'all' ? 'active' : ''}" data-filter="all">
+            <div class="ganado-tally-top">
+              <span class="ganado-tally-label">Total Animales</span>
               <span class="ganado-tally-count">
-                <span class="ganado-card-value" style="color: #ffffff !important; font-size: 38px; font-weight: 800;">${totalAnimales}</span>
+                <span class="ganado-card-value">${totalAnimales}</span>
               </span>
             </div>
-            <div class="ganado-tally-divider" style="border-top: 1px solid rgba(255,255,255,0.18); margin-bottom: 16px;"></div>
-            <div class="ganado-tally-row" style="display: flex; gap: 12px; flex-wrap: wrap;">
-              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'hembra' ? 'active' : ''}" data-filter="hembra" title="Ver hembras" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px;">
-                <span class="ganado-tag-swatch h"><span class="ganado-sex-icon-img"></span></span>
+            <div class="ganado-tally-divider"></div>
+            <div class="ganado-tally-row">
+              <div class="ganado-tag-stat ganado-tag-stat-total ganado-card-filter ${currentFilter === 'all' ? 'active' : ''}" data-filter="all" title="Ver todos">
+                <span class="ganado-tag-swatch t"><span class="ganado-total-icon-img"></span></span>
                 <span class="ganado-tag-info">
-                  <span class="ganado-tag-n" style="font-size: 19px; font-weight: 800; color: #2d3e2c;">${hembrasCount}</span>
-                  <span class="ganado-tag-l" style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: 700;">Hembras</span>
+                  <span class="ganado-tag-n">${totalAnimales}</span>
+                  <span class="ganado-tag-l">Total</span>
                 </span>
               </div>
-              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'macho' ? 'active' : ''}" data-filter="macho" title="Ver machos" style="background: rgba(255,255,255,0.95); border-radius: 14px; padding: 14px 18px; flex: 1; min-width: 130px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 12px;">
+              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'hembra' ? 'active' : ''}" data-filter="hembra" title="Ver hembras">
+                <span class="ganado-tag-swatch h"><span class="ganado-sex-icon-img"></span></span>
+                <span class="ganado-tag-info">
+                  <span class="ganado-tag-n">${hembrasCount}</span>
+                  <span class="ganado-tag-l">Hembras</span>
+                </span>
+              </div>
+              <div class="ganado-tag-stat ganado-card-filter ${currentFilter === 'macho' ? 'active' : ''}" data-filter="macho" title="Ver machos">
                 <span class="ganado-tag-swatch m"><span class="ganado-sex-icon-img"></span></span>
                 <span class="ganado-tag-info">
-                  <span class="ganado-tag-n" style="font-size: 19px; font-weight: 800; color: #2d3e2c;">${machosCount}</span>
-                  <span class="ganado-tag-l" style="font-size: 12px; text-transform: uppercase; color: #666; font-weight: 700;">Machos</span>
+                  <span class="ganado-tag-n">${machosCount}</span>
+                  <span class="ganado-tag-l">Machos</span>
                 </span>
               </div>
             </div>
@@ -403,6 +411,13 @@ export async function renderGanado(page = 1, filter = 'all') {
               <div class="ganado-carousel-badge neutral">Historial</div>
             </div>
 
+          </div>
+        </div>
+
+        
+          <div class="ganado-list-header">
+            <h4 id="ganado-list-title">${currentFilter === 'all' ? 'Inventario Ganadero' : currentFilter === 'pesajes' ? 'Control de Pesajes' : 'Resultados del Filtro'}</h4>
+            <span class="ganado-count-label" id="ganado-count-label">${currentFilter !== 'all' ? (currentFilter === 'pesajes' ? `${totalGanadoCount} animales en seguimiento` : `${totalGanadoCount} animales encontrados`) : ''}</span>
           </div>
         </div>
 
@@ -538,11 +553,6 @@ export async function renderGanado(page = 1, filter = 'all') {
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="ganado-list-header" style="margin-top: 32px;">
-          <h4 id="ganado-list-title">${currentFilter === 'all' ? 'Inventario Ganadero' : currentFilter === 'pesajes' ? 'Control de Pesajes' : 'Resultados del Filtro'}</h4>
-          <span class="ganado-count-label" id="ganado-count-label">${currentFilter !== 'all' ? (currentFilter === 'pesajes' ? `${totalGanadoCount} animales en seguimiento` : `${totalGanadoCount} animales encontrados`) : ''}</span>
         </div>
 
         <div class="ganado-list" id="ganado-list-container">
@@ -945,6 +955,21 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
 }
 
 export function initGanado() {
+  // Cleanup any orphaned bottom sheets in document.body from previous visits
+  document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim').forEach(el => el.remove());
+  const cleanupGanadoSheets = () => {
+    document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim').forEach(el => el.remove());
+  };
+  window.addEventListener('navigate', cleanupGanadoSheets, { once: true });
+  const updateTopBarHeight = () => {
+    const topBar = document.querySelector('.top-bar');
+    if (topBar) {
+      const h = topBar.getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--top-bar-height', `${Math.round(h)}px`);
+    }
+  };
+  updateTopBarHeight();
+  window.addEventListener('resize', updateTopBarHeight);
   // Hide the redundant screen title in header so search is wide and permanently open
   const titleEl = document.getElementById('current-screen-title');
   if (titleEl) {
@@ -1217,6 +1242,9 @@ export function initGanado() {
 
   const openFumigBottomSheet = () => {
     const scrim = getOrCreateGanadoScrim();
+    if (fumigPanel && fumigPanel.parentElement !== document.body) {
+      document.body.appendChild(fumigPanel);
+    }
     scrim.style.display = 'block';
     fumigPanel.style.display = 'block';
     if (fumigFecha && !fumigFecha.value) fumigFecha.value = getLocalToday();
@@ -1576,6 +1604,9 @@ export function initGanado() {
 
   const openVacunaBottomSheet = () => {
     const scrim = getOrCreateGanadoScrim();
+    if (vacunaPanel && vacunaPanel.parentElement !== document.body) {
+      document.body.appendChild(vacunaPanel);
+    }
     scrim.style.display = 'block';
     vacunaPanel.style.display = 'block';
     if (vacunaFecha && !vacunaFecha.value) vacunaFecha.value = getLocalToday();
