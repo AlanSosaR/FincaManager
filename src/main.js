@@ -1,9 +1,11 @@
+
 import './style.css';
 import './components.css';
 import './pickers.css';
 import './detalle_motor.css';
 import './asistente.css';
 import './snackbar.js';
+import './action_sheet.js';
 
 import { registerSW } from 'virtual:pwa-register';
 
@@ -20,6 +22,7 @@ import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 import { initRealtime, disconnectRealtime } from './realtime.js';
 import { migrateExistingImagesToExternal } from './utils/image_uploader.js';
+
 
 const syncIcon = document.getElementById('sync-icon');
 const syncBadge = document.getElementById('sync-badge');
@@ -531,10 +534,38 @@ document.addEventListener('DOMContentLoaded', () => {
         if (screenId === 'recuperar') initRecuperar();
         if (screenId === 'restablecer') initRestablecer();
         if (screenId === 'asistente') initAsistente();
+        promoteSplitCtrlToTopbar(screenId);
     }
 
     const DETAIL_SCREENS = new Set(['detalle_motor','detalle_animal','detalle_potrero','detalle_herramienta','detalle_lote','detalle_personal']);
     const FORM_SCREENS = new Set(['nuevo_motor','nuevo_animal','nuevo_potrero','nuevo_lote','nueva_actividad','nueva_herramienta','nuevo_gasto','nuevo_cultivo']);
+
+    function promoteSplitCtrlToTopbar(screenId) {
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const topbarActions = document.getElementById('topbar-actions');
+        if (!topbarActions) return;
+
+        const currentScreenId = screenId || (typeof getHashParts === 'function' ? getHashParts()[0] : '') || 'dashboard';
+        const screenCfg = screens[currentScreenId];
+
+        if (screenCfg?.backTo || FORM_SCREENS.has(currentScreenId) || DETAIL_SCREENS.has(currentScreenId)) {
+            topbarActions.innerHTML = '';
+            return;
+        }
+
+        if (isMobile) {
+            const inPageCtrl = document.querySelector('.main-content .preview-container .ganado-split-ctrl, #app-content .ganado-split-ctrl, .main-content .m3-card-filled .ganado-split-ctrl');
+            if (inPageCtrl && !topbarActions.contains(inPageCtrl)) {
+                topbarActions.innerHTML = '';
+                inPageCtrl.classList.add('expanded');
+                topbarActions.appendChild(inPageCtrl);
+                const parent = inPageCtrl.parentElement;
+                if (parent && (parent.classList.contains('equipo-top-search-container') || parent.classList.contains('ganado-top-actions-container'))) {
+                    parent.style.display = 'none';
+                }
+            }
+        }
+    }
 
     const navHistoryStack = [];
     let isNavigatingBack = false;
@@ -603,38 +634,92 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.body.classList.toggle('screen-auth', !!screen.noAuth);
+        document.body.classList.toggle('has-back-nav', !!screen.backTo);
 
         if (!screen.noAuth && window._currentEmpresaId) {
             updateSidebarEmpresaName();
             if (!_empresaList.length) initEmpresaSelector();
         }
 
+        // Clear topbar actions on any screen transition
+        const topbarActionsEl = document.getElementById('topbar-actions');
+        if (topbarActionsEl) topbarActionsEl.innerHTML = '';
+        if (titleElement) titleElement.style.display = '';
+
         if (screen.backTo) {
             const backTarget = typeof screen.backTo === 'function' ? screen.backTo(...args) : screen.backTo;
             const onClickFallback = Array.isArray(backTarget) 
                 ? backTarget.map(s => `'${s}'`).join(', ')
                 : `'${backTarget}'`;
-            const title = screenId === 'nuevo_animal' && args.length > 0 && args[0]
-                ? 'Editar Animal'
-                : screenId === 'nuevo_motor' && args.length > 0 && args[0]
-                ? 'Actualizar Equipo'
-                : screenId === 'nueva_herramienta' && args.length > 0 && args[0]
-                ? 'Editar Herramienta'
-                : screenId === 'nuevo_potrero' && args.length > 0 && args[0]
-                ? 'Editar Potrero'
-                : screenId === 'nuevo_lote' && args.length > 0 && args[0]
-                ? 'Editar Lote'
-                : screenId === 'nuevo_gasto' && args.length > 0 && args[0]
-                ? 'Editar Gasto'
-                : screenId === 'nuevo_cultivo' && args.length > 0 && args[0]
-                ? 'Editar Cultivo'
-                : (screenId === 'nuevo_motor' ? 'Nuevo Equipo' : screen.title);
+
+            let isEdit = args.length > 0 && args[0];
+            let title = isEdit ? 'Editar Animal' : 'Registrar Animal';
+            let subtitle = isEdit ? 'Actualizando registro' : 'Nuevo registro de inventario';
+            let iconInnerHtml = '';
+
+            if (screenId === 'nuevo_animal') {
+                iconInnerHtml = `<img src="/vaca.png" alt="Ganado" style="width: 20px; height: 20px; filter: grayscale(1) opacity(0.85); pointer-events: none;">`;
+            } else if (screenId === 'nuevo_lote') {
+                title = isEdit ? 'Editar Lote' : 'Nuevo Lote de Cafetal';
+                subtitle = isEdit ? 'Actualiza información' : 'Registro de cultivo';
+                iconInnerHtml = `<span class="material-icons" style="font-size: 20px; color: #2d3e2c; pointer-events: none;">landscape</span>`;
+            } else if (screenId === 'nuevo_motor') {
+                title = isEdit ? 'Actualizar Equipo' : 'Nuevo Equipo';
+                subtitle = 'Registro de motor';
+                iconInnerHtml = `<span class="material-icons" style="font-size: 20px; color: #2d3e2c; pointer-events: none;">precision_manufacturing</span>`;
+            } else if (screenId === 'nueva_herramienta') {
+                title = isEdit ? 'Editar Herramienta' : 'Nueva Herramienta';
+                subtitle = 'Registro de herramienta';
+                iconInnerHtml = `<span class="material-icons" style="font-size: 20px; color: #2d3e2c; pointer-events: none;">build</span>`;
+            } else if (screenId === 'nuevo_potrero') {
+                title = isEdit ? 'Editar Potrero' : 'Nuevo Potrero';
+                subtitle = 'Registro de potrero';
+                iconInnerHtml = `<span class="material-icons" style="font-size: 20px; color: #2d3e2c; pointer-events: none;">landscape</span>`;
+            } else if (screenId === 'nuevo_gasto') {
+                title = isEdit ? 'Editar Gasto' : 'Nuevo Gasto';
+                subtitle = 'Registro financiero';
+                iconInnerHtml = `<span class="material-icons" style="font-size: 20px; color: #2d3e2c; pointer-events: none;">payments</span>`;
+            } else if (screenId === 'nuevo_cultivo') {
+                title = isEdit ? 'Editar Cultivo' : 'Nuevo Cultivo';
+                subtitle = 'Registro de cultivo';
+                iconInnerHtml = `<span class="material-icons" style="font-size: 20px; color: #2d3e2c; pointer-events: none;">agriculture</span>`;
+            } else if (screenId === 'nuevo_personal') {
+                title = isEdit ? 'Editar Personal' : 'Nuevo Personal';
+                subtitle = 'Registro de trabajador';
+                iconInnerHtml = `<span class="material-icons" style="font-size: 20px; color: #2d3e2c; pointer-events: none;">groups</span>`;
+            } else {
+                title = screen.title;
+                subtitle = '';
+            }
+
+            if (screenId === 'detalle_animal' && args[0]) {
+                title = 'Detalle de Animal';
+                subtitle = '';
+                db.ganado.get(args[0]).then(a => {
+                    if (a && a.nombre) {
+                        const t = document.querySelector('#current-screen-title .topbar-title-text');
+                        if (t) t.textContent = a.nombre;
+                    }
+                }).catch(() => {});
+            }
+
+            const backButtonHtml = iconInnerHtml ? `
+                <button type="button" class="topbar-back-btn topbar-avatar-icon topbar-avatar-btn" onclick="window.navigateTo(${onClickFallback})" aria-label="Volver atrás" title="Volver atrás">
+                    ${iconInnerHtml}
+                </button>
+            ` : `
+                <button type="button" class="topbar-back-btn" onclick="window.navigateTo(${onClickFallback})" aria-label="Volver atrás" title="Volver atrás">
+                    <span class="material-icons">arrow_back</span>
+                </button>
+            `;
+
             titleElement.innerHTML = `
-                <div class="topbar-title-row">
-                    <button type="button" class="topbar-back-btn" onclick="window.navigateTo(${onClickFallback})" aria-label="Volver atrás" title="Volver atrás">
-                        <span class="material-icons">arrow_back</span>
-                    </button>
-                    <span class="topbar-title-text">${title}</span>
+                <div class="topbar-title-row" style="display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; flex: 1;">
+                    ${backButtonHtml}
+                    <div style="display: flex; flex-direction: column; min-width: 0; justify-content: center; flex: 1; overflow: hidden;">
+                        <span class="topbar-title-text" style="font-size: 16.5px; font-weight: 800; color: #1e3e2b; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</span>
+                        ${subtitle ? `<span class="topbar-subtitle-text" style="font-size: 11.5px; color: #556b53; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${subtitle}</span>` : ''}
+                    </div>
                 </div>
             `;
         } else {

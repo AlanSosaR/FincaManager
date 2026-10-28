@@ -1,4 +1,4 @@
-import { getEmpresaMembers, getEmpresaInvitations, inviteUser, revokeInvitation, getUser, getAccessToken, updateMemberRole, removeMember, SUPABASE_URL, SUPABASE_KEY } from '../auth.js';
+import { getEmpresaMembers, getEmpresaInvitations, inviteUser, revokeInvitation, getUser, getAccessToken, updateMemberRole, removeMember, sendRecoveryEmail, SUPABASE_URL, SUPABASE_KEY } from '../auth.js';
 
 
 
@@ -39,27 +39,27 @@ export async function renderEquipo() {
   return `
     <div class="m3-card-filled" style="margin-bottom:80px;">
       <!-- Search (green split control, sin menú) -->
-      <div style="display:flex;justify-content:flex-end;margin:16px 0 8px;">
-        <div class="ganado-split-ctrl ${currentEquipoSearchQuery ? 'expanded' : ''}" id="equipo-search-wrapper">
-          <button id="equipo-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar">
-            <span class="material-icons" style="color:#ffffff;">search</span>
+      <div class="equipo-top-search-container" style="display:flex;justify-content:flex-end;margin:16px 0 8px;">
+        <div class="ganado-split-ctrl expanded" id="equipo-search-wrapper" style="background:#edf1ed; border:1px solid rgba(45,62,44,0.16);">
+          <button id="equipo-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;" title="Buscar">
+            <span class="material-icons" style="color:#435b47;font-size:20px;">search</span>
           </button>
-          <input type="text" id="equipo-search-input" placeholder="Buscar por nombre..." value="${currentEquipoSearchQuery}" style="border:none;background:transparent;outline:none;font-size:15px;width:${currentEquipoSearchQuery?'160px':'0px'};transition:width 0.3s;opacity:${currentEquipoSearchQuery?'1':'0'};padding:${currentEquipoSearchQuery?'0 8px 0 0':'0'};color:#ffffff;">
-          <button id="equipo-search-clear" style="background:none;border:none;cursor:pointer;display:${currentEquipoSearchQuery?'flex':'none'};align-items:center;justify-content:center;padding:0 16px 0 8px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
-            <span class="material-icons" style="font-size:20px;">close</span>
+          <input type="text" id="equipo-search-input" placeholder="Buscar por nombre..." value="${currentEquipoSearchQuery}" style="border:none;background:transparent;outline:none;font-size:14px;color:#1e3e2b;padding:0 8px;flex:1;min-width:0;">
+          <button id="equipo-search-clear" style="background:none;border:none;cursor:pointer;display:${currentEquipoSearchQuery?'flex':'none'};align-items:center;justify-content:center;padding:0 8px;color:#435b47;height:100%;" title="Limpiar búsqueda">
+            <span class="material-icons" style="font-size:18px;">close</span>
           </button>
-          <span class="ganado-split-ctrl-sep"></span>
-          <button class="ganado-split-ctrl-reg" onclick="window.toggleEquipoSplitMenu(event)" title="Más opciones">
-            <span class="material-icons">arrow_drop_down</span>
+          <span class="ganado-split-ctrl-sep" style="width:1px;height:22px;background:rgba(45,62,44,0.18);align-self:center;"></span>
+          <button class="ganado-split-ctrl-reg" onclick="window.toggleEquipoSplitMenu(event)" title="Más opciones" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#e2e8e2;border:none;cursor:pointer;border-radius:0 9px 9px 0;">
+            <span class="material-icons" style="color:#1e3e2b;font-size:20px;">arrow_drop_down</span>
           </button>
           <div class="ganado-split-menu" id="equipo-split-menu">
-            <button class="ganado-split-item" onclick="window.toggleInviteInline(); document.getElementById('equipo-split-menu').classList.remove('open');">
-              <span class="material-icons">person_add</span><span>Invitar</span>
+            <button class="ganado-split-item" onclick="window.toggleInviteInline(); document.getElementById('equipo-split-menu')?.classList.remove('open');">
+              <span class="material-icons">person_add</span><span>Invitar miembro</span>
             </button>
           </div>
         </div>
       </div>
-      <h2 class="m3-headline-small m3-font-bold" style="color:#2d3e2c;margin-bottom:24px;">Equipo</h2>
+      
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
         <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;">Miembros</h3>
@@ -89,11 +89,193 @@ export async function renderEquipo() {
   `;
 }
 
+
+function getSuspendedUserIds(empresaId) {
+  if (!empresaId) return [];
+  try {
+    return JSON.parse(localStorage.getItem('suspended_members_' + empresaId) || '[]');
+  } catch { return []; }
+}
+
+function setMemberSuspended(empresaId, userId, suspend) {
+  if (!empresaId || !userId) return;
+  let list = getSuspendedUserIds(empresaId);
+  if (suspend) {
+    if (!list.includes(userId)) list.push(userId);
+  } else {
+    list = list.filter(id => id !== userId);
+  }
+  localStorage.setItem('suspended_members_' + empresaId, JSON.stringify(list));
+  try {
+    restFetch(`/rest/v1/usuario_empresas?empresa_id=eq.${encodeURIComponent(empresaId)}&usuario_id=eq.${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ activo: !suspend })
+    }).catch(() => {});
+  } catch {}
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
+
+function openMemberBottomSheet(m) {
+  let scrim = document.getElementById('m3-action-sheet-scrim');
+  let sheet = document.getElementById('m3-action-sheet');
+
+  if (!scrim) {
+    scrim = document.createElement('div');
+    scrim.id = 'm3-action-sheet-scrim';
+    scrim.className = 'm3-action-sheet-scrim';
+    scrim.onclick = () => window.closeActionBottomSheet?.();
+    document.body.appendChild(scrim);
+  }
+
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'm3-action-sheet';
+    sheet.className = 'm3-action-sheet';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    document.body.appendChild(sheet);
+  }
+
+  const isSelf = m.id === _equipoCurrentUserId;
+  const isSuspended = getSuspendedUserIds(window._currentEmpresaId).includes(m.id);
+  const nextRol = m.rol === 'admin' ? 'visitante' : 'admin';
+
+  sheet.innerHTML = `
+    <button type="button" class="m3-action-sheet-close-btn" id="sheet-btn-close" aria-label="Cerrar">
+      <span class="material-icons">close</span>
+    </button>
+    <div class="m3-action-sheet-handle-box">
+      <div class="m3-action-sheet-handle"></div>
+    </div>
+    <div class="m3-action-sheet-header">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:rgba(45,62,44,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span class="material-icons" style="font-size:24px;color:#2d3e2c;">person</span>
+        </div>
+        <div style="min-width:0;flex:1;">
+          <div class="m3-action-sheet-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1e3e2b;">${escapeHtml(m.nombre || m.email)}${isSelf ? ' (tú)' : ''}</div>
+          <div style="font-size:13px;color:#556b53;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(m.email)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="m3-action-sheet-list">
+      <button type="button" class="m3-action-sheet-item" id="sheet-btn-recover">
+        <span class="material-icons">lock_reset</span>
+        <span>Enviar enlace de recuperación</span>
+      </button>
+
+      ${!isSelf ? `
+        <div class="m3-action-sheet-switch-row" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:14px;background:#f2f4f2;margin:8px 0;border:1px solid rgba(45,62,44,0.08);">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="material-icons" style="color:${!isSuspended ? '#2d3e2c' : '#777'};font-size:22px;">${!isSuspended ? 'check_circle' : 'block'}</span>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:#1e3e2b;">Acceso a la cuenta</div>
+              <div style="font-size:12px;color:#556b53;font-weight:500;">${!isSuspended ? 'Acceso activo' : 'Acceso desactivado'}</div>
+            </div>
+          </div>
+          <label class="m3-switch" style="position:relative;display:inline-block;width:50px;height:30px;cursor:pointer;margin:0;flex-shrink:0;">
+            <input type="checkbox" id="sheet-btn-toggle-active" ${!isSuspended ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute;">
+            <span class="m3-switch-track" style="position:absolute;inset:0;background:${!isSuspended ? '#2d3e2c' : '#c5c9c5'};border-radius:30px;transition:all 0.25s cubic-bezier(0.2,0,0,1);">
+              <span class="m3-switch-thumb" style="position:absolute;height:22px;width:22px;left:${!isSuspended ? '24px' : '4px'};bottom:4px;background:#ffffff;border-radius:50%;transition:all 0.25s cubic-bezier(0.2,0,0,1);box-shadow:0 2px 4px rgba(0,0,0,0.25);"></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="m3-action-sheet-switch-row" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:14px;background:#f2f4f2;margin:8px 0;border:1px solid rgba(45,62,44,0.08);">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="material-icons" style="color:${m.rol === 'admin' ? '#1565c0' : '#777'};font-size:22px;">manage_accounts</span>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:#1e3e2b;">Rol Administrador</div>
+              <div style="font-size:12px;color:#556b53;font-weight:500;">${m.rol === 'admin' ? 'Acceso de administrador' : 'Acceso de visitante'}</div>
+            </div>
+          </div>
+          <label class="m3-switch" style="position:relative;display:inline-block;width:50px;height:30px;cursor:pointer;margin:0;flex-shrink:0;">
+            <input type="checkbox" id="sheet-btn-change-role" ${m.rol === 'admin' ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute;">
+            <span class="m3-switch-track" style="position:absolute;inset:0;background:${m.rol === 'admin' ? '#1565c0' : '#c5c9c5'};border-radius:30px;transition:all 0.25s cubic-bezier(0.2,0,0,1);">
+              <span class="m3-switch-thumb" style="position:absolute;height:22px;width:22px;left:${m.rol === 'admin' ? '24px' : '4px'};bottom:4px;background:#ffffff;border-radius:50%;transition:all 0.25s cubic-bezier(0.2,0,0,1);box-shadow:0 2px 4px rgba(0,0,0,0.25);"></span>
+            </span>
+          </label>
+        </div>
+
+        <button type="button" class="m3-action-sheet-item delete" id="sheet-btn-delete-member">
+          <span class="material-icons">person_remove</span>
+          <span>Eliminar miembro</span>
+        </button>
+      ` : ''}
+    </div>
+  `;
+
+  document.getElementById('sheet-btn-recover')?.addEventListener('click', async () => {
+    window.closeActionBottomSheet?.();
+    try {
+      await sendRecoveryEmail(m.email);
+      window.Snackbar?.show('Enlace de recuperación enviado a ' + m.email);
+    } catch (err) {
+      window.Snackbar?.show('Error al enviar enlace: ' + err.message, { type: 'error' });
+    }
+  });
+
+  document.getElementById('sheet-btn-toggle-active')?.addEventListener('change', (e) => {
+    const willSuspend = !e.target.checked;
+    const actionTxt = willSuspend ? 'desactivar' : 'activar';
+    window.Snackbar?.confirm(`¿Seguro que deseas ${actionTxt} el acceso a ${m.nombre || m.email}?`, () => {
+      setMemberSuspended(window._currentEmpresaId, m.id, willSuspend);
+      window.closeActionBottomSheet?.();
+      window.Snackbar?.show(`Acceso ${willSuspend ? 'desactivado' : 'activado'}`);
+      refreshEquipoMembers();
+    }, () => {
+      e.target.checked = !willSuspend;
+    });
+  });
+
+  document.getElementById('sheet-btn-change-role')?.addEventListener('change', (e) => {
+    const newRol = e.target.checked ? 'admin' : 'visitante';
+    window.Snackbar?.confirm(`¿Cambiar el rol de ${m.nombre || m.email} a ${newRol}?`, async () => {
+      window.closeActionBottomSheet?.();
+      try {
+        await updateMemberRole(window._currentEmpresaId, m.id, newRol);
+        window.Snackbar?.show(`Rol actualizado a ${newRol} ✓`);
+        allEquipoMembers = await getEmpresaMembers(window._currentEmpresaId);
+        refreshEquipoMembers();
+      } catch (err) {
+        window.Snackbar?.show('Error al cambiar rol: ' + err.message, { type: 'error' });
+      }
+    }, () => {
+      e.target.checked = !e.target.checked;
+    });
+  });
+
+  document.getElementById('sheet-btn-delete-member')?.addEventListener('click', () => {
+    window.closeActionBottomSheet?.();
+    const btn = document.querySelector(`.btn-member-menu[data-userid="${m.id}"]`);
+    if (btn) handleRemoveMember(btn);
+  });
+
+  document.getElementById('sheet-btn-close')?.addEventListener('click', () => {
+    window.closeActionBottomSheet?.();
+  });
+
+  scrim.style.display = 'block';
+  sheet.style.display = 'block';
+  sheet.style.transform = '';
+
+  requestAnimationFrame(() => {
+    scrim.classList.add('open');
+    sheet.classList.add('open');
+  });
+}
+
 function renderMemberRow(m, currentUserId) {
   const isSelf = m.id === currentUserId;
+  const isSuspended = getSuspendedUserIds(window._currentEmpresaId).includes(m.id);
   const roleColors = { propietario: '#2d3e2c', admin: '#1565c0', visitante: '#888' };
   return `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--m3-surface-container-low);border-radius:12px;margin-bottom:8px;">
+    <div class="member-row" data-userid="${m.id}" data-email="${m.email}" data-nombre="${(m.nombre || m.email).replace(/"/g,'&quot;')}" data-rol="${m.rol}" style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--m3-surface-container-low);border-radius:12px;margin-bottom:8px;cursor:pointer;position:relative;">
       <div style="display:flex;align-items:center;gap:12px;min-width:0;">
         <div style="width:36px;height:36px;border-radius:50%;background:#2d3e2c;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <span class="material-icons" style="font-size:18px;color:white;">person</span>
@@ -104,6 +286,7 @@ function renderMemberRow(m, currentUserId) {
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        ${isSuspended ? '<span class="m3-badge" style="background:#c62828;color:white;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;">Inactivo</span>' : ''}
         <span class="m3-badge" style="background:${roleColors[m.rol] || '#888'};color:white;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;">${m.rol}</span>
         ${!isSelf && !m._isReadonly ? `
           <div class="member-actions" style="position:relative;">
@@ -136,24 +319,13 @@ export function initEquipo() {
 
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '160px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      }
+      searchInput.focus();
     });
 
     searchClear.addEventListener('click', () => {
       currentEquipoSearchQuery = '';
       searchInput.value = '';
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
       searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
       refreshEquipoMembers();
     });
 
@@ -211,6 +383,29 @@ export function initEquipo() {
         }
         return;
       }
+
+      // On mobile (<= 768px): open Bottom Sheet on member row or 3-dots button
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      const memberRow = e.target.closest('.member-row');
+      const btnMore = e.target.closest('.btn-member-menu');
+
+      if (isMobile && (btnMore || memberRow)) {
+        e.stopPropagation();
+        const targetRow = btnMore ? btnMore.closest('.member-row') : memberRow;
+        if (targetRow) {
+          const userId = targetRow.dataset.userid;
+          const member = allEquipoMembers.find(m => m.id === userId) || {
+            id: userId,
+            email: targetRow.dataset.email,
+            nombre: targetRow.dataset.nombre,
+            rol: targetRow.dataset.rol
+          };
+          openMemberBottomSheet(member);
+          return;
+        }
+      }
+
+      // On desktop (> 768px): open dropdown menu as currently is
       const btn = e.target.closest('.btn-member-menu');
       if (btn) {
         e.stopPropagation();

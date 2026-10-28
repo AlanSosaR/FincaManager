@@ -316,27 +316,7 @@ export async function renderGanado(page = 1, filter = 'all') {
 
   return `
     <div class="screen-ganado" style="padding-bottom: 80px;">
-      <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 8px;">
-        <div class="ganado-split-ctrl ${currentSearchQuery ? 'expanded' : ''}" id="ganado-search-wrapper">
-          <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
-            <span class="material-icons" style="color: #ffffff;">search</span>
-          </button>
-          <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentSearchQuery ? '1' : '0'}; padding: ${currentSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
-          <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
-            <span class="material-icons" style="font-size: 20px;">close</span>
-          </button>
-          <span class="ganado-split-ctrl-sep"></span>
-          <button class="ganado-split-ctrl-reg" onclick="window.toggleGanadoSplitMenu(event)" title="Más opciones">
-            <span class="material-icons">arrow_drop_down</span>
-          </button>
-          <div class="ganado-split-menu" id="ganado-split-menu">
-            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_animal'); document.getElementById('ganado-split-menu').classList.remove('open');">
-              <span class="material-icons">add</span><span>Registrar animal</span>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="ganado-page-title" style="margin-top: -10px; margin-bottom: 24px;">
+      <div class="ganado-page-title" style="margin-top: 4px; margin-bottom: 20px;">
         <h2>Ganado</h2>
       </div>
 
@@ -443,6 +423,9 @@ export async function renderGanado(page = 1, filter = 'all') {
           </div>
 
           <div class="ganado-fumig-panel" id="ganado-fumig-panel" style="display: none; margin-top: 12px;">
+            <div class="m3-action-sheet-handle-box">
+              <div class="m3-action-sheet-handle"></div>
+            </div>
             <div style="background: var(--surface-container-low, #fff); border-radius: 16px; padding: 20px; border: 1px solid rgba(44,102,110,0.25); box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
               <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
                 <span class="material-icons" style="font-size:22px; color:#2c666e;">bug_report</span>
@@ -505,6 +488,9 @@ export async function renderGanado(page = 1, filter = 'all') {
           </div>
 
           <div class="ganado-vacuna-panel" id="ganado-vacuna-panel" style="display: none; margin-top: 12px;">
+            <div class="m3-action-sheet-handle-box">
+              <div class="m3-action-sheet-handle"></div>
+            </div>
             <div style="background: var(--surface-container-low, #fff); border-radius: 16px; padding: 20px; border: 1px solid rgba(59,109,17,0.25); box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
               <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
                 <span class="material-symbols-outlined" style="font-size:22px; color:#3B6D11;">vaccines</span>
@@ -913,7 +899,7 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
   }
 
   return `
-    <div class="ganado-row ${isSold ? 'ganado-row-sold' : ''}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
+    <div class="ganado-row ${isSold ? 'ganado-row-sold' : ''}" data-animal-id="${a.id}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
       <div class="ganado-row-img-container">
         <img src="${imageUrl}">
         ${isSold ? '<div class="ganado-row-badge sold"><span class="material-icons">payments</span></div>' : ''}
@@ -959,6 +945,38 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
 }
 
 export function initGanado() {
+  // Hide the redundant screen title in header so search is wide and permanently open
+  const titleEl = document.getElementById('current-screen-title');
+  if (titleEl) {
+    titleEl.innerHTML = '';
+    titleEl.style.display = 'none';
+  }
+
+  // Mount permanently open Split search directly into header topbar-actions
+  const topbarActions = document.getElementById('topbar-actions');
+  if (topbarActions) {
+    topbarActions.innerHTML = `
+      <div class="ganado-split-ctrl expanded" id="ganado-search-wrapper" style="width:100%; flex:1; min-width:0; background:#edf1ed; border:1px solid rgba(45,62,44,0.16);">
+        <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer; flex-shrink: 0;" title="Buscar">
+          <span class="material-icons" style="color: #435b47; font-size: 20px;">search</span>
+        </button>
+        <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 14px; flex: 1; min-width: 0; color: #1e3e2b; padding: 0 4px;">
+        <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 8px 0 4px; color: #435b47; height: 100%; flex-shrink: 0;" title="Limpiar búsqueda">
+          <span class="material-icons" style="font-size: 18px;">close</span>
+        </button>
+        <span class="ganado-split-ctrl-sep" style="width: 1px; height: 22px; background: rgba(45,62,44,0.18); align-self: center; flex-shrink: 0;"></span>
+        <button class="ganado-split-ctrl-reg" onclick="window.toggleGanadoSplitMenu(event)" title="Más opciones" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: #e2e8e2; border: none; cursor: pointer; border-radius: 0 9px 9px 0; flex-shrink: 0;">
+          <span class="material-icons" style="color: #1e3e2b; font-size: 20px;">arrow_drop_down</span>
+        </button>
+        <div class="ganado-split-menu" id="ganado-split-menu">
+          <button class="ganado-split-item" onclick="window.navigateTo('nuevo_animal'); document.getElementById('ganado-split-menu')?.classList.remove('open');">
+            <span class="material-icons">add</span><span>Registrar animal</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
 
   // Split control (search + arrow) menu
   window.toggleGanadoSplitMenu = (e) => {
@@ -975,6 +993,19 @@ export function initGanado() {
   // Action menus logic
   window.toggleActionMenu = (btn) => {
     const menu = btn.nextElementSibling;
+    if (!menu) return;
+
+    // On mobile, open as Bottom Sheet; on PC leave as is
+    if (window.matchMedia('(max-width: 768px)').matches && window.openActionBottomSheet) {
+      document.querySelectorAll('.action-menu.active').forEach(m => {
+        m.classList.remove('active');
+        const r = m.closest('.ganado-row');
+        if (r) r.classList.remove('menu-open');
+      });
+      window.openActionBottomSheet(btn, menu);
+      return;
+    }
+
     const row = btn.closest('.ganado-row');
     const isActive = menu.classList.contains('active');
     document.querySelectorAll('.action-menu.active').forEach(m => {
@@ -1171,8 +1202,50 @@ export function initGanado() {
   const cancelBtn = document.getElementById('ganado-fumig-cancel');
   const closeBtn = document.getElementById('ganado-fumig-close');
 
+  const isMobileView = () => window.matchMedia('(max-width: 768px)').matches;
+
+  const getOrCreateGanadoScrim = () => {
+    let scrim = document.getElementById('ganado-panel-scrim');
+    if (!scrim) {
+      scrim = document.createElement('div');
+      scrim.id = 'ganado-panel-scrim';
+      scrim.className = 'm3-action-sheet-scrim';
+      document.body.appendChild(scrim);
+    }
+    return scrim;
+  };
+
+  const openFumigBottomSheet = () => {
+    const scrim = getOrCreateGanadoScrim();
+    scrim.style.display = 'block';
+    fumigPanel.style.display = 'block';
+    if (fumigFecha && !fumigFecha.value) fumigFecha.value = getLocalToday();
+    if (typeof loadFumigRecords === 'function') loadFumigRecords();
+    requestAnimationFrame(() => {
+      scrim.classList.add('open');
+      fumigPanel.classList.add('open');
+    });
+    scrim.onclick = () => closeFumigBottomSheet();
+  };
+
+  const closeFumigBottomSheet = () => {
+    const scrim = document.getElementById('ganado-panel-scrim');
+    fumigPanel.classList.remove('open');
+    if (scrim) scrim.classList.remove('open');
+    setTimeout(() => {
+      if (!fumigPanel.classList.contains('open') && !vacunaPanel?.classList.contains('open')) {
+        if (scrim) scrim.style.display = 'none';
+        fumigPanel.style.display = 'none';
+      }
+    }, 280);
+  };
+
   if (fumigToggleBtn && fumigPanel) {
     fumigToggleBtn.addEventListener('click', () => {
+      if (isMobileView()) {
+        openFumigBottomSheet();
+        return;
+      }
       const isOpen = fumigPanel.style.display === 'block';
       fumigPanel.style.display = isOpen ? 'none' : 'block';
       if (fumigToggleText) fumigToggleText.textContent = isOpen ? 'Ver' : 'Ocultar';
@@ -1183,6 +1256,13 @@ export function initGanado() {
       }
     });
   }
+
+  cancelBtn?.addEventListener('click', () => {
+    if (isMobileView()) closeFumigBottomSheet();
+  });
+  closeBtn?.addEventListener('click', () => {
+    if (isMobileView()) closeFumigBottomSheet();
+  });
 
   const closeFumigPanel = () => {
     if (fumigPanel) fumigPanel.style.display = 'none';
@@ -1494,8 +1574,38 @@ export function initGanado() {
     updateVacunaApplyLabel();
   };
 
+  const openVacunaBottomSheet = () => {
+    const scrim = getOrCreateGanadoScrim();
+    scrim.style.display = 'block';
+    vacunaPanel.style.display = 'block';
+    if (vacunaFecha && !vacunaFecha.value) vacunaFecha.value = getLocalToday();
+    if (typeof loadVacunaRecords === 'function') loadVacunaRecords();
+    updateVacunaApplyLabel();
+    requestAnimationFrame(() => {
+      scrim.classList.add('open');
+      vacunaPanel.classList.add('open');
+    });
+    scrim.onclick = () => closeVacunaBottomSheet();
+  };
+
+  const closeVacunaBottomSheet = () => {
+    const scrim = document.getElementById('ganado-panel-scrim');
+    vacunaPanel.classList.remove('open');
+    if (scrim) scrim.classList.remove('open');
+    setTimeout(() => {
+      if (!vacunaPanel.classList.contains('open') && !fumigPanel?.classList.contains('open')) {
+        if (scrim) scrim.style.display = 'none';
+        vacunaPanel.style.display = 'none';
+      }
+    }, 280);
+  };
+
   if (vacunaToggleBtn && vacunaPanel) {
     vacunaToggleBtn.addEventListener('click', () => {
+      if (isMobileView()) {
+        openVacunaBottomSheet();
+        return;
+      }
       const isOpen = vacunaPanel.style.display === 'block';
       vacunaPanel.style.display = isOpen ? 'none' : 'block';
       if (vacunaToggleText) vacunaToggleText.textContent = isOpen ? 'Ver' : 'Ocultar';
@@ -1506,6 +1616,13 @@ export function initGanado() {
       }
     });
   }
+
+  vacunaCancelBtn?.addEventListener('click', () => {
+    if (isMobileView()) closeVacunaBottomSheet();
+  });
+  vacunaCloseBtn?.addEventListener('click', () => {
+    if (isMobileView()) closeVacunaBottomSheet();
+  });
 
   const updateVacunaApplyLabel = () => {
     if (!vacunaFecha || !vacunaApplyBtn) return;
@@ -1804,7 +1921,7 @@ export function initGanado() {
   if (searchToggle && searchInput && searchWrapper && searchClear) {
     searchToggle.addEventListener('click', () => {
       if (!searchWrapper.classList.contains('expanded') || !searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '160px';
+        searchInput.style.width = '140px';
         searchInput.style.opacity = '1';
         searchInput.style.padding = '0 8px 0 0';
         searchClear.style.display = 'flex';

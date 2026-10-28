@@ -1,3 +1,10 @@
+
+function updateTopbarAnimalName(name) {
+    if (!name) return;
+    const topbarText = document.querySelector('#current-screen-title .topbar-title-text');
+    if (topbarText) topbarText.textContent = name;
+}
+window._updateTopbarAnimalName = updateTopbarAnimalName;
 import { restFetch, restInsert } from '../auth.js';
 import { Chart, registerables } from 'chart.js';
 import { showModal, closeModal } from '../modals.js';
@@ -222,7 +229,7 @@ async function loadAllData(animalId, container, flag, targetTab) {
                     animalData.peso_venta   = v.peso_venta;
                 }
 
-                currentAnimal = animalData;
+                currentAnimal = animalData; updateTopbarAnimalName(animalData.nombre);
                 vaccines = vaccinesData;
                 weights = weightsData;
                 fumigaciones = fumigData;
@@ -273,7 +280,7 @@ async function loadAllData(animalId, container, flag, targetTab) {
                     // Abort again if user navigated away while fetching
                     if (!document.getElementById('da-container')) return;
 
-                    currentAnimal = freshAnimal;
+                    currentAnimal = freshAnimal; updateTopbarAnimalName(freshAnimal.nombre);
                     vaccines = Array.isArray(vRest) ? vRest : vaccinesData;
                     weights  = Array.isArray(wRest) ? wRest : weightsData;
                     fumigaciones = Array.isArray(fRest) ? fRest : fumigData;
@@ -2113,15 +2120,144 @@ window.triggerInlineVaccine = (formattedDate, tipo) => {
     }
 };
 
+
+function showDaBottomSheet(contentHtml, onDismiss) {
+    let scrim = document.getElementById('da-m3-sheet-scrim');
+    let sheet = document.getElementById('da-m3-sheet');
+
+    if (!scrim) {
+        scrim = document.createElement('div');
+        scrim.id = 'da-m3-sheet-scrim';
+        scrim.className = 'da-m3-sheet-scrim';
+        document.body.appendChild(scrim);
+    }
+    if (!sheet) {
+        sheet = document.createElement('div');
+        sheet.id = 'da-m3-sheet';
+        sheet.className = 'da-m3-sheet';
+        sheet.setAttribute('role', 'dialog');
+        sheet.setAttribute('aria-modal', 'true');
+        document.body.appendChild(sheet);
+    }
+
+    sheet.innerHTML = `
+      <button type="button" class="m3-action-sheet-close-btn" id="da-sheet-close-btn" aria-label="Cerrar">
+        <span class="material-icons">close</span>
+      </button>
+      ${contentHtml}
+    `;
+
+    const closeSheet = () => {
+        sheet.classList.remove('open');
+        scrim.classList.remove('open');
+        setTimeout(() => {
+            sheet.style.display = 'none';
+            scrim.style.display = 'none';
+            if (onDismiss) onDismiss();
+        }, 280);
+    };
+
+    window._closeDaBottomSheet = closeSheet;
+    scrim.onclick = closeSheet;
+    sheet.querySelector('#da-sheet-close-btn')?.addEventListener('click', closeSheet);
+    setupDaSheetGestures(sheet, closeSheet);
+
+    scrim.style.display = 'block';
+    sheet.style.display = 'block';
+    sheet.style.transform = '';
+
+    requestAnimationFrame(() => {
+        scrim.classList.add('open');
+        sheet.classList.add('open');
+    });
+}
+
+
+function setupDaSheetGestures(sheet, closeCallback) {
+    let startY = 0;
+    let currentY = 0;
+    let isDragging = false;
+
+    // Toggle expand on handle click
+    sheet.querySelector('.m3-action-sheet-handle-box')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sheet.classList.toggle('expanded');
+    });
+
+    const onTouchStart = (e) => {
+        if (sheet.scrollTop > 10 && !e.target.closest('.m3-action-sheet-handle-box')) return;
+        startY = e.touches[0].clientY;
+        currentY = startY;
+        isDragging = true;
+        sheet.style.transition = 'none';
+    };
+
+    const onTouchMove = (e) => {
+        if (!isDragging) return;
+        currentY = e.touches[0].clientY;
+        const deltaY = currentY - startY;
+        if (deltaY > 0) {
+            sheet.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    const onTouchEnd = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        sheet.style.transition = 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), height 0.28s cubic-bezier(0.16, 1, 0.3, 1)';
+        const deltaY = currentY - startY;
+        
+        // Swipe UP -> Expand sheet to full height
+        if (deltaY < -30) {
+            sheet.classList.add('expanded');
+            sheet.style.transform = '';
+        }
+        // Swipe DOWN -> Collapse if expanded, or close if peek
+        else if (deltaY > 50) {
+            if (sheet.classList.contains('expanded')) {
+                if (sheet.scrollTop <= 15) {
+                    sheet.classList.remove('expanded');
+                    sheet.style.transform = '';
+                } else {
+                    sheet.style.transform = '';
+                }
+            } else {
+                closeCallback();
+            }
+        } else {
+            sheet.style.transform = '';
+        }
+    };
+
+    sheet.addEventListener('touchstart', onTouchStart, { passive: true });
+    sheet.addEventListener('touchmove', onTouchMove, { passive: true });
+    sheet.addEventListener('touchend', onTouchEnd, { passive: true });
+}
+
+function closeDaBottomSheet() {
+    if (window._closeDaBottomSheet) {
+        window._closeDaBottomSheet();
+    }
+}
+
 function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo = 'Programar') {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
     const panel = document.getElementById('da-day-details-panel');
-    if (!panel) return;
+    if (!isMobile && !panel) return;
 
     const dateStr = new Date(defaultDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    panel.innerHTML = `
-        <div class="da-day-details" style="display:flex; flex-direction:column; gap:16px;">
-            <h4>${dateStr}</h4>
+    const formHtml = `
+        <div class="${isMobile ? 'da-sheet-form-content' : 'da-day-details'}" style="display:flex; flex-direction:column; gap:16px;">
+            ${isMobile ? `
+              <div class="m3-action-sheet-handle-box">
+                <div class="m3-action-sheet-handle"></div>
+              </div>
+            ` : ''}
+            <div style="display:flex; align-items:center; ${isMobile ? 'padding-right: 44px;' : 'justify-content:space-between;'}">
+                <h4 style="margin:0; font-size:18px; font-weight:800; color:#2d3e2c;">${tipo === 'Registrar' ? 'Registrar Vacuna' : 'Programar Vacuna'}</h4>
+                ${isMobile ? '' : `<span style="font-size:13px; font-weight:600; color:#666;">${dateStr}</span>`}
+            </div>
             <form id="form-inline-vaccine" style="display: flex; flex-direction: column; gap: 14px;">
                 <div class="m3-field">
                     <input type="text" name="nombre" id="inline-vaccine-nombre" placeholder=" " required autocomplete="off">
@@ -2139,19 +2275,30 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo 
                     <textarea name="observaciones" id="inline-vaccine-obs" placeholder=" " rows="2"></textarea>
                     <label>Observaciones (opcional)</label>
                 </div>
-                <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
-                    <button type="button" class="btn-m3-text" id="cancel-inline-vaccine">Cancelar</button>
-                    <button type="submit" class="btn-m3-fill">Guardar</button>
+                <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:4px;">
+                    ${isMobile ? '' : '<button type="button" class="btn-m3-text" id="cancel-inline-vaccine" style="padding: 10px 16px;">Cancelar</button>'}
+                    <button type="submit" class="btn-m3-fill" style="padding: 12px 24px; ${isMobile ? 'width: 100%; justify-content: center; font-size: 15px; font-weight: 700; border-radius: 12px;' : ''}">Guardar</button>
                 </div>
             </form>
         </div>
     `;
 
-    document.getElementById('cancel-inline-vaccine').onclick = () => {
-        showDayDetails(
-            parseInt(defaultDate.split('-')[2]),
-            existingEvents
-        );
+    if (isMobile) {
+        showDaBottomSheet(formHtml);
+    } else {
+        panel.innerHTML = formHtml;
+    }
+
+    const cancelVacBtn = document.getElementById('cancel-inline-vaccine');
+    if (cancelVacBtn) cancelVacBtn.onclick = () => {
+        if (isMobile) {
+            closeDaBottomSheet();
+        } else {
+            showDayDetails(
+                parseInt(defaultDate.split('-')[2]),
+                existingEvents
+            );
+        }
     };
 
     document.getElementById('form-inline-vaccine').onsubmit = (e) => {
@@ -2179,6 +2326,8 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo 
         const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const dateStr = new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', dateOptions);
         const confirmMsg = `¿Deseas ${tipo === 'Registrar' ? 'registrar' : 'programar'} esta vacuna para el ${dateStr}?`;
+
+        if (isMobile) closeDaBottomSheet();
 
         window.Snackbar.confirm(confirmMsg, async () => {
             try {
@@ -2209,14 +2358,23 @@ function showInlineVaccineForm(animalId, defaultDate, existingEvents = [], tipo 
 
 // ─── Inline Fumigacion Form ──────────────────────────────────────────────────
 function showInlineFumigForm(animalId, defaultDate, existingEvents = [], tipo = 'Programar') {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
     const panel = document.getElementById('da-day-details-panel-fumig');
-    if (!panel) return;
+    if (!isMobile && !panel) return;
 
     const dateStr = new Date(defaultDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    panel.innerHTML = `
-        <div class="da-day-details" style="display:flex; flex-direction:column; gap:16px;">
-            <h4>${dateStr}</h4>
+    const formHtml = `
+        <div class="${isMobile ? 'da-sheet-form-content' : 'da-day-details'}" style="display:flex; flex-direction:column; gap:16px;">
+            ${isMobile ? `
+              <div class="m3-action-sheet-handle-box">
+                <div class="m3-action-sheet-handle"></div>
+              </div>
+            ` : ''}
+            <div style="display:flex; align-items:center; ${isMobile ? 'padding-right: 44px;' : 'justify-content:space-between;'}">
+                <h4 style="margin:0; font-size:18px; font-weight:800; color:#2d3e2c;">${tipo === 'Registrar' ? 'Registrar Fumigación' : 'Programar Fumigación'}</h4>
+                ${isMobile ? '' : `<span style="font-size:13px; font-weight:600; color:#666;">${dateStr}</span>`}
+            </div>
             <form id="form-inline-fumig" style="display: flex; flex-direction: column; gap: 14px;">
                 <div class="m3-field">
                     <input type="text" name="producto" id="inline-fumig-producto" placeholder=" " required autocomplete="off">
@@ -2234,17 +2392,28 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = [], tipo = 
                     <textarea name="observaciones" id="inline-fumig-obs" placeholder=" " rows="2"></textarea>
                     <label>Observaciones</label>
                 </div>
-                <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
-                    <button type="button" class="btn-m3-text" id="cancel-inline-fumig">Cancelar</button>
-                    <button type="submit" class="btn-m3-fill">Guardar</button>
+                <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:4px;">
+                    ${isMobile ? '' : '<button type="button" class="btn-m3-text" id="cancel-inline-fumig" style="padding: 10px 16px;">Cancelar</button>'}
+                    <button type="submit" class="btn-m3-fill" style="padding: 12px 24px; ${isMobile ? 'width: 100%; justify-content: center; font-size: 15px; font-weight: 700; border-radius: 12px;' : ''}">Guardar</button>
                 </div>
             </form>
         </div>
     `;
 
-    document.getElementById('cancel-inline-fumig').onclick = () => {
-        const day = parseInt(defaultDate.split('-')[2]);
-        showDayDetailsFumig(day, existingEvents);
+    if (isMobile) {
+        showDaBottomSheet(formHtml);
+    } else {
+        panel.innerHTML = formHtml;
+    }
+
+    const cancelFumBtn = document.getElementById('cancel-inline-fumig');
+    if (cancelFumBtn) cancelFumBtn.onclick = () => {
+        if (isMobile) {
+            closeDaBottomSheet();
+        } else {
+            const day = parseInt(defaultDate.split('-')[2]);
+            showDayDetailsFumig(day, existingEvents);
+        }
     };
 
     document.getElementById('form-inline-fumig').onsubmit = (e) => {
@@ -2273,6 +2442,8 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = [], tipo = 
         const dateStr = new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', dateOptions);
         const confirmMsg = `¿Deseas ${tipo === 'Registrar' ? 'registrar' : 'programar'} esta fumigación para el ${dateStr}?`;
 
+        if (isMobile) closeDaBottomSheet();
+
         window.Snackbar.confirm(confirmMsg, async () => {
             try {
                 await restInsert('/rest/v1/animal_fumigaciones', payload);
@@ -2298,6 +2469,7 @@ function showInlineFumigForm(animalId, defaultDate, existingEvents = [], tipo = 
         }, { confirmLabel: 'Aceptar', cancelLabel: 'Cancelar' });
     };
 }
+
 
 // ─── Inline Weight Form ──────────────────────────────────────────────────────
 function showInlineWeightForm(animalId) {
@@ -3253,16 +3425,22 @@ async function handleEditVaccine(vaccineId) {
     const v = vaccines.find(x => x.id === vaccineId);
     if (!v) return;
 
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
     const container = document.getElementById('da-day-details-panel');
-    if (!container) return;
+    if (!isMobile && !container) return;
 
-    // Guardamos el contenido original para el botón Cancelar
-    const originalContent = container.innerHTML;
-
-    container.innerHTML = `
-        <div class="da-inline-form-card" style="margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);">
-            <h3 style="margin-top:0; margin-bottom:16px; font-size:1.1rem; color:#6b8245;">Editar Vacuna</h3>
-            <form id="form-edit-vaccine" style="display: flex; flex-direction: column; gap: 16px;">
+    const formHtml = `
+        <div class="${isMobile ? 'da-sheet-form-content' : 'da-inline-form-card'}" style="${isMobile ? '' : 'margin-top:0; border:1px dashed #ccc; padding:16px; border-radius:12px; background:rgba(0,0,0,0.02);'}">
+            ${isMobile ? `
+              <div class="m3-action-sheet-handle-box">
+                <div class="m3-action-sheet-handle"></div>
+              </div>
+            ` : ''}
+            <div style="display:flex; align-items:center; margin-bottom:16px; ${isMobile ? 'padding-right:44px;' : 'justify-content:space-between;'}">
+                <h4 style="margin:0; font-size:18px; font-weight:800; color:#2d3e2c;">Editar Vacuna</h4>
+                ${isMobile ? '' : `<span style="font-size:13px; font-weight:600; color:#666;">${v.fecha || ''}</span>`}
+            </div>
+            <form id="form-edit-vaccine" style="display: flex; flex-direction: column; gap: 14px;">
                 <div class="m3-field">
                     <input type="text" name="nombre" value="${v.nombre || ''}" placeholder=" " required autocomplete="off">
                     <label>Nombre de la Vacuna</label>
@@ -3284,20 +3462,28 @@ async function handleEditVaccine(vaccineId) {
                     <button type="button" class="btn-m3-tonal" id="delete-edit-vaccine" style="background:#ffe2db; color:#ff4103;">
                         <span class="material-icons" style="font-size:18px;">delete</span> Eliminar
                     </button>
-                    <div style="display:flex; gap:12px;">
-                        <button type="button" class="btn-m3-text" id="cancel-edit-vaccine">Cancelar</button>
-                        <button type="submit" class="btn-m3-fill">Guardar</button>
+                    <div style="display:flex; gap:12px; flex:1; justify-content:flex-end;">
+                        ${isMobile ? '' : '<button type="button" class="btn-m3-text" id="cancel-edit-vaccine">Cancelar</button>'}
+                        <button type="submit" class="btn-m3-fill" style="${isMobile ? 'flex:1; justify-content:center;' : ''}">Guardar</button>
                     </div>
                 </div>
             </form>
         </div>
     `;
 
-    document.getElementById('cancel-edit-vaccine').onclick = () => {
-        container.innerHTML = originalContent;
-        // Re-vincular eventos si es necesario o simplemente recargar
-        renderDayDetails(v.fecha); 
-    };
+    if (isMobile) {
+        showDaBottomSheet(formHtml);
+    } else {
+        const originalContent = container.innerHTML;
+        container.innerHTML = formHtml;
+        const cancelBtn = document.getElementById('cancel-edit-vaccine');
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                container.innerHTML = originalContent;
+                renderDayDetails(v.fecha);
+            };
+        }
+    }
 
     document.getElementById('delete-edit-vaccine').onclick = () => {
         window.Snackbar.confirm(
@@ -3310,7 +3496,7 @@ async function handleEditVaccine(vaccineId) {
                         await db.animal_vacunas.delete(vaccineId).catch(() => {});
                     }
                     syncTable('animal_vacunas');
-                    showSnackbar('Vacuna eliminada');
+                    if (window.matchMedia('(max-width: 768px)').matches) closeDaBottomSheet(); showSnackbar('Vacuna eliminada');
                     renderCalendar();
                     const dayVac = vaccines.filter(x => x.fecha === v.fecha);
                     showDayDetails(selectedDayVaccines, dayVac);
@@ -3355,7 +3541,7 @@ async function handleEditVaccine(vaccineId) {
                 }
             }
             syncTable('animal_vacunas');
-            showSnackbar('Vacuna actualizada ✓');
+            if (window.matchMedia('(max-width: 768px)').matches) closeDaBottomSheet(); showSnackbar('Vacuna actualizada ✓');
 
             const [y, m, d] = newFecha.split('-').map(Number);
             currentYear = y;
@@ -3435,7 +3621,7 @@ async function handleEditFumigacion(fumigacionId) {
                         await db.animal_fumigaciones.delete(fumigacionId).catch(() => {});
                     }
                     syncTable('animal_fumigaciones');
-                    showSnackbar('Fumigación eliminada');
+                    if (window.matchMedia('(max-width: 768px)').matches) closeDaBottomSheet(); showSnackbar('Fumigación eliminada');
                     renderCalendarFumig();
                     const dayFum = fumigaciones.filter(x => x.fecha === f.fecha);
                     showDayDetailsFumig(selectedDayFumig, dayFum);
@@ -3480,7 +3666,7 @@ async function handleEditFumigacion(fumigacionId) {
                 }
             }
             syncTable('animal_fumigaciones');
-            showSnackbar('Fumigación actualizada ✓');
+            if (window.matchMedia('(max-width: 768px)').matches) closeDaBottomSheet(); showSnackbar('Fumigación actualizada ✓');
 
             const [y, m, d] = newFecha.split('-').map(Number);
             currentYearFumig = y;

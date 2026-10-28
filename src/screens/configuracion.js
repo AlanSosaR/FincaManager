@@ -168,18 +168,24 @@ export async function renderConfiguracion() {
             <span style="color:#666;">Aplicación</span>
             <span style="font-weight:600;color:#2d3e2c;">Finca Manager</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
-            <span style="color:#666;">Versión</span>
-            <span style="font-weight:600;color:#2d3e2c;">1.0.0</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--m3-outline-variant,#eee);">
-            <span style="color:#666;">Navegador</span>
-            <span style="font-weight:600;color:#2d3e2c;">${navigator.userAgent.substring(0, 40)}...</span>
-          </div>
           <div style="display:flex;justify-content:space-between;padding:8px 0;">
             <span style="color:#666;">Estado</span>
             <span style="font-weight:600;color:${navigator.onLine ? '#2d3e2c' : '#ff4103'};">${navigator.onLine ? 'En línea' : 'Sin conexión'}</span>
           </div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
+
+      <div>
+        <h3 class="m3-title-medium m3-font-bold" style="color:#2d3e2c;margin-bottom:14px;">Compartir Aplicación</h3>
+        <div style="display:grid;gap:10px;">
+          <button id="btn-share-whatsapp" type="button" class="btn-m3-primary" style="width:100%;padding:13px;border-radius:12px;background:#25d366;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 3px 12px rgba(37,211,102,0.25);">
+            <span class="material-icons">share</span> Compartir por WhatsApp
+          </button>
+          <button id="btn-copy-link" type="button" class="btn-m3-tonal" style="width:100%;padding:13px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:1px solid rgba(45,62,44,0.15);font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span class="material-icons">content_copy</span> Copiar enlace de la app
+          </button>
         </div>
       </div>
 
@@ -577,6 +583,26 @@ export function initConfiguracion() {
   document.getElementById('btn-config-clear-cache')?.addEventListener('click', () => {
     window.clearScreenCache?.();
     if (window.Snackbar) window.Snackbar.show('Caché limpiado');
+  });
+
+  const APP_LOGIN_URL = 'https://finca-manager.vercel.app/#login';
+  document.getElementById('btn-share-whatsapp')?.addEventListener('click', () => {
+    const text = 'Accede a Finca Manager: ' + APP_LOGIN_URL;
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+  });
+  document.getElementById('btn-copy-link')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(APP_LOGIN_URL);
+      window.Snackbar?.show('Enlace copiado al portapapeles');
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = APP_LOGIN_URL;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      window.Snackbar?.show('Enlace copiado al portapapeles');
+    }
   });
 }
 

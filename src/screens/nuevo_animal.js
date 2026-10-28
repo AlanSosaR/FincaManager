@@ -24,13 +24,13 @@ export async function renderNuevoAnimal(id) {
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card">
-        <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
-          <div class="da-stat-icon" style="background: rgba(107, 130, 69, 0.1); color: #6b8245; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-            <img src="/vaca.png" alt="Ganado" style="width: 32px; height: 32px; filter: grayscale(1) opacity(0.85);">
+        <div class="nuevo-animal-card-header" style="margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+          <div class="da-stat-icon" style="background: rgba(107, 130, 69, 0.1); color: #6b8245; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <img src="/vaca.png" alt="Ganado" style="width: 28px; height: 28px; filter: grayscale(1) opacity(0.85);">
           </div>
           <div>
             <div class="da-hero-subtitle" style="margin:0;">${isEdit ? 'Actualizando registro' : 'Nuevo registro de inventario'}</div>
-            <h2 class="da-hero-title" style="margin:0; font-size: 24px;">${isEdit ? 'Editar Animal' : 'Registrar Animal'}</h2>
+            <h2 class="da-hero-title" style="margin:0; font-size: 22px;">${isEdit ? 'Editar Animal' : 'Registrar Animal'}</h2>
           </div>
         </div>
 

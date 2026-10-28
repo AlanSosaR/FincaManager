@@ -303,7 +303,7 @@
 
 .session-icon-box {
   width: 48px; height: 48px;
-  background: #f0ede4;
+  background: #ffffff;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -341,7 +341,7 @@
 }
 
 .btn-download-pdf:hover {
-  background-color: #f0ede4;
+  background-color: #ffffff;
   border-color: #ddd;
   color: #444;
 }
@@ -451,7 +451,7 @@
 }
 
 .tl-pill {
-  background: #f0ede4;
+  background: #ffffff;
   padding: 6px 14px;
   border-radius: 12px;
   font-size: 10.5px;
@@ -524,7 +524,7 @@
 }
 
 .m3-result-bubble {
-  background: #f0ede4;
+  background: #ffffff;
   border: 2px dashed #c7cec3;
   border-radius: 12px;
   padding: 20px;

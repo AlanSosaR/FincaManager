@@ -115,7 +115,7 @@ export async function renderNuevoLote(id) {
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card" style="padding: 28px 32px;">
-        <div style="margin-bottom: 28px; display: flex; align-items: center; gap: 16px;">
+        <div class="m3-form-header nuevo-lote-card-header" style="margin-bottom: 28px; display: flex; align-items: center; gap: 16px;">
           <button type="button" onclick="window.navigateTo('dashboard')" class="m3-btn-icon" style="background: none; border: none; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--m3-primary, #2d3e2c);" title="Volver">
             <span class="material-icons" style="font-size: 28px;">arrow_back</span>
           </button>

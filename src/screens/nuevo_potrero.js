@@ -76,7 +76,7 @@ export async function renderNuevoPotrero(id) {
   return `
     <div class="m3-form-screen">
       <div class="m3-form-card">
-        <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;">
+        <div style="margin-bottom: 32px; display: flex; align-items: center; gap: 20px;" class="nuevo-potrero-card-header">
           <div class="da-stat-icon" style="background: rgba(107, 130, 69, 0.1); color: #6b8245; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
             <span class="material-icons" style="font-size: 32px;">landscape</span>
           </div>
