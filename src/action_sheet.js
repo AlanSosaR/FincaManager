@@ -374,11 +374,12 @@ export async function openActionBottomSheet(btn, menu) {
 
 async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, attachActionHandlers) {
   try {
-    const [animalRes, vacRes, fumRes, pesRes] = await Promise.all([
+    const [animalRes, vacRes, fumRes, pesRes, pregRes] = await Promise.all([
       supabase.from('ganado').select('*').eq('id', animalId).maybeSingle(),
       supabase.from('animal_vacunas').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).limit(8),
       supabase.from('animal_fumigaciones').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).limit(8),
-      supabase.from('animal_pesajes').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).limit(8)
+      supabase.from('animal_pesajes').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).limit(8),
+      supabase.from('animal_preñez').select('*').eq('animal_id', animalId).order('fecha_monta', { ascending: false }).limit(8)
     ]);
 
     const a = animalRes?.data;
@@ -397,6 +398,9 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
 
     const vacunas = (vacRes?.data || []).filter(v => v.estado !== 'Cancelada').slice(0, 5);
     const fumigaciones = (fumRes?.data || []).filter(f => f.estado !== 'Cancelada').slice(0, 5);
+    const pregnancies = [...(pregRes?.data || [])].sort((p1, p2) => (p2.fecha_monta || '').localeCompare(p1.fecha_monta || ''));
+    const activePreg = pregnancies.find(p => p.estado === 'Preñada');
+    const isFemale = !/macho|male|toro|torete/i.test(a.sexo || '');
     const pesajes = [...(pesRes?.data || [])]
       .sort((p1, p2) => {
         const dDiff = (p2.fecha || '').localeCompare(p1.fecha || '');
@@ -531,6 +535,112 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
         </div>
       </div>
 
+      ${isFemale ? (() => {
+        const addDaysLocal = (dateStr, days) => {
+          const d = new Date((dateStr || getLocalToday()) + 'T12:00:00');
+          d.setDate(d.getDate() + days);
+          return d.toISOString().split('T')[0];
+        };
+        const prenezListHtml = pregnancies.slice(0, 5).map(p => {
+          const estado = p.estado || 'Preñada';
+          const badgeClass = estado === 'Parida' ? 'badge-ok' : (estado === 'Preñada' ? 'badge-pending' : '');
+          const badgeStyle = estado === 'Abortada' ? 'background:#ffebee;color:#c62828;' : '';
+          const fMontaStr = formatFecha(p.fecha_monta);
+          const fPartoStr = p.estado === 'Parida' && p.fecha_parto
+            ? `Parto: ${formatFecha(p.fecha_parto)}${p.num_crias ? ` (${p.num_crias} cría${p.num_crias > 1 ? 's' : ''})` : ''}`
+            : `Est. parto: ${formatFecha(p.fecha_probable_parto || addDaysLocal(p.fecha_monta, 283))}`;
+          return `
+            <div class="sheet-peso-swipe-wrap" data-record-id="${escapeHtml(p.id)}" data-record-type="prenez">
+              <button type="button" class="sheet-peso-delete-bg" aria-label="Eliminar preñez">
+                <span class="material-icons">delete</span>
+                <span>Eliminar</span>
+              </button>
+              <div class="sheet-tag-row sheet-peso-swipe-card" style="padding: 7px 10px;">
+                <div style="min-width: 0; flex: 1;">
+                  <div style="font-weight: 800; color: #1e3e2b; font-size: 12px;">Monta: ${escapeHtml(fMontaStr)}</div>
+                  <div style="color: #666; font-size: 10.5px; margin-top: 1px;">${escapeHtml(fPartoStr)}</div>
+                </div>
+                <span class="${badgeClass}" style="font-size: 9.5px; padding: 2px 7px; border-radius: 999px; font-weight: 800; ${badgeStyle}">${escapeHtml(estado)}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        let activeBannerHtml = '';
+        if (activePreg) {
+          const fPartoProb = activePreg.fecha_probable_parto || addDaysLocal(activePreg.fecha_monta, 283);
+          const diffRest = Math.ceil((new Date(fPartoProb + 'T00:00:00') - new Date(getLocalToday() + 'T00:00:00')) / 86400000);
+          const diasTrans = activePreg.fecha_monta
+            ? Math.max(0, Math.floor((new Date(getLocalToday() + 'T00:00:00') - new Date(activePreg.fecha_monta + 'T00:00:00')) / 86400000))
+            : 0;
+          const restLabel = diffRest > 0
+            ? `${diffRest} días para parto`
+            : (diffRest === 0 ? '¡Fecha de parto hoy!' : `Sobre fecha (+${Math.abs(diffRest)}d)`);
+
+          activeBannerHtml = `
+            <div style="background: #fff8ee; border: 1.5px solid #ffe0b2; border-radius: 14px; padding: 10px 12px; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
+                <span style="background: #fff3e0; color: #b26a00; border: 1px solid #ffcc80; font-weight: 800; font-size: 11px; padding: 3px 9px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px;">
+                  <img src="/cow.png" style="width: 14px; height: 14px; object-fit: contain;">
+                  <span>Gestación en Curso</span>
+                </span>
+                <span style="font-size: 12px; font-weight: 800; color: #e65100;">${escapeHtml(restLabel)}</span>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #fff; border-radius: 10px; padding: 8px 10px; border: 1px solid #f3e2c7; margin-bottom: 10px;">
+                <div>
+                  <span style="display: block; font-size: 9.5px; font-weight: 800; color: #777; text-transform: uppercase;">Monta</span>
+                  <span style="font-size: 11.5px; font-weight: 800; color: #1e3e2b;">${escapeHtml(formatFecha(activePreg.fecha_monta))}</span>
+                </div>
+                <div>
+                  <span style="display: block; font-size: 9.5px; font-weight: 800; color: #777; text-transform: uppercase;">Parto Est.</span>
+                  <span style="font-size: 11.5px; font-weight: 800; color: #e65100;">${escapeHtml(formatFecha(fPartoProb))}</span>
+                </div>
+                <div>
+                  <span style="display: block; font-size: 9.5px; font-weight: 800; color: #777; text-transform: uppercase;">Gestación</span>
+                  <span style="font-size: 11.5px; font-weight: 800; color: #2d3e2c;">${diasTrans} días</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button type="button" class="sheet-card-add-btn" data-open-sheet="parto-prenez" style="flex: 1; justify-content: center; padding: 7px 10px;">
+                  <span class="material-icons" style="font-size: 15px;">child_care</span>
+                  <span>Registrar Parto</span>
+                </button>
+                <button type="button" class="sheet-card-add-btn" data-open-sheet="edit-prenez" style="background: #eef5ee; color: #2d3e2c; border: 1px solid #c8dcc6; box-shadow: none; padding: 7px 10px;">
+                  <span class="material-icons" style="font-size: 15px; color: #2d3e2c;">edit</span>
+                  <span>Editar</span>
+                </button>
+                <button type="button" class="sheet-card-add-btn" data-open-sheet="abort-prenez" style="background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; box-shadow: none; padding: 7px 10px;">
+                  <span class="material-icons" style="font-size: 15px; color: #c62828;">cancel</span>
+                  <span>Aborto</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <!-- Preñez / Reproducción (Hembras) -->
+          <div class="sheet-detail-card">
+            <div class="sheet-detail-card-header-row" style="margin-bottom: 10px;">
+              <div class="sheet-detail-card-title" style="margin-bottom: 0;">
+                <img src="/cow.png" style="width: 18px; height: 18px; object-fit: contain;">
+                <span>Preñez y Reproducción</span>
+              </div>
+              ${!activePreg ? `
+                <button type="button" class="sheet-card-add-btn" data-open-sheet="add-prenez">
+                  <span class="material-icons">add</span>
+                  <span>Registrar preñez</span>
+                </button>
+              ` : ''}
+            </div>
+            ${activeBannerHtml}
+            <div class="sheet-tag-list" style="gap: 6px;">
+              ${prenezListHtml || '<p style="font-size: 11.5px; color: #888; margin: 0;">Sin registros de preñez</p>'}
+            </div>
+          </div>
+        `;
+      })() : ''}
+
       <!-- Control de Peso -->
       <div class="sheet-detail-card">
         <div class="sheet-detail-card-header-row">
@@ -629,6 +739,12 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
           prompt: '¿Deseas eliminar este registro de fumigación?',
           success: 'Fumigación eliminada ✓',
           error: 'Error al eliminar fumigación'
+        },
+        prenez: {
+          table: 'animal_preñez',
+          prompt: '¿Deseas eliminar este registro de preñez?',
+          success: 'Registro de preñez eliminado ✓',
+          error: 'Error al eliminar registro de preñez'
         }
       };
       const cfg = configMap[recordType] || configMap.peso;
@@ -643,6 +759,15 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
             await restFetch(`/rest/v1/${cfg.table}?id=eq.${encodeURIComponent(recordId)}`, {
               method: 'DELETE'
             });
+            if (recordType === 'prenez') {
+              const remainingActive = pregnancies.find(p => p.id !== recordId && p.estado === 'Preñada');
+              if (!remainingActive && activePreg?.id === recordId) {
+                await restFetch(`/rest/v1/ganado?id=eq.${encodeURIComponent(animalId)}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({ reproductivo: 'Vacía' })
+                }).catch(() => {});
+              }
+            }
             syncTable(cfg.table);
             showSnackbar(cfg.success);
             reloadDetails();
@@ -780,7 +905,7 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
       });
     });
 
-    // Bind "+ Registrar" buttons
+    // Bind "+ Registrar" and Preñez buttons
     detailsContainer.querySelectorAll('[data-open-sheet]').forEach(btnEl => {
       btnEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -788,6 +913,10 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
         if (action === 'add-peso') openPesoFormSheet(a, pesoActual, pesoUnidad, reloadDetails);
         else if (action === 'add-vacuna') openVacunaFormSheet(a, pesoActual, reloadDetails);
         else if (action === 'add-fumig') openFumigFormSheet(a, pesoActual, reloadDetails);
+        else if (action === 'add-prenez') openPrenezFormSheet(a, pesoActual, reloadDetails);
+        else if (action === 'edit-prenez' && activePreg) openEditPrenezFormSheet(a, activePreg, pregnancies, pesoActual, reloadDetails);
+        else if (action === 'parto-prenez' && activePreg) openPartoFormSheet(a, activePreg, pesoActual, reloadDetails);
+        else if (action === 'abort-prenez' && activePreg) handleAbortPrenezInSheet(a, activePreg, reloadDetails);
       });
     });
 
@@ -1816,6 +1945,350 @@ function formatFecha(fecha) {
   const d = new Date(fecha.length === 10 ? fecha + 'T12:00:00' : fecha);
   if (isNaN(d.getTime())) return fecha;
   return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function addDaysSheet(dateStr, days) {
+  const d = new Date((dateStr || getLocalToday()) + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+// ─── Sub-Bottom Sheets: Preñez / Reproducción ────────────────────────────────
+
+function openPrenezFormSheet(animal, pesoActual, onReload) {
+  const today = getLocalToday();
+  const estParto = addDaysSheet(today, 283);
+  const html = `
+    <div class="m3-sub-sheet-header">
+      <div class="m3-sub-sheet-icon">
+        <img src="/cow.png" style="width: 22px; height: 22px; object-fit: contain;">
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <h4 class="m3-sub-sheet-title">Registrar Preñez</h4>
+        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • <span style="color: #e65100; font-weight: 800;">Peso actual: ${escapeHtml(pesoActual)} kg</span></p>
+      </div>
+    </div>
+    <form id="sub-sheet-form-prenez" class="m3-sub-sheet-form">
+      <div class="m3-field">
+        <input type="number" id="sub-prenez-dias" min="0" max="300" value="0" placeholder=" " autocomplete="off">
+        <label>Días de preñez (gestación actual)</label>
+      </div>
+      <div class="m3-field">
+        <input type="date" name="fecha_monta" id="sub-prenez-fecha-monta" value="${today}" placeholder=" " required>
+        <label>Fecha de Monta</label>
+      </div>
+      <div style="background: #fff8ee; border: 1.5px solid #ffe0b2; border-radius: 12px; padding: 10px 14px; font-size: 13px; color: #1e3e2b; display: flex; align-items: center; gap: 8px;">
+        <span class="material-icons" style="font-size: 18px; color: #e65100;">event_available</span>
+        <span>Parto estimado: <strong id="sub-prenez-parto-est" style="color: #e65100;">${formatFecha(estParto)}</strong> <span id="sub-prenez-restantes" style="color: #666; font-size: 11.5px;">(283 días restantes)</span></span>
+      </div>
+      <div class="m3-sub-sheet-actions">
+        <button type="button" class="btn-m3-tonal" id="sub-prenez-cancel">Cancelar</button>
+        <button type="submit" class="btn-m3-fill" id="sub-prenez-submit">
+          <span class="material-icons" style="font-size: 18px;">check</span>
+          <span>Guardar Preñez</span>
+        </button>
+      </div>
+    </form>
+  `;
+
+  openSubBottomSheet(html, (subSheet) => {
+    const diasInput = subSheet.querySelector('#sub-prenez-dias');
+    const fechaMontaInput = subSheet.querySelector('#sub-prenez-fecha-monta');
+    const partoEstEl = subSheet.querySelector('#sub-prenez-parto-est');
+    const restantesEl = subSheet.querySelector('#sub-prenez-restantes');
+
+    const updatePartoInfo = (fMonta) => {
+      if (!fMonta) return;
+      const fParto = addDaysSheet(fMonta, 283);
+      if (partoEstEl) partoEstEl.textContent = formatFecha(fParto);
+      const rest = Math.ceil((new Date(fParto + 'T12:00:00') - new Date(today + 'T12:00:00')) / 86400000);
+      if (restantesEl) {
+        restantesEl.textContent = rest > 0 ? `(${rest} días restantes)` : (rest === 0 ? '(¡Parto hoy!)' : `(Sobre fecha hace ${Math.abs(rest)}d)`);
+      }
+    };
+
+    diasInput?.addEventListener('input', () => {
+      const d = Math.max(0, parseInt(diasInput.value, 10) || 0);
+      const fMonta = addDaysSheet(today, -d);
+      if (fechaMontaInput) fechaMontaInput.value = fMonta;
+      updatePartoInfo(fMonta);
+    });
+
+    fechaMontaInput?.addEventListener('change', () => {
+      const fMonta = fechaMontaInput.value;
+      if (!fMonta) return;
+      const diff = Math.max(0, Math.floor((new Date(today + 'T12:00:00') - new Date(fMonta + 'T12:00:00')) / 86400000));
+      if (diasInput) diasInput.value = isNaN(diff) ? 0 : diff;
+      updatePartoInfo(fMonta);
+    });
+
+    subSheet.querySelector('#sub-prenez-cancel')?.addEventListener('click', closeSubBottomSheet);
+    subSheet.querySelector('#sub-sheet-form-prenez')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = subSheet.querySelector('#sub-prenez-submit');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const fechaMonta = fechaMontaInput?.value || today;
+        const fechaProbable = addDaysSheet(fechaMonta, 283);
+
+        const { error } = await supabase.from('animal_preñez').insert({
+          animal_id: animal.id,
+          empresa_id: window._currentEmpresaId,
+          fecha_monta: fechaMonta,
+          fecha_probable_parto: fechaProbable,
+          estado: 'Preñada'
+        });
+        if (error) throw new Error(error);
+
+        await restFetch(`/rest/v1/ganado?id=eq.${encodeURIComponent(animal.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ reproductivo: 'Preñada' })
+        }).catch(() => {});
+
+        sendWhatsApp(
+          `🐮 Preñez Registrada\nAnimal: ${animal.nombre || 'Animal'}\nFecha de monta: ${fechaMonta}\nParto estimado: ${fechaProbable}\nFinca: ${window._empresaNombre || ''}`
+        );
+
+        showSnackbar('Preñez registrada ✓');
+        closeSubBottomSheet();
+        if (onReload) onReload();
+      } catch (err) {
+        showSnackbar(err.message || 'Error al registrar preñez', 'error');
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  });
+}
+
+function openEditPrenezFormSheet(animal, preg, allPregs, pesoActual, onReload) {
+  const today = getLocalToday();
+  const initDias = preg.fecha_monta
+    ? Math.max(0, Math.floor((new Date(today + 'T12:00:00') - new Date(preg.fecha_monta + 'T12:00:00')) / 86400000))
+    : 0;
+  const initProbable = preg.fecha_probable_parto || addDaysSheet(preg.fecha_monta || today, 283);
+
+  const html = `
+    <div class="m3-sub-sheet-header">
+      <div class="m3-sub-sheet-icon">
+        <img src="/cow.png" style="width: 22px; height: 22px; object-fit: contain;">
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <h4 class="m3-sub-sheet-title">Editar Preñez</h4>
+        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • <span style="color: #e65100; font-weight: 800;">Peso actual: ${escapeHtml(pesoActual)} kg</span></p>
+      </div>
+    </div>
+    <form id="sub-sheet-edit-prenez" class="m3-sub-sheet-form">
+      <div class="m3-field">
+        <input type="number" id="sub-edit-prenez-dias" min="0" max="300" value="${initDias}" placeholder=" " autocomplete="off">
+        <label>Días de preñez (gestación)</label>
+      </div>
+      <div class="m3-field">
+        <input type="date" name="fecha_monta" id="sub-edit-prenez-monta" value="${escapeHtml(preg.fecha_monta || today)}" placeholder=" " required>
+        <label>Fecha de Monta</label>
+      </div>
+      <div style="background: #fff8ee; border: 1.5px solid #ffe0b2; border-radius: 12px; padding: 10px 14px; font-size: 13px; color: #1e3e2b; display: flex; align-items: center; gap: 8px;">
+        <span class="material-icons" style="font-size: 18px; color: #e65100;">event_available</span>
+        <span>Parto estimado: <strong id="sub-edit-prenez-parto-est" style="color: #e65100;">${formatFecha(initProbable)}</strong></span>
+      </div>
+      <div class="m3-sub-sheet-actions">
+        <button type="button" class="btn-m3-tonal" id="sub-edit-prenez-cancel">Cancelar</button>
+        <button type="submit" class="btn-m3-fill" id="sub-edit-prenez-save">
+          <span class="material-icons" style="font-size: 18px;">save</span>
+          <span>Guardar cambios</span>
+        </button>
+      </div>
+    </form>
+  `;
+
+  openSubBottomSheet(html, (subSheet) => {
+    const diasInput = subSheet.querySelector('#sub-edit-prenez-dias');
+    const montaInput = subSheet.querySelector('#sub-edit-prenez-monta');
+    const partoEstEl = subSheet.querySelector('#sub-edit-prenez-parto-est');
+
+    const updateEst = (fMonta) => {
+      if (!fMonta) return;
+      const fParto = addDaysSheet(fMonta, 283);
+      if (partoEstEl) partoEstEl.textContent = formatFecha(fParto);
+    };
+
+    diasInput?.addEventListener('input', () => {
+      const d = Math.max(0, parseInt(diasInput.value, 10) || 0);
+      const fMonta = addDaysSheet(today, -d);
+      if (montaInput) montaInput.value = fMonta;
+      updateEst(fMonta);
+    });
+
+    montaInput?.addEventListener('change', () => {
+      const fMonta = montaInput.value;
+      if (!fMonta) return;
+      const diff = Math.max(0, Math.floor((new Date(today + 'T12:00:00') - new Date(fMonta + 'T12:00:00')) / 86400000));
+      if (diasInput) diasInput.value = isNaN(diff) ? 0 : diff;
+      updateEst(fMonta);
+    });
+
+    subSheet.querySelector('#sub-edit-prenez-cancel')?.addEventListener('click', closeSubBottomSheet);
+    subSheet.querySelector('#sub-sheet-edit-prenez')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const saveBtn = subSheet.querySelector('#sub-edit-prenez-save');
+      if (saveBtn) saveBtn.disabled = true;
+
+      try {
+        const fechaMonta = montaInput?.value || today;
+        const fechaProbable = addDaysSheet(fechaMonta, 283);
+
+        await restFetch(`/rest/v1/animal_preñez?id=eq.${encodeURIComponent(preg.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            fecha_monta: fechaMonta,
+            fecha_probable_parto: fechaProbable
+          })
+        });
+        syncTable('animal_preñez');
+        showSnackbar('Preñez actualizada ✓');
+        closeSubBottomSheet();
+        if (onReload) onReload();
+      } catch (err) {
+        showSnackbar(err.message || 'Error al actualizar preñez', 'error');
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    });
+  });
+}
+
+function openPartoFormSheet(animal, activePreg, pesoActual, onReload) {
+  const today = getLocalToday();
+  const html = `
+    <div class="m3-sub-sheet-header">
+      <div class="m3-sub-sheet-icon">
+        <span class="material-icons">child_care</span>
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <h4 class="m3-sub-sheet-title">Registrar Parto</h4>
+        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • <span style="color: #e65100; font-weight: 800;">Peso actual: ${escapeHtml(pesoActual)} kg</span></p>
+      </div>
+    </div>
+    <form id="sub-sheet-form-parto" class="m3-sub-sheet-form">
+      <div class="m3-field">
+        <input type="date" name="fecha_parto" value="${today}" placeholder=" " required>
+        <label>Fecha de Parto</label>
+      </div>
+      <div class="m3-field">
+        <input type="text" name="cria_nombre" placeholder=" " autocomplete="off">
+        <label>Nombre de la cría (opcional)</label>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div class="m3-field" style="margin-bottom: 0;">
+          <select name="cria_sexo" style="width: 100%; height: 54px; border-radius: 12px; border: 1.5px solid rgba(45,62,44,0.28); padding: 18px 12px 6px; font-size: 14px; font-weight: 700; color: #1e3e2b; background: #fff; outline: none; font-family: inherit;">
+            <option value="Hembra">Hembra</option>
+            <option value="Macho">Macho</option>
+          </select>
+          <label style="top: 10px; font-size: 10.5px; font-weight: 800; color: #2d3e2c; text-transform: uppercase;">Sexo de la cría</label>
+        </div>
+        <div class="m3-field" style="margin-bottom: 0;">
+          <input type="number" step="0.1" name="cria_peso_lb" placeholder=" " autocomplete="off">
+          <label>Peso al nacer (lb)</label>
+        </div>
+      </div>
+      <div class="m3-sub-sheet-actions">
+        <button type="button" class="btn-m3-tonal" id="sub-parto-cancel">Cancelar</button>
+        <button type="submit" class="btn-m3-fill" id="sub-parto-submit">
+          <span class="material-icons" style="font-size: 18px;">check</span>
+          <span>Guardar Parto</span>
+        </button>
+      </div>
+    </form>
+  `;
+
+  openSubBottomSheet(html, (subSheet) => {
+    subSheet.querySelector('#sub-parto-cancel')?.addEventListener('click', closeSubBottomSheet);
+    subSheet.querySelector('#sub-sheet-form-parto')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const submitBtn = subSheet.querySelector('#sub-parto-submit');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const fechaParto = fd.get('fecha_parto') || today;
+        const criaNombre = (fd.get('cria_nombre') || '').trim() || `Cría de ${animal.nombre || 'vaca'}`;
+        const criaSexo = fd.get('cria_sexo') || 'Hembra';
+        const pesoLb = parseFloat(fd.get('cria_peso_lb'));
+        const pesoKg = !isNaN(pesoLb) && pesoLb > 0 ? Math.round((pesoLb / 2.20462) * 10) / 10 : null;
+
+        await restFetch(`/rest/v1/animal_preñez?id=eq.${encodeURIComponent(activePreg.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ estado: 'Parida', fecha_parto: fechaParto, num_crias: 1 })
+        });
+        await restFetch(`/rest/v1/ganado?id=eq.${encodeURIComponent(animal.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ reproductivo: 'Lactando' })
+        });
+
+        const created = await restInsert('/rest/v1/ganado', {
+          nombre: criaNombre,
+          empresa_id: window._currentEmpresaId,
+          raza: animal.raza || null,
+          sexo: criaSexo,
+          origen: 'Criollo',
+          madre_id: animal.id,
+          peso_unidad: 'kg',
+          fecha_adquisicion: fechaParto,
+          reproductivo: 'Vacía'
+        });
+
+        const criaId = created && created.id;
+        if (criaId && pesoKg) {
+          await restInsert('/rest/v1/animal_pesajes', {
+            animal_id: criaId,
+            empresa_id: window._currentEmpresaId,
+            peso: String(pesoKg),
+            fecha: fechaParto,
+            estado: 'Aplicada'
+          });
+        }
+
+        syncTable('animal_preñez');
+        syncTable('ganado');
+
+        sendWhatsApp(
+          `🐄 Parto Registrado\nMadre: ${animal.nombre || 'Animal'}\nFecha: ${fechaParto}\nCría: ${criaNombre} (${criaSexo})${pesoKg ? ` — ${pesoKg} kg` : ''}\nFinca: ${window._empresaNombre || ''}`
+        );
+
+        showSnackbar('Parto y cría registrados ✓');
+        closeSubBottomSheet();
+        if (onReload) onReload();
+      } catch (err) {
+        showSnackbar(err.message || 'Error al registrar parto', 'error');
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  });
+}
+
+function handleAbortPrenezInSheet(animal, activePreg, onReload) {
+  window.Snackbar.confirm('¿Registrar aborto de esta gestación?', async () => {
+    try {
+      await restFetch(`/rest/v1/animal_preñez?id=eq.${encodeURIComponent(activePreg.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: 'Abortada' })
+      });
+      await restFetch(`/rest/v1/ganado?id=eq.${encodeURIComponent(animal.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reproductivo: 'Vacía' })
+      });
+      syncTable('animal_preñez');
+      syncTable('ganado');
+
+      sendWhatsApp(
+        `⚠️ Aborto Registrado\nAnimal: ${animal.nombre || 'Animal'}\nFecha monta: ${activePreg.fecha_monta || 'N/A'}\nFinca: ${window._empresaNombre || ''}`
+      );
+
+      showSnackbar('Aborto registrado ✓');
+      if (onReload) onReload();
+    } catch (err) {
+      showSnackbar(err.message || 'Error al registrar aborto', 'error');
+    }
+  });
 }
 
 function calcEdad(fechaNac) {

@@ -961,10 +961,10 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
 }
 
 export function initGanado() {
-  // Cleanup any orphaned bottom sheets in document.body from previous visits
-  document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim').forEach(el => el.remove());
+  // Cleanup any orphaned bottom sheets or search scrims in document.body from previous visits
+  document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim, body > #ganado-search-scrim').forEach(el => el.remove());
   const cleanupGanadoSheets = () => {
-    document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim').forEach(el => el.remove());
+    document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim, body > #ganado-search-scrim').forEach(el => el.remove());
   };
   window.addEventListener('navigate', cleanupGanadoSheets, { once: true });
   const updateTopBarHeight = () => {
@@ -983,24 +983,24 @@ export function initGanado() {
     titleEl.style.display = 'none';
   }
 
-  // Mount permanently open Split search directly into header topbar-actions
+  // Mount Material 3 Search Bar entry point into header topbar-actions
   const topbarActions = document.getElementById('topbar-actions');
   if (topbarActions) {
     topbarActions.innerHTML = `
-      <div class="ganado-split-ctrl expanded" id="ganado-search-wrapper" style="width:100%; flex:1; min-width:0; background:#edf1ed; border:1px solid rgba(45,62,44,0.16);">
-        <button id="ganado-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer; flex-shrink: 0;" title="Buscar">
-          <span class="material-icons" style="color: #435b47; font-size: 20px;">search</span>
+      <div class="ganado-split-ctrl expanded m3-search-bar" id="ganado-search-wrapper">
+        <button type="button" id="ganado-search-toggle" class="m3-search-icon-btn" title="Buscar" aria-label="Buscar">
+          <span class="material-icons" id="ganado-search-leading-icon">search</span>
         </button>
-        <input type="text" id="ganado-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 14px; flex: 1; min-width: 0; color: #1e3e2b; padding: 0 4px;">
-        <button id="ganado-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 8px 0 4px; color: #435b47; height: 100%; flex-shrink: 0;" title="Limpiar búsqueda">
-          <span class="material-icons" style="font-size: 18px;">close</span>
+        <input type="text" id="ganado-search-input" class="m3-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" autocomplete="off" readonly>
+        <button type="button" id="ganado-search-clear" class="m3-search-icon-btn" style="display: ${currentSearchQuery ? 'inline-flex' : 'none'};" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">
+          <span class="material-icons" style="font-size: 19px;">close</span>
         </button>
-        <span class="ganado-split-ctrl-sep" style="width: 1px; height: 22px; background: rgba(45,62,44,0.18); align-self: center; flex-shrink: 0;"></span>
-        <button class="ganado-split-ctrl-reg" onclick="window.toggleGanadoSplitMenu(event)" title="Más opciones" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: #e2e8e2; border: none; cursor: pointer; border-radius: 0 9px 9px 0; flex-shrink: 0;">
-          <span class="material-icons" style="color: #1e3e2b; font-size: 20px;">arrow_drop_down</span>
+        <span class="ganado-split-ctrl-sep"></span>
+        <button type="button" class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.toggleGanadoSplitMenu(event)" title="Más opciones" aria-label="Más opciones">
+          <span class="material-icons">arrow_drop_down</span>
         </button>
         <div class="ganado-split-menu" id="ganado-split-menu">
-          <button class="ganado-split-item" onclick="window.navigateTo('nuevo_animal'); document.getElementById('ganado-split-menu')?.classList.remove('open');">
+          <button type="button" class="ganado-split-item" onclick="window.navigateTo('nuevo_animal'); document.getElementById('ganado-split-menu')?.classList.remove('open');">
             <span class="material-icons">add</span><span>Registrar animal</span>
           </button>
         </div>
@@ -1949,46 +1949,410 @@ export function initGanado() {
   if (vacunaCancelBtn) vacunaCancelBtn.onclick = closeVacunaPanel;
   if (vacunaCloseBtn) vacunaCloseBtn.onclick = closeVacunaPanel;
 
-  // Search logic
+  // Material 3 Focused Search logic — Full-screen layout in the contained style
   const searchToggle = document.getElementById('ganado-search-toggle');
   const searchWrapper = document.getElementById('ganado-search-wrapper');
   const searchInput = document.getElementById('ganado-search-input');
   const searchClear = document.getElementById('ganado-search-clear');
 
   if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      if (!searchWrapper.classList.contains('expanded') || !searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '140px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      } else {
-        searchInput.focus();
+    let isSearchFocused = false;
+    let cachedAnimals = null;
+    let cachedPesajesMap = new Map();
+
+    // Remove any stale full-screen search overlay from previous screen renders
+    const existingFs = document.getElementById('ganado-fullscreen-search');
+    if (existingFs) existingFs.remove();
+
+    const fsOverlay = document.createElement('div');
+    fsOverlay.id = 'ganado-fullscreen-search';
+    fsOverlay.className = 'm3-fs-search-overlay';
+    fsOverlay.setAttribute('role', 'dialog');
+    fsOverlay.setAttribute('aria-modal', 'true');
+    fsOverlay.setAttribute('aria-label', 'Búsqueda enfocada de ganado');
+    fsOverlay.innerHTML = `
+      <div class="m3-fs-search-shell">
+        <div class="m3-fs-search-header">
+          <div class="m3-fs-search-pill" id="ganado-fs-search-pill">
+            <button type="button" id="ganado-fs-back-btn" class="m3-search-icon-btn" title="Salir de búsqueda" aria-label="Salir de búsqueda">
+              <span class="material-icons">arrow_back</span>
+            </button>
+            <input type="text" id="ganado-fs-query-field" class="m3-fs-search-input" placeholder="Buscar animal..." value="${currentSearchQuery}" autocomplete="off">
+            <button type="button" id="ganado-fs-clear-btn" class="m3-search-icon-btn" style="display: ${currentSearchQuery ? 'inline-flex' : 'none'};" title="Limpiar texto" aria-label="Limpiar texto">
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+        </div>
+        <div class="m3-fs-search-body" id="ganado-focused-search-content" role="listbox" aria-label="Sugerencias y resultados de búsqueda"></div>
+      </div>
+    `;
+    document.body.appendChild(fsOverlay);
+
+    const fsBackBtn = document.getElementById('ganado-fs-back-btn');
+    const fsInput = document.getElementById('ganado-fs-query-field');
+    const fsClearBtn = document.getElementById('ganado-fs-clear-btn');
+    const focusedContent = document.getElementById('ganado-focused-search-content');
+
+    const getRecentSearchesKey = () => {
+      const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || 'default';
+      return `finca_ganado_recent_searches_${empId}`;
+    };
+
+    const getRecentSearches = () => {
+      try {
+        const raw = localStorage.getItem(getRecentSearchesKey());
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr.slice(0, 5) : [];
+      } catch {
+        return [];
       }
+    };
+
+    const saveRecentSearch = (term) => {
+      const clean = (term || '').trim();
+      if (!clean) return;
+      const list = getRecentSearches().filter(item => item.toLowerCase() !== clean.toLowerCase());
+      list.unshift(clean);
+      try {
+        localStorage.setItem(getRecentSearchesKey(), JSON.stringify(list.slice(0, 6)));
+      } catch {}
+    };
+
+    const removeRecentSearch = (term) => {
+      const list = getRecentSearches().filter(item => item.toLowerCase() !== (term || '').toLowerCase());
+      try {
+        localStorage.setItem(getRecentSearchesKey(), JSON.stringify(list));
+      } catch {}
+    };
+
+    const ensureSearchCatalogLoaded = async () => {
+      if (cachedAnimals) return;
+      try {
+        const [animRes, pesRes] = await Promise.all([
+          supabase.from('ganado').select('id,nombre,raza,sexo,estado,reproductivo,image_url,peso_actual,created_at').order('created_at', { ascending: false }).range(0, 299),
+          supabase.from('animal_pesajes').select('animal_id,peso,fecha,created_at').order('fecha', { ascending: false }).range(0, 999)
+        ]);
+        cachedAnimals = animRes?.data || [];
+        const pMap = new Map();
+        for (const p of (pesRes?.data || [])) {
+          if (!pMap.has(p.animal_id)) {
+            pMap.set(p.animal_id, p.peso);
+          }
+        }
+        cachedPesajesMap = pMap;
+      } catch {
+        cachedAnimals = [];
+      }
+    };
+
+    const escapeSearchHtml = (str) => String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const highlightMatch = (text, query) => {
+      const safeText = escapeSearchHtml(text || '');
+      const cleanQ = (query || '').trim();
+      if (!cleanQ) return safeText;
+      const escapedQ = cleanQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return safeText.replace(new RegExp(`(${escapedQ})`, 'gi'), '<mark class="m3-search-highlight">$1</mark>');
+    };
+
+    const renderFocusedSearchContent = async (queryText) => {
+      await ensureSearchCatalogLoaded();
+      const q = (queryText || '').trim();
+      const qLower = q.toLowerCase();
+      const activeAnimals = (cachedAnimals || []).filter(a => a.estado !== 'Vendido');
+
+      if (!q) {
+        // 1. Pre-text state: Suggestion chips + Recent searches (contained group) + Suggested animals (contained group)
+        const recents = getRecentSearches();
+        const uniqueBreeds = Array.from(new Set(activeAnimals.map(a => (a.raza || '').trim()).filter(Boolean))).slice(0, 4);
+        const suggestedAnimals = activeAnimals.slice(0, 6);
+
+        const chipsList = [
+          { label: 'Hembras', type: 'filter', value: 'hembra', icon: 'female' },
+          { label: 'Machos', type: 'filter', value: 'macho', icon: 'male' },
+          { label: 'Preñadas', type: 'filter', value: 'preñadas', icon: 'favorite' },
+          ...uniqueBreeds.map(b => ({ label: b, type: 'query', value: b, icon: 'pets' }))
+        ];
+
+        const chipsHtml = `
+          <div class="m3-fs-contained-section">
+            <div class="m3-search-section-header">
+              <span>Sugerencias rápidas</span>
+            </div>
+            <div class="m3-search-chips-row">
+              ${chipsList.map(c => `
+                <button type="button" class="m3-search-suggestion-chip" data-chip-type="${c.type}" data-chip-val="${escapeSearchHtml(c.value)}">
+                  <span class="material-icons">${c.icon}</span>
+                  <span>${escapeSearchHtml(c.label)}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+
+        const recentsHtml = recents.length > 0 ? `
+          <div class="m3-fs-contained-section">
+            <div class="m3-search-section-header">
+              <span>Búsquedas recientes</span>
+            </div>
+            <div class="m3-contained-list">
+              ${recents.map(r => `
+                <div class="m3-search-item m3-contained-item" data-search-term="${escapeSearchHtml(r)}" role="option" tabindex="0">
+                  <span class="material-icons m3-search-item-leading">history</span>
+                  <div class="m3-search-item-body">
+                    <span class="m3-search-item-title">${escapeSearchHtml(r)}</span>
+                  </div>
+                  <button type="button" class="m3-search-item-action" data-remove-recent="${escapeSearchHtml(r)}" title="Quitar de recientes" aria-label="Quitar de recientes">
+                    <span class="material-icons">close</span>
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '';
+
+        const animalsHtml = suggestedAnimals.length > 0 ? `
+          <div class="m3-fs-contained-section">
+            <div class="m3-search-section-header">
+              <span>Animales sugeridos</span>
+            </div>
+            <div class="m3-contained-list">
+              ${suggestedAnimals.map(a => {
+                const seed = encodeURIComponent(a.id || a.nombre || 'animal');
+                const img = a.image_url || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${seed}&backgroundColor=f0ebe3&radius=16`;
+                const peso = cachedPesajesMap.get(a.id) ?? a.peso_actual ?? 0;
+                return `
+                  <div class="m3-search-item m3-contained-item" data-animal-id="${escapeSearchHtml(a.id)}" data-animal-name="${escapeSearchHtml(a.nombre)}" role="option" tabindex="0">
+                    <div class="m3-search-animal-avatar">
+                      <img src="${escapeSearchHtml(img)}" alt="${escapeSearchHtml(a.nombre)}">
+                    </div>
+                    <div class="m3-search-item-body">
+                      <span class="m3-search-item-title">${escapeSearchHtml(a.nombre || 'Sin nombre')}</span>
+                      <span class="m3-search-item-sub">${escapeSearchHtml(a.raza || 'Otro')} • ${escapeSearchHtml(a.sexo || '—')}</span>
+                    </div>
+                    <span class="m3-search-item-meta">${escapeSearchHtml(peso)} kg</span>
+                    <button type="button" class="m3-search-item-action" data-fill-term="${escapeSearchHtml(a.nombre)}" title="Completar en buscador" aria-label="Completar en buscador">
+                      <span class="material-icons">north_west</span>
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : '';
+
+        focusedContent.innerHTML = chipsHtml + recentsHtml + animalsHtml;
+      } else {
+        // 2. Typing / Live Search Results state in Contained Style
+        const matches = (cachedAnimals || []).filter(a => {
+          const n = (a.nombre || '').toLowerCase();
+          const r = (a.raza || '').toLowerCase();
+          const s = (a.sexo || '').toLowerCase();
+          return n.includes(qLower) || r.includes(qLower) || s.includes(qLower);
+        }).slice(0, 10);
+
+        const resultsHtml = matches.length > 0 ? `
+          <div class="m3-fs-contained-section">
+            <div class="m3-search-section-header">
+              <span>Resultados (${matches.length})</span>
+            </div>
+            <div class="m3-contained-list">
+              ${matches.map(a => {
+                const seed = encodeURIComponent(a.id || a.nombre || 'animal');
+                const img = a.image_url || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${seed}&backgroundColor=f0ebe3&radius=16`;
+                const peso = cachedPesajesMap.get(a.id) ?? a.peso_actual ?? 0;
+                return `
+                  <div class="m3-search-item m3-contained-item" data-animal-id="${escapeSearchHtml(a.id)}" data-animal-name="${escapeSearchHtml(a.nombre)}" role="option" tabindex="0">
+                    <div class="m3-search-animal-avatar">
+                      <img src="${escapeSearchHtml(img)}" alt="${escapeSearchHtml(a.nombre)}">
+                    </div>
+                    <div class="m3-search-item-body">
+                      <span class="m3-search-item-title">${highlightMatch(a.nombre || 'Sin nombre', q)}</span>
+                      <span class="m3-search-item-sub">${highlightMatch(a.raza || 'Otro', q)} • ${escapeSearchHtml(a.sexo || '—')}</span>
+                    </div>
+                    <span class="m3-search-item-meta">${escapeSearchHtml(peso)} kg</span>
+                    <button type="button" class="m3-search-item-action" data-fill-term="${escapeSearchHtml(a.nombre)}" title="Completar término" aria-label="Completar término">
+                      <span class="material-icons">north_west</span>
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : `
+          <div class="m3-fs-contained-section">
+            <div class="m3-contained-list">
+              <div class="m3-search-empty m3-contained-item">
+                <span class="material-icons">search_off</span>
+                <p style="margin: 0;">No se encontraron animales para «${escapeSearchHtml(q)}»</p>
+              </div>
+            </div>
+          </div>
+        `;
+
+        focusedContent.innerHTML = resultsHtml;
+      }
+    };
+
+    const syncSearchInputs = (val) => {
+      const cleanVal = val || '';
+      searchInput.value = cleanVal;
+      fsInput.value = cleanVal;
+      searchClear.style.display = cleanVal ? 'inline-flex' : 'none';
+      fsClearBtn.style.display = cleanVal ? 'inline-flex' : 'none';
+    };
+
+    const openFocusedSearch = () => {
+      if (isSearchFocused) {
+        renderFocusedSearchContent(fsInput.value);
+        return;
+      }
+      isSearchFocused = true;
+      syncSearchInputs(currentSearchQuery);
+      fsOverlay.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      renderFocusedSearchContent(fsInput.value);
+      setTimeout(() => {
+        fsInput.focus();
+        const len = fsInput.value.length;
+        try { fsInput.setSelectionRange(len, len); } catch {}
+      }, 30);
+    };
+
+    const closeFocusedSearch = () => {
+      if (!isSearchFocused) return;
+      isSearchFocused = false;
+      fsOverlay.classList.remove('open');
+      document.body.style.overflow = '';
+      fsInput.blur();
+    };
+
+    const applySearchQuery = (val, shouldCloseView = false) => {
+      const cleanVal = val || '';
+      currentSearchQuery = cleanVal;
+      syncSearchInputs(cleanVal);
+      if (cleanVal.trim()) saveRecentSearch(cleanVal.trim());
+      window.changeGanadoPage(1);
+      if (shouldCloseView) {
+        closeFocusedSearch();
+      } else {
+        renderFocusedSearchContent(cleanVal);
+      }
+    };
+
+    // Entry point selection opens Full-screen Contained Search
+    searchInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFocusedSearch();
+    });
+    searchInput.addEventListener('focus', () => {
+      openFocusedSearch();
+    });
+    searchToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFocusedSearch();
     });
 
-    searchClear.addEventListener('click', () => {
+    // Entry point clear button clears active query directly with its own independent state
+    searchClear.addEventListener('click', (e) => {
+      e.stopPropagation();
+      applySearchQuery('', false);
+    });
+
+    // Full-screen controls (Back button, Clear button, Input)
+    fsBackBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeFocusedSearch();
+    });
+
+    fsClearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       currentSearchQuery = '';
-      searchInput.value = '';
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
-      searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
+      syncSearchInputs('');
       window.changeGanadoPage(1);
+      renderFocusedSearchContent('');
+      fsInput.focus();
     });
 
     let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
+    fsInput.addEventListener('input', (e) => {
       const val = e.target.value;
-      searchClear.style.display = val ? 'flex' : 'none';
+      syncSearchInputs(val);
+      renderFocusedSearchContent(val);
       clearTimeout(searchTimeout);
       currentSearchQuery = val;
       searchTimeout = setTimeout(() => {
         window.changeGanadoPage(1);
-      }, 500);
+      }, 280);
+    });
+
+    fsInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applySearchQuery(fsInput.value, true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeFocusedSearch();
+      }
+    });
+
+    // Delegate clicks inside Contained Search View
+    focusedContent.addEventListener('click', (e) => {
+      e.stopPropagation();
+
+      const removeBtn = e.target.closest('[data-remove-recent]');
+      if (removeBtn) {
+        removeRecentSearch(removeBtn.dataset.removeRecent);
+        renderFocusedSearchContent(fsInput.value);
+        return;
+      }
+
+      const fillBtn = e.target.closest('[data-fill-term]');
+      if (fillBtn) {
+        const term = fillBtn.dataset.fillTerm || '';
+        applySearchQuery(term, false);
+        fsInput.focus();
+        return;
+      }
+
+      const chipBtn = e.target.closest('[data-chip-type]');
+      if (chipBtn) {
+        const cType = chipBtn.dataset.chipType;
+        const cVal = chipBtn.dataset.chipVal || '';
+        if (cType === 'filter') {
+          const targetCard = document.querySelector(`.ganado-card-filter[data-filter="${cVal}"]`);
+          if (targetCard) targetCard.click();
+          closeFocusedSearch();
+        } else {
+          applySearchQuery(cVal, true);
+        }
+        return;
+      }
+
+      const executeRow = e.target.closest('[data-execute-query]');
+      if (executeRow) {
+        applySearchQuery(executeRow.dataset.executeQuery, true);
+        return;
+      }
+
+      const recentRow = e.target.closest('[data-search-term]');
+      if (recentRow) {
+        applySearchQuery(recentRow.dataset.searchTerm, true);
+        return;
+      }
+
+      const animalRow = e.target.closest('[data-animal-id]');
+      if (animalRow) {
+        const animalId = animalRow.dataset.animalId;
+        const animalName = animalRow.dataset.animalName;
+        if (animalName) saveRecentSearch(animalName);
+        closeFocusedSearch();
+        if (animalId) window.navigateTo('detalle_animal', animalId);
+      }
     });
   }
 
