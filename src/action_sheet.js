@@ -516,8 +516,8 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
           </button>
         </div>
         <div style="margin: 8px 0 10px;">
-          <span class="sheet-detail-label">Peso Actual:</span>
-          <span style="font-size: 16px; font-weight: 900; color: #2d3e2c; margin-left: 6px;">${escapeHtml(pesoActual)} ${escapeHtml(pesoUnidad)}</span>
+          <span class="sheet-detail-label" style="color: #e65100; font-weight: 800;">Peso Actual:</span>
+          <span style="font-size: 16px; font-weight: 900; color: #e65100; margin-left: 6px;">${escapeHtml(pesoActual)} ${escapeHtml(pesoUnidad)}</span>
         </div>
         <div class="sheet-tag-list">
           ${pesajesHtml}
