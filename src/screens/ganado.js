@@ -684,7 +684,13 @@ window.changeGanadoPage = async function(page) {
 
   if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
   if (typeof updateCarouselCounts === 'function') updateCarouselCounts();
-}
+};
+
+window.refreshGanadoList = function() {
+  if (document.getElementById('ganado-list-container')) {
+    return window.changeGanadoPage(currentGanadoPage || 1);
+  }
+};
 
 
 function formatTiempoEmpresa(fechaStr) {
