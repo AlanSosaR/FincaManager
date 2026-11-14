@@ -778,7 +778,7 @@ function openPesoFormSheet(animal, pesoActual, pesoUnidad, onReload) {
       </div>
       <div style="flex: 1; min-width: 0;">
         <h4 class="m3-sub-sheet-title">Registrar Peso</h4>
-        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • Peso actual: <strong>${escapeHtml(pesoActual)} kg</strong></p>
+        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • <span style="color: #e65100; font-weight: 800;">Peso actual: ${escapeHtml(pesoActual)} kg</span></p>
       </div>
     </div>
     <form id="sub-sheet-form-peso" class="m3-sub-sheet-form">
@@ -1006,7 +1006,7 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
       </div>
       <div style="flex: 1; min-width: 0;">
         <h4 class="m3-sub-sheet-title" id="sub-vacuna-title">Registrar Vacuna</h4>
-        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • Peso actual: <strong style="color: #1e3e2b;">${escapeHtml(pesoActual)} kg</strong></p>
+        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • <span style="color: #e65100; font-weight: 800;">Peso actual: ${escapeHtml(pesoActual)} kg</span></p>
       </div>
     </div>
     <form id="sub-sheet-form-vacuna" class="m3-sub-sheet-form">
@@ -1375,7 +1375,7 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
       </div>
       <div style="flex: 1; min-width: 0;">
         <h4 class="m3-sub-sheet-title" id="sub-fumig-title">Registrar Fumigación / Baño</h4>
-        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • Peso actual: <strong style="color: #1e3e2b;">${escapeHtml(pesoActual)} kg</strong></p>
+        <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • <span style="color: #e65100; font-weight: 800;">Peso actual: ${escapeHtml(pesoActual)} kg</span></p>
       </div>
     </div>
     <form id="sub-sheet-form-fumig" class="m3-sub-sheet-form">
