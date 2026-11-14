@@ -397,10 +397,38 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
 
     const vacunas = (vacRes?.data || []).filter(v => v.estado !== 'Cancelada').slice(0, 5);
     const fumigaciones = (fumRes?.data || []).filter(f => f.estado !== 'Cancelada').slice(0, 5);
-    const pesajes = (pesRes?.data || []).slice(0, 5);
+    const pesajes = [...(pesRes?.data || [])]
+      .sort((p1, p2) => {
+        const dDiff = (p2.fecha || '').localeCompare(p1.fecha || '');
+        if (dDiff !== 0) return dDiff;
+        return (p2.created_at || '').localeCompare(p1.created_at || '');
+      })
+      .slice(0, 5);
 
     const pesoUnidad = 'kg';
     const pesoActual = pesajes[0]?.peso ?? a.peso_actual ?? '0';
+
+    let pesoTrendHtml = '';
+    if (pesajes.length >= 1) {
+      const latestPeso = parseFloat(pesajes[0]?.peso);
+      const prevPeso = pesajes.length >= 2 ? parseFloat(pesajes[1]?.peso) : null;
+      if (!isNaN(latestPeso) && prevPeso !== null && !isNaN(prevPeso)) {
+        const change = latestPeso - prevPeso;
+        let arrow = '→';
+        let arrowClass = 'same';
+        let changeText = '±0';
+        if (change > 0) {
+          arrow = '↑';
+          arrowClass = 'up';
+          changeText = `+${change.toFixed(1)}`;
+        } else if (change < 0) {
+          arrow = '↓';
+          arrowClass = 'down';
+          changeText = `${change.toFixed(1)}`;
+        }
+        pesoTrendHtml = `<span class="ganado-trend-body" style="margin-left: 10px; font-size: 14px; font-weight: 800;"><span class="ganado-trend-arrow ${arrowClass}">${arrow}</span> <span class="ganado-trend-change ${arrowClass}">${changeText} kg</span></span>`;
+      }
+    }
 
     const vacunasHtml = vacunas.length > 0 ? vacunas.map((v) => `
       <div class="sheet-peso-swipe-wrap" data-record-id="${escapeHtml(v.id)}" data-record-type="vacuna">
@@ -515,9 +543,10 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
             <span>Registrar</span>
           </button>
         </div>
-        <div style="margin: 8px 0 10px;">
+        <div style="margin: 8px 0 10px; display: flex; align-items: baseline; flex-wrap: wrap;">
           <span class="sheet-detail-label" style="color: #e65100; font-weight: 800;">Peso Actual:</span>
           <span style="font-size: 16px; font-weight: 900; color: #e65100; margin-left: 6px;">${escapeHtml(pesoActual)} ${escapeHtml(pesoUnidad)}</span>
+          ${pesoTrendHtml}
         </div>
         <div class="sheet-tag-list">
           ${pesajesHtml}
