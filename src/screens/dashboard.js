@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { getPaginationFooterHtml } from '../pagination.js';
 import { loadPuntoReferencia } from '../auth.js';
+import { renderM3SearchBar, initM3FullScreenSearch, escapeSearchHtml } from '../components/m3_search.js';
 
 let allLotes = [];
 let currentLotesSearchQuery = '';
@@ -521,19 +522,20 @@ export async function renderDashboard() {
       <div class="screen-cafetal" style="padding-bottom: 80px;">
         <!-- Top Search Bar + Quick Add aligned exactly like Ganado -->
         <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; gap: 10px; margin: 16px 0 8px;">
-          <div class="ganado-split-ctrl ${currentLotesSearchQuery ? 'expanded' : ''}" id="lotes-search-wrapper">
-            <button id="lotes-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar lote">
-              <span class="material-icons" style="color: #ffffff;">search</span>
-            </button>
-            <input type="text" id="lotes-search-input" placeholder="Buscar lote..." value="${currentLotesSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentLotesSearchQuery ? '160px' : '0px'}; transition: width 0.3s, flex-grow 0.3s ease; opacity: ${currentLotesSearchQuery ? '1' : '0'}; padding: ${currentLotesSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
-            <button id="lotes-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentLotesSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
-              <span class="material-icons" style="font-size: 20px;">close</span>
-            </button>
-            <span class="ganado-split-ctrl-sep"></span>
-            <button class="ganado-split-ctrl-reg" onclick="window.navigateTo('nuevo_lote')" title="Nuevo Lote">
-              <span class="material-icons">add</span>
-            </button>
-          </div>
+          ${renderM3SearchBar({
+            wrapperId: 'lotes-search-wrapper',
+            toggleId: 'lotes-search-toggle',
+            inputId: 'lotes-search-input',
+            clearId: 'lotes-search-clear',
+            placeholder: 'Buscar lote...',
+            value: currentLotesSearchQuery,
+            extraHtml: `
+              <span class="ganado-split-ctrl-sep"></span>
+              <button class="ganado-split-ctrl-reg" onclick="window.navigateTo('nuevo_lote')" title="Nuevo Lote">
+                <span class="material-icons">add</span>
+              </button>
+            `
+          })}
         </div>
 
         <div class="ganado-page-title" style="margin-top: -10px; margin-bottom: 24px;">
@@ -1441,41 +1443,20 @@ export async function initDashboard() {
     adjustMapView();
   }, 120);
 
-  // Search logic on map
-  const searchToggle = document.getElementById('lotes-search-toggle');
-  const searchWrapper = document.getElementById('lotes-search-wrapper');
-  const searchInput = document.getElementById('lotes-search-input');
-  const searchClear = document.getElementById('lotes-search-clear');
-
-  if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      if (!searchWrapper.classList.contains('expanded') || !searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '160px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      } else {
-        searchInput.focus();
-      }
-    });
-
-    searchClear.addEventListener('click', () => {
-      currentLotesSearchQuery = '';
-      searchInput.value = '';
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
-      searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
-      clearLoteSelection();
-    });
-
-    searchInput.addEventListener('input', (e) => {
-      const q = (e.target.value || '').trim().toLowerCase();
-      searchClear.style.display = q ? 'flex' : 'none';
-      currentLotesSearchQuery = q;
+  // Material 3 Full-Screen Search on Cafetal / Lotes
+  initM3FullScreenSearch({
+    moduleKey: 'lotes',
+    toggleId: 'lotes-search-toggle',
+    inputId: 'lotes-search-input',
+    clearId: 'lotes-search-clear',
+    placeholder: 'Buscar lote...',
+    ariaLabel: 'Búsqueda de lotes de cafetal',
+    suggestedTitle: 'Lotes sugeridos',
+    emptyLabel: 'lotes',
+    getQuery: () => currentLotesSearchQuery,
+    setQuery: (v) => { currentLotesSearchQuery = (v || '').trim(); },
+    onApplySearch: (v) => {
+      const q = (v || '').trim().toLowerCase();
       if (!q) {
         clearLoteSelection();
         return;
@@ -1484,8 +1465,37 @@ export async function initDashboard() {
       if (match && polyByLote[match.id]) {
         selectLote(match.id);
       }
-    });
-  }
+    },
+    loadItems: async () => lotes || [],
+    getQuickChips: (items) => {
+      const variedades = Array.from(new Set(items.map(l => (l.variedad || '').trim()).filter(Boolean))).slice(0, 5);
+      return variedades.map(v => ({ label: v, type: 'query', value: v, icon: 'eco' }));
+    },
+    filterItems: (items, qLower) => items.filter(l =>
+      (l.nombre || '').toLowerCase().includes(qLower) ||
+      (l.variedad || '').toLowerCase().includes(qLower) ||
+      (l.estado || '').toLowerCase().includes(qLower)
+    ),
+    renderItem: (l) => `
+      <div class="ganado-row" data-lote-id="${l.id}" onclick="window.navigateTo('detalle_lote', '${l.id}')">
+        <div class="ganado-row-img-container" style="background: var(--surface-container-high); display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons" style="font-size:26px;color:#2d3e2c;">eco</span>
+        </div>
+        <div class="ganado-row-content">
+          <div class="ganado-col-group" style="flex:1;min-width:0;">
+            <p class="ganado-col-label">${escapeSearchHtml((l.variedad || 'CAFÉ').toUpperCase())}</p>
+            <p class="ganado-col-value">${escapeSearchHtml(l.nombre || 'Sin nombre')}</p>
+            <p class="ganado-col-label" style="margin-top:4px;">${Number(l.numero_plantas || 0).toLocaleString('es-HN')} plantas</p>
+          </div>
+          <div class="ganado-col-group" style="text-align:right;margin-left:auto;align-items:flex-end;">
+            <p class="ganado-col-value" style="font-weight:800;color:#2d3e2c;">${(parseFloat(l.area_ha) || 0).toFixed(2)} ha</p>
+          </div>
+        </div>
+      </div>
+    `,
+    itemSelector: '.ganado-row[data-lote-id]',
+    getItemTitle: (el) => el.querySelector('.ganado-col-value')?.textContent?.trim() || ''
+  });
 
   setTimeout(() => map.invalidateSize(), 300);
 }

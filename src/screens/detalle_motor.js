@@ -78,9 +78,10 @@ export async function renderDetalleMotor(motorId) {
     .order('fecha', { ascending: false });
 
   const totalHoras = motor.horas || 0;
-  const maxHoras = motor.max_horas || 100;
+  const hasPrevMant = (mants || []).length > 0;
+  const maxHoras = hasPrevMant ? (motor.max_horas || 100) : 80;
   const horasRestantes = Math.max(0, maxHoras - totalHoras);
-  const pct = Math.min(100, Math.round((totalHoras / maxHoras) * 100));
+  const pct = totalHoras > 0 ? Math.min(100, Math.max(1, Math.round((totalHoras / maxHoras) * 100))) : 0;
   const requiresAlert = horasRestantes <= 0;
   const today = new Date().toISOString().split('T')[0];
   const currentUserName = await getCurrentUserName();
@@ -88,8 +89,11 @@ export async function renderDetalleMotor(motorId) {
 
   // Guardar datos en window para Bottom Sheet
   window._currentMotorData = motor;
+  window._currentMotorHasPrevMant = hasPrevMant;
   window._currentMotorSesiones = sesiones || [];
+  window._currentMotorMants = mants || [];
   window._currentOperadorNombreMap = operadorNombreMap || {};
+  window._currentUserName = currentUserName || 'Operador';
 
   // Calcular marca y modelo limpios (si no tiene o son valores por defecto, se omite)
   const rawMarca = (motor.marca || '').trim();
@@ -113,9 +117,16 @@ export async function renderDetalleMotor(motorId) {
           width: 100%;
           box-sizing: border-box;
         }
-        .screen-detalle-motor {
-          width: 100%;
-          box-sizing: border-box;
+        .motor-sticky-summary {
+          position: -webkit-sticky;
+          position: sticky;
+          top: 12px;
+          z-index: 40;
+        }
+        @media (max-width: 1024px) {
+          .motor-sticky-summary {
+            top: 64px;
+          }
         }
         .screen-detalle-motor .section-title {
           display: flex !important;
@@ -388,16 +399,16 @@ export async function renderDetalleMotor(motorId) {
       </style>
 
       <!-- Main Detail Card (GitHub/Vercel Design) -->
-      <div class="card" style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.06); position: relative;">
+      <div class="card motor-sticky-summary" style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.06);">
         
         <!-- Header: Imagen a la izquierda y Nombre a la derecha en un solo bloque -->
         <div class="motor-detail-header" style="display: flex; align-items: center; gap: 12px; width: 100%; position: relative;">
           
           <!-- Foto / Icono a la izquierda -->
-          <div class="motor-header-image" style="width: 56px; height: 56px; min-width: 56px; border-radius: 16px; background: #eef3ed; border: 1.5px solid #dce5da; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 2px 8px rgba(45, 62, 44, 0.08);">
+          <div class="motor-header-image" style="width: 100px; height: 100px; min-width: 100px; border-radius: 20px; background: #eef3ed; border: 1.5px solid #dce5da; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 3px 10px rgba(45, 62, 44, 0.10);">
             ${motor.image_url 
               ? `<img src="${motor.image_url}" alt="${motor.nombre}" style="width: 100%; height: 100%; object-fit: cover;">`
-              : `<span class="material-symbols-outlined" style="font-size: 30px; color: #2d3e2c;">precision_manufacturing</span>`
+              : `<span class="material-symbols-outlined" style="font-size: 44px; color: #2d3e2c;">precision_manufacturing</span>`
             }
           </div>
 
@@ -409,70 +420,39 @@ export async function renderDetalleMotor(motorId) {
             ${subtitleHtml}
           </div>
 
-          <!-- Botón Editar a la derecha -->
-          <button onclick="window.navigateTo('nuevo_motor', '${motor.id}')" title="Editar Motor" style="width: 36px; height: 36px; min-width: 36px; border-radius: 50%; background: #f2f6f2; border: 1.5px solid #dce5da; color: #2d3e2c; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.04);">
-            <span class="material-symbols-outlined" style="font-size: 18px;">edit</span>
-          </button>
+          <!-- Píldora Límite de Servicio a la derecha -->
+          <div class="motor-stat-pill" id="motor-pill-limit" style="flex-shrink: 0; padding: 6px 12px 6px 6px; ${requiresAlert ? 'background: #fff4ed; border-color: #fdba74;' : ''}">
+            <div class="motor-stat-pill-icon" id="motor-pill-limit-icon" style="width: 30px; height: 30px; ${requiresAlert ? 'background: #ffedd5; color: #ea580c; border-color: #fdba74;' : ''}">
+              <span class="material-symbols-outlined" style="font-size: 16px;">speed</span>
+            </div>
+            <div class="motor-stat-pill-info">
+              <span class="motor-stat-pill-val" id="motor-pill-limit-val" style="font-size: 13.5px; ${requiresAlert ? 'color: #c2410c;' : ''}">${maxHoras}h</span>
+              <span class="motor-stat-pill-lbl" id="motor-pill-limit-lbl" style="font-size: 8.5px; ${requiresAlert ? 'color: #ea580c;' : ''}">Límite Servicio</span>
+            </div>
+          </div>
 
         </div>
 
         <!-- Carrusel de Píldoras de Estadísticas (Material 3 Expressive) -->
-        <div class="motor-stats-carousel">
-          
-          <!-- Píldora 1: Uso Acumulado -->
-          <div class="motor-stat-pill">
-            <div class="motor-stat-pill-icon">
-              <span class="material-symbols-outlined" style="font-size: 18px;">schedule</span>
-            </div>
-            <div class="motor-stat-pill-info">
-              <span class="motor-stat-pill-val">${totalHoras.toFixed(1)}h</span>
-              <span class="motor-stat-pill-lbl">Uso Acumulado</span>
-            </div>
-          </div>
-
-          <!-- Píldora 2: Límite de Servicio -->
-          <div class="motor-stat-pill">
-            <div class="motor-stat-pill-icon">
-              <span class="material-symbols-outlined" style="font-size: 18px;">speed</span>
-            </div>
-            <div class="motor-stat-pill-info">
-              <span class="motor-stat-pill-val">${maxHoras}h</span>
-              <span class="motor-stat-pill-lbl">Límite Servicio</span>
-            </div>
-          </div>
-
-          <!-- Píldora 3: Próximo Cambio -->
-          <div class="motor-stat-pill">
-            <div class="motor-stat-pill-icon">
-              <span class="material-symbols-outlined" style="font-size: 18px;">oil_barrel</span>
-            </div>
-            <div class="motor-stat-pill-info">
-              <span class="motor-stat-pill-val" style="color: ${requiresAlert ? '#ba1a1a' : '#1e3e2b'};">${horasRestantes.toFixed(1)}h</span>
-              <span class="motor-stat-pill-lbl">Próximo Cambio</span>
-            </div>
-          </div>
-
-          <!-- Píldora 4: Estado -->
-          <div class="motor-stat-pill ${requiresAlert ? 'alert' : 'ok'}">
-            <div class="motor-stat-pill-icon" style="background: ${requiresAlert ? '#ffe2db' : '#eef7ee'}; color: ${requiresAlert ? '#ba1a1a' : '#2e7d32'}; border-color: ${requiresAlert ? '#ffcdd2' : '#c8dfc8'};">
-              <span class="material-symbols-outlined" style="font-size: 18px;">${requiresAlert ? 'warning' : 'check_circle'}</span>
-            </div>
-            <div class="motor-stat-pill-info">
-              <span class="motor-stat-pill-val" style="color: ${requiresAlert ? '#ba1a1a' : '#2e7d32'};">${requiresAlert ? 'Atención' : 'Operativo'}</span>
-              <span class="motor-stat-pill-lbl">Estado Motor</span>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Health Progress -->
-        <div style="margin-top: 14px;">
+        <!-- Health Progress (integrando Uso Acumulado y Próximo Cambio) -->
+        <div style="margin-top: 12px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span style="font-size: 11.5px; font-weight: 700; color: #666;">Vida útil del aceite</span>
-            <span style="font-size: 12px; font-weight: 800; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'};">${pct}%</span>
+            <span id="motor-oil-pct-label" style="font-size: 12px; font-weight: 800; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'};">${pct}%</span>
           </div>
-          <div style="height: 8px; background: #eee; border-radius: 12px; overflow: hidden; position: relative;">
-            <div style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; border-radius: 12px; transition: width 1s ease-out;"></div>
+          <div style="height: 8px; background: #eee; border-radius: 12px; overflow: hidden; position: relative; display: flex;">
+            <div id="motor-oil-bar-current" style="width: ${pct}%; min-width: ${totalHoras > 0 ? '6px' : '0px'}; height: 100%; background: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; transition: width 1s ease-out;"></div>
+            <div id="motor-oil-bar-preview" style="width: 0%; height: 100%; background: #f97316; transition: width 0.35s ease-out;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 7px; font-size: 11.5px; font-weight: 700; color: #5a7056; gap: 8px;">
+            <span style="display: inline-flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 14px;">schedule</span>
+              <span>Uso acumulado: <strong id="motor-oil-uso-val" style="color: #1e3e2b;">${totalHoras.toFixed(1)}h</strong></span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 14px; color: ${requiresAlert ? '#ba1a1a' : '#5a7056'};">oil_barrel</span>
+              <span>Próximo cambio: <strong id="motor-oil-restante-val" style="color: ${requiresAlert ? '#ba1a1a' : '#1e3e2b'};">${horasRestantes.toFixed(1)}h</strong></span>
+            </span>
           </div>
         </div>
 
@@ -490,23 +470,227 @@ export async function renderDetalleMotor(motorId) {
         <!-- Left Column: Operations (Unified Single Card with Segmented Button) -->
         <div class="section">
           
-          <div class="card" style="background: white; border: 1.5px solid rgba(45, 62, 44, 0.12); box-shadow: 0 4px 24px rgba(0,0,0,0.04);">
+          <div class="card" style="background: white; border: 1.5px solid rgba(45, 62, 44, 0.12); box-shadow: 0 4px 24px rgba(0,0,0,0.04); padding: 14px;">
             
-            <!-- Segmented Button Material 3 Expressive -->
-            <div class="m3-segmented-button-container" style="display: flex; background: #eef3ed; border-radius: 9999px; padding: 4px; gap: 4px; margin-bottom: 22px; border: 1.5px solid #dce5da;">
-              <button type="button" id="seg-btn-live" class="m3-segment-btn active" onclick="window.switchMotorSessionMode('live')">
-                <span class="material-symbols-outlined" style="font-size: 18px;">timer</span>
+            <!-- Segmented Button Material 3 Expressive (Abre Bottom Sheet) -->
+            <div class="m3-segmented-button-container" style="display: flex; background: #eef3ed; border-radius: 9999px; padding: 4px; gap: 4px; border: 1.5px solid #dce5da;">
+              <button type="button" id="seg-btn-live" class="m3-segment-btn" onclick="window.openMotorActionSheet('live')" style="${horasRestantes <= 0 ? 'opacity: 0.45; cursor: not-allowed;' : ''}">
+                <span class="material-symbols-outlined" style="font-size: 18px;">${horasRestantes <= 0 ? 'lock' : 'timer'}</span>
                 <span>Cronómetro en Vivo</span>
               </button>
-              <button type="button" id="seg-btn-manual" class="m3-segment-btn" onclick="window.switchMotorSessionMode('manual')">
-                <span class="material-symbols-outlined" style="font-size: 18px;">edit_calendar</span>
+              <button type="button" id="seg-btn-manual" class="m3-segment-btn" onclick="window.openMotorActionSheet('manual')" style="${horasRestantes <= 0 ? 'opacity: 0.45; cursor: not-allowed;' : ''}">
+                <span class="material-symbols-outlined" style="font-size: 18px;">${horasRestantes <= 0 ? 'lock' : 'edit_calendar'}</span>
                 <span>Registro Manual</span>
               </button>
             </div>
+            ${horasRestantes <= 0 ? `
+            <p style="margin: 8px 0 0; font-size: 11.5px; font-weight: 700; color: #c2410c; text-align: center; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 15px;">lock</span>
+              <span>Horas completadas. Registra el cambio de aceite para continuar.</span>
+            </p>
+            ` : ''}
 
+          </div>
+
+        </div>
+
+
+        <!-- Right Column: History -->
+        <div class="section">
+          
+          <div class="section-title" id="motor-operacion-title">
+             <h3>Historial de Operación</h3>
+             <div style="display: flex; align-items: center; gap: 8px;">
+               <span class="tag" style="background: var(--secondary-container); color: var(--on-secondary-container);">${sesiones ? sesiones.length : 0} Sesiones</span>
+               <button type="button" id="btn-toggle-operacion-history" class="press-effect" title="Mostrar / Ocultar historial" style="width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #dce5da; background: #eef3ed; color: #2d3e2c; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                 <span class="material-symbols-outlined" id="icon-toggle-operacion-history" style="font-size: 19px;">visibility_off</span>
+               </button>
+             </div>
+          </div>
+          
+          <div id="motor-operacion-history-list" class="activity-list" style="margin-bottom: 32px; display: none;">
+            ${sesiones && sesiones.length > 0 ? sesiones.map((s, idx) => {
+              const rawOp = s.operador || '';
+              const opName = rawOp.includes('@') ? (operadorNombreMap[rawOp] || rawOp.split('@')[0]) : (rawOp || currentUserName || 'Alan Rodezno');
+              const opInitials = getInitials(opName);
+              
+              const d = s.fecha ? new Date(s.fecha) : new Date();
+              const fechaFormateada = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+              
+              const durMins = s.duracion_mins || (s.total_horas ? Math.round(s.total_horas * 60) : 0);
+              const durH = Math.floor(durMins / 60);
+              const durM = durMins % 60;
+              const duracionTexto = durH > 0 ? (durM > 0 ? `${durH}h ${durM}m` : `${durH}h`) : `${durM}m`;
+              
+              const horasSumadas = Math.round((durMins / 60) * 10) / 10;
+              const horoFinal = parseFloat(s.total_horas) || horasSumadas;
+              const horoInicial = Math.max(0, Math.round((horoFinal - horasSumadas) * 10) / 10);
+              
+              // Determinar modo
+              const isLive = s.modo === 'live' || (durMins <= 180 && idx % 2 !== 0);
+
+              return `
+              <div class="motor-session-card press-effect" data-session-idx="${idx}" title="Toca para ver ficha técnica de la sesión">
+                <!-- Top Row: Modo Badge + Fecha -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <div style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 9999px; background: ${isLive ? '#eef7ee' : '#f0f3ef'}; color: ${isLive ? '#2e7d32' : '#455a43'}; font-size: 11px; font-weight: 700;">
+                    <span class="material-symbols-outlined" style="font-size: 14px;">${isLive ? 'timer' : 'edit_calendar'}</span>
+                    <span>${isLive ? 'Cronómetro en Vivo' : 'Registro Manual'}</span>
+                  </div>
+                  <span style="font-size: 12px; font-weight: 700; color: #5a7056;">
+                    ${fechaFormateada}
+                  </span>
+                </div>
+
+                <!-- Middle Row: Rango Horario & Progresión Horómetro -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <div>
+                    <div style="font-size: 12px; font-weight: 600; color: #666; margin-bottom: 2px;">
+                      ${s.hora_inicio && s.hora_fin ? `${s.hora_inicio} - ${s.hora_fin}` : 'Registro directo por horas'}
+                    </div>
+                    <div style="font-size: 15px; font-weight: 800; color: #1e3e2b;">
+                      ${duracionTexto} trabajadas
+                    </div>
+                  </div>
+                  
+                  <div style="text-align: right;">
+                    <span style="font-size: 9.5px; font-weight: 800; color: #889988; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Horómetro</span>
+                    <div style="display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; font-weight: 800; color: #2d3e2c; background: #eef3ed; padding: 2px 7px; border-radius: 8px; margin-top: 2px;">
+                      <span>${horoInicial.toFixed(1)}h</span>
+                      <span class="material-symbols-outlined" style="font-size: 13px; color: #5a7056;">arrow_forward</span>
+                      <span style="color: #1e3e2b; font-weight: 900;">${horoFinal.toFixed(1)}H</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bottom Row: Operador Verificado Autovinculado + "Ver ficha >" -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px dashed #e2e8e0;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="width: 22px; height: 22px; border-radius: 50%; background: #2d3e2c; color: white; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 800;">
+                      ${opInitials}
+                    </div>
+                    <span style="font-size: 12px; font-weight: 700; color: #1e3e2b;">${opName}</span>
+                    <span class="material-symbols-outlined" style="font-size: 14px; color: #2d3e2c; font-variation-settings: 'FILL' 1;" title="Autovinculado">verified</span>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 700; color: #2d3e2c;">
+                    <span>Ver ficha</span>
+                    <span class="material-symbols-outlined" style="font-size: 15px;">chevron_right</span>
+                  </div>
+                </div>
+              </div>
+            `;}).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">No hay sesiones registradas.</p>'}
+          </div>
+
+          <div class="section-title">
+             <h3>Mantenimientos</h3>
+             <div style="display: flex; align-items: center; gap: 8px;">
+               <span class="tag" style="background: var(--secondary-container); color: var(--on-secondary-container);">${mants ? mants.length : 0} Registros</span>
+               <button type="button" id="btn-toggle-mants-history" class="press-effect" title="Mostrar / Ocultar mantenimientos" style="width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #dce5da; background: #eef3ed; color: #2d3e2c; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                 <span class="material-symbols-outlined" id="icon-toggle-mants-history" style="font-size: 19px;">visibility_off</span>
+               </button>
+             </div>
+          </div>
+          
+          <div id="motor-mants-history-list" class="activity-list" style="display: none;">
+            ${mants && mants.length > 0 ? mants.map(m => {
+              const histSesiones = Array.isArray(m.historial_sesiones) ? m.historial_sesiones : [];
+              const dMant = m.fecha ? new Date(m.fecha) : new Date();
+              const fechaMantFormateada = dMant.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+              return `
+              <div class="motor-session-card press-effect" onclick="window.openMotorMantDetailSheet('${m.id}')" title="Toca para ver el historial de horas y operarios" style="cursor: pointer;">
+                <!-- Top Row: Tipo Badge + Fecha -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <div style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 9999px; background: #eef3ed; color: #2d3e2c; font-size: 11px; font-weight: 700;">
+                    <span class="material-symbols-outlined" style="font-size: 14px; color: #ff4103;">oil_barrel</span>
+                    <span>${m.titulo || 'Cambio de Aceite'}</span>
+                  </div>
+                  <span style="font-size: 12px; font-weight: 700; color: #5a7056;">
+                    ${fechaMantFormateada}
+                  </span>
+                </div>
+
+                <!-- Middle Row: Descripción & Sesiones + Uso acumulado -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <div>
+                    <div style="font-size: 12px; font-weight: 600; color: #666; margin-bottom: 2px;">
+                      ${m.descripcion || 'Mantenimiento preventivo.'}
+                    </div>
+                    <div style="font-size: 15px; font-weight: 800; color: #1e3e2b;">
+                      ${histSesiones.length} ${histSesiones.length === 1 ? 'sesión registrada' : 'sesiones registradas'}
+                    </div>
+                  </div>
+
+                  <div style="text-align: right;">
+                    <span style="font-size: 9.5px; font-weight: 800; color: #889988; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Uso acumulado</span>
+                    <div style="display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; font-weight: 900; color: #1e3e2b; background: #eef3ed; padding: 2px 9px; border-radius: 8px; margin-top: 2px;">
+                      <span>${m.total_horas || 0}h</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bottom Row: Eliminar + "Ver historial >" -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px dashed #e2e8e0;">
+                  <button type="button" class="btn-m3-text btn-delete-maintenance" data-id="${m.id}" onclick="event.stopPropagation();" title="Eliminar mantenimiento" style="color: var(--error); padding: 2px 8px 2px 4px; height: 28px; min-width: 0; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 700;">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
+                    <span>Eliminar</span>
+                  </button>
+
+                  <div style="display: flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 700; color: #2d3e2c;">
+                    <span>Ver historial</span>
+                    <span class="material-symbols-outlined" style="font-size: 15px;">chevron_right</span>
+                  </div>
+                </div>
+              </div>
+            `;
+            }).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">Sin mantenimientos registrados.</p>'}
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Bottom Sheet Scrim & Container para Ficha Técnica de Operación -->
+      <div id="motor-sheet-scrim" class="motor-sheet-scrim"></div>
+      <div id="motor-session-sheet" class="motor-session-sheet"></div>
+
+      <!-- Bottom Sheet Scrim & Container para Cronómetro / Registro Manual -->
+      <div id="motor-action-scrim" class="motor-sheet-scrim"></div>
+      <div id="motor-action-sheet" class="motor-session-sheet">
+        <div style="width: 36px; height: 4px; background: #d0d7cf; border-radius: 9999px; margin: 0 auto 14px;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
+          <h3 id="motor-action-sheet-title" style="margin: 0; font-size: 18px; font-weight: 800; color: #1e3e2b;">Cronómetro en Vivo</h3>
+          <button type="button" id="motor-action-sheet-close" class="motor-float-close" title="Cerrar">
+            <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+          </button>
+        </div>
             <!-- Panel 1: Cronómetro en Vivo -->
             <div id="panel-session-live" style="display: block; text-align: center;">
               
+              <!-- Vida útil del aceite & Límite Servicio (en vivo en Cronómetro) -->
+              <div style="background: #ffffff; border: 1px solid #dce5da; padding: 12px 14px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; text-align: left;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                  <div id="live-pill-limit" class="motor-stat-pill" style="transition: background 0.25s, border-color 0.25s;">
+                    <div id="live-pill-limit-icon" class="motor-stat-pill-icon" style="transition: background 0.25s, color 0.25s, border-color 0.25s;"><span class="material-symbols-outlined">speed</span></div>
+                    <div class="motor-stat-pill-text">
+                      <span id="live-pill-limit-val" class="motor-stat-pill-val">${maxHoras}h</span>
+                      <span id="live-pill-limit-lbl" class="motor-stat-pill-lbl">Límite Servicio</span>
+                    </div>
+                  </div>
+                  <span id="live-oil-pct-label" style="font-size: 13px; font-weight: 800; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'};">${pct}%</span>
+                </div>
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <span style="font-size: 11.5px; font-weight: 700; color: #666;">Vida útil del aceite</span>
+                    <span id="live-oil-hours-label" style="font-size: 11px; font-weight: 600; color: #5a7056;">${totalHoras.toFixed(1)}h / ${maxHoras}h</span>
+                  </div>
+                  <div style="height: 8px; background: #eee; border-radius: 12px; overflow: hidden; position: relative; display: flex;">
+                    <div id="live-oil-bar-current" style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; transition: width 0.35s ease-out;"></div>
+                    <div id="live-oil-bar-preview" style="width: 0%; height: 100%; background: #f97316; transition: width 0.35s ease-out;"></div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Status Pill -->
               <div id="ui-current-session-info" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; background: #f0f4ef; border-radius: 9999px; border: 1px solid #dce5da; margin-bottom: 8px;">
                 <span id="ui-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #888; transition: all 0.3s;"></span>
@@ -566,6 +750,30 @@ export async function renderDetalleMotor(motorId) {
               
               <div style="display: flex; flex-direction: column; gap: 16px;">
                 
+                <!-- Vida útil del aceite & Límite Servicio (en vivo en Registro Manual) -->
+                <div style="background: #ffffff; border: 1px solid #dce5da; padding: 12px 14px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                    <div id="manual-pill-limit" class="motor-stat-pill" style="transition: background 0.25s, border-color 0.25s;">
+                      <div id="manual-pill-limit-icon" class="motor-stat-pill-icon" style="transition: background 0.25s, color 0.25s, border-color 0.25s;"><span class="material-symbols-outlined">speed</span></div>
+                      <div class="motor-stat-pill-text">
+                        <span id="manual-pill-limit-val" class="motor-stat-pill-val">${maxHoras}h</span>
+                        <span id="manual-pill-limit-lbl" class="motor-stat-pill-lbl">Límite Servicio</span>
+                      </div>
+                    </div>
+                    <span id="manual-oil-pct-label" style="font-size: 13px; font-weight: 800; color: ${requiresAlert ? '#ff4103' : '#2d3e2c'};">${pct}%</span>
+                  </div>
+                  <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                      <span style="font-size: 11.5px; font-weight: 700; color: #666;">Vida útil del aceite</span>
+                      <span style="font-size: 11px; font-weight: 600; color: #5a7056;">${totalHoras.toFixed(1)}h / ${maxHoras}h</span>
+                    </div>
+                    <div style="height: 8px; background: #eee; border-radius: 12px; overflow: hidden; position: relative; display: flex;">
+                      <div id="manual-oil-bar-current" style="width: ${pct}%; height: 100%; background: ${requiresAlert ? '#ff4103' : '#2d3e2c'}; transition: width 0.35s ease-out;"></div>
+                      <div id="manual-oil-bar-preview" style="width: 0%; height: 100%; background: #f97316; transition: width 0.35s ease-out;"></div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Fecha -->
                 <div class="m3-field">
                   <input type="text" id="input-manual-date" value="${today}" readonly placeholder=" " style="cursor: pointer;">
@@ -573,8 +781,20 @@ export async function renderDetalleMotor(motorId) {
                   <span class="material-icons" style="cursor: pointer;">calendar_today</span>
                 </div>
 
+                <!-- Modo de Registro Manual: Por horario vs Por horas -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #eef3ed; padding: 4px; border-radius: 12px; border: 1px solid #dce5da;">
+                  <button type="button" id="btn-manual-mode-time" class="press-effect" style="padding: 8px 10px; border-radius: 9px; border: none; background: #2d3e2c; color: #ffffff; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <span class="material-symbols-outlined" style="font-size: 15px;">schedule</span>
+                    <span>Por horario</span>
+                  </button>
+                  <button type="button" id="btn-manual-mode-hours" class="press-effect" style="padding: 8px 10px; border-radius: 9px; border: none; background: transparent; color: #455a43; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <span class="material-symbols-outlined" style="font-size: 15px;">add_circle</span>
+                    <span>Por horas</span>
+                  </button>
+                </div>
+
                 <!-- Hora Inicio & Fin -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div id="manual-time-inputs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                   <div class="m3-field">
                     <input type="text" id="input-manual-start" value="08:00 AM" readonly placeholder=" " style="cursor: pointer;">
                     <label>Hora Inicio</label>
@@ -587,13 +807,31 @@ export async function renderDetalleMotor(motorId) {
                   </div>
                 </div>
 
+                <!-- Cantidad Directa de Horas -->
+                <div id="manual-hours-inputs" style="display: none; flex-direction: column; gap: 10px;">
+                  <div class="m3-field">
+                    <input type="number" id="input-manual-hours" min="0.1" step="0.1" value="1" placeholder=" ">
+                    <label>Cantidad de Horas</label>
+                    <span class="material-icons">hourglass_top</span>
+                  </div>
+                  ${horasRestantes > 0 ? `
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    <button type="button" id="btn-fill-remaining-hours" data-hours="${horasRestantes.toFixed(1)}" class="press-effect" style="padding: 8px 14px; border-radius: 9999px; border: 1.5px solid #2d3e2c; background: #eef3ed; color: #1e3e2b; font-size: 12px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                      <span class="material-symbols-outlined" style="font-size: 15px;">bolt</span>
+                      <span>Completar el servicio (${horasRestantes.toFixed(1)}h)</span>
+                    </button>
+                  </div>
+                  ` : ''}
+                </div>
+
                 <!-- Duración Calculada -->
-                <div style="background: #f4f8f4; border: 1.5px solid #d8e5d7; padding: 14px 16px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center;">
-                  <div style="display: flex; flex-direction: column;">
+                <div style="background: #f4f8f4; border: 1.5px solid #d8e5d7; padding: 14px 16px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                  <div style="display: flex; flex-direction: column; min-width: 0;">
                     <span style="font-size: 10.5px; font-weight: 700; color: #5a7056; text-transform: uppercase; letter-spacing: 0.5px;">Duración Calculada</span>
                     <span id="calc-manual-result" style="font-size: 20px; font-weight: 900; color: #1e3e2b; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">4h 00m</span>
+                    <span id="calc-manual-projection" style="font-size: 11.5px; font-weight: 700; color: #5a7056; margin-top: 3px;">${totalHoras.toFixed(1)}h registradas + 4.0h = ${(Math.round((totalHoras + 4) * 10) / 10).toFixed(1)}h / ${maxHoras}h (${Math.min(100, Math.round(((totalHoras + 4) / maxHoras) * 100))}%)</span>
                   </div>
-                  <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(45, 62, 44, 0.08); color: #2d3e2c; display: flex; align-items: center; justify-content: center;">
+                  <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(45, 62, 44, 0.08); color: #2d3e2c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                     <span class="material-symbols-outlined" style="font-size: 20px;">hourglass_bottom</span>
                   </div>
                 </div>
@@ -624,136 +862,89 @@ export async function renderDetalleMotor(motorId) {
               </div>
 
             </div>
-
-          </div>
-
-        </div>
-
-        <!-- Right Column: History -->
-        <div class="section">
-          
-          <div class="section-title">
-             <h3>Historial de Operación</h3>
-             <span class="tag" style="background: var(--secondary-container); color: var(--on-secondary-container);">${sesiones ? sesiones.length : 0} Sesiones</span>
-          </div>
-          
-          <div class="activity-list" style="margin-bottom: 32px;">
-            ${sesiones && sesiones.length > 0 ? sesiones.map((s, idx) => {
-              const rawOp = s.operador || '';
-              const opName = rawOp.includes('@') ? (operadorNombreMap[rawOp] || rawOp.split('@')[0]) : (rawOp || currentUserName || 'Alan Rodezno');
-              const opInitials = getInitials(opName);
-              
-              const d = s.fecha ? new Date(s.fecha) : new Date();
-              const fechaFormateada = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-              
-              const durMins = s.duracion_mins || (s.total_horas ? Math.round(s.total_horas * 60) : 0);
-              const durH = Math.floor(durMins / 60);
-              const durM = durMins % 60;
-              const duracionTexto = durH > 0 ? (durM > 0 ? `${durH}h ${durM}m` : `${durH}h`) : `${durM}m`;
-              
-              const horasSumadas = Math.round((durMins / 60) * 10) / 10;
-              const horoFinal = parseFloat(s.total_horas) || horasSumadas;
-              const horoInicial = Math.max(0, Math.round((horoFinal - horasSumadas) * 10) / 10);
-              
-              // Determinar modo
-              const isLive = s.modo === 'live' || (durMins <= 180 && idx % 2 !== 0);
-
-              return `
-              <div class="motor-session-card press-effect" data-session-idx="${idx}" title="Toca para ver ficha técnica de la sesión">
-                <!-- Top Row: Modo Badge + Fecha -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                  <div style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 9999px; background: ${isLive ? '#eef7ee' : '#f0f3ef'}; color: ${isLive ? '#2e7d32' : '#455a43'}; font-size: 11px; font-weight: 700;">
-                    <span class="material-symbols-outlined" style="font-size: 14px;">${isLive ? 'timer' : 'edit_calendar'}</span>
-                    <span>${isLive ? 'Cronómetro en Vivo' : 'Registro Manual'}</span>
-                  </div>
-                  <span style="font-size: 12px; font-weight: 700; color: #5a7056;">
-                    ${fechaFormateada}
-                  </span>
-                </div>
-
-                <!-- Middle Row: Rango Horario & Progresión Horómetro -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                  <div>
-                    <div style="font-size: 12px; font-weight: 600; color: #666; margin-bottom: 2px;">
-                      ${s.hora_inicio || '--:--'} - ${s.hora_fin || '--:--'}
-                    </div>
-                    <div style="font-size: 15px; font-weight: 800; color: #1e3e2b;">
-                      ${duracionTexto} trabajadas
-                    </div>
-                  </div>
-                  
-                  <div style="text-align: right;">
-                    <span style="font-size: 9.5px; font-weight: 800; color: #889988; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Horómetro</span>
-                    <div style="display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; font-weight: 800; color: #2d3e2c; background: #eef3ed; padding: 2px 7px; border-radius: 8px; margin-top: 2px;">
-                      <span>${horoInicial.toFixed(1)}h</span>
-                      <span class="material-symbols-outlined" style="font-size: 13px; color: #5a7056;">arrow_forward</span>
-                      <span style="color: #1e3e2b; font-weight: 900;">${horoFinal.toFixed(1)}H</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Bottom Row: Operador Verificado Autovinculado + "Ver ficha >" -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px dashed #e2e8e0;">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <div style="width: 22px; height: 22px; border-radius: 50%; background: #2d3e2c; color: white; display: flex; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 800;">
-                      ${opInitials}
-                    </div>
-                    <span style="font-size: 12px; font-weight: 700; color: #1e3e2b;">${opName}</span>
-                    <span class="material-symbols-outlined" style="font-size: 14px; color: #2d3e2c; font-variation-settings: 'FILL' 1;" title="Autovinculado">verified</span>
-                  </div>
-
-                  <div style="display: flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 700; color: #2d3e2c;">
-                    <span>Ver ficha</span>
-                    <span class="material-symbols-outlined" style="font-size: 15px;">chevron_right</span>
-                  </div>
-                </div>
-              </div>
-            `;}).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">No hay sesiones registradas.</p>'}
-          </div>
-
-          <div class="section-title">
-             <h3>Mantenimientos</h3>
-             <button class="btn-m3-tonal" id="btn-register-oil-change" style="font-size: 12px; height: 32px; padding: 0 16px;">+ Nuevo</button>
-          </div>
-          
-          <div class="activity-list">
-            ${mants && mants.length > 0 ? mants.map(m => `
-              <div class="activity-item card" style="padding: 16px; margin-bottom: 12px; border-left: 6px solid var(--primary); background: #fff;">
-                <div class="activity-icon" style="background: var(--primary-container); color: var(--on-primary-container); border-radius: 12px; width: 44px; height: 44px;">
-                  <span class="material-icons" style="font-size: 20px;">oil_barrel</span>
-                </div>
-                <div class="activity-content" style="flex: 1;">
-                  <h4 style="font-size: 15px; margin: 0; font-weight: 800; color: var(--primary-container);">${m.titulo || 'Cambio de Aceite'}</h4>
-                  <p style="font-size: 12px; color: #555; margin: 4px 0; line-height: 1.4;">${m.descripcion || 'Mantenimiento preventivo de rutina.'}</p>
-                  <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                    <span class="history-date" style="font-size: 11px; font-weight: 700; color: #888;">
-                       ${new Date(m.fecha).toLocaleDateString()}
-                    </span>
-                    <span class="tag" style="font-size: 10px; background: #eee; padding: 2px 8px;">${m.total_horas}h de uso</span>
-                  </div>
-                </div>
-                <div class="activity-actions">
-                  <button class="btn-m3-text btn-delete-maintenance" data-id="${m.id}" style="color: var(--error); width: 36px; height: 36px; border-radius: 50%; min-width: 0;">
-                    <span class="material-symbols-outlined" style="font-size: 20px;">delete</span>
-                  </button>
-                </div>
-              </div>
-            `).join('') : '<p style="text-align:center; padding: 40px; color:#999; background: var(--surface); border-radius: 12px; border: 1px dashed #ccc;">Sin mantenimientos registrados.</p>'}
-          </div>
-
-        </div>
-
       </div>
-
-      <!-- Bottom Sheet Scrim & Container para Ficha Técnica de Operación -->
-      <div id="motor-sheet-scrim" class="motor-sheet-scrim"></div>
-      <div id="motor-session-sheet" class="motor-session-sheet"></div>
     </div>
   `;
 }
 
 export function initDetalleMotor(motorId) {
-  let timerInterval = null;
+  // If rendered inside mobile bottom sheet, place summary + action bar in fixed top area
+  const sheetBody = document.getElementById('motor-list-sheet-body');
+  const fixedTop = document.getElementById('motor-sheet-fixed-top');
+  if (sheetBody) {
+    sheetBody.style.padding = '0';
+    sheetBody.querySelectorAll('.motor-sticky-summary, .section > .card').forEach(cardEl => {
+      cardEl.style.border = 'none';
+      cardEl.style.borderRadius = '0';
+      cardEl.style.boxShadow = 'none';
+      cardEl.style.background = '#ffffff';
+      cardEl.style.margin = '0';
+      cardEl.style.width = '100%';
+      cardEl.style.boxSizing = 'border-box';
+    });
+    const stickyEl = sheetBody.querySelector('.motor-sticky-summary');
+    const actionSection = sheetBody.querySelector('.screen-detalle-motor .grid-2 > .section:first-child');
+    const opTitle = sheetBody.querySelector('#motor-operacion-title');
+    if (fixedTop && stickyEl) {
+      fixedTop.innerHTML = '';
+      stickyEl.style.position = 'static';
+      stickyEl.style.padding = '4px 14px 10px';
+      stickyEl.style.borderBottom = 'none';
+      const headerTitle = stickyEl.querySelector('.motor-header-title');
+      if (headerTitle) headerTitle.style.display = 'none';
+      fixedTop.appendChild(stickyEl);
+      if (actionSection) {
+        actionSection.style.padding = '0 14px 10px';
+        actionSection.style.borderBottom = opTitle ? 'none' : '1px solid #eef2ed';
+        const actionCard = actionSection.querySelector('.card');
+        if (actionCard) actionCard.style.padding = '0';
+        fixedTop.appendChild(actionSection);
+      }
+      if (opTitle) {
+        opTitle.style.setProperty('margin', '4px 0 0', 'important');
+        opTitle.style.setProperty('padding', '0 14px 10px', 'important');
+        opTitle.style.borderBottom = '1px solid #eef2ed';
+        fixedTop.appendChild(opTitle);
+      }
+    }
+    const gridEl = sheetBody.querySelector('.screen-detalle-motor .grid-2');
+    if (gridEl) {
+      gridEl.style.padding = '12px 14px 24px';
+      gridEl.style.marginTop = '0';
+      gridEl.style.boxSizing = 'border-box';
+    }
+  }
+
+  // Portal bottom sheets to document.body so position:fixed is always relative to viewport
+  document.querySelectorAll('[data-motor-portal="1"]').forEach(el => el.remove());
+  ['motor-sheet-scrim', 'motor-session-sheet', 'motor-action-scrim', 'motor-action-sheet'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.parentElement !== document.body) {
+      el.setAttribute('data-motor-portal', '1');
+      document.body.appendChild(el);
+    }
+  });
+
+  [
+    ['btn-toggle-operacion-history', 'icon-toggle-operacion-history', 'motor-operacion-history-list'],
+    ['btn-toggle-mants-history', 'icon-toggle-mants-history', 'motor-mants-history-list']
+  ].forEach(([btnId, iconId, listId]) => {
+    const btn = document.getElementById(btnId);
+    const icon = document.getElementById(iconId);
+    const list = document.getElementById(listId);
+    if (btn && list) {
+      btn.onclick = () => {
+        const isHidden = list.style.display === 'none';
+        list.style.display = isHidden ? 'block' : 'none';
+        if (icon) icon.textContent = isHidden ? 'visibility' : 'visibility_off';
+      };
+    }
+  });
+
+  if (window._motorTimerInterval) {
+    clearInterval(window._motorTimerInterval);
+    window._motorTimerInterval = null;
+  }
   let isRunning = false;
   let lastStartTime = 0;
   let savedElapsed = 0;
@@ -765,12 +956,13 @@ export function initDetalleMotor(motorId) {
   const uiLabel = document.getElementById('ui-current-session-label');
   const uiDot = document.getElementById('ui-status-dot');
 
-  // Segment Switcher
+  // Segment Switcher & Action Bottom Sheet
   window.switchMotorSessionMode = function(mode) {
     const btnLive = document.getElementById('seg-btn-live');
     const btnManual = document.getElementById('seg-btn-manual');
     const panelLive = document.getElementById('panel-session-live');
     const panelManual = document.getElementById('panel-session-manual');
+    const sheetTitle = document.getElementById('motor-action-sheet-title');
     if (!btnLive || !btnManual || !panelLive || !panelManual) return;
 
     if (mode === 'live') {
@@ -778,13 +970,59 @@ export function initDetalleMotor(motorId) {
       btnManual.classList.remove('active');
       panelLive.style.display = 'block';
       panelManual.style.display = 'none';
+      if (sheetTitle) sheetTitle.textContent = 'Cronómetro en Vivo';
+      if (typeof window._updateLivePreview === 'function') {
+        window._updateLivePreview();
+      } else if (typeof window._resetOilBarPreview === 'function') {
+        window._resetOilBarPreview();
+      }
     } else {
       btnManual.classList.add('active');
       btnLive.classList.remove('active');
       panelLive.style.display = 'none';
       panelManual.style.display = 'block';
+      if (sheetTitle) sheetTitle.textContent = 'Registro Manual';
+      if (typeof window._updateManualPreview === 'function') window._updateManualPreview();
     }
   };
+
+  function isMotorServiceCompleted() {
+    const baseHoras = parseFloat(window._currentMotorData?.horas) || 0;
+    const maxHoras = window._currentMotorHasPrevMant ? (window._currentMotorData?.max_horas || 100) : 80;
+    return baseHoras >= maxHoras;
+  }
+
+  window.openMotorActionSheet = function(mode) {
+    if (isMotorServiceCompleted()) {
+      showSnackbar('Horas completadas. Registra el cambio de aceite para continuar.', 'warning');
+      return;
+    }
+    window.switchMotorSessionMode(mode);
+    const scrim = document.getElementById('motor-action-scrim');
+    const sheet = document.getElementById('motor-action-sheet');
+    if (!scrim || !sheet) return;
+    requestAnimationFrame(() => {
+      scrim.classList.add('open');
+      sheet.classList.add('open');
+    });
+  };
+
+  window.closeMotorActionSheet = function() {
+    const scrim = document.getElementById('motor-action-scrim');
+    const sheet = document.getElementById('motor-action-sheet');
+    if (scrim) scrim.classList.remove('open');
+    if (sheet) sheet.classList.remove('open');
+    document.getElementById('seg-btn-live')?.classList.remove('active');
+    document.getElementById('seg-btn-manual')?.classList.remove('active');
+    if (isRunning || savedElapsed > 0) {
+      window._updateLivePreview?.();
+    } else {
+      window._resetOilBarPreview?.();
+    }
+  };
+
+  document.getElementById('motor-action-scrim')?.addEventListener('click', window.closeMotorActionSheet);
+  document.getElementById('motor-action-sheet-close')?.addEventListener('click', window.closeMotorActionSheet);
 
   // Cargar estado guardado del cronómetro
   const savedState = JSON.parse(localStorage.getItem(`motor_v2_timer_${motorId}`));
@@ -836,7 +1074,19 @@ export function initDetalleMotor(motorId) {
         }
       }
     }
+    const actionSheet = document.getElementById('motor-action-sheet');
+    const panelManual = document.getElementById('panel-session-manual');
+    const isManualOpen = actionSheet?.classList.contains('open') && panelManual?.style.display !== 'none';
+    if (!isManualOpen && (isRunning || total > 0)) {
+      updateOilBarPreview(total / 3600000, total);
+    }
   }
+
+  window._updateLivePreview = () => {
+    let total = savedElapsed;
+    if (isRunning) total += (Date.now() - lastStartTime);
+    updateOilBarPreview(total / 3600000, total);
+  };
 
   function updateButtons() {
     const initialCtrl = document.getElementById('timer-initial-controls');
@@ -868,13 +1118,18 @@ export function initDetalleMotor(motorId) {
   }
 
   function resumeTimer() {
+    if (window._motorTimerInterval) clearInterval(window._motorTimerInterval);
     isRunning = true;
     updateButtons();
-    timerInterval = setInterval(updateDisplay, 1000);
+    window._motorTimerInterval = setInterval(updateDisplay, 1000);
   }
 
   if (btnStart) {
     btnStart.onclick = () => {
+      if (isMotorServiceCompleted()) {
+        showSnackbar('Horas completadas. Registra el cambio de aceite para continuar.', 'warning');
+        return;
+      }
       lastStartTime = Date.now();
       resumeTimer();
       saveLocalState();
@@ -885,7 +1140,10 @@ export function initDetalleMotor(motorId) {
   if (btnPause) {
     btnPause.onclick = () => {
       if (isRunning) {
-        clearInterval(timerInterval);
+        if (window._motorTimerInterval) {
+          clearInterval(window._motorTimerInterval);
+          window._motorTimerInterval = null;
+        }
         savedElapsed += (Date.now() - lastStartTime);
         isRunning = false;
       } else {
@@ -902,59 +1160,207 @@ export function initDetalleMotor(motorId) {
     btnFinish.onclick = async () => {
       let finalElapsed = savedElapsed;
       if (isRunning) finalElapsed += (Date.now() - lastStartTime);
-      
+
+      // Detener inmediatamente el contador en todos lados
+      if (window._motorTimerInterval) {
+        clearInterval(window._motorTimerInterval);
+        window._motorTimerInterval = null;
+      }
+      isRunning = false;
+      savedElapsed = 0;
+      localStorage.removeItem(`motor_v2_timer_${motorId}`);
+      updateDisplay();
+      updateButtons();
+      updateOilBarPreview(0);
+
       const mins = Math.round(finalElapsed / (1000 * 60));
       if (mins < 1) {
-         showSnackbar('La sesión es muy corta para registrar.', 'warning');
-         resetTimer();
-         return;
+        showSnackbar('La sesión es muy corta para registrar.', 'warning');
+        await resetTimer();
+        return;
       }
 
-      const dInicio = new Date(Date.now() - finalElapsed);
-      const dFin = new Date();
-      const format12 = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      btnFinish.disabled = true;
+      try {
+        const dInicio = new Date(Date.now() - finalElapsed);
+        const dFin = new Date();
+        const format12 = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-      const currentUserName = await getCurrentUserName();
-      await saveSession(motorId, mins, null, format12(dInicio), format12(dFin), currentUserName);
-      resetTimer();
+        const currentUserName = await getCurrentUserName();
+        await saveSession(motorId, mins, null, format12(dInicio), format12(dFin), currentUserName);
+      } finally {
+        btnFinish.disabled = false;
+      }
+      await resetTimer();
     };
   }
 
-  function resetTimer() {
-    clearInterval(timerInterval);
+  async function resetTimer() {
+    if (window._motorTimerInterval) {
+      clearInterval(window._motorTimerInterval);
+      window._motorTimerInterval = null;
+    }
     localStorage.removeItem(`motor_v2_timer_${motorId}`);
     savedElapsed = 0;
     isRunning = false;
-    window.clearScreenCache?.('detalle_motor');
-    window.navigateTo('detalle_motor', motorId);
+    updateDisplay();
+    updateButtons();
+    updateOilBarPreview(0);
+    window.closeMotorActionSheet?.();
+    await reloadDetalleSinParpadeo(motorId);
   }
 
   // --- Registro Manual ---
   const manualDate = document.getElementById('input-manual-date');
   const manualStart = document.getElementById('input-manual-start');
   const manualEnd = document.getElementById('input-manual-end');
+  const manualHours = document.getElementById('input-manual-hours');
+  const manualTimeInputs = document.getElementById('manual-time-inputs');
+  const manualHoursInputs = document.getElementById('manual-hours-inputs');
+  const btnModeTime = document.getElementById('btn-manual-mode-time');
+  const btnModeHours = document.getElementById('btn-manual-mode-hours');
+  const btnFillRemaining = document.getElementById('btn-fill-remaining-hours');
   const calcResult = document.getElementById('calc-manual-result');
+  const calcProjection = document.getElementById('calc-manual-projection');
+  const oilPctLabel = document.getElementById('motor-oil-pct-label');
+  const oilBarPreview = document.getElementById('motor-oil-bar-preview');
   const btnSaveManual = document.getElementById('btn-save-manual');
+  let manualMode = 'time';
+
+  function updateOilBarPreview(addedHoras, liveElapsedMs = null) {
+    const baseHoras = parseFloat(window._currentMotorData?.horas) || 0;
+    const maxHoras = window._currentMotorHasPrevMant ? (window._currentMotorData?.max_horas || 100) : 80;
+    const basePct = baseHoras > 0 ? Math.min(100, Math.max(1, Math.round((baseHoras / maxHoras) * 100))) : 0;
+    const projPct = (baseHoras + addedHoras) > 0 ? Math.min(100, Math.max(1, Math.round(((baseHoras + addedHoras) / maxHoras) * 100))) : 0;
+    const deltaPct = Math.max(0, projPct - basePct);
+    const basePctExact = Math.min(100, (baseHoras / maxHoras) * 100);
+    const projPctExact = Math.min(100, ((baseHoras + addedHoras) / maxHoras) * 100);
+    const deltaPctExact = Math.max(0, projPctExact - basePctExact);
+    const completesService = projPct >= 95;
+
+    ['motor', 'manual', 'live'].forEach((prefix) => {
+      const barPreview = document.getElementById(`${prefix}-oil-bar-preview`);
+      const pctLabel = document.getElementById(`${prefix}-oil-pct-label`);
+      const hoursLabel = document.getElementById(`${prefix}-oil-hours-label`);
+      if (barPreview) {
+        barPreview.style.width = addedHoras > 0 ? `${deltaPctExact.toFixed(3)}%` : '0%';
+        barPreview.style.minWidth = addedHoras > 0 ? '4px' : '0px';
+      }
+      if (pctLabel) {
+        if (addedHoras > 0 && deltaPct > 0) {
+          pctLabel.innerHTML = `${basePct}% <span style="color: #ea580c;">→ ${projPct}%</span>`;
+        } else {
+          pctLabel.textContent = `${basePct}%`;
+        }
+      }
+      if (hoursLabel) {
+        if (addedHoras > 0) {
+          hoursLabel.innerHTML = `${baseHoras.toFixed(1)}h <span style="color: #ea580c;">+ ${addedHoras.toFixed(2)}h</span> / ${maxHoras}h`;
+        } else {
+          hoursLabel.textContent = `${baseHoras.toFixed(1)}h / ${maxHoras}h`;
+        }
+      }
+
+      const limitPill = document.getElementById(`${prefix}-pill-limit`);
+      const limitIcon = document.getElementById(`${prefix}-pill-limit-icon`);
+      const limitVal = document.getElementById(`${prefix}-pill-limit-val`);
+      const limitLbl = document.getElementById(`${prefix}-pill-limit-lbl`);
+      if (limitPill) {
+        limitPill.style.background = completesService ? '#fff4ed' : '';
+        limitPill.style.borderColor = completesService ? '#fdba74' : '';
+      }
+      if (limitIcon) {
+        limitIcon.style.background = completesService ? '#ffedd5' : '';
+        limitIcon.style.color = completesService ? '#ea580c' : '';
+        limitIcon.style.borderColor = completesService ? '#fdba74' : '';
+      }
+      if (limitVal) limitVal.style.color = completesService ? '#c2410c' : '';
+      if (limitLbl) limitLbl.style.color = completesService ? '#ea580c' : '';
+    });
+
+    const usoVal = document.getElementById('motor-oil-uso-val');
+    if (usoVal) {
+      if (liveElapsedMs && liveElapsedMs > 0) {
+        usoVal.innerHTML = `${baseHoras.toFixed(1)}h <span style="color: #ea580c;">(+${formatTime(liveElapsedMs)})</span>`;
+      } else if (addedHoras > 0) {
+        usoVal.innerHTML = `${baseHoras.toFixed(1)}h <span style="color: #ea580c;">+${addedHoras.toFixed(1)}h</span>`;
+      } else {
+        usoVal.textContent = `${baseHoras.toFixed(1)}h`;
+      }
+    }
+  }
+
+  window._resetOilBarPreview = () => updateOilBarPreview(0);
 
   function calculateManual() {
-    if (!manualStart || !manualEnd || !calcResult) return 0;
-    const to24 = (t12) => {
-      const parts = (t12 || '').trim().split(' ');
-      if (!parts[0]) return 0;
-      let [h, m] = parts[0].split(':').map(Number);
-      h = h || 0;
-      m = m || 0;
-      const suffix = parts[1] || 'AM';
-      if (suffix === 'PM' && h !== 12) h += 12;
-      if (suffix === 'AM' && h === 12) h = 0;
-      return h * 60 + m;
+    if (!calcResult) return 0;
+    let mins = 0;
+    if (manualMode === 'hours') {
+      const hrs = parseFloat(manualHours?.value || '0');
+      mins = Number.isFinite(hrs) && hrs > 0 ? Math.round(hrs * 60) : 0;
+    } else if (manualStart && manualEnd) {
+      const to24 = (t12) => {
+        const parts = (t12 || '').trim().split(' ');
+        if (!parts[0]) return 0;
+        let [h, m] = parts[0].split(':').map(Number);
+        h = h || 0;
+        m = m || 0;
+        const suffix = parts[1] || 'AM';
+        if (suffix === 'PM' && h !== 12) h += 12;
+        if (suffix === 'AM' && h === 12) h = 0;
+        return h * 60 + m;
+      };
+      const startMins = to24(manualStart.value);
+      const endMins = to24(manualEnd.value);
+      let diff = endMins - startMins;
+      if (diff < 0) diff += 1440;
+      mins = diff;
+    }
+    calcResult.textContent = `${Math.floor(mins / 60)}h ${(mins % 60).toString().padStart(2, '0')}m`;
+
+    const baseHoras = parseFloat(window._currentMotorData?.horas) || 0;
+    const maxHoras = window._currentMotorHasPrevMant ? (window._currentMotorData?.max_horas || 100) : 80;
+    const addedHoras = mins / 60;
+    const totalProj = Math.round((baseHoras + addedHoras) * 10) / 10;
+    const projPct = Math.min(100, Math.round((totalProj / maxHoras) * 100));
+    if (calcProjection) {
+      calcProjection.textContent = `${baseHoras.toFixed(1)}h registradas + ${addedHoras.toFixed(1)}h = ${totalProj.toFixed(1)}h / ${maxHoras}h (${projPct}%)`;
+    }
+    const panelManual = document.getElementById('panel-session-manual');
+    if (panelManual && panelManual.style.display !== 'none') {
+      updateOilBarPreview(addedHoras);
+    }
+    return mins;
+  }
+
+  window._updateManualPreview = calculateManual;
+
+  function setManualMode(mode) {
+    manualMode = mode;
+    const isHours = mode === 'hours';
+    if (manualTimeInputs) manualTimeInputs.style.display = isHours ? 'none' : 'grid';
+    if (manualHoursInputs) manualHoursInputs.style.display = isHours ? 'flex' : 'none';
+    if (btnModeTime) {
+      btnModeTime.style.background = isHours ? 'transparent' : '#2d3e2c';
+      btnModeTime.style.color = isHours ? '#455a43' : '#ffffff';
+    }
+    if (btnModeHours) {
+      btnModeHours.style.background = isHours ? '#2d3e2c' : 'transparent';
+      btnModeHours.style.color = isHours ? '#ffffff' : '#455a43';
+    }
+    calculateManual();
+  }
+
+  if (btnModeTime) btnModeTime.onclick = () => setManualMode('time');
+  if (btnModeHours) btnModeHours.onclick = () => setManualMode('hours');
+  if (manualHours) manualHours.oninput = () => calculateManual();
+
+  if (btnFillRemaining) {
+    btnFillRemaining.onclick = () => {
+      if (!manualHours) return;
+      manualHours.value = btnFillRemaining.dataset.hours || '1';
+      calculateManual();
     };
-    const startMins = to24(manualStart.value);
-    const endMins = to24(manualEnd.value);
-    let diff = endMins - startMins;
-    if (diff < 0) diff += 1440;
-    calcResult.textContent = `${Math.floor(diff / 60)}h ${(diff % 60).toString().padStart(2, '0')}m`;
-    return diff;
   }
 
   // Integración con M3 Pickers
@@ -973,13 +1379,22 @@ export function initDetalleMotor(motorId) {
 
   if (btnSaveManual) {
     btnSaveManual.onclick = async () => {
+      if (isMotorServiceCompleted()) {
+        showSnackbar('Horas completadas. Registra el cambio de aceite para continuar.', 'warning');
+        return;
+      }
       const mins = calculateManual();
+      if (mins <= 0) {
+        showSnackbar('Ingresa una duración válida mayor a 0', 'error');
+        return;
+      }
       btnSaveManual.disabled = true;
       btnSaveManual.innerHTML = `<span class="material-symbols-outlined animate-spin" style="font-size:18px;">sync</span> Guardando...`;
       const currentUserName = await getCurrentUserName();
-      await saveSession(motorId, mins, manualDate.value, manualStart.value, manualEnd.value, currentUserName);
-      window.clearScreenCache?.('detalle_motor');
-      window.navigateTo('detalle_motor', motorId);
+      const hInicio = manualMode === 'hours' ? null : manualStart.value;
+      const hFin = manualMode === 'hours' ? null : manualEnd.value;
+      await saveSession(motorId, mins, manualDate.value, hInicio, hFin, currentUserName);
+      await reloadDetalleSinParpadeo(motorId);
     };
   }
 
@@ -997,8 +1412,7 @@ export function initDetalleMotor(motorId) {
       if (confirm('¿Deseas eliminar este registro de mantenimiento?')) {
         const id = btn.dataset.id;
         await supabase.from('motor_mantenimientos').delete().eq('id', id);
-        window.clearScreenCache?.('detalle_motor');
-        window.navigateTo('detalle_motor', motorId);
+        await reloadDetalleSinParpadeo(motorId);
       }
     };
   });
@@ -1007,7 +1421,7 @@ export function initDetalleMotor(motorId) {
   const sheet = document.getElementById('motor-session-sheet');
   const scrim = document.getElementById('motor-sheet-scrim');
 
-  document.querySelectorAll('.motor-session-card').forEach(card => {
+  document.querySelectorAll('.motor-session-card[data-session-idx]').forEach(card => {
     card.onclick = () => {
       const idx = parseInt(card.dataset.sessionIdx, 10);
       const session = window._currentMotorSesiones?.[idx];
@@ -1041,7 +1455,7 @@ function showMotorSessionDetailSheet(s, motor, sheet, scrim, opMap = {}) {
   const horoFinal = parseFloat(s.total_horas) || horasSumadas;
   const horoInicial = Math.max(0, Math.round((horoFinal - horasSumadas) * 10) / 10);
 
-  const maxHoras = motor.max_horas || 100;
+  const maxHoras = window._currentMotorHasPrevMant ? (motor.max_horas || 100) : 80;
   const impactPct = maxHoras > 0 ? Math.min(100, Math.round((horasSumadas / maxHoras) * 100)) : 0;
   const horoFinalPct = maxHoras > 0 ? Math.min(100, Math.round((horoFinal / maxHoras) * 100)) : 0;
 
@@ -1151,7 +1565,7 @@ function showMotorSessionDetailSheet(s, motor, sheet, scrim, opMap = {}) {
         <div>
           <span style="font-size: 10px; font-weight: 700; color: #6c7e6b; text-transform: uppercase;">Horario de Ejecución</span>
           <div style="font-size: 13px; font-weight: 800; color: #1e3e2b; margin-top: 5px;">
-            ${s.hora_inicio || '--:--'} a ${s.hora_fin || '--:--'}
+            ${s.hora_inicio && s.hora_fin ? `${s.hora_inicio} a ${s.hora_fin}` : 'Registro directo por horas'}
           </div>
         </div>
 
@@ -1222,6 +1636,8 @@ async function saveSession(motorId, mins, customDate = null, horaInicio = null, 
 }
 
 async function reloadDetalleSinParpadeo(motorId) {
+  window.clearScreenCache?.('motores');
+  window.refreshMotoresList?.();
   const currentScreen = document.querySelector('.screen-detalle-motor');
   if (currentScreen && currentScreen.parentElement) {
     const parent = currentScreen.parentElement;
@@ -1229,39 +1645,265 @@ async function reloadDetalleSinParpadeo(motorId) {
     parent.innerHTML = html;
     initDetalleMotor(motorId);
   } else {
-    window.clearScreenCache?.('detalle_motor');
-    window.navigateTo('detalle_motor', motorId);
+    await reloadDetalleSinParpadeo(motorId);
   }
 }
 
 function registerOilChange(motorId) {
-  window.Snackbar.confirm(
-    '¿Confirmas registrar un cambio de aceite? Esto guardará el historial y reiniciará el contador de horas a 0.',
-    async () => {
-      try {
-        const { data: motor } = await supabase.from('motores').select('horas').eq('id', motorId).single();
-        const { data: sesiones } = await supabase.from('motor_sesiones').select('*').eq('motor_id', motorId);
-        
-        await supabase.from('motor_mantenimientos').insert({
-          motor_id: motorId,
-          titulo: 'Cambio de Aceite',
-          descripcion: 'Mantenimiento preventivo.',
-          fecha: new Date().toISOString(),
-          icon: 'oil_barrel',
-          color: '#ff4103',
-          total_horas: motor.horas || 0,
-          historial_sesiones: sesiones || []
-        });
-        
-        await supabase.from('motores').update({ horas: 0 }).eq('id', motorId);
-        await supabase.from('motor_sesiones').delete().eq('motor_id', motorId);
-        
-        window.Snackbar.show('Cambio de aceite registrado');
-        await reloadDetalleSinParpadeo(motorId);
-      } catch (err) {
-        console.error(err);
-        window.Snackbar.show('Error: ' + err.message, { type: 'error' });
-      }
+  document.getElementById('motor-oil-confirm-scrim')?.remove();
+  document.getElementById('motor-oil-confirm-sheet')?.remove();
+
+  const motorNombre = (window._currentMotorData?.nombre || 'este equipo')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const scrim = document.createElement('div');
+  scrim.id = 'motor-oil-confirm-scrim';
+  scrim.className = 'motor-sheet-scrim';
+  scrim.setAttribute('data-motor-portal', '1');
+  scrim.style.zIndex = '100005';
+
+  const sheet = document.createElement('div');
+  sheet.id = 'motor-oil-confirm-sheet';
+  sheet.className = 'motor-session-sheet';
+  sheet.setAttribute('data-motor-portal', '1');
+  sheet.style.zIndex = '100006';
+  sheet.innerHTML = `
+    <div style="width: 38px; height: 4px; background: #d0d7cf; border-radius: 9999px; margin: 4px auto 14px;"></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+      <span style="font-size: 16.5px; font-weight: 800; color: #1e3e2b;">Confirmar Cambio de Aceite</span>
+      <button type="button" id="btn-oil-sheet-close" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid #dce5da; background: #ffffff; color: #2d3e2c; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
+      </button>
+    </div>
+    <div style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; background: #fff4ed; border: 1px solid #fdba74; border-radius: 14px; margin-bottom: 18px;">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: #ffedd5; color: #ea580c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <span class="material-symbols-outlined" style="font-size: 22px;">oil_barrel</span>
+      </div>
+      <p style="margin: 0; font-size: 13.5px; font-weight: 600; color: #431407; line-height: 1.45;">
+        ¿Confirmar un cambio de aceite para <strong>${motorNombre}</strong>? Esto guardará el historial y reiniciará el contador de horas a 0.
+      </p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button type="button" id="btn-oil-sheet-cancel" class="press-effect" style="flex: 1; padding: 13px 16px; border-radius: 9999px; border: 1.5px solid #dce5da; background: #eef3ed; color: #2d3e2c; font-size: 14px; font-weight: 800; cursor: pointer;">
+        Cancelar
+      </button>
+      <button type="button" id="btn-oil-sheet-confirm" class="press-effect" style="flex: 1; padding: 13px 16px; border-radius: 9999px; border: none; background: #ff4103; color: #ffffff; font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(255, 65, 3, 0.25);">
+        <span>Confirmar</span>
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(scrim);
+  document.body.appendChild(sheet);
+
+  const closeOilSheet = () => {
+    scrim.classList.remove('open');
+    sheet.classList.remove('open');
+    setTimeout(() => {
+      scrim.remove();
+      sheet.remove();
+    }, 320);
+  };
+
+  requestAnimationFrame(() => {
+    scrim.classList.add('open');
+    sheet.classList.add('open');
+  });
+
+  scrim.onclick = closeOilSheet;
+  sheet.querySelector('#btn-oil-sheet-close').onclick = closeOilSheet;
+  sheet.querySelector('#btn-oil-sheet-cancel').onclick = closeOilSheet;
+
+  const confirmBtn = sheet.querySelector('#btn-oil-sheet-confirm');
+  confirmBtn.onclick = async () => {
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `<span class="material-symbols-outlined animate-spin" style="font-size: 18px;">sync</span><span>Guardando...</span>`;
+    try {
+      const { data: motor } = await supabase.from('motores').select('horas').eq('id', motorId).single();
+      const { data: sesiones } = await supabase.from('motor_sesiones').select('*').eq('motor_id', motorId);
+
+      await supabase.from('motor_mantenimientos').insert({
+        motor_id: motorId,
+        titulo: 'Cambio de Aceite',
+        descripcion: 'Mantenimiento preventivo.',
+        fecha: new Date().toISOString(),
+        icon: 'oil_barrel',
+        color: '#ff4103',
+        total_horas: motor.horas || 0,
+        historial_sesiones: sesiones || []
+      });
+
+      await supabase.from('motores').update({ horas: 0 }).eq('id', motorId);
+      await supabase.from('motor_sesiones').delete().eq('motor_id', motorId);
+
+      closeOilSheet();
+      window.Snackbar.show('Cambio de aceite registrado');
+      await reloadDetalleSinParpadeo(motorId);
+    } catch (err) {
+      console.error(err);
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<span>Confirmar</span>`;
+      window.Snackbar.show('Error: ' + err.message, { type: 'error' });
     }
-  );
+  };
 }
+
+window.openMotorMantDetailSheet = (mantId) => {
+  const mants = window._currentMotorMants || [];
+  const mant = mants.find(item => String(item.id) === String(mantId));
+  if (!mant) return;
+
+  const opMap = window._currentOperadorNombreMap || {};
+  const fallbackUser = window._currentUserName || 'Operador';
+  const motorNombre = window._currentMotorData?.nombre || 'Equipo';
+
+  let scrim = document.getElementById('motor-mant-detail-scrim');
+  let sheet = document.getElementById('motor-mant-detail-sheet');
+  if (scrim) scrim.remove();
+  if (sheet) sheet.remove();
+
+  scrim = document.createElement('div');
+  scrim.id = 'motor-mant-detail-scrim';
+  scrim.className = 'motor-sheet-scrim';
+  scrim.setAttribute('data-motor-portal', '1');
+  scrim.style.zIndex = '100005';
+
+  sheet = document.createElement('div');
+  sheet.id = 'motor-mant-detail-sheet';
+  sheet.className = 'motor-session-sheet';
+  sheet.setAttribute('data-motor-portal', '1');
+  sheet.style.zIndex = '100006';
+
+  const closeMantSheet = () => {
+    scrim.classList.remove('open');
+    sheet.classList.remove('open');
+    setTimeout(() => {
+      scrim.remove();
+      sheet.remove();
+    }, 260);
+  };
+
+  const fechaMant = mant.fecha
+    ? new Date(mant.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+    : 'Sin fecha';
+
+  const rawSesiones = Array.isArray(mant.historial_sesiones) ? [...mant.historial_sesiones] : [];
+  rawSesiones.sort((a, b) => new Date(b.fecha || b.created_at || 0) - new Date(a.fecha || a.created_at || 0));
+
+  const sesionesHtml = rawSesiones.length > 0
+    ? rawSesiones.map((s) => {
+        const rawOp = s.operador || '';
+        const opName = rawOp.includes('@')
+          ? (opMap[rawOp] || rawOp.split('@')[0])
+          : (rawOp || fallbackUser);
+        const opInitials = getInitials(opName);
+
+        const d = s.fecha ? new Date(s.fecha) : (s.created_at ? new Date(s.created_at) : null);
+        const fechaFormateada = d && !isNaN(d.getTime())
+          ? d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+          : 'Fecha no registrada';
+
+        const durMins = s.duracion_mins || (s.horas ? Math.round(parseFloat(s.horas) * 60) : (s.total_horas ? Math.round(parseFloat(s.total_horas) * 60) : 0));
+        const durH = Math.floor(durMins / 60);
+        const durM = durMins % 60;
+        const duracionTexto = durH > 0 ? (durM > 0 ? `${durH}h ${durM}m` : `${durH}h`) : `${durM}m`;
+
+        const horasRegistradas = s.horas != null
+          ? (Math.round(parseFloat(s.horas) * 100) / 100)
+          : (Math.round((durMins / 60) * 100) / 100);
+
+        const horaInicio = s.hora_inicio ? String(s.hora_inicio).slice(0, 5) : '';
+        const horaFin = s.hora_fin ? String(s.hora_fin).slice(0, 5) : '';
+        const rangoHorario = horaInicio && horaFin ? `${horaInicio} – ${horaFin}` : (horaInicio || '');
+        const isLive = s.modo === 'live';
+
+        return `
+          <div style="background: #f8fbf7; border: 1px solid #e1e9df; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <div style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 9999px; background: ${isLive ? '#eef7ee' : '#eef2ec'}; color: ${isLive ? '#2e7d32' : '#455a43'}; font-size: 11px; font-weight: 700;">
+                <span class="material-symbols-outlined" style="font-size: 14px;">${isLive ? 'timer' : 'edit_calendar'}</span>
+                <span>${isLive ? 'Cronómetro' : 'Manual'}</span>
+              </div>
+              <span style="font-size: 12px; font-weight: 700; color: #5a7056;">${fechaFormateada}</span>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <div style="display: flex; align-items: baseline; gap: 6px;">
+                <span style="font-size: 18px; font-weight: 800; color: #192b18;">+${horasRegistradas}h</span>
+                <span style="font-size: 12px; font-weight: 600; color: #5a7056;">(${duracionTexto})</span>
+              </div>
+              ${rangoHorario ? `
+                <span style="font-size: 12px; font-weight: 600; color: #455a43; display: inline-flex; align-items: center; gap: 4px;">
+                  <span class="material-symbols-outlined" style="font-size: 14px;">schedule</span>
+                  ${rangoHorario}
+                </span>
+              ` : ''}
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed #dce5da;">
+              <div style="width: 26px; height: 26px; border-radius: 50%; background: #2d3e2c; color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                ${opInitials}
+              </div>
+              <div style="font-size: 12.5px; font-weight: 700; color: #2d3e2c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${opName}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')
+    : `
+      <div style="text-align: center; padding: 28px 16px; background: #f8fbf7; border-radius: 14px; border: 1px dashed #cdd9cb; color: #6a7b68;">
+        <span class="material-symbols-outlined" style="font-size: 30px; opacity: 0.7; margin-bottom: 6px;">history</span>
+        <p style="margin: 0; font-size: 13px; font-weight: 600;">No hay sesiones detalladas guardadas en este mantenimiento.</p>
+      </div>
+    `;
+
+  sheet.innerHTML = `
+    <div style="width: 38px; height: 4px; background: #d0d7ce; border-radius: 9999px; margin: 0 auto 14px;"></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px;">
+      <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+        <div style="width: 40px; height: 40px; border-radius: 12px; background: #eef3ed; color: #ff4103; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <span class="material-symbols-outlined" style="font-size: 22px;">oil_barrel</span>
+        </div>
+        <div style="min-width: 0;">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #192b18; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mant.titulo || 'Cambio de Aceite'}</h3>
+          <p style="margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #5a7056;">${motorNombre} · ${fechaMant}</p>
+        </div>
+      </div>
+      <button type="button" id="btn-mant-detail-close" class="press-effect" style="width: 34px; height: 34px; border-radius: 50%; border: none; background: #f0f3ef; color: #444; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
+        <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;">
+      <div style="background: #f3f7f2; border-radius: 12px; padding: 10px 12px;">
+        <div style="font-size: 10px; font-weight: 700; color: #5a7056; text-transform: uppercase;">Total acumulado</div>
+        <div style="font-size: 18px; font-weight: 800; color: #192b18; margin-top: 2px;">${mant.total_horas || 0}h</div>
+      </div>
+      <div style="background: #f3f7f2; border-radius: 12px; padding: 10px 12px;">
+        <div style="font-size: 10px; font-weight: 700; color: #5a7056; text-transform: uppercase;">Sesiones registradas</div>
+        <div style="font-size: 18px; font-weight: 800; color: #192b18; margin-top: 2px;">${rawSesiones.length}</div>
+      </div>
+    </div>
+
+    <div style="font-size: 12px; font-weight: 800; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;">
+      Historial de horas y operarios
+    </div>
+    <div style="max-height: 46vh; overflow-y: auto; padding-right: 2px;">
+      ${sesionesHtml}
+    </div>
+  `;
+
+  document.body.appendChild(scrim);
+  document.body.appendChild(sheet);
+
+  requestAnimationFrame(() => {
+    scrim.classList.add('open');
+    sheet.classList.add('open');
+  });
+
+  scrim.onclick = closeMantSheet;
+  sheet.querySelector('#btn-mant-detail-close').onclick = closeMantSheet;
+};

@@ -517,7 +517,38 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
       </div>
     `).join('') : '<p style="font-size: 12.5px; color: #888; margin: 0;">Sin pesajes adicionales</p>';
 
-    const edadStr = calcEdad(a.fecha_nacimiento);
+    const formatEdadAnimal = (fechaStr) => {
+      if (!fechaStr) return '';
+      const d = new Date(fechaStr.includes('T') ? fechaStr : fechaStr + 'T00:00:00');
+      if (isNaN(d.getTime())) return '';
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((now - d) / 86400000);
+      if (diffDays < 0) return '';
+      if (diffDays <= 1) return '1 día';
+      if (diffDays < 30) return `${diffDays} días`;
+
+      let anios = now.getFullYear() - d.getFullYear();
+      let meses = now.getMonth() - d.getMonth();
+      let dias = now.getDate() - d.getDate();
+      if (dias < 0) {
+        meses -= 1;
+        dias += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+      }
+      if (meses < 0) {
+        anios -= 1;
+        meses += 12;
+      }
+      if (anios <= 0) {
+        const m = Math.max(1, meses);
+        return dias > 0 ? `${m} ${m === 1 ? 'mes' : 'meses'}, ${dias} d` : `${m} ${m === 1 ? 'mes' : 'meses'}`;
+      }
+      if (meses > 0 && dias > 0) return `${anios} ${anios === 1 ? 'año' : 'años'}, ${meses} m, ${dias} d`;
+      if (meses > 0) return `${anios} ${anios === 1 ? 'año' : 'años'}, ${meses} m`;
+      if (dias > 0) return `${anios} ${anios === 1 ? 'año' : 'años'}, ${dias} d`;
+      return `${anios} ${anios === 1 ? 'año' : 'años'}`;
+    };
+    const edadDisplay = formatEdadAnimal(a.fecha_nacimiento || a.fecha_adquisicion || a.created_at) || calcEdad(a.fecha_nacimiento);
 
     // Pending (Programada) vacunas & fumigaciones
     const todayStr = getLocalToday();
@@ -760,6 +791,8 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
 
     const vacunasSummary = buildTreatmentSummary(vacunas);
     const fumigSummary = buildTreatmentSummary(fumigaciones);
+    const animalSeed = encodeURIComponent(a.nombre || a.id || 'animal');
+    const animalImgUrl = a.image_url || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${animalSeed}&backgroundColor=f0ebe3&radius=16`;
 
     // Populating detailsContainer
     detailsContainer.innerHTML = `
@@ -771,14 +804,16 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
             <span>Ficha de Identificación</span>
           </div>
         </div>
-        <div class="sheet-detail-grid">
+        <div class="sheet-ficha-content">
+          <img class="sheet-ficha-photo" src="${escapeHtml(animalImgUrl)}" alt="${escapeHtml(a.nombre || 'Animal')}">
+          <div class="sheet-detail-grid" style="flex: 1; min-width: 0;">
           <div class="sheet-detail-item">
             <span class="sheet-detail-label">Fecha de Registro</span>
             <span class="sheet-detail-value">${formatFecha(a.created_at)}</span>
           </div>
           <div class="sheet-detail-item">
-            <span class="sheet-detail-label">Fecha Nacimiento</span>
-            <span class="sheet-detail-value">${formatFecha(a.fecha_nacimiento)}${edadStr ? ` <small style="font-weight:500;color:#666;">(${edadStr})</small>` : ''}</span>
+            <span class="sheet-detail-label">Edad</span>
+            <span class="sheet-detail-value">${edadDisplay ? `${escapeHtml(edadDisplay)}${a.fecha_nacimiento ? ` <small style="font-weight:500;color:#666;">(${formatFecha(a.fecha_nacimiento)})</small>` : ''}` : 'No registrada'}</span>
           </div>
           <div class="sheet-detail-item">
             <span class="sheet-detail-label">Sexo / Raza</span>
@@ -802,6 +837,7 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
               <span class="sheet-detail-value" style="font-weight: 500; font-size: 12.5px; color: #444;">${escapeHtml(a.observaciones)}</span>
             </div>
           ` : ''}
+          </div>
         </div>
       </div>
 

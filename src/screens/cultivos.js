@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { getPaginationFooterHtml } from '../pagination.js';
+import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
 
 let currentCultivosPage = 1;
 let totalCultivosCount = 0;
@@ -118,24 +119,25 @@ export async function renderCultivos() {
 
       <!-- Search -->
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
-        <div class="ganado-split-ctrl ${currentCultivosSearchQuery ? 'expanded' : ''}" id="cultivos-search-wrapper">
-          <button id="cultivos-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
-            <span class="material-icons" style="color: #ffffff;">search</span>
-          </button>
-          <input type="text" id="cultivos-search-input" placeholder="Buscar por tipo..." value="${currentCultivosSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentCultivosSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentCultivosSearchQuery ? '1' : '0'}; padding: ${currentCultivosSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
-          <button id="cultivos-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentCultivosSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
-            <span class="material-icons" style="font-size: 20px;">close</span>
-          </button>
-          <span class="ganado-split-ctrl-sep"></span>
-          <button class="ganado-split-ctrl-reg" onclick="window.toggleCultivosSplitMenu(event)" title="Más opciones">
-            <span class="material-icons">arrow_drop_down</span>
-          </button>
-          <div class="ganado-split-menu" id="cultivos-split-menu">
-            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_cultivo'); document.getElementById('cultivos-split-menu').classList.remove('open');">
-              <span class="material-icons">add</span><span>Registrar cultivo</span>
+        ${renderM3SearchBar({
+          wrapperId: 'cultivos-search-wrapper',
+          toggleId: 'cultivos-search-toggle',
+          inputId: 'cultivos-search-input',
+          clearId: 'cultivos-search-clear',
+          placeholder: 'Buscar por tipo...',
+          value: currentCultivosSearchQuery,
+          extraHtml: `
+            <span class="ganado-split-ctrl-sep"></span>
+            <button class="ganado-split-ctrl-reg" onclick="window.toggleCultivosSplitMenu(event)" title="Más opciones">
+              <span class="material-icons">arrow_drop_down</span>
             </button>
-          </div>
-        </div>
+            <div class="ganado-split-menu" id="cultivos-split-menu">
+              <button class="ganado-split-item" onclick="window.navigateTo('nuevo_cultivo'); document.getElementById('cultivos-split-menu').classList.remove('open');">
+                <span class="material-icons">add</span><span>Registrar cultivo</span>
+              </button>
+            </div>
+          `
+        })}
       </div>
 
       <!-- Page Title -->
@@ -234,44 +236,48 @@ export function initCultivos() {
     if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
   });
 
-  // Search logic
-  const searchToggle  = document.getElementById('cultivos-search-toggle');
-  const searchWrapper = document.getElementById('cultivos-search-wrapper');
-  const searchInput   = document.getElementById('cultivos-search-input');
-  const searchClear   = document.getElementById('cultivos-search-clear');
-
-  if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '180px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      }
-    });
-
-    searchClear.addEventListener('click', () => {
-      currentCultivosSearchQuery = '';
-      searchInput.value = '';
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
-      searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
-      window.changeCultivosPage(1);
-    });
-
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      currentCultivosSearchQuery = e.target.value;
-      searchTimeout = setTimeout(() => {
-        window.changeCultivosPage(1);
-      }, 500);
-    });
-  }
+  // Material 3 Full-Screen Search
+  let searchLoteMap = new Map();
+  initM3FullScreenSearch({
+    moduleKey: 'cultivos',
+    toggleId: 'cultivos-search-toggle',
+    inputId: 'cultivos-search-input',
+    clearId: 'cultivos-search-clear',
+    placeholder: 'Buscar por tipo...',
+    ariaLabel: 'Búsqueda de cultivos',
+    suggestedTitle: 'Cultivos sugeridos',
+    emptyLabel: 'cultivos',
+    getQuery: () => currentCultivosSearchQuery,
+    setQuery: (v) => { currentCultivosSearchQuery = v; },
+    onApplySearch: () => window.changeCultivosPage(1),
+    loadItems: async () => {
+      const [cRes, lRes] = await Promise.all([
+        supabase.from('cultivos').select('*').order('created_at', { ascending: false }).range(0, 299),
+        supabase.from('lotes').select('id,nombre')
+      ]);
+      searchLoteMap = new Map((lRes?.data || []).map(l => [l.id, l.nombre]));
+      return cRes?.data || [];
+    },
+    getQuickChips: (items) => {
+      const tipos = Array.from(new Set(items.map(c => (c.tipo || '').trim()).filter(Boolean))).slice(0, 4);
+      return [
+        { label: 'En crecimiento', type: 'filter', value: 'En crecimiento', icon: 'spa' },
+        { label: 'Cosechado', type: 'filter', value: 'Cosechado', icon: 'check_circle' },
+        ...tipos.map(t => ({ label: t, type: 'query', value: t, icon: 'agriculture' }))
+      ];
+    },
+    onFilterChip: (val) => window.changeCultivoEstado(val),
+    filterItems: (items, qLower) => items.filter(c => {
+      const lName = (c.lote_id ? (searchLoteMap.get(c.lote_id) || '') : '').toLowerCase();
+      return (c.tipo || '').toLowerCase().includes(qLower) ||
+        (c.notas || '').toLowerCase().includes(qLower) ||
+        (c.estado_cosecha || '').toLowerCase().includes(qLower) ||
+        lName.includes(qLower);
+    }),
+    renderItem: (c) => renderCultivoRow(c, searchLoteMap),
+    itemSelector: '.ganado-row',
+    getItemTitle: (el) => el.querySelector('.ganado-col-label')?.textContent?.trim() || ''
+  });
 
   window.confirmDeleteCultivo = (id, tipo) => {
     window.Snackbar.confirm(

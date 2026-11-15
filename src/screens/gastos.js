@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { restFetch } from '../auth.js';
+import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
 
 let _allGastos = [];
 let _refs = { lotes: new Map(), ganado: new Map(), herramientas: new Map(), personal: new Map() };
@@ -1363,24 +1364,25 @@ export async function renderGastos() {
     <div class="screen-gastos" style="padding-bottom: 100px;">
       <!-- Barra Superior de Búsqueda y Añadir Rápido -->
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
-        <div class="ganado-split-ctrl ${currentGastosSearchQuery ? 'expanded' : ''}" id="gastos-search-wrapper">
-          <button id="gastos-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
-            <span class="material-icons" style="color: #ffffff;">search</span>
-          </button>
-          <input type="text" id="gastos-search-input" placeholder="Buscar gasto..." value="${currentGastosSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentGastosSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentGastosSearchQuery ? '1' : '0'}; padding: ${currentGastosSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
-          <button id="gastos-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentGastosSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
-            <span class="material-icons" style="font-size: 20px;">close</span>
-          </button>
-          <span class="ganado-split-ctrl-sep"></span>
-          <button class="ganado-split-ctrl-reg" onclick="window.toggleGastosSplitMenu(event)" title="Más opciones">
-            <span class="material-icons">arrow_drop_down</span>
-          </button>
-          <div class="ganado-split-menu" id="gastos-split-menu">
-            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_gasto'); document.getElementById('gastos-split-menu').classList.remove('open');">
-              <span class="material-icons">add</span><span>Registrar gasto</span>
+        ${renderM3SearchBar({
+          wrapperId: 'gastos-search-wrapper',
+          toggleId: 'gastos-search-toggle',
+          inputId: 'gastos-search-input',
+          clearId: 'gastos-search-clear',
+          placeholder: 'Buscar gasto...',
+          value: currentGastosSearchQuery,
+          extraHtml: `
+            <span class="ganado-split-ctrl-sep"></span>
+            <button class="ganado-split-ctrl-reg" onclick="window.toggleGastosSplitMenu(event)" title="Más opciones">
+              <span class="material-icons">arrow_drop_down</span>
             </button>
-          </div>
-        </div>
+            <div class="ganado-split-menu" id="gastos-split-menu">
+              <button class="ganado-split-item" onclick="window.navigateTo('nuevo_gasto'); document.getElementById('gastos-split-menu').classList.remove('open');">
+                <span class="material-icons">add</span><span>Registrar gasto</span>
+              </button>
+            </div>
+          `
+        })}
       </div>
 
       <!-- Título de la Página -->
@@ -1454,44 +1456,42 @@ export async function renderGastos() {
 export function initGastos() {
   renderDonutAndUI();
 
-  // Búsqueda en vivo
-  const searchToggle  = document.getElementById('gastos-search-toggle');
-  const searchWrapper = document.getElementById('gastos-search-wrapper');
-  const searchInput   = document.getElementById('gastos-search-input');
-  const searchClear   = document.getElementById('gastos-search-clear');
-
-  if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '180px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      }
-    });
-
-    searchClear.addEventListener('click', () => {
-      currentGastosSearchQuery = '';
-      searchInput.value = '';
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
-      searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
+  // Material 3 Full-Screen Search
+  initM3FullScreenSearch({
+    moduleKey: 'gastos',
+    toggleId: 'gastos-search-toggle',
+    inputId: 'gastos-search-input',
+    clearId: 'gastos-search-clear',
+    placeholder: 'Buscar gasto...',
+    ariaLabel: 'Búsqueda de gastos',
+    suggestedTitle: 'Gastos recientes',
+    emptyLabel: 'gastos',
+    getQuery: () => currentGastosSearchQuery,
+    setQuery: (v) => { currentGastosSearchQuery = v; },
+    onApplySearch: () => renderDonutAndUI(),
+    loadItems: async () => _allGastos || [],
+    getQuickChips: () => [
+      { label: 'Personal', type: 'filter', value: 'personal', icon: 'groups' },
+      { label: 'Veterinaria', type: 'filter', value: 'veterinaria', icon: 'vaccines' },
+      { label: 'Insumos', type: 'filter', value: 'insumos', icon: 'inventory_2' },
+      { label: 'Maquinaria', type: 'filter', value: 'maquinaria', icon: 'precision_manufacturing' }
+    ],
+    onFilterChip: (cat) => {
+      activeCategory = activeCategory === cat ? 'all' : cat;
       renderDonutAndUI();
-    });
-
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      currentGastosSearchQuery = e.target.value;
-      searchTimeout = setTimeout(() => {
-        renderDonutAndUI();
-      }, 250);
-    });
-  }
+    },
+    filterItems: (items, qLower) => items.filter(g => {
+      const cat = (g.categoria || '').toLowerCase();
+      const desc = (g.descripcion || '').toLowerCase();
+      const sub = (g.subcategoria || '').toLowerCase();
+      const pName = (_refs.personal.get(g.personal_id)?.nombre || '').toLowerCase();
+      const lName = (_refs.lotes.get(g.lote_id)?.nombre || '').toLowerCase();
+      return cat.includes(qLower) || desc.includes(qLower) || sub.includes(qLower) || pName.includes(qLower) || lName.includes(qLower);
+    }),
+    renderItem: (g) => renderGastoRow(g, _refs),
+    itemSelector: '.ganado-row',
+    getItemTitle: (el) => el.querySelector('.ganado-col-value')?.textContent?.trim() || ''
+  });
 
   // Cerrar menú de tres puntos al hacer clic fuera
   const closeMenus = (e) => {

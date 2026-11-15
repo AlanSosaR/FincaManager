@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { getPaginationFooterHtml } from '../pagination.js';
+import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
 
 let currentToolsPage = 1;
 let totalToolsCount = 0;
@@ -94,24 +95,25 @@ export async function renderHerramientas() {
 
       <!-- Search -->
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
-        <div class="ganado-split-ctrl ${currentToolsSearchQuery ? 'expanded' : ''}" id="tools-search-wrapper">
-          <button id="tools-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
-            <span class="material-icons" style="color: #ffffff;">search</span>
-          </button>
-          <input type="text" id="tools-search-input" placeholder="Buscar herramienta..." value="${currentToolsSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentToolsSearchQuery ? '180px' : '0px'}; transition: width 0.3s; opacity: ${currentToolsSearchQuery ? '1' : '0'}; padding: ${currentToolsSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
-          <button id="tools-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentToolsSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
-            <span class="material-icons" style="font-size: 20px;">close</span>
-          </button>
-          <span class="ganado-split-ctrl-sep"></span>
-          <button class="ganado-split-ctrl-reg" onclick="window.toggleToolsSplitMenu(event)" title="Más opciones">
-            <span class="material-icons">arrow_drop_down</span>
-          </button>
-          <div class="ganado-split-menu" id="tools-split-menu">
-            <button class="ganado-split-item" onclick="window.navigateTo('nueva_herramienta'); document.getElementById('tools-split-menu').classList.remove('open');">
-              <span class="material-icons">add</span><span>Registrar herramienta</span>
+        ${renderM3SearchBar({
+          wrapperId: 'tools-search-wrapper',
+          toggleId: 'tools-search-toggle',
+          inputId: 'tools-search-input',
+          clearId: 'tools-search-clear',
+          placeholder: 'Buscar herramienta...',
+          value: currentToolsSearchQuery,
+          extraHtml: `
+            <span class="ganado-split-ctrl-sep"></span>
+            <button class="ganado-split-ctrl-reg" onclick="window.toggleToolsSplitMenu(event)" title="Más opciones">
+              <span class="material-icons">arrow_drop_down</span>
             </button>
-          </div>
-        </div>
+            <div class="ganado-split-menu" id="tools-split-menu">
+              <button class="ganado-split-item" onclick="window.navigateTo('nueva_herramienta'); document.getElementById('tools-split-menu').classList.remove('open');">
+                <span class="material-icons">add</span><span>Registrar herramienta</span>
+              </button>
+            </div>
+          `
+        })}
       </div>
 
       <!-- Page Title -->
@@ -207,44 +209,41 @@ export function initHerramientas() {
     if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
   });
 
-  // Search logic
-  const searchToggle  = document.getElementById('tools-search-toggle');
-  const searchWrapper = document.getElementById('tools-search-wrapper');
-  const searchInput   = document.getElementById('tools-search-input');
-  const searchClear   = document.getElementById('tools-search-clear');
-
-  if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '180px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      }
-    });
-
-    searchClear.addEventListener('click', () => {
-      currentToolsSearchQuery = '';
-      searchInput.value = '';
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
-      searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
-      window.changeToolsPage(1);
-    });
-
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      currentToolsSearchQuery = e.target.value;
-      searchTimeout = setTimeout(() => {
-        window.changeToolsPage(1);
-      }, 500);
-    });
-  }
+  // Material 3 Full-Screen Search
+  initM3FullScreenSearch({
+    moduleKey: 'herramientas',
+    toggleId: 'tools-search-toggle',
+    inputId: 'tools-search-input',
+    clearId: 'tools-search-clear',
+    placeholder: 'Buscar herramienta...',
+    ariaLabel: 'Búsqueda de herramientas',
+    suggestedTitle: 'Herramientas sugeridas',
+    emptyLabel: 'herramientas',
+    getQuery: () => currentToolsSearchQuery,
+    setQuery: (v) => { currentToolsSearchQuery = v; },
+    onApplySearch: () => window.changeToolsPage(1),
+    loadItems: async () => {
+      const { data } = await supabase.from('herramientas').select('*').order('created_at', { ascending: false }).range(0, 299);
+      return data || [];
+    },
+    getQuickChips: (items) => {
+      const cats = Array.from(new Set(items.map(t => (t.categoria || '').trim()).filter(Boolean))).slice(0, 4);
+      return [
+        { label: 'Disponibles', type: 'query', value: 'Disponible', icon: 'check_circle' },
+        { label: 'Reparación', type: 'query', value: 'Reparación', icon: 'build' },
+        ...cats.map(c => ({ label: c, type: 'query', value: c, icon: 'construction' }))
+      ];
+    },
+    filterItems: (items, qLower) => items.filter(t =>
+      (t.nombre || '').toLowerCase().includes(qLower) ||
+      (t.categoria || '').toLowerCase().includes(qLower) ||
+      (t.estado || '').toLowerCase().includes(qLower) ||
+      (t.ubicacion || '').toLowerCase().includes(qLower)
+    ),
+    renderItem: (t) => renderToolRow(t),
+    itemSelector: '.ganado-row',
+    getItemTitle: (el) => el.querySelector('.ganado-col-value')?.textContent?.trim() || ''
+  });
 
   window.confirmDeleteHerramienta = (id, name) => {
     window.Snackbar.confirm(

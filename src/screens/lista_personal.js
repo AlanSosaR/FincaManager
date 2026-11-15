@@ -1,4 +1,5 @@
 import { restFetch } from '../auth.js';
+import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
 
 let currentPersonalSearchQuery = '';
 let allPersonalData = [];
@@ -171,24 +172,25 @@ export async function renderListaPersonal() {
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-3xl m3-mx-auto m3-font-work-sans">
         <!-- Search + Register split control -->
         <div style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
-          <div class="ganado-split-ctrl ${currentPersonalSearchQuery ? 'expanded' : ''}" id="personal-search-wrapper">
-            <button id="personal-search-toggle" class="m3-icon-btn-tonal" style="margin: 0; box-shadow: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;" title="Buscar">
-              <span class="material-icons" style="color: #ffffff;">search</span>
-            </button>
-            <input type="text" id="personal-search-input" placeholder="Buscar por nombre..." value="${currentPersonalSearchQuery}" style="border: none; background: transparent; outline: none; font-size: 15px; width: ${currentPersonalSearchQuery ? '160px' : '0px'}; transition: width 0.3s; opacity: ${currentPersonalSearchQuery ? '1' : '0'}; padding: ${currentPersonalSearchQuery ? '0 8px 0 0' : '0'}; color: #ffffff;">
-            <button id="personal-search-clear" style="background: none; border: none; cursor: pointer; display: ${currentPersonalSearchQuery ? 'flex' : 'none'}; align-items: center; justify-content: center; padding: 0 16px 0 8px; color: #ffffff; height: 100%;" title="Limpiar búsqueda">
-              <span class="material-icons" style="font-size: 20px;">close</span>
-            </button>
-            <span class="ganado-split-ctrl-sep"></span>
-            <button class="ganado-split-ctrl-reg" onclick="window.togglePersonalSplitMenu(event)" title="Más opciones">
-              <span class="material-icons">arrow_drop_down</span>
-            </button>
-            <div class="ganado-split-menu" id="personal-split-menu">
-              <button class="ganado-split-item" onclick="window.navigateTo('nuevo_personal', '', 'personal'); document.getElementById('personal-split-menu').classList.remove('open');">
-                <span class="material-icons">add</span><span>Nuevo personal</span>
+          ${renderM3SearchBar({
+            wrapperId: 'personal-search-wrapper',
+            toggleId: 'personal-search-toggle',
+            inputId: 'personal-search-input',
+            clearId: 'personal-search-clear',
+            placeholder: 'Buscar por nombre...',
+            value: currentPersonalSearchQuery,
+            extraHtml: `
+              <span class="ganado-split-ctrl-sep"></span>
+              <button class="ganado-split-ctrl-reg" onclick="window.togglePersonalSplitMenu(event)" title="Más opciones">
+                <span class="material-icons">arrow_drop_down</span>
               </button>
-            </div>
-          </div>
+              <div class="ganado-split-menu" id="personal-split-menu">
+                <button class="ganado-split-item" onclick="window.navigateTo('nuevo_personal', '', 'personal'); document.getElementById('personal-split-menu').classList.remove('open');">
+                  <span class="material-icons">add</span><span>Nuevo personal</span>
+                </button>
+              </div>
+            `
+          })}
         </div>
         <section class="m3-mb-6">
           <div class="m3-flex m3-items-center m3-justify-between m3-gap-4 m3-flex-wrap">
@@ -240,44 +242,33 @@ export function initListaPersonal() {
     if (countLabel) countLabel.textContent = `${list.length} trabajadores registrados`;
   };
 
-  // Search logic
-  const searchToggle  = document.getElementById('personal-search-toggle');
-  const searchWrapper = document.getElementById('personal-search-wrapper');
-  const searchInput   = document.getElementById('personal-search-input');
-  const searchClear   = document.getElementById('personal-search-clear');
-
-  if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '160px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      }
-    });
-
-    searchClear.addEventListener('click', () => {
-      currentPersonalSearchQuery = '';
-      searchInput.value = '';
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
-      searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
-      refreshPersonalList();
-    });
-
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      currentPersonalSearchQuery = e.target.value;
-      searchTimeout = setTimeout(() => {
-        refreshPersonalList();
-      }, 500);
-    });
-  }
+  // Material 3 Full-Screen Search
+  initM3FullScreenSearch({
+    moduleKey: 'personal',
+    toggleId: 'personal-search-toggle',
+    inputId: 'personal-search-input',
+    clearId: 'personal-search-clear',
+    placeholder: 'Buscar por nombre...',
+    ariaLabel: 'Búsqueda de personal',
+    suggestedTitle: 'Personal sugerido',
+    emptyLabel: 'trabajadores',
+    listClass: 'lp-list m3-search-inventory-list',
+    getQuery: () => currentPersonalSearchQuery,
+    setQuery: (v) => { currentPersonalSearchQuery = v; },
+    onApplySearch: () => refreshPersonalList(),
+    loadItems: async () => allPersonalData || [],
+    getQuickChips: (items) => {
+      const roles = Array.from(new Set(items.map(p => (p.rol || '').trim()).filter(Boolean))).slice(0, 5);
+      return roles.map(r => ({ label: r, type: 'query', value: r, icon: 'badge' }));
+    },
+    filterItems: (items, qLower) => items.filter(p =>
+      (p.nombre || '').toLowerCase().includes(qLower) ||
+      (p.rol || '').toLowerCase().includes(qLower)
+    ),
+    renderItem: (p) => personalRowsHtml([p]),
+    itemSelector: '.lp-card',
+    getItemTitle: (el) => el.querySelector('.m3-label-large')?.textContent?.trim() || ''
+  });
 
   window.confirmDeletePersonal = (id, name) => {
     window.Snackbar.confirm(`¿Eliminar a ${name}?`, async () => {

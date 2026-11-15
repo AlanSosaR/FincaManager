@@ -1,4 +1,5 @@
 import { getEmpresaMembers, getEmpresaInvitations, inviteUser, revokeInvitation, getUser, getAccessToken, updateMemberRole, removeMember, sendRecoveryEmail, SUPABASE_URL, SUPABASE_KEY } from '../auth.js';
+import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
 
 
 
@@ -38,26 +39,27 @@ export async function renderEquipo() {
 
   return `
     <div class="m3-card-filled" style="margin-bottom:80px;">
-      <!-- Search (green split control, sin menú) -->
+      <!-- Search (M3 Search Bar) -->
       <div class="equipo-top-search-container" style="display:flex;justify-content:flex-end;margin:16px 0 8px;">
-        <div class="ganado-split-ctrl expanded" id="equipo-search-wrapper" style="background:#edf1ed; border:1px solid rgba(45,62,44,0.16);">
-          <button id="equipo-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;cursor:pointer;" title="Buscar">
-            <span class="material-icons" style="color:#435b47;font-size:20px;">search</span>
-          </button>
-          <input type="text" id="equipo-search-input" placeholder="Buscar por nombre..." value="${currentEquipoSearchQuery}" style="border:none;background:transparent;outline:none;font-size:14px;color:#1e3e2b;padding:0 8px;flex:1;min-width:0;">
-          <button id="equipo-search-clear" style="background:none;border:none;cursor:pointer;display:${currentEquipoSearchQuery?'flex':'none'};align-items:center;justify-content:center;padding:0 8px;color:#435b47;height:100%;" title="Limpiar búsqueda">
-            <span class="material-icons" style="font-size:18px;">close</span>
-          </button>
-          <span class="ganado-split-ctrl-sep" style="width:1px;height:22px;background:rgba(45,62,44,0.18);align-self:center;"></span>
-          <button class="ganado-split-ctrl-reg" onclick="window.toggleEquipoSplitMenu(event)" title="Más opciones" style="width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:#e2e8e2;border:none;cursor:pointer;border-radius:0 9px 9px 0;">
-            <span class="material-icons" style="color:#1e3e2b;font-size:20px;">arrow_drop_down</span>
-          </button>
-          <div class="ganado-split-menu" id="equipo-split-menu">
-            <button class="ganado-split-item" onclick="window.toggleInviteInline(); document.getElementById('equipo-split-menu')?.classList.remove('open');">
-              <span class="material-icons">person_add</span><span>Invitar miembro</span>
+        ${renderM3SearchBar({
+          wrapperId: 'equipo-search-wrapper',
+          toggleId: 'equipo-search-toggle',
+          inputId: 'equipo-search-input',
+          clearId: 'equipo-search-clear',
+          placeholder: 'Buscar por nombre...',
+          value: currentEquipoSearchQuery,
+          extraHtml: `
+            <span class="ganado-split-ctrl-sep"></span>
+            <button class="ganado-split-ctrl-reg" onclick="window.toggleEquipoSplitMenu(event)" title="Más opciones">
+              <span class="material-icons">arrow_drop_down</span>
             </button>
-          </div>
-        </div>
+            <div class="ganado-split-menu" id="equipo-split-menu">
+              <button class="ganado-split-item" onclick="window.toggleInviteInline(); document.getElementById('equipo-split-menu')?.classList.remove('open');">
+                <span class="material-icons">person_add</span><span>Invitar miembro</span>
+              </button>
+            </div>
+          `
+        })}
       </div>
       
 
@@ -311,33 +313,39 @@ function renderMemberRow(m, currentUserId) {
 }
 
 export function initEquipo() {
-  // Search logic (sin menú registrar)
-  const searchToggle  = document.getElementById('equipo-search-toggle');
-  const searchWrapper = document.getElementById('equipo-search-wrapper');
-  const searchInput   = document.getElementById('equipo-search-input');
-  const searchClear   = document.getElementById('equipo-search-clear');
-
-  if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      searchInput.focus();
-    });
-
-    searchClear.addEventListener('click', () => {
-      currentEquipoSearchQuery = '';
-      searchInput.value = '';
-      searchClear.style.display = 'none';
-      refreshEquipoMembers();
-    });
-
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      currentEquipoSearchQuery = e.target.value;
-      searchTimeout = setTimeout(() => {
-        refreshEquipoMembers();
-      }, 500);
-    });
-  }
+  // Material 3 Full-Screen Search
+  initM3FullScreenSearch({
+    moduleKey: 'equipo',
+    toggleId: 'equipo-search-toggle',
+    inputId: 'equipo-search-input',
+    clearId: 'equipo-search-clear',
+    placeholder: 'Buscar por nombre...',
+    ariaLabel: 'Búsqueda de miembros del equipo',
+    suggestedTitle: 'Miembros del equipo',
+    emptyLabel: 'miembros',
+    listClass: 'm3-search-inventory-list',
+    getQuery: () => currentEquipoSearchQuery,
+    setQuery: (v) => { currentEquipoSearchQuery = v; },
+    onApplySearch: () => refreshEquipoMembers(),
+    loadItems: async () => allEquipoMembers || [],
+    getQuickChips: () => [
+      { label: 'Propietario', type: 'query', value: 'propietario', icon: 'shield_person' },
+      { label: 'Admin', type: 'query', value: 'admin', icon: 'manage_accounts' },
+      { label: 'Visitante', type: 'query', value: 'visitante', icon: 'person' }
+    ],
+    filterItems: (items, qLower) => items.filter(m =>
+      (m.nombre || '').toLowerCase().includes(qLower) ||
+      (m.email || '').toLowerCase().includes(qLower) ||
+      (m.rol || '').toLowerCase().includes(qLower)
+    ),
+    renderItem: (m) => renderMemberRow(m, _equipoCurrentUserId),
+    itemSelector: '.member-row[data-userid]',
+    getItemTitle: (el) => el.dataset.nombre || el.dataset.email || '',
+    onItemClick: (el) => {
+      const m = allEquipoMembers.find(item => String(item.id) === String(el.dataset.userid));
+      if (m) openMemberBottomSheet(m);
+    }
+  });
 
   // Split control (search + arrow) menu
   window.toggleEquipoSplitMenu = (e) => {

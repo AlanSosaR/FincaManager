@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { loadPuntoReferencia } from '../auth.js';
+import { renderM3SearchBar, initM3FullScreenSearch, escapeSearchHtml } from '../components/m3_search.js';
 
 let currentPotrerosSearchQuery = '';
 let refMarker = null;
@@ -392,24 +393,25 @@ export async function renderPotreros() {
     </style>
     <div class="screen-potreros" style="padding-bottom: 80px;">
       <div class="ganado-top-actions-container" style="display:flex;justify-content:flex-end;gap:10px;margin:16px 0 8px;">
-        <div class="ganado-split-ctrl ${currentPotrerosSearchQuery ? 'expanded' : ''}" id="potreros-search-wrapper">
-          <button id="potreros-search-toggle" class="m3-icon-btn-tonal" style="margin:0;box-shadow:none;width:48px;height:48px;display:flex;align-items:center;justify-content:center;" title="Buscar potrero">
-            <span class="material-icons" style="color:#ffffff;">search</span>
-          </button>
-          <input type="text" id="potreros-search-input" placeholder="Buscar potrero..." value="${currentPotrerosSearchQuery}" style="border:none;background:transparent;outline:none;font-size:15px;width:${currentPotrerosSearchQuery ? '180px' : '0px'};transition:width 0.3s;opacity:${currentPotrerosSearchQuery ? '1' : '0'};padding:${currentPotrerosSearchQuery ? '0 8px 0 0' : '0'};color:#ffffff;">
-          <button id="potreros-search-clear" style="background:none;border:none;cursor:pointer;display:${currentPotrerosSearchQuery ? 'flex' : 'none'};align-items:center;justify-content:center;padding:0 16px 0 8px;color:#ffffff;height:100%;" title="Limpiar búsqueda">
-            <span class="material-icons" style="font-size:20px;">close</span>
-          </button>
-          <span class="ganado-split-ctrl-sep"></span>
-          <button class="ganado-split-ctrl-reg" onclick="window.togglePotrerosSplitMenu(event)" title="Más opciones">
-            <span class="material-icons">arrow_drop_down</span>
-          </button>
-          <div class="ganado-split-menu" id="potreros-split-menu">
-            <button class="ganado-split-item" onclick="window.navigateTo('nuevo_potrero'); document.getElementById('potreros-split-menu').classList.remove('open');">
-              <span class="material-icons">add</span><span>Registrar potrero</span>
+        ${renderM3SearchBar({
+          wrapperId: 'potreros-search-wrapper',
+          toggleId: 'potreros-search-toggle',
+          inputId: 'potreros-search-input',
+          clearId: 'potreros-search-clear',
+          placeholder: 'Buscar potrero...',
+          value: currentPotrerosSearchQuery,
+          extraHtml: `
+            <span class="ganado-split-ctrl-sep"></span>
+            <button class="ganado-split-ctrl-reg" onclick="window.togglePotrerosSplitMenu(event)" title="Más opciones">
+              <span class="material-icons">arrow_drop_down</span>
             </button>
-          </div>
-        </div>
+            <div class="ganado-split-menu" id="potreros-split-menu">
+              <button class="ganado-split-item" onclick="window.navigateTo('nuevo_potrero'); document.getElementById('potreros-split-menu').classList.remove('open');">
+                <span class="material-icons">add</span><span>Registrar potrero</span>
+              </button>
+            </div>
+          `
+        })}
       </div>
       <div class="ganado-page-title" style="margin-top: -10px; margin-bottom: 24px;">
         <h2>Potreros <span id="mapa-title-count" style="font-weight:500;font-size:22px;color:var(--on-surface-variant);"></span></h2>
@@ -970,51 +972,59 @@ export async function initPotreros() {
     if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
   });
 
-  const searchToggle  = document.getElementById('potreros-search-toggle');
-  const searchWrapper = document.getElementById('potreros-search-wrapper');
-  const searchInput   = document.getElementById('potreros-search-input');
-  const searchClear   = document.getElementById('potreros-search-clear');
-
-  if (searchToggle && searchInput && searchWrapper && searchClear) {
-    searchToggle.addEventListener('click', () => {
-      if (!searchInput.style.width || searchInput.style.width === '0px') {
-        searchInput.style.width = '180px';
-        searchInput.style.opacity = '1';
-        searchInput.style.padding = '0 8px 0 0';
-        searchClear.style.display = 'flex';
-        searchWrapper.classList.add('expanded');
-        searchInput.focus();
-      } else {
-        searchInput.style.width = '0px';
-        searchInput.style.opacity = '0';
-        searchInput.style.padding = '0';
-        searchClear.style.display = 'none';
-        searchWrapper.classList.remove('expanded');
-        searchInput.value = '';
-        applyPotreroSearch('');
-      }
-    });
-
-    searchClear.addEventListener('click', () => {
-      searchInput.value = '';
-      applyPotreroSearch('');
-      searchInput.style.width = '0px';
-      searchInput.style.opacity = '0';
-      searchInput.style.padding = '0';
-      searchClear.style.display = 'none';
-      searchWrapper.classList.remove('expanded');
-      fitToParcels();
-    });
-
-    let searchTimeout;
-    searchInput.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        currentPotrerosSearchQuery = e.target.value.trim();
-        applyPotreroSearch(currentPotrerosSearchQuery);
-      }, 250);
-    });
-  }
+  initM3FullScreenSearch({
+    moduleKey: 'potreros',
+    toggleId: 'potreros-search-toggle',
+    inputId: 'potreros-search-input',
+    clearId: 'potreros-search-clear',
+    placeholder: 'Buscar potrero...',
+    ariaLabel: 'Búsqueda de potreros',
+    suggestedTitle: 'Potreros sugeridos',
+    emptyLabel: 'potreros',
+    getQuery: () => currentPotrerosSearchQuery,
+    setQuery: (v) => { currentPotrerosSearchQuery = (v || '').trim(); },
+    onApplySearch: (v) => {
+      const clean = (v || '').trim();
+      applyPotreroSearch(clean);
+      if (!clean) fitToParcels();
+    },
+    loadItems: async () => {
+      const { data } = await supabase.from('potreros').select('*').order('created_at', { ascending: false }).range(0, 299);
+      return data || [];
+    },
+    getQuickChips: (items) => {
+      const estados = Array.from(new Set(items.map(p => (p.estado || '').trim()).filter(Boolean))).slice(0, 4);
+      const pastos = Array.from(new Set(items.map(p => (p.tipo_pasto || '').trim()).filter(Boolean))).slice(0, 3);
+      return [
+        ...estados.map(e => ({ label: e, type: 'query', value: e, icon: 'fence' })),
+        ...pastos.map(t => ({ label: t, type: 'query', value: t, icon: 'grass' }))
+      ];
+    },
+    filterItems: (items, qLower) => items.filter(p =>
+      (p.nombre || '').toLowerCase().includes(qLower) ||
+      (p.estado || '').toLowerCase().includes(qLower) ||
+      (p.tipo_pasto || '').toLowerCase().includes(qLower)
+    ),
+    renderItem: (p) => `
+      <div class="ganado-row" data-potrero-id="${p.id}" onclick="window.navigateTo('detalle_potrero', '${p.id}')">
+        <div class="ganado-row-img-container" style="background: var(--surface-container-high); display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons" style="font-size:26px;color:#2d3e2c;">fence</span>
+        </div>
+        <div class="ganado-row-content">
+          <div class="ganado-col-group" style="flex:1;min-width:0;">
+            <p class="ganado-col-label">${escapeSearchHtml((p.tipo_pasto || 'POTRERO').toUpperCase())}</p>
+            <p class="ganado-col-value">${escapeSearchHtml(p.nombre || 'Sin nombre')}</p>
+            <p class="ganado-col-label" style="margin-top:4px;">${escapeSearchHtml(p.estado || 'Disponible')}</p>
+          </div>
+          <div class="ganado-col-group" style="text-align:right;margin-left:auto;align-items:flex-end;">
+            <p class="ganado-col-value" style="font-weight:800;color:#2d3e2c;">${(parseFloat(p.area_ha) || 0).toFixed(2)} ha</p>
+          </div>
+        </div>
+      </div>
+    `,
+    itemSelector: '.ganado-row[data-potrero-id]',
+    getItemTitle: (el) => el.querySelector('.ganado-col-value')?.textContent?.trim() || ''
+  });
 
   function applyPotreroSearch(q) {
     const ql = q.toLowerCase();

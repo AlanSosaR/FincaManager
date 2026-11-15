@@ -1,12 +1,12 @@
 import { supabase } from '../supabase.js';
 import { restFetch } from '../auth.js';
 import { sendWhatsApp } from '../wa.js';
-import { getPaginationFooterHtml } from '../pagination.js';
 let currentGanadoPage = 1;
 const PAGE_SIZE = 8;
 let currentFilter = 'all';
 let currentSearchQuery = '';
 let totalGanadoCount = 0;
+let loadedGanadoCount = 0;
 
 function getLocalToday() {
   const d = new Date();
@@ -298,6 +298,7 @@ export async function renderGanado(page = 1, filter = 'all') {
   }
 
   totalGanadoCount = filteredCount || 0;
+  loadedGanadoCount = (animales || []).length;
 
   const visibleAnimalIds = (animales || []).map(a => a.id);
   const [visVacunas, visPesajes, visFumigaciones] = await Promise.all([
@@ -571,29 +572,42 @@ export async function renderGanado(page = 1, filter = 'all') {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function paginationFooterHtml() {
-  const totalPages = Math.ceil(totalGanadoCount / PAGE_SIZE) || 1;
-  return getPaginationFooterHtml({
-    currentPage: currentGanadoPage,
-    totalPages,
-    prevId: 'ganado-prev-btn',
-    nextId: 'ganado-next-btn',
-    changeFn: 'changeGanadoPage'
-  });
+  if (!totalGanadoCount || loadedGanadoCount >= totalGanadoCount) return '';
+  return `
+    <div style="display: flex; justify-content: center; padding: 16px 0 8px;">
+      <button id="ganado-load-more-btn" type="button" onclick="window.loadMoreGanado()" class="press-effect" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 9999px; border: 1.5px solid #2d3e2c; background: #eef3ed; color: #1e3e2b; font-size: 13.5px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(45, 62, 44, 0.10);">
+        <span class="material-symbols-outlined" style="font-size: 18px;">expand_more</span>
+        <span>Ver más (${loadedGanadoCount} de ${totalGanadoCount})</span>
+      </button>
+    </div>
+  `;
 }
 
-window.changeGanadoPage = async function(page) {
+window.loadMoreGanado = function() {
+  return window.changeGanadoPage(currentGanadoPage + 1, true);
+};
+
+window.changeGanadoPage = async function(page, append = false) {
   currentGanadoPage = page;
-  const from = (page - 1) * PAGE_SIZE;
+  const from = append ? (page - 1) * PAGE_SIZE : 0;
   const to = page * PAGE_SIZE - 1;
 
   const listContainer = document.getElementById('ganado-list-container');
   const footerContainer = document.getElementById('ganado-pagination-wrapper');
   if (!listContainer) return;
 
-  listContainer.innerHTML = `
-    <div style="padding: 32px; text-align: center; color: #888;">
-      <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
-    </div>`;
+  if (append) {
+    const loadMoreBtn = document.getElementById('ganado-load-more-btn');
+    if (loadMoreBtn) {
+      loadMoreBtn.disabled = true;
+      loadMoreBtn.innerHTML = `<span class="material-icons rotating" style="font-size: 18px;">autorenew</span><span>Cargando...</span>`;
+    }
+  } else {
+    listContainer.innerHTML = `
+      <div style="padding: 32px; text-align: center; color: #888;">
+        <span class="material-icons rotating" style="font-size: 28px; color: var(--primary-container);">autorenew</span>
+      </div>`;
+  }
 
   let activeFilterIds = [];
   if (currentFilter === 'vacunas') {
@@ -678,9 +692,16 @@ window.changeGanadoPage = async function(page) {
   const { vacunasMap, vacunasAppliedMap, fumigacionesMap, fumigacionesAppliedMap, pesajesPendingMap } = processPendingData(visVacunas, visPesajes, visFumigaciones);
   const pesajesMap = await fetchLatestPesajes(visibleAnimalIds);
 
-  listContainer.innerHTML = animales.length === 0
-    ? '<div class="ganado-empty"><p>No se encontraron animales.</p></div>'
-    : animales.map(a => renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumigacionesAppliedMap, pesajesPendingMap, pesajesMap)).join('');
+  const rowsHtml = animales.map(a => renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumigacionesAppliedMap, pesajesPendingMap, pesajesMap)).join('');
+  if (append) {
+    loadedGanadoCount += animales.length;
+    if (rowsHtml) listContainer.insertAdjacentHTML('beforeend', rowsHtml);
+  } else {
+    loadedGanadoCount = animales.length;
+    listContainer.innerHTML = animales.length === 0
+      ? '<div class="ganado-empty"><p>No se encontraron animales.</p></div>'
+      : rowsHtml;
+  }
 
   if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
   if (typeof updateCarouselCounts === 'function') updateCarouselCounts();

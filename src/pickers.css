@@ -10,7 +10,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 100010;
   backdrop-filter: blur(2px);
 }
 
@@ -97,16 +97,17 @@
   background: rgba(107, 130, 69, 0.1);
 }
 
-.m3-day-cell.selected {
+.m3-day-cell.selected,
+.m3-day-cell.today.selected {
   background: #2d3e2c;
-  color: white;
+  color: #ffffff;
 }
 
 .m3-day-cell.other-month {
   color: #c4c7c0;
 }
 
-.m3-day-cell.today {
+.m3-day-cell.today:not(.selected) {
   border: 1px solid #2d3e2c;
   color: #2d3e2c;
 }
