@@ -7523,11 +7523,18 @@ input[id$="-search-input"]::placeholder {
 }
 
 .m3-sub-sheet-actions {
+  position: sticky;
+  bottom: calc(-24px - env(safe-area-inset-bottom, 16px));
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 6px;
+  margin: 8px -18px calc(-24px - env(safe-area-inset-bottom, 16px)) -18px;
+  padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 12px)) 18px;
+  background: #ffffff;
+  border-top: 1px solid #e4ede3;
+  box-shadow: 0 -6px 18px rgba(30, 62, 43, 0.06);
+  z-index: 15;
 }
 
 .m3-sub-sheet-actions .btn-m3-fill {
@@ -8190,4 +8197,984 @@ input[id$="-search-input"]::placeholder {
 .m3-search-empty .material-icons {
   font-size: 30px;
   color: #8a9e88;
+}
+
+/* ---- Bottom Quick Register Bar inside Animal Action Sheet (Fixed Footer) ---- */
+.m3-action-sheet:has(.sheet-quick-register-box) {
+  flex-direction: column;
+  overflow: hidden !important;
+  padding-bottom: 0 !important;
+}
+
+.m3-action-sheet:has(.sheet-quick-register-box) .m3-action-sheet-handle-box,
+.m3-action-sheet:has(.sheet-quick-register-box) .m3-action-sheet-header {
+  flex-shrink: 0;
+}
+
+.m3-action-sheet:has(.sheet-quick-register-box) .sheet-detail-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 14px;
+}
+
+.sheet-quick-register-box {
+  flex-shrink: 0;
+  z-index: 25;
+  background: #ffffff;
+  border-top: 1px solid #e4ede3;
+  border-radius: 20px 20px 0 0;
+  margin: 0 -18px 0 -18px;
+  padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 12px)) 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 -6px 20px rgba(30, 62, 43, 0.08);
+}
+
+.sheet-quick-register-title {
+  margin: 0 0 0 2px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #556b53;
+  letter-spacing: 0.01em;
+}
+
+.sheet-quick-register-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sheet-quick-register-pill {
+  border: none;
+  border-radius: 999px;
+  background: #2d3e2c;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 800;
+  font-family: inherit;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(45, 62, 44, 0.2);
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-quick-register-pill:hover {
+  background: #1f2c1e;
+}
+
+.sheet-quick-register-pill:active {
+  background: #172116;
+  transform: scale(0.96);
+}
+
+/* ---- Pending Activities Card inside Animal Action Sheet ---- */
+.sheet-pending-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheet-pending-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #b45309;
+  padding-left: 2px;
+}
+
+.sheet-pending-header .material-icons {
+  font-size: 16px;
+  color: #d97706;
+}
+
+.sheet-pending-card {
+  background: #fffaf0;
+  border: 1.5px solid #e6a23c;
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sheet-pending-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sheet-pending-kind {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7c5c2e;
+}
+
+.sheet-pending-badge {
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+.sheet-pending-badge.is-late {
+  background: #d9480f;
+  color: #ffffff;
+}
+
+.sheet-pending-badge.is-today {
+  background: #f59f00;
+  color: #ffffff;
+}
+
+.sheet-pending-badge.is-future {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.sheet-pending-title {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #1e3e2b;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.sheet-pending-meta {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6b5e4c;
+  margin-bottom: 6px;
+}
+
+.sheet-pending-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.sheet-pending-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 9px 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.1s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-pending-btn:active {
+  transform: scale(0.96);
+}
+
+.sheet-pending-btn--apply {
+  background: #2d3e2c;
+  color: #ffffff;
+}
+
+.sheet-pending-btn--apply:hover {
+  background: #1f2c1e;
+}
+
+.sheet-pending-btn--edit {
+  background: #e9efe8;
+  color: #1e3e2b;
+}
+
+.sheet-pending-btn--edit:hover {
+  background: #dce5da;
+}
+
+.sheet-pending-btn--cancel {
+  background: #fdeceb;
+  color: #ba1a1a;
+}
+
+.sheet-pending-btn--cancel:hover {
+  background: #fbd9d7;
+}
+
+/* ─── Collapsible Summary Cards (Peso, Vacunas, Fumigaciones) ─────────────── */
+.sheet-collapsible-card {
+  padding: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sheet-collapsible-trigger {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.sheet-collapsible-trigger:active {
+  background: #f3f7f2;
+}
+
+.sheet-collapsible-summary {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sheet-collapsible-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #556b53;
+}
+
+.sheet-collapsible-weight-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sheet-collapsible-weight-val {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #1e3e2b;
+}
+
+.sheet-collapsible-weight-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: #556b53;
+}
+
+.sheet-collapsible-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1e3e2b;
+  line-height: 1.2;
+}
+
+.sheet-collapsible-sub {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #556b53;
+  line-height: 1.3;
+}
+
+.sheet-collapsible-chevron {
+  font-size: 20px;
+  color: #6a7d68;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.sheet-collapsible-card.is-open .sheet-collapsible-chevron {
+  transform: rotate(90deg);
+}
+
+.sheet-collapsible-body {
+  display: none;
+  padding: 0 14px 14px 14px;
+  border-top: 1px solid #edf2ec;
+  padding-top: 10px;
+}
+
+.sheet-collapsible-card.is-open .sheet-collapsible-body {
+  display: block;
+}
+
+/* ─── Week / Month Date Picker (Vacuna / Fumigación) ───────────────────────── */
+.sheet-date-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sheet-date-picker-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e3e2b;
+  padding-left: 2px;
+}
+
+.sheet-date-picker-box {
+  background: #f7f9f6;
+  border: 1px solid #d8e4d6;
+  border-radius: 18px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sheet-date-picker-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheet-dp-nav-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #d5e1d3;
+  background: #ffffff;
+  color: #1e3e2b;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-dp-nav-btn:active {
+  background: #e9f0e8;
+}
+
+.sheet-dp-current-label {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1e3e2b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-dp-pill-btn {
+  border: 1px solid #d5e1d3;
+  background: #ffffff;
+  color: #1e3e2b;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-dp-pill-btn:active {
+  background: #e9f0e8;
+}
+
+.sheet-dp-grid.is-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.sheet-dp-grid.is-month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.sheet-dp-weekday {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #556b53;
+  padding: 2px 0 4px;
+}
+
+.sheet-dp-day {
+  border: 1.5px solid #e1ebe0;
+  background: #ffffff;
+  color: #1e3e2b;
+  border-radius: 14px;
+  padding: 8px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-dp-day.is-compact {
+  padding: 7px 2px;
+  border-radius: 10px;
+}
+
+.sheet-dp-day.is-muted {
+  opacity: 0.42;
+}
+
+.sheet-dp-day-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: inherit;
+  opacity: 0.78;
+}
+
+.sheet-dp-day-num {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.sheet-dp-day.is-compact .sheet-dp-day-num {
+  font-size: 13px;
+}
+
+.sheet-dp-day.is-today {
+  border: 2px solid #2d3e2c;
+}
+
+.sheet-dp-day.is-selected {
+  background: #2d3e2c;
+  border-color: #2d3e2c;
+  color: #ffffff;
+}
+
+.sheet-dp-day.is-selected .sheet-dp-day-name {
+  opacity: 0.92;
+}
+
+.sheet-date-picker-hint {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e3e2b;
+  padding-left: 2px;
+}
+
+.sheet-date-picker-hint .is-programada {
+  color: #c2410c;
+  font-weight: 800;
+}
+
+.sheet-date-picker-hint .is-aplicada {
+  color: #2d3e2c;
+  font-weight: 800;
+}
+
+/* ─── Gestation Progress Card (Hembras) ──────────────────────────────────── */
+.sheet-gestation-card {
+  background: #fffaf0;
+  border: 1.5px solid #e3a84f;
+  border-radius: 18px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.sheet-gestation-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sheet-gestation-pill {
+  background: #f9ecd4;
+  color: #8c5300;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+
+.sheet-gestation-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheet-gestation-pct {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #b45309;
+}
+
+.sheet-gestation-edit-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: #f1e6cf;
+  color: #6b4e16;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sheet-gestation-edit-icon .material-icons {
+  font-size: 15px;
+}
+
+.sheet-gestation-month-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.sheet-gestation-month {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #1e3e2b;
+}
+
+.sheet-gestation-of {
+  font-size: 14px;
+  font-weight: 700;
+  color: #6b5e4c;
+}
+
+.sheet-gestation-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b5e4c;
+}
+
+.sheet-gestation-progress {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: #ede3cf;
+  overflow: hidden;
+  margin: 2px 0;
+}
+
+.sheet-gestation-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #d97706;
+  transition: width 0.3s ease;
+}
+
+.sheet-gestation-info-box {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #f0dfc2;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-top: 2px;
+}
+
+.sheet-gestation-info-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7a6d5a;
+  margin-bottom: 2px;
+}
+
+.sheet-gestation-info-val {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1e3e2b;
+}
+
+.sheet-gestation-info-val.is-accent {
+  color: #c2410c;
+}
+
+.sheet-gestation-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.sheet-gestation-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-size: 13.5px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.1s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-gestation-btn:active {
+  transform: scale(0.97);
+}
+
+.sheet-gestation-btn--primary {
+  flex: 1.5;
+  background: #2d3e2c;
+  color: #ffffff;
+}
+
+.sheet-gestation-btn--primary:hover {
+  background: #1f2c1e;
+}
+
+.sheet-gestation-btn--abort {
+  flex: 1;
+  background: #fdeceb;
+  color: #ba1a1a;
+}
+
+.sheet-gestation-btn--abort:hover {
+  background: #fbd9d7;
+}
+
+/* ─── Peso (Control de Peso con Gráfica Comparativa) ───────────────────────── */
+.sheet-peso-card {
+  --peso-up-bg: #dff0db;
+  --peso-up-fg: #1b4d20;
+  --peso-up-bar: #8fd17e;
+  --peso-down-bg: #fde8e6;
+  --peso-down-fg: #b42318;
+  --peso-down-bar: #f59891;
+  --peso-same-bg: #e8ece7;
+  --peso-same-fg: #4a5948;
+  --peso-same-bar: #aeb8ad;
+  --peso-panel-bg: #ffffff;
+  --peso-panel-border: #dce5db;
+  --peso-sel-ring: #2d3e2c;
+}
+
+.sheet-peso-collapsed-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 3px;
+}
+
+.sheet-peso-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.sheet-peso-status-pill.is-up {
+  background: var(--peso-up-bg);
+  color: var(--peso-up-fg);
+}
+
+.sheet-peso-status-pill.is-down {
+  background: var(--peso-down-bg);
+  color: var(--peso-down-fg);
+}
+
+.sheet-peso-status-pill.is-same,
+.sheet-peso-status-pill.is-first {
+  background: var(--peso-same-bg);
+  color: var(--peso-same-fg);
+}
+
+.sheet-peso-collapsed-vs {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant, #556b53);
+}
+
+.sheet-peso-chart-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 2px 6px;
+}
+
+.sheet-peso-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  min-width: 100%;
+  width: max-content;
+}
+
+.sheet-peso-bar-btn {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 44px;
+  border: 2px solid transparent;
+  background: transparent;
+  border-radius: 18px;
+  padding: 8px 10px 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-peso-bar-btn.is-selected {
+  border-color: var(--peso-sel-ring);
+  background: rgba(45, 62, 44, 0.04);
+}
+
+.sheet-peso-bar-delta {
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sheet-peso-bar-delta.is-up { color: var(--peso-up-fg); }
+.sheet-peso-bar-delta.is-down { color: var(--peso-down-fg); }
+.sheet-peso-bar-delta.is-same,
+.sheet-peso-bar-delta.is-first { color: var(--peso-same-fg); }
+
+.sheet-peso-bar-val {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--m3-on-surface, #1e3e2b);
+  line-height: 1.1;
+}
+
+.sheet-peso-bar-col {
+  width: 34px;
+  border-radius: 9px;
+  display: block;
+  transition: height 0.25s ease, opacity 0.15s ease;
+}
+
+.sheet-peso-bar-col.is-up { background: var(--peso-up-bar); }
+.sheet-peso-bar-col.is-down { background: var(--peso-down-bar); }
+.sheet-peso-bar-col.is-same,
+.sheet-peso-bar-col.is-first { background: var(--peso-same-bar); }
+
+.sheet-peso-bar-date {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant, #556b53);
+  white-space: nowrap;
+}
+
+.sheet-peso-detail-panel {
+  margin-top: 10px;
+  background: var(--peso-panel-bg);
+  border: 1px solid var(--peso-panel-border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sheet-peso-detail-circle,
+.sheet-peso-history-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.sheet-peso-detail-circle.is-up,
+.sheet-peso-history-circle.is-up {
+  background: var(--peso-up-bg);
+  color: var(--peso-up-fg);
+}
+
+.sheet-peso-detail-circle.is-down,
+.sheet-peso-history-circle.is-down {
+  background: var(--peso-down-bg);
+  color: var(--peso-down-fg);
+}
+
+.sheet-peso-detail-circle.is-same,
+.sheet-peso-detail-circle.is-first,
+.sheet-peso-history-circle.is-same,
+.sheet-peso-history-circle.is-first {
+  background: var(--peso-same-bg);
+  color: var(--peso-same-fg);
+  font-size: 13px;
+}
+
+.sheet-peso-detail-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.sheet-peso-detail-title {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--m3-on-surface, #1e3e2b);
+  line-height: 1.2;
+}
+
+.sheet-peso-detail-meta {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant, #556b53);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.sheet-peso-legend {
+  margin: 10px 2px 0;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--m3-on-surface-variant, #556b53);
+  line-height: 1.4;
+}
+
+.sheet-peso-summary-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sheet-peso-summary-row {
+  background: var(--peso-panel-bg);
+  border: 1px solid var(--peso-panel-border);
+  border-radius: 14px;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sheet-peso-summary-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--m3-on-surface, #1e3e2b);
+}
+
+.sheet-peso-summary-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant, #556b53);
+  margin-top: 2px;
+}
+
+.sheet-peso-summary-val {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--m3-on-surface, #1e3e2b);
+}
+
+.sheet-peso-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sheet-peso-history-item {
+  background: var(--peso-panel-bg);
+  border: 1px solid var(--peso-panel-border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sheet-peso-history-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.sheet-peso-history-kg {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--m3-on-surface, #1e3e2b);
+  line-height: 1.2;
+}
+
+.sheet-peso-history-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--m3-on-surface-variant, #556b53);
+  margin-top: 1px;
+}
+
+.sheet-peso-history-phrase {
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+.sheet-peso-history-phrase.is-up { color: var(--peso-up-fg); }
+.sheet-peso-history-phrase.is-down { color: var(--peso-down-fg); }
+.sheet-peso-history-phrase.is-same,
+.sheet-peso-history-phrase.is-first { color: var(--peso-same-fg); }
+
+.sheet-peso-edit-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--peso-panel-border);
+  background: var(--peso-same-bg);
+  color: var(--m3-on-surface, #1e3e2b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sheet-peso-edit-btn .material-icons {
+  font-size: 18px;
+}
+
+.sheet-peso-edit-btn:active {
+  transform: scale(0.95);
 }

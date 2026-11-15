@@ -173,9 +173,9 @@ export async function renderGanado(page = 1, filter = 'all') {
 
   const activeAnimalIds = new Set((activeAnimals?.data || []).map(a => a.id));
 
-  // Purge any lingering vacuna/fumigación records from sold or deleted animals
-  const deadVacIds = (vacunas.data || []).filter(v => !activeAnimalIds.has(v.animal_id)).map(v => v.id).filter(Boolean);
-  const deadFumIds = (fumigaciones.data || []).filter(f => !activeAnimalIds.has(f.animal_id)).map(f => f.id).filter(Boolean);
+  // Purge any lingering vacuna/fumigación records from sold or deleted animals (keep Catalogo entries)
+  const deadVacIds = (vacunas.data || []).filter(v => v.animal_id && v.estado !== 'Catalogo' && !activeAnimalIds.has(v.animal_id)).map(v => v.id).filter(Boolean);
+  const deadFumIds = (fumigaciones.data || []).filter(f => f.animal_id && f.estado !== 'Catalogo' && !activeAnimalIds.has(f.animal_id)).map(f => f.id).filter(Boolean);
 
   if (deadVacIds.length > 0) {
     const idsParam = deadVacIds.map(id => encodeURIComponent(id)).join(',');
@@ -687,6 +687,9 @@ window.changeGanadoPage = async function(page) {
 };
 
 window.refreshGanadoList = function() {
+  if (typeof window._refreshFocusedSearch === 'function') {
+    window._refreshFocusedSearch();
+  }
   if (document.getElementById('ganado-list-container')) {
     return window.changeGanadoPage(currentGanadoPage || 1);
   }
@@ -915,7 +918,7 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
   }
 
   return `
-    <div class="ganado-row ${isSold ? 'ganado-row-sold' : ''}" data-animal-id="${a.id}" onclick="window.navigateTo('detalle_animal', '${a.id}')">
+    <div class="ganado-row ${isSold ? 'ganado-row-sold' : ''}" data-animal-id="${a.id}" onclick="window.openAnimalActionSheet(this)">
       <div class="ganado-row-img-container">
         <img src="${imageUrl}">
         ${isSold ? '<div class="ganado-row-badge sold"><span class="material-icons">payments</span></div>' : ''}
@@ -962,9 +965,10 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
 
 export function initGanado() {
   // Cleanup any orphaned bottom sheets or search scrims in document.body from previous visits
-  document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim, body > #ganado-search-scrim').forEach(el => el.remove());
+  document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim, body > #ganado-search-scrim, body > #ganado-fullscreen-search').forEach(el => el.remove());
   const cleanupGanadoSheets = () => {
-    document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim, body > #ganado-search-scrim').forEach(el => el.remove());
+    document.body.style.overflow = '';
+    document.querySelectorAll('body > #ganado-fumig-panel, body > #ganado-vacuna-panel, body > #ganado-panel-scrim, body > #ganado-search-scrim, body > #ganado-fullscreen-search').forEach(el => el.remove());
   };
   window.addEventListener('navigate', cleanupGanadoSheets, { once: true });
   const updateTopBarHeight = () => {
@@ -1019,23 +1023,35 @@ export function initGanado() {
   document.addEventListener('click', (e) => {
     const menu = document.getElementById('ganado-split-menu');
     if (menu && !e.target.closest('.ganado-split-ctrl')) menu.classList.remove('open');
-  });
-
-  // Action menus logic
-  window.toggleActionMenu = (btn) => {
-    const menu = btn.nextElementSibling;
-    if (!menu) return;
-
-    // On mobile, open as Bottom Sheet; on PC leave as is
-    if (window.matchMedia('(max-width: 768px)').matches && window.openActionBottomSheet) {
+    if (!e.target.closest('.ganado-row-actions-box')) {
       document.querySelectorAll('.action-menu.active').forEach(m => {
         m.classList.remove('active');
         const r = m.closest('.ganado-row');
         if (r) r.classList.remove('menu-open');
       });
-      window.openActionBottomSheet(btn, menu);
-      return;
     }
+  });
+
+  window.openAnimalActionSheet = (rowEl) => {
+    if (!rowEl) return;
+    document.querySelectorAll('.action-menu.active').forEach(m => {
+      m.classList.remove('active');
+      const r = m.closest('.ganado-row');
+      if (r) r.classList.remove('menu-open');
+    });
+    if (window.openActionBottomSheet) {
+      const btn = rowEl.querySelector('.ganado-btn-more') || rowEl;
+      const menu = rowEl.querySelector('.action-menu') || document.createElement('div');
+      window.openActionBottomSheet(btn, menu);
+    } else if (rowEl.dataset.animalId) {
+      window.navigateTo('detalle_animal', rowEl.dataset.animalId);
+    }
+  };
+
+  // Action menus logic (always opens compact Editar / Registrar venta / Eliminar menu)
+  window.toggleActionMenu = (btn) => {
+    const menu = btn.nextElementSibling;
+    if (!menu) return;
 
     const row = btn.closest('.ganado-row');
     const isActive = menu.classList.contains('active');
@@ -1069,8 +1085,8 @@ export function initGanado() {
 
       const activeAnimalIds = new Set((activeRes?.data || []).map(a => a.id));
 
-      const deadVacIds = (vacRes?.data || []).filter(v => !activeAnimalIds.has(v.animal_id)).map(v => v.id).filter(Boolean);
-      const deadFumIds = (fumRes?.data || []).filter(f => !activeAnimalIds.has(f.animal_id)).map(f => f.id).filter(Boolean);
+      const deadVacIds = (vacRes?.data || []).filter(v => v.animal_id && v.estado !== 'Catalogo' && !activeAnimalIds.has(v.animal_id)).map(v => v.id).filter(Boolean);
+      const deadFumIds = (fumRes?.data || []).filter(f => f.animal_id && f.estado !== 'Catalogo' && !activeAnimalIds.has(f.animal_id)).map(f => f.id).filter(Boolean);
 
       if (deadVacIds.length > 0) {
         const idsParam = deadVacIds.map(id => encodeURIComponent(id)).join(',');
@@ -1445,7 +1461,7 @@ export function initGanado() {
           supabase.from('ganado').select('id').neq('estado', 'Vendido')
         ]);
         const activeAnimalIds = new Set((activeRes?.data || []).map(a => a.id));
-        const deadFumIds = (fumRes?.data || []).filter(f => !activeAnimalIds.has(f.animal_id)).map(f => f.id).filter(Boolean);
+        const deadFumIds = (fumRes?.data || []).filter(f => f.animal_id && f.estado !== 'Catalogo' && !activeAnimalIds.has(f.animal_id)).map(f => f.id).filter(Boolean);
         if (deadFumIds.length > 0) {
           const idsParam = deadFumIds.map(id => encodeURIComponent(id)).join(',');
           let fumUrl = `/rest/v1/animal_fumigaciones?id=in.(${idsParam})`;
@@ -1805,7 +1821,7 @@ export function initGanado() {
           supabase.from('ganado').select('id').neq('estado', 'Vendido')
         ]);
         const activeAnimalIds = new Set((activeRes?.data || []).map(a => a.id));
-        const deadVacIds = (vacRes?.data || []).filter(v => !activeAnimalIds.has(v.animal_id)).map(v => v.id).filter(Boolean);
+        const deadVacIds = (vacRes?.data || []).filter(v => v.animal_id && v.estado !== 'Catalogo' && !activeAnimalIds.has(v.animal_id)).map(v => v.id).filter(Boolean);
         if (deadVacIds.length > 0) {
           const idsParam = deadVacIds.map(id => encodeURIComponent(id)).join(',');
           let vacUrl = `/rest/v1/animal_vacunas?id=in.(${idsParam})`;
@@ -2025,18 +2041,20 @@ export function initGanado() {
       } catch {}
     };
 
-    const ensureSearchCatalogLoaded = async () => {
-      if (cachedAnimals) return;
+    const ensureSearchCatalogLoaded = async (forceRefresh = false) => {
+      if (cachedAnimals && !forceRefresh) return;
       try {
         const [animRes, pesRes] = await Promise.all([
-          supabase.from('ganado').select('id,nombre,raza,sexo,estado,reproductivo,image_url,peso_actual,created_at').order('created_at', { ascending: false }).range(0, 299),
-          supabase.from('animal_pesajes').select('animal_id,peso,fecha,created_at').order('fecha', { ascending: false }).range(0, 999)
+          supabase.from('ganado').select('*').order('created_at', { ascending: false }).range(0, 299),
+          supabase.from('animal_pesajes').select('animal_id,peso,fecha,created_at').order('fecha', { ascending: false }).range(0, 1999)
         ]);
         cachedAnimals = animRes?.data || [];
         const pMap = new Map();
-        for (const p of (pesRes?.data || [])) {
-          if (!pMap.has(p.animal_id)) {
-            pMap.set(p.animal_id, p.peso);
+        for (const row of (pesRes?.data || [])) {
+          if (!pMap.has(row.animal_id)) {
+            pMap.set(row.animal_id, { latest: row, previous: null });
+          } else if (pMap.get(row.animal_id).previous === null) {
+            pMap.get(row.animal_id).previous = row;
           }
         }
         cachedPesajesMap = pMap;
@@ -2051,22 +2069,15 @@ export function initGanado() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
-    const highlightMatch = (text, query) => {
-      const safeText = escapeSearchHtml(text || '');
-      const cleanQ = (query || '').trim();
-      if (!cleanQ) return safeText;
-      const escapedQ = cleanQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return safeText.replace(new RegExp(`(${escapedQ})`, 'gi'), '<mark class="m3-search-highlight">$1</mark>');
-    };
-
-    const renderFocusedSearchContent = async (queryText) => {
-      await ensureSearchCatalogLoaded();
+    const renderFocusedSearchContent = async (queryText, forceRefresh = false) => {
+      await ensureSearchCatalogLoaded(forceRefresh);
       const q = (queryText || '').trim();
       const qLower = q.toLowerCase();
       const activeAnimals = (cachedAnimals || []).filter(a => a.estado !== 'Vendido');
+      const emptyMap = new Map();
 
       if (!q) {
-        // 1. Pre-text state: Suggestion chips + Recent searches (contained group) + Suggested animals (contained group)
+        // 1. Pre-text state: Suggestion chips + Recent searches (contained group) + Suggested animals (inventory card style)
         const recents = getRecentSearches();
         const uniqueBreeds = Array.from(new Set(activeAnimals.map(a => (a.raza || '').trim()).filter(Boolean))).slice(0, 4);
         const suggestedAnimals = activeAnimals.slice(0, 6);
@@ -2120,67 +2131,29 @@ export function initGanado() {
             <div class="m3-search-section-header">
               <span>Animales sugeridos</span>
             </div>
-            <div class="m3-contained-list">
-              ${suggestedAnimals.map(a => {
-                const seed = encodeURIComponent(a.id || a.nombre || 'animal');
-                const img = a.image_url || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${seed}&backgroundColor=f0ebe3&radius=16`;
-                const peso = cachedPesajesMap.get(a.id) ?? a.peso_actual ?? 0;
-                return `
-                  <div class="m3-search-item m3-contained-item" data-animal-id="${escapeSearchHtml(a.id)}" data-animal-name="${escapeSearchHtml(a.nombre)}" role="option" tabindex="0">
-                    <div class="m3-search-animal-avatar">
-                      <img src="${escapeSearchHtml(img)}" alt="${escapeSearchHtml(a.nombre)}">
-                    </div>
-                    <div class="m3-search-item-body">
-                      <span class="m3-search-item-title">${escapeSearchHtml(a.nombre || 'Sin nombre')}</span>
-                      <span class="m3-search-item-sub">${escapeSearchHtml(a.raza || 'Otro')} • ${escapeSearchHtml(a.sexo || '—')}</span>
-                    </div>
-                    <span class="m3-search-item-meta">${escapeSearchHtml(peso)} kg</span>
-                    <button type="button" class="m3-search-item-action" data-fill-term="${escapeSearchHtml(a.nombre)}" title="Completar en buscador" aria-label="Completar en buscador">
-                      <span class="material-icons">north_west</span>
-                    </button>
-                  </div>
-                `;
-              }).join('')}
+            <div class="ganado-list m3-search-inventory-list">
+              ${suggestedAnimals.map(a => renderAnimalRow(a, emptyMap, emptyMap, emptyMap, emptyMap, emptyMap, cachedPesajesMap)).join('')}
             </div>
           </div>
         ` : '';
 
         focusedContent.innerHTML = chipsHtml + recentsHtml + animalsHtml;
       } else {
-        // 2. Typing / Live Search Results state in Contained Style
+        // 2. Typing / Live Search Results state using Inventory Card layout
         const matches = (cachedAnimals || []).filter(a => {
           const n = (a.nombre || '').toLowerCase();
           const r = (a.raza || '').toLowerCase();
           const s = (a.sexo || '').toLowerCase();
           return n.includes(qLower) || r.includes(qLower) || s.includes(qLower);
-        }).slice(0, 10);
+        }).slice(0, 12);
 
         const resultsHtml = matches.length > 0 ? `
           <div class="m3-fs-contained-section">
             <div class="m3-search-section-header">
               <span>Resultados (${matches.length})</span>
             </div>
-            <div class="m3-contained-list">
-              ${matches.map(a => {
-                const seed = encodeURIComponent(a.id || a.nombre || 'animal');
-                const img = a.image_url || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${seed}&backgroundColor=f0ebe3&radius=16`;
-                const peso = cachedPesajesMap.get(a.id) ?? a.peso_actual ?? 0;
-                return `
-                  <div class="m3-search-item m3-contained-item" data-animal-id="${escapeSearchHtml(a.id)}" data-animal-name="${escapeSearchHtml(a.nombre)}" role="option" tabindex="0">
-                    <div class="m3-search-animal-avatar">
-                      <img src="${escapeSearchHtml(img)}" alt="${escapeSearchHtml(a.nombre)}">
-                    </div>
-                    <div class="m3-search-item-body">
-                      <span class="m3-search-item-title">${highlightMatch(a.nombre || 'Sin nombre', q)}</span>
-                      <span class="m3-search-item-sub">${highlightMatch(a.raza || 'Otro', q)} • ${escapeSearchHtml(a.sexo || '—')}</span>
-                    </div>
-                    <span class="m3-search-item-meta">${escapeSearchHtml(peso)} kg</span>
-                    <button type="button" class="m3-search-item-action" data-fill-term="${escapeSearchHtml(a.nombre)}" title="Completar término" aria-label="Completar término">
-                      <span class="material-icons">north_west</span>
-                    </button>
-                  </div>
-                `;
-              }).join('')}
+            <div class="ganado-list m3-search-inventory-list">
+              ${matches.map(a => renderAnimalRow(a, emptyMap, emptyMap, emptyMap, emptyMap, emptyMap, cachedPesajesMap)).join('')}
             </div>
           </div>
         ` : `
@@ -2345,15 +2318,21 @@ export function initGanado() {
         return;
       }
 
-      const animalRow = e.target.closest('[data-animal-id]');
-      if (animalRow) {
-        const animalId = animalRow.dataset.animalId;
-        const animalName = animalRow.dataset.animalName;
+      const animalRow = e.target.closest('.ganado-row[data-animal-id]');
+      if (animalRow && !e.target.closest('.ganado-btn-more') && !e.target.closest('.action-menu')) {
+        const nameEl = animalRow.querySelector('.ganado-col-value');
+        const animalName = nameEl ? nameEl.textContent.trim() : '';
         if (animalName) saveRecentSearch(animalName);
         closeFocusedSearch();
-        if (animalId) window.navigateTo('detalle_animal', animalId);
       }
     });
+
+    window._refreshFocusedSearch = () => {
+      cachedAnimals = null;
+      if (isSearchFocused) {
+        renderFocusedSearchContent(fsInput.value, true);
+      }
+    };
   }
 
 

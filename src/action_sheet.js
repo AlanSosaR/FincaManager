@@ -303,6 +303,15 @@ export async function openActionBottomSheet(btn, menu) {
           <span class="material-icons" style="animation: spin 1s linear infinite; font-size: 20px; display: inline-block; vertical-align: middle;">sync</span> Cargando ficha técnica...
         </div>
       </div>
+      <!-- Footer fijo del sheet -->
+      <div class="sheet-quick-register-box" id="sheet-quick-register-footer">
+        <p class="sheet-quick-register-title">Registrar o programar</p>
+        <div class="sheet-quick-register-row">
+          <button type="button" class="sheet-quick-register-pill" data-open-sheet="add-peso">+ Peso</button>
+          <button type="button" class="sheet-quick-register-pill" data-open-sheet="add-vacuna">+ Vacuna</button>
+          <button type="button" class="sheet-quick-register-pill" data-open-sheet="add-fumig">+ Fumigación</button>
+        </div>
+      </div>
     ` : `
       <!-- Lista plana para casos sin animal -->
       <div class="m3-action-sheet-flat-list">
@@ -358,7 +367,7 @@ export async function openActionBottomSheet(btn, menu) {
 
   // Show in peek mode
   scrim.style.display = 'block';
-  sheet.style.display = 'block';
+  sheet.style.display = animalId ? 'flex' : 'block';
   sheet.style.transform = '';
 
   requestAnimationFrame(() => {
@@ -372,13 +381,13 @@ export async function openActionBottomSheet(btn, menu) {
   }
 }
 
-async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, attachActionHandlers) {
+async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, attachActionHandlers, options = {}) {
   try {
     const [animalRes, vacRes, fumRes, pesRes, pregRes] = await Promise.all([
       supabase.from('ganado').select('*').eq('id', animalId).maybeSingle(),
       supabase.from('animal_vacunas').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).limit(8),
       supabase.from('animal_fumigaciones').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).limit(8),
-      supabase.from('animal_pesajes').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).limit(8),
+      supabase.from('animal_pesajes').select('*').eq('animal_id', animalId).order('fecha', { ascending: false }).range(0, 999),
       supabase.from('animal_preñez').select('*').eq('animal_id', animalId).order('fecha_monta', { ascending: false }).limit(8)
     ]);
 
@@ -401,38 +410,67 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
     const pregnancies = [...(pregRes?.data || [])].sort((p1, p2) => (p2.fecha_monta || '').localeCompare(p1.fecha_monta || ''));
     const activePreg = pregnancies.find(p => p.estado === 'Preñada');
     const isFemale = !/macho|male|toro|torete/i.test(a.sexo || '');
-    const pesajes = [...(pesRes?.data || [])]
+    const pesajesAsc = [...(pesRes?.data || [])]
       .sort((p1, p2) => {
-        const dDiff = (p2.fecha || '').localeCompare(p1.fecha || '');
+        const dDiff = (p1.fecha || '').localeCompare(p2.fecha || '');
         if (dDiff !== 0) return dDiff;
-        return (p2.created_at || '').localeCompare(p1.created_at || '');
-      })
-      .slice(0, 5);
+        return (p1.created_at || '').localeCompare(p2.created_at || '');
+      });
+    const pesajes = [...pesajesAsc].reverse();
 
     const pesoUnidad = 'kg';
-    const pesoActual = pesajes[0]?.peso ?? a.peso_actual ?? '0';
+    const formatKgNum = (val) => {
+      const n = Math.round((parseFloat(val) || 0) * 10) / 10;
+      return Number.isInteger(n) ? String(n) : n.toFixed(1);
+    };
+    const formatShortPesoDate = (ymd) => {
+      if (!ymd) return '';
+      const [, m, d] = ymd.split('-');
+      const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+      return `${parseInt(d, 10)} ${months[(parseInt(m, 10) || 1) - 1] || ''}`;
+    };
+    const daysBetween = (fromYmd, toYmd) => {
+      if (!fromYmd || !toYmd) return 0;
+      const d1 = new Date(fromYmd + 'T00:00:00');
+      const d2 = new Date(toYmd + 'T00:00:00');
+      return Math.max(0, Math.round((d2 - d1) / 86400000));
+    };
 
-    let pesoTrendHtml = '';
-    if (pesajes.length >= 1) {
-      const latestPeso = parseFloat(pesajes[0]?.peso);
-      const prevPeso = pesajes.length >= 2 ? parseFloat(pesajes[1]?.peso) : null;
-      if (!isNaN(latestPeso) && prevPeso !== null && !isNaN(prevPeso)) {
-        const change = latestPeso - prevPeso;
-        let arrow = '→';
-        let arrowClass = 'same';
-        let changeText = '±0';
-        if (change > 0) {
-          arrow = '↑';
-          arrowClass = 'up';
-          changeText = `+${change.toFixed(1)}`;
-        } else if (change < 0) {
-          arrow = '↓';
-          arrowClass = 'down';
-          changeText = `${change.toFixed(1)}`;
-        }
-        pesoTrendHtml = `<span class="ganado-trend-body" style="margin-left: 10px; font-size: 14px; font-weight: 800;"><span class="ganado-trend-arrow ${arrowClass}">${arrow}</span> <span class="ganado-trend-change ${arrowClass}">${changeText} kg</span></span>`;
+    const pesoStats = pesajesAsc.map((p, idx) => {
+      const kg = Math.round((parseFloat(p.peso) || 0) * 10) / 10;
+      if (idx === 0) {
+        return {
+          ...p,
+          idx,
+          kg,
+          isFirst: true,
+          trend: 'first',
+          delta: null,
+          days: null,
+          rate: null,
+          prev: null
+        };
       }
-    }
+      const prev = pesajesAsc[idx - 1];
+      const prevKg = Math.round((parseFloat(prev.peso) || 0) * 10) / 10;
+      const delta = Math.round((kg - prevKg) * 10) / 10;
+      const days = daysBetween(prev.fecha, p.fecha);
+      const rate = days > 0 ? (delta / days).toFixed(2) : null;
+      const trend = delta > 0 ? 'up' : (delta < 0 ? 'down' : 'same');
+      return {
+        ...p,
+        idx,
+        kg,
+        isFirst: false,
+        trend,
+        delta,
+        days,
+        rate,
+        prev: { ...prev, kg: prevKg }
+      };
+    });
+
+    const pesoActual = pesoStats.length > 0 ? formatKgNum(pesoStats[pesoStats.length - 1].kg) : formatKgNum(a.peso_actual ?? 0);
 
     const vacunasHtml = vacunas.length > 0 ? vacunas.map((v) => `
       <div class="sheet-peso-swipe-wrap" data-record-id="${escapeHtml(v.id)}" data-record-type="vacuna">
@@ -481,6 +519,248 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
 
     const edadStr = calcEdad(a.fecha_nacimiento);
 
+    // Pending (Programada) vacunas & fumigaciones
+    const todayStr = getLocalToday();
+    const pendingItems = [
+      ...(vacRes?.data || []).filter(v => v.estado === 'Programada').map(v => ({
+        id: v.id,
+        type: 'vacuna',
+        tipoLabel: 'Vacuna',
+        titulo: v.nombre || 'Vacuna',
+        fecha: v.fecha || '',
+        dosis: v.dosis || '',
+        raw: v
+      })),
+      ...(fumRes?.data || []).filter(f => f.estado === 'Programada').map(f => ({
+        id: f.id,
+        type: 'fumig',
+        tipoLabel: 'Fumigación',
+        titulo: f.producto || 'Fumigación',
+        fecha: f.fecha || '',
+        dosis: f.dosis || '',
+        raw: f
+      }))
+    ].sort((x, y) => (x.fecha || '').localeCompare(y.fecha || ''));
+
+    const pendingSectionHtml = pendingItems.length > 0 ? `
+      <div class="sheet-pending-section">
+        <div class="sheet-pending-header">
+          <span class="material-icons">schedule</span>
+          <span>PENDIENTE · ${pendingItems.length}</span>
+        </div>
+        ${pendingItems.map(item => {
+          let badgeText = 'PROGRAMADA';
+          let badgeClass = 'is-future';
+          if (item.fecha && item.fecha < todayStr) {
+            const d1 = new Date(item.fecha + 'T00:00:00');
+            const d2 = new Date(todayStr + 'T00:00:00');
+            const diffDays = Math.max(1, Math.round((d2 - d1) / 86400000));
+            badgeText = `ATRASADA · ${diffDays} DÍA${diffDays === 1 ? '' : 'S'}`;
+            badgeClass = 'is-late';
+          } else if (item.fecha && item.fecha === todayStr) {
+            badgeText = 'PARA HOY';
+            badgeClass = 'is-today';
+          } else if (item.fecha && item.fecha > todayStr) {
+            const d1 = new Date(todayStr + 'T00:00:00');
+            const d2 = new Date(item.fecha + 'T00:00:00');
+            const diffDays = Math.max(1, Math.round((d2 - d1) / 86400000));
+            badgeText = `EN ${diffDays} DÍA${diffDays === 1 ? '' : 'S'}`;
+            badgeClass = 'is-future';
+          }
+          return `
+            <div class="sheet-pending-card ${badgeClass}" data-pending-id="${escapeHtml(item.id)}" data-pending-type="${item.type}">
+              <div class="sheet-pending-top">
+                <span class="sheet-pending-kind">${escapeHtml(item.tipoLabel)}</span>
+                <span class="sheet-pending-badge ${badgeClass}">${escapeHtml(badgeText)}</span>
+              </div>
+              <div class="sheet-pending-title">${escapeHtml(item.titulo)}</div>
+              <div class="sheet-pending-meta">${formatFecha(item.fecha)}${item.dosis ? ` · Dosis ${escapeHtml(item.dosis)}` : ''}</div>
+              <div class="sheet-pending-actions">
+                <button type="button" class="sheet-pending-btn sheet-pending-btn--apply" data-pending-action="apply">✓ Aplicar</button>
+                <button type="button" class="sheet-pending-btn sheet-pending-btn--edit" data-pending-action="edit">Editar</button>
+                <button type="button" class="sheet-pending-btn sheet-pending-btn--cancel" data-pending-action="cancel">Cancelar</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : '';
+
+    const latestPesoStat = pesoStats.length > 0 ? pesoStats[pesoStats.length - 1] : null;
+    const pesoDateStr = latestPesoStat?.fecha ? formatFecha(latestPesoStat.fecha) : '';
+
+    let pesoCollapsedSubHtml = '<div class="sheet-collapsible-sub">Sin pesajes registrados</div>';
+    if (pesoStats.length === 1) {
+      pesoCollapsedSubHtml = '<div class="sheet-collapsible-sub">Primer pesaje · aún sin comparación</div>';
+    } else if (pesoStats.length >= 2 && latestPesoStat) {
+      const prevStat = latestPesoStat.prev;
+      const dVal = latestPesoStat.delta;
+      let pillText = '→ Se mantiene igual';
+      if (dVal > 0) pillText = `↑ Subió ${formatKgNum(dVal)} kg`;
+      else if (dVal < 0) pillText = `↓ Bajó ${formatKgNum(Math.abs(dVal))} kg`;
+      const daysLabel = `${latestPesoStat.days} ${latestPesoStat.days === 1 ? 'día' : 'días'}`;
+      pesoCollapsedSubHtml = `
+        <div class="sheet-peso-collapsed-status">
+          <span class="sheet-peso-status-pill is-${latestPesoStat.trend}">${escapeHtml(pillText)}</span>
+          <span class="sheet-peso-collapsed-vs">en ${escapeHtml(daysLabel)} (vs. ${escapeHtml(formatFecha(prevStat?.fecha))})</span>
+        </div>
+      `;
+    }
+
+    let selectedPesoIdx = pesoStats.length > 0 ? pesoStats.length - 1 : -1;
+    if (options.selectPesoId && pesoStats.length > 0) {
+      const foundIdx = pesoStats.findIndex(s => String(s.id) === String(options.selectPesoId));
+      if (foundIdx >= 0) selectedPesoIdx = foundIdx;
+    }
+
+    const renderPesoDetailPanelHtml = (idx) => {
+      const s = pesoStats[idx];
+      if (!s) return '';
+      if (s.isFirst) {
+        return `
+          <div class="sheet-peso-detail-panel is-first">
+            <div class="sheet-peso-detail-circle is-first" aria-hidden="true">1.º</div>
+            <div class="sheet-peso-detail-copy">
+              <div class="sheet-peso-detail-title">Primer pesaje: ${escapeHtml(formatKgNum(s.kg))} kg</div>
+              <div class="sheet-peso-detail-meta">Registrado el ${escapeHtml(formatFecha(s.fecha))} · Aún sin comparación</div>
+            </div>
+          </div>
+        `;
+      }
+      const prev = s.prev;
+      const icon = s.trend === 'up' ? '↑' : (s.trend === 'down' ? '↓' : '→');
+      const headline = s.trend === 'up'
+        ? `Subió ${formatKgNum(s.delta)} kg`
+        : (s.trend === 'down' ? `Bajó ${formatKgNum(Math.abs(s.delta))} kg` : 'Se mantuvo igual');
+      const daysText = `${s.days} ${s.days === 1 ? 'día' : 'días'}`;
+      const rateText = s.rate !== null ? ` · ${s.rate} kg/día` : '';
+      return `
+        <div class="sheet-peso-detail-panel is-${s.trend}">
+          <div class="sheet-peso-detail-circle is-${s.trend}" aria-hidden="true">${icon}</div>
+          <div class="sheet-peso-detail-copy">
+            <div class="sheet-peso-detail-title">${escapeHtml(headline)}</div>
+            <div class="sheet-peso-detail-meta">De ${escapeHtml(formatKgNum(prev.kg))} kg (${escapeHtml(formatFecha(prev.fecha))}) a ${escapeHtml(formatKgNum(s.kg))} kg (${escapeHtml(formatFecha(s.fecha))}) · ${escapeHtml(daysText)}${escapeHtml(rateText)}</div>
+          </div>
+        </div>
+      `;
+    };
+
+    const buildPesoExpandedBodyHtml = () => {
+      if (pesoStats.length === 0) {
+        return '<p style="font-size: 12.5px; color: var(--m3-on-surface-variant, #666); margin: 0;">Sin pesajes registrados</p>';
+      }
+      const minKg = Math.min(...pesoStats.map(s => s.kg));
+      const maxKg = Math.max(...pesoStats.map(s => s.kg));
+
+      const barsHtml = pesoStats.map((s, idx) => {
+        const barH = maxKg === minKg
+          ? 70
+          : Math.round(34 + ((s.kg - minKg) / (maxKg - minKg)) * 86);
+        const topLabel = s.isFirst
+          ? '1.º'
+          : (s.delta > 0 ? `↑ +${formatKgNum(s.delta)}` : (s.delta < 0 ? `↓ −${formatKgNum(Math.abs(s.delta))}` : '→ 0'));
+        const ariaChange = s.isFirst
+          ? 'primer pesaje'
+          : (s.delta > 0 ? `subió ${formatKgNum(s.delta)} kg` : (s.delta < 0 ? `bajó ${formatKgNum(Math.abs(s.delta))} kg` : 'se mantuvo igual'));
+        const isSel = idx === selectedPesoIdx;
+        return `
+          <button type="button"
+                  class="sheet-peso-bar-btn is-${s.trend} ${isSel ? 'is-selected' : ''}"
+                  data-peso-idx="${idx}"
+                  aria-pressed="${isSel ? 'true' : 'false'}"
+                  aria-label="${escapeHtml(`${formatFecha(s.fecha)}, ${formatKgNum(s.kg)} kg, ${ariaChange}`)}">
+            <span class="sheet-peso-bar-delta is-${s.trend}">${escapeHtml(topLabel)}</span>
+            <span class="sheet-peso-bar-val">${escapeHtml(formatKgNum(s.kg))}</span>
+            <span class="sheet-peso-bar-col is-${s.trend}" style="height: ${barH}px;"></span>
+            <span class="sheet-peso-bar-date">${escapeHtml(formatShortPesoDate(s.fecha))}</span>
+          </button>
+        `;
+      }).join('');
+
+      let summaryRowsHtml = '';
+      if (pesoStats.length >= 2) {
+        const first = pesoStats[0];
+        const last = pesoStats[pesoStats.length - 1];
+        const totalDelta = Math.round((last.kg - first.kg) * 10) / 10;
+        const totalDays = daysBetween(first.fecha, last.fecha);
+        const totalTrend = totalDelta > 0 ? 'up' : (totalDelta < 0 ? 'down' : 'same');
+        const totalBadgeText = totalDelta > 0
+          ? `↑ +${formatKgNum(totalDelta)} kg`
+          : (totalDelta < 0 ? `↓ −${formatKgNum(Math.abs(totalDelta))} kg` : '→ 0 kg');
+        const avgDailyText = (totalDelta !== 0 && totalDays > 0)
+          ? `${(totalDelta / totalDays).toFixed(2)} kg/día`
+          : 'Sin cambio';
+
+        summaryRowsHtml = `
+          <div class="sheet-peso-summary-rows">
+            <div class="sheet-peso-summary-row">
+              <div>
+                <div class="sheet-peso-summary-title">Desde el primer pesaje</div>
+                <div class="sheet-peso-summary-sub">${escapeHtml(formatFecha(first.fecha))} · ${totalDays} ${totalDays === 1 ? 'día' : 'días'}</div>
+              </div>
+              <span class="sheet-peso-status-pill is-${totalTrend}">${escapeHtml(totalBadgeText)}</span>
+            </div>
+            <div class="sheet-peso-summary-row">
+              <div class="sheet-peso-summary-title">Ganancia diaria promedio</div>
+              <div class="sheet-peso-summary-val">${escapeHtml(avgDailyText)}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      const listHtml = [...pesoStats].reverse().map((s) => {
+        const icon = s.isFirst ? '1.º' : (s.trend === 'up' ? '↑' : (s.trend === 'down' ? '↓' : '→'));
+        const phrase = s.isFirst
+          ? 'Primer pesaje registrado'
+          : (s.trend === 'up'
+            ? `Subió ${formatKgNum(s.delta)} kg desde el ${formatFecha(s.prev.fecha)} · ${s.days} ${s.days === 1 ? 'día' : 'días'}`
+            : (s.trend === 'down'
+              ? `Bajó ${formatKgNum(Math.abs(s.delta))} kg desde el ${formatFecha(s.prev.fecha)} · ${s.days} ${s.days === 1 ? 'día' : 'días'}`
+              : `Se mantuvo igual desde el ${formatFecha(s.prev.fecha)} · ${s.days} ${s.days === 1 ? 'día' : 'días'}`));
+        return `
+          <div class="sheet-peso-history-item">
+            <div class="sheet-peso-history-circle is-${s.trend}" aria-hidden="true">${icon}</div>
+            <div class="sheet-peso-history-copy">
+              <div class="sheet-peso-history-kg">${escapeHtml(formatKgNum(s.kg))} kg</div>
+              <div class="sheet-peso-history-date">${escapeHtml(formatFecha(s.fecha))}</div>
+              <div class="sheet-peso-history-phrase is-${s.trend}">${escapeHtml(phrase)}</div>
+            </div>
+            <button type="button" class="sheet-peso-edit-btn" data-edit-peso-id="${escapeHtml(s.id)}" aria-label="Editar pesaje del ${escapeHtml(formatFecha(s.fecha))}">
+              <span class="material-icons">edit</span>
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="sheet-peso-chart-scroll">
+          <div class="sheet-peso-bars">${barsHtml}</div>
+        </div>
+        <div id="sheet-peso-detail-panel">${renderPesoDetailPanelHtml(selectedPesoIdx)}</div>
+        <p class="sheet-peso-legend">Toca una barra para ver el detalle. Verde ↑ subió · Rojo ↓ bajó · Gris igual o primero. La altura es solo comparativa.</p>
+        ${summaryRowsHtml}
+        <div class="sheet-peso-history-list">${listHtml}</div>
+      `;
+    };
+
+    const isPesoInitiallyOpen = Boolean(options.expandPeso);
+
+    const buildTreatmentSummary = (items) => {
+      const applied = items.filter(x => (x.estado || 'Aplicada') === 'Aplicada');
+      const pending = items.filter(x => x.estado === 'Programada');
+      const parts = [];
+      if (applied.length > 0) {
+        parts.push(`Última: ${formatFecha(applied[0].fecha)} · Aplicada`);
+      }
+      if (pending.length > 0) {
+        parts.push(`${pending.length} pendiente${pending.length === 1 ? '' : 's'}`);
+      }
+      return parts.length > 0 ? parts.join(' · ') : 'Sin registros';
+    };
+
+    const vacunasSummary = buildTreatmentSummary(vacunas);
+    const fumigSummary = buildTreatmentSummary(fumigaciones);
+
     // Populating detailsContainer
     detailsContainer.innerHTML = `
       <!-- Ficha de Identificación -->
@@ -490,16 +770,6 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
             <span class="material-icons" style="font-size: 18px; color: #2d3e2c;">badge</span>
             <span>Ficha de Identificación</span>
           </div>
-          ${itemsHtml ? `
-            <div class="sheet-ficha-menu-wrap">
-              <button type="button" class="sheet-ficha-more-btn" id="sheet-ficha-more-btn" aria-label="Más opciones" title="Opciones">
-                <span class="material-icons">more_vert</span>
-              </button>
-              <div class="sheet-ficha-dropdown" id="sheet-ficha-dropdown">
-                ${itemsHtml}
-              </div>
-            </div>
-          ` : ''}
         </div>
         <div class="sheet-detail-grid">
           <div class="sheet-detail-item">
@@ -512,7 +782,7 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
           </div>
           <div class="sheet-detail-item">
             <span class="sheet-detail-label">Sexo / Raza</span>
-            <span class="sheet-detail-value">${escapeHtml(a.sexo || '-')} • ${escapeHtml(a.raza || 'Bovino')}</span>
+            <span class="sheet-detail-value">${escapeHtml(a.sexo || '-')} • <span style="color: #e65100; font-weight: 800;">${escapeHtml(a.raza || 'Bovino')}</span></span>
           </div>
           ${!/macho|male|toro|torete/i.test(a.sexo || '') ? `
           <div class="sheet-detail-item">
@@ -535,13 +805,36 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
         </div>
       </div>
 
+      ${pendingSectionHtml}
+
       ${isFemale ? (() => {
         const addDaysLocal = (dateStr, days) => {
           const d = new Date((dateStr || getLocalToday()) + 'T12:00:00');
           d.setDate(d.getDate() + days);
           return d.toISOString().split('T')[0];
         };
-        const prenezListHtml = pregnancies.slice(0, 5).map(p => {
+        const formatMonthsDays = (fromYmd, toYmd) => {
+          if (!fromYmd || !toYmd || toYmd <= fromYmd) return '0 días';
+          const [y1, m1, d1] = fromYmd.split('-').map(Number);
+          const [y2, m2, d2] = toYmd.split('-').map(Number);
+          let months = (y2 - y1) * 12 + (m2 - m1);
+          let days = d2 - d1;
+          if (days < 0) {
+            months -= 1;
+            const prevMonthLastDay = new Date(y2, m2 - 1, 0).getDate();
+            days += prevMonthLastDay;
+          }
+          const parts = [];
+          if (months > 0) parts.push(`${months} ${months === 1 ? 'mes' : 'meses'}`);
+          if (days > 0 || parts.length === 0) parts.push(`${days} ${days === 1 ? 'día' : 'días'}`);
+          return parts.join(' y ');
+        };
+
+        const pastPregnancies = activePreg
+          ? pregnancies.filter(p => p.id !== activePreg.id)
+          : pregnancies;
+
+        const prenezListHtml = pastPregnancies.slice(0, 5).map(p => {
           const estado = p.estado || 'Preñada';
           const badgeClass = estado === 'Parida' ? 'badge-ok' : (estado === 'Preñada' ? 'badge-pending' : '');
           const badgeStyle = estado === 'Abortada' ? 'background:#ffebee;color:#c62828;' : '';
@@ -568,63 +861,68 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
 
         let activeBannerHtml = '';
         if (activePreg) {
+          const todayLocal = getLocalToday();
           const fPartoProb = activePreg.fecha_probable_parto || addDaysLocal(activePreg.fecha_monta, 283);
-          const diffRest = Math.ceil((new Date(fPartoProb + 'T00:00:00') - new Date(getLocalToday() + 'T00:00:00')) / 86400000);
+          const diffRest = Math.ceil((new Date(fPartoProb + 'T00:00:00') - new Date(todayLocal + 'T00:00:00')) / 86400000);
           const diasTrans = activePreg.fecha_monta
-            ? Math.max(0, Math.floor((new Date(getLocalToday() + 'T00:00:00') - new Date(activePreg.fecha_monta + 'T00:00:00')) / 86400000))
+            ? Math.max(0, Math.floor((new Date(todayLocal + 'T00:00:00') - new Date(activePreg.fecha_monta + 'T00:00:00')) / 86400000))
             : 0;
-          const restLabel = diffRest > 0
-            ? `${diffRest} días para parto`
-            : (diffRest === 0 ? '¡Fecha de parto hoy!' : `Sobre fecha (+${Math.abs(diffRest)}d)`);
+          const pct = Math.max(0, Math.min(100, Math.round((diasTrans / 283) * 100)));
+          const mesActual = Math.min(9, Math.max(1, Math.floor(diasTrans / 30.44) + 1));
+          const elapsedStr = activePreg.fecha_monta ? formatMonthsDays(activePreg.fecha_monta, todayLocal) : `${diasTrans} días`;
+          const remainingStr = diffRest > 0
+            ? formatMonthsDays(todayLocal, fPartoProb)
+            : (diffRest === 0 ? '¡Parto hoy!' : `Atrasado ${Math.abs(diffRest)} días`);
 
           activeBannerHtml = `
-            <div style="background: #fff8ee; border: 1.5px solid #ffe0b2; border-radius: 14px; padding: 10px 12px; margin-bottom: 10px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
-                <span style="background: #fff3e0; color: #b26a00; border: 1px solid #ffcc80; font-weight: 800; font-size: 11px; padding: 3px 9px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px;">
-                  <img src="/cow.png" style="width: 14px; height: 14px; object-fit: contain;">
-                  <span>Gestación en Curso</span>
-                </span>
-                <span style="font-size: 12px; font-weight: 800; color: #e65100;">${escapeHtml(restLabel)}</span>
-              </div>
-              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #fff; border-radius: 10px; padding: 8px 10px; border: 1px solid #f3e2c7; margin-bottom: 10px;">
-                <div>
-                  <span style="display: block; font-size: 9.5px; font-weight: 800; color: #777; text-transform: uppercase;">Monta</span>
-                  <span style="font-size: 11.5px; font-weight: 800; color: #1e3e2b;">${escapeHtml(formatFecha(activePreg.fecha_monta))}</span>
-                </div>
-                <div>
-                  <span style="display: block; font-size: 9.5px; font-weight: 800; color: #777; text-transform: uppercase;">Parto Est.</span>
-                  <span style="font-size: 11.5px; font-weight: 800; color: #e65100;">${escapeHtml(formatFecha(fPartoProb))}</span>
-                </div>
-                <div>
-                  <span style="display: block; font-size: 9.5px; font-weight: 800; color: #777; text-transform: uppercase;">Gestación</span>
-                  <span style="font-size: 11.5px; font-weight: 800; color: #2d3e2c;">${diasTrans} días</span>
+            <div class="sheet-gestation-card">
+              <div class="sheet-gestation-top">
+                <span class="sheet-gestation-pill">Gestación en curso</span>
+                <div class="sheet-gestation-top-right">
+                  <span class="sheet-gestation-pct">${pct} %</span>
+                  <button type="button" class="sheet-gestation-edit-icon" data-open-sheet="edit-prenez" title="Editar preñez" aria-label="Editar preñez">
+                    <span class="material-icons">edit</span>
+                  </button>
                 </div>
               </div>
-              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <button type="button" class="sheet-card-add-btn" data-open-sheet="parto-prenez" style="flex: 1; justify-content: center; padding: 7px 10px;">
-                  <span class="material-icons" style="font-size: 15px;">child_care</span>
-                  <span>Registrar Parto</span>
-                </button>
-                <button type="button" class="sheet-card-add-btn" data-open-sheet="edit-prenez" style="background: #eef5ee; color: #2d3e2c; border: 1px solid #c8dcc6; box-shadow: none; padding: 7px 10px;">
-                  <span class="material-icons" style="font-size: 15px; color: #2d3e2c;">edit</span>
-                  <span>Editar</span>
-                </button>
-                <button type="button" class="sheet-card-add-btn" data-open-sheet="abort-prenez" style="background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; box-shadow: none; padding: 7px 10px;">
-                  <span class="material-icons" style="font-size: 15px; color: #c62828;">cancel</span>
-                  <span>Aborto</span>
-                </button>
+              <div class="sheet-gestation-month-row">
+                <span class="sheet-gestation-month">Mes ${mesActual}</span>
+                <span class="sheet-gestation-of">de 9</span>
+              </div>
+              <div class="sheet-gestation-sub">Monta ${escapeHtml(formatFecha(activePreg.fecha_monta))} · ${escapeHtml(elapsedStr)}</div>
+              <div class="sheet-gestation-progress">
+                <div class="sheet-gestation-progress-fill" style="width: ${pct}%;"></div>
+              </div>
+              <div class="sheet-gestation-info-box">
+                <div>
+                  <span class="sheet-gestation-info-label">PARTO ESTIMADO</span>
+                  <span class="sheet-gestation-info-val is-accent">${escapeHtml(formatFecha(fPartoProb))}</span>
+                </div>
+                <div>
+                  <span class="sheet-gestation-info-label">FALTAN</span>
+                  <span class="sheet-gestation-info-val">${escapeHtml(remainingStr)}</span>
+                </div>
+              </div>
+              <div class="sheet-gestation-actions">
+                <button type="button" class="sheet-gestation-btn sheet-gestation-btn--primary" data-open-sheet="parto-prenez">Registrar parto</button>
+                <button type="button" class="sheet-gestation-btn sheet-gestation-btn--abort" data-open-sheet="abort-prenez">Aborto</button>
               </div>
             </div>
           `;
         }
 
+        if (activePreg && pastPregnancies.length === 0) {
+          return activeBannerHtml;
+        }
+
         return `
           <!-- Preñez / Reproducción (Hembras) -->
+          ${activeBannerHtml}
           <div class="sheet-detail-card">
             <div class="sheet-detail-card-header-row" style="margin-bottom: 10px;">
               <div class="sheet-detail-card-title" style="margin-bottom: 0;">
                 <img src="/cow.png" style="width: 18px; height: 18px; object-fit: contain;">
-                <span>Preñez y Reproducción</span>
+                <span>${activePreg ? 'Historial de Preñez' : 'Preñez y Reproducción'}</span>
               </div>
               ${!activePreg ? `
                 <button type="button" class="sheet-card-add-btn" data-open-sheet="add-prenez">
@@ -633,7 +931,6 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
                 </button>
               ` : ''}
             </div>
-            ${activeBannerHtml}
             <div class="sheet-tag-list" style="gap: 6px;">
               ${prenezListHtml || '<p style="font-size: 11.5px; color: #888; margin: 0;">Sin registros de preñez</p>'}
             </div>
@@ -642,83 +939,106 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
       })() : ''}
 
       <!-- Control de Peso -->
-      <div class="sheet-detail-card">
-        <div class="sheet-detail-card-header-row">
-          <div class="sheet-detail-card-title" style="margin-bottom: 0;">
-            <span class="material-icons" style="font-size: 18px; color: #2d3e2c;">scale</span>
-            <span>Control de Peso</span>
+      <div class="sheet-detail-card sheet-collapsible-card sheet-peso-card ${isPesoInitiallyOpen ? 'is-open' : ''}" data-collapsible="peso">
+        <button type="button" class="sheet-collapsible-trigger" aria-expanded="${isPesoInitiallyOpen ? 'true' : 'false'}">
+          <div class="sheet-collapsible-summary">
+            <div class="sheet-collapsible-eyebrow">PESO ACTUAL</div>
+            <div class="sheet-collapsible-weight-row">
+              <span class="sheet-collapsible-weight-val">${escapeHtml(pesoActual)} ${escapeHtml(pesoUnidad)}</span>
+              ${pesoDateStr ? `<span class="sheet-collapsible-weight-date">· ${escapeHtml(pesoDateStr)}</span>` : ''}
+            </div>
+            ${pesoCollapsedSubHtml}
           </div>
-          <button type="button" class="sheet-card-add-btn" data-open-sheet="add-peso">
-            <span class="material-icons">add</span>
-            <span>Registrar</span>
-          </button>
-        </div>
-        <div style="margin: 8px 0 10px; display: flex; align-items: baseline; flex-wrap: wrap;">
-          <span class="sheet-detail-label" style="color: #e65100; font-weight: 800;">Peso Actual:</span>
-          <span style="font-size: 16px; font-weight: 900; color: #e65100; margin-left: 6px;">${escapeHtml(pesoActual)} ${escapeHtml(pesoUnidad)}</span>
-          ${pesoTrendHtml}
-        </div>
-        <div class="sheet-tag-list">
-          ${pesajesHtml}
+          <span class="material-icons sheet-collapsible-chevron">chevron_right</span>
+        </button>
+        <div class="sheet-collapsible-body">
+          ${buildPesoExpandedBodyHtml()}
         </div>
       </div>
 
       <!-- Vacunas -->
-      <div class="sheet-detail-card" style="padding: 12px 14px;">
-        <div class="sheet-detail-card-header-row" style="margin-bottom: 8px;">
-          <div class="sheet-detail-card-title" style="font-size: 11.5px; margin-bottom: 0;">
-            <span class="material-icons" style="font-size: 16px; color: #2d3e2c;">vaccines</span>
-            <span>Vacunas (Aplicadas y Programadas)</span>
+      <div class="sheet-detail-card sheet-collapsible-card" data-collapsible="vacunas">
+        <button type="button" class="sheet-collapsible-trigger" aria-expanded="false">
+          <div class="sheet-collapsible-summary">
+            <div class="sheet-collapsible-title">Vacunas</div>
+            <div class="sheet-collapsible-sub">${escapeHtml(vacunasSummary)}</div>
           </div>
-          <button type="button" class="sheet-card-add-btn" data-open-sheet="add-vacuna">
-            <span class="material-icons">add</span>
-            <span>Registrar</span>
-          </button>
-        </div>
-        <div class="sheet-tag-list" style="gap: 6px;">
-          ${vacunasHtml}
+          <span class="material-icons sheet-collapsible-chevron">chevron_right</span>
+        </button>
+        <div class="sheet-collapsible-body">
+          <div class="sheet-tag-list" style="gap: 6px;">
+            ${vacunasHtml}
+          </div>
         </div>
       </div>
 
       <!-- Fumigaciones -->
-      <div class="sheet-detail-card" style="padding: 12px 14px;">
-        <div class="sheet-detail-card-header-row" style="margin-bottom: 8px;">
-          <div class="sheet-detail-card-title" style="font-size: 11.5px; margin-bottom: 0;">
-            <span class="material-icons" style="font-size: 16px; color: #2d3e2c;">pest_control</span>
-            <span>Fumigaciones / Baños</span>
+      <div class="sheet-detail-card sheet-collapsible-card" data-collapsible="fumig">
+        <button type="button" class="sheet-collapsible-trigger" aria-expanded="false">
+          <div class="sheet-collapsible-summary">
+            <div class="sheet-collapsible-title">Fumigaciones / baños</div>
+            <div class="sheet-collapsible-sub">${escapeHtml(fumigSummary)}</div>
           </div>
-          <button type="button" class="sheet-card-add-btn" data-open-sheet="add-fumig">
-            <span class="material-icons">add</span>
-            <span>Registrar</span>
-          </button>
-        </div>
-        <div class="sheet-tag-list" style="gap: 6px;">
-          ${fumigHtml}
+          <span class="material-icons sheet-collapsible-chevron">chevron_right</span>
+        </button>
+        <div class="sheet-collapsible-body">
+          <div class="sheet-tag-list" style="gap: 6px;">
+            ${fumigHtml}
+          </div>
         </div>
       </div>
     `;
 
-    // Re-attach action handlers for the action buttons inside Ficha 3-dot menu
-    attachActionHandlers(detailsContainer);
-
-    const fichaMoreBtn = detailsContainer.querySelector('#sheet-ficha-more-btn');
-    const fichaDropdown = detailsContainer.querySelector('#sheet-ficha-dropdown');
-    if (fichaMoreBtn && fichaDropdown) {
-      fichaMoreBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fichaDropdown.classList.toggle('open');
-      });
-      sheet.addEventListener('click', (e) => {
-        if (!e.target.closest('.sheet-ficha-menu-wrap')) {
-          fichaDropdown.classList.remove('open');
+    detailsContainer.querySelectorAll('.sheet-collapsible-trigger').forEach((trigger) => {
+      trigger.addEventListener('click', () => {
+        const card = trigger.closest('.sheet-collapsible-card');
+        if (!card) return;
+        const isOpen = card.classList.toggle('is-open');
+        trigger.setAttribute('aria-expanded', String(isOpen));
+        if (isOpen && card.dataset.collapsible === 'peso') {
+          const selBar = card.querySelector('.sheet-peso-bar-btn.is-selected');
+          selBar?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
       });
+    });
+
+    if (isPesoInitiallyOpen) {
+      const selBar = detailsContainer.querySelector('.sheet-peso-card .sheet-peso-bar-btn.is-selected');
+      requestAnimationFrame(() => selBar?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'end' }));
     }
 
-    const reloadDetails = () => {
-      loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, attachActionHandlers);
+    const reloadDetails = (reloadOpts = {}) => {
+      loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, attachActionHandlers, reloadOpts);
       notifyParentRefresh();
     };
+
+    const detailPanelEl = detailsContainer.querySelector('#sheet-peso-detail-panel');
+    detailsContainer.querySelectorAll('.sheet-peso-bar-btn').forEach((barBtn) => {
+      barBtn.addEventListener('click', () => {
+        const idx = parseInt(barBtn.dataset.pesoIdx, 10);
+        if (isNaN(idx) || !pesoStats[idx]) return;
+        selectedPesoIdx = idx;
+        detailsContainer.querySelectorAll('.sheet-peso-bar-btn').forEach((b) => {
+          const active = parseInt(b.dataset.pesoIdx, 10) === idx;
+          b.classList.toggle('is-selected', active);
+          b.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        if (detailPanelEl) {
+          detailPanelEl.innerHTML = renderPesoDetailPanelHtml(idx);
+        }
+      });
+    });
+
+    detailsContainer.querySelectorAll('.sheet-peso-edit-btn').forEach((editBtn) => {
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pesoId = editBtn.dataset.editPesoId;
+        const pObj = pesajes.find(p => String(p.id) === String(pesoId));
+        if (pObj) {
+          openPesoDetailSheet(a, pObj, pesoUnidad, pesoStats.length, reloadDetails);
+        }
+      });
+    });
 
     const confirmDeleteRecord = (recordId, recordType, resetCardFn) => {
       const configMap = {
@@ -905,9 +1225,87 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
       });
     });
 
-    // Bind "+ Registrar" and Preñez buttons
-    detailsContainer.querySelectorAll('[data-open-sheet]').forEach(btnEl => {
-      btnEl.addEventListener('click', (e) => {
+    // Bind Pending card actions (Aplicar / Editar / Cancelar)
+    detailsContainer.querySelectorAll('.sheet-pending-card [data-pending-action]').forEach(btnEl => {
+      btnEl.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const card = btnEl.closest('.sheet-pending-card');
+        const pId = card?.dataset.pendingId;
+        const pType = card?.dataset.pendingType;
+        const action = btnEl.dataset.pendingAction;
+        const pItem = pendingItems.find(x => String(x.id) === String(pId) && x.type === pType);
+        if (!pItem) return;
+
+        const table = pType === 'vacuna' ? 'animal_vacunas' : 'animal_fumigaciones';
+
+        if (action === 'apply') {
+          btnEl.disabled = true;
+          try {
+            const payload = { estado: 'Aplicada' };
+            await restFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(pId)}`, {
+              method: 'PATCH',
+              body: JSON.stringify(payload)
+            });
+            if (db[table]) {
+              const existing = await db[table].get(pId).catch(() => null);
+              if (existing) await db[table].put({ ...existing, ...payload }).catch(() => {});
+            }
+            syncTable(table);
+            if (pType === 'vacuna') {
+              sendWhatsApp(
+                '✅ Vacuna Aplicada\nAnimal: ' + (a.nombre || 'Animal') +
+                '\nVacuna: ' + pItem.titulo +
+                '\nDosis: ' + (pItem.dosis || 'N/A') +
+                '\nFecha: ' + (pItem.fecha || getLocalToday()) +
+                '\nFinca: ' + (window._empresaNombre || '')
+              );
+            } else {
+              sendWhatsApp(
+                '✅ Fumigación Aplicada\nAnimal: ' + (a.nombre || 'Animal') +
+                '\nProducto: ' + pItem.titulo +
+                '\nDosis: ' + (pItem.dosis || 'N/A') +
+                '\nFecha: ' + (pItem.fecha || getLocalToday()) +
+                '\nFinca: ' + (window._empresaNombre || '')
+              );
+            }
+            showSnackbar(`${pItem.tipoLabel} marcada como Aplicada ✓`);
+            reloadDetails();
+          } catch (err) {
+            showSnackbar(err.message || 'Error al aplicar', 'error');
+            btnEl.disabled = false;
+          }
+        } else if (action === 'edit') {
+          if (pType === 'vacuna') {
+            openVacunaDetailSheet(a, pItem.raw, reloadDetails);
+          } else {
+            openFumigDetailSheet(a, pItem.raw, reloadDetails);
+          }
+        } else if (action === 'cancel') {
+          window.Snackbar.confirm(`¿Cancelar "${pItem.titulo}" programada?`, async () => {
+            try {
+              const payload = { estado: 'Cancelada' };
+              await restFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(pId)}`, {
+                method: 'PATCH',
+                body: JSON.stringify(payload)
+              });
+              if (db[table]) {
+                const existing = await db[table].get(pId).catch(() => null);
+                if (existing) await db[table].put({ ...existing, ...payload }).catch(() => {});
+              }
+              syncTable(table);
+              showSnackbar(`${pItem.tipoLabel} cancelada ✓`);
+              reloadDetails();
+            } catch (err) {
+              showSnackbar(err.message || 'Error al cancelar', 'error');
+            }
+          });
+        }
+      });
+    });
+
+    // Bind "+ Registrar" footer pills and Preñez buttons (use onclick to avoid duplicate handlers on reload)
+    sheet.querySelectorAll('[data-open-sheet]').forEach(btnEl => {
+      btnEl.onclick = (e) => {
         e.stopPropagation();
         const action = btnEl.dataset.openSheet;
         if (action === 'add-peso') openPesoFormSheet(a, pesoActual, pesoUnidad, reloadDetails);
@@ -917,7 +1315,7 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
         else if (action === 'edit-prenez' && activePreg) openEditPrenezFormSheet(a, activePreg, pregnancies, pesoActual, reloadDetails);
         else if (action === 'parto-prenez' && activePreg) openPartoFormSheet(a, activePreg, pesoActual, reloadDetails);
         else if (action === 'abort-prenez' && activePreg) handleAbortPrenezInSheet(a, activePreg, reloadDetails);
-      });
+      };
     });
 
   } catch (err) {
@@ -997,7 +1395,7 @@ function openPesoFormSheet(animal, pesoActual, pesoUnidad, onReload) {
 
         const pesoKg = Math.round((pesoLb / 2.20462) * 10) / 10;
 
-        const { error } = await supabase.from('animal_pesajes').insert({
+        const { data: insertedData, error } = await supabase.from('animal_pesajes').insert({
           animal_id: animal.id,
           empresa_id: window._currentEmpresaId,
           peso: pesoKg,
@@ -1014,7 +1412,8 @@ function openPesoFormSheet(animal, pesoActual, pesoUnidad, onReload) {
 
         showSnackbar(`Pesaje registrado: ${pesoKg} kg ✓`);
         closeSubBottomSheet();
-        if (onReload) onReload();
+        const insertedId = insertedData?.id || (Array.isArray(insertedData) ? insertedData[0]?.id : null);
+        if (onReload) onReload({ expandPeso: true, selectPesoId: insertedId });
       } catch (err) {
         showSnackbar(err.message || 'Error al registrar pesaje', 'error');
         if (submitBtn) submitBtn.disabled = false;
@@ -1023,30 +1422,29 @@ function openPesoFormSheet(animal, pesoActual, pesoUnidad, onReload) {
   });
 }
 
-function openPesoDetailSheet(animal, pesaje, pesoUnidad, onReload) {
+function openPesoDetailSheet(animal, pesaje, pesoUnidad, totalPesajes, onReload) {
+  const today = getLocalToday();
+  const isLastPesaje = totalPesajes <= 1;
   const html = `
     <div class="m3-sub-sheet-header">
       <div class="m3-sub-sheet-icon">
         <span class="material-icons">scale</span>
       </div>
       <div>
-        <h4 class="m3-sub-sheet-title">Detalle de Pesaje</h4>
+        <h4 class="m3-sub-sheet-title">Editar Pesaje</h4>
         <p class="m3-sub-sheet-subtitle">${escapeHtml(animal.nombre || 'Animal')} • ${formatFecha(pesaje.fecha)}</p>
       </div>
     </div>
     <form id="sub-sheet-edit-peso" class="m3-sub-sheet-form">
       <div class="m3-field">
-        <input type="number" step="0.1" name="peso" value="${escapeHtml(pesaje.peso)}" placeholder=" " required autocomplete="off">
+        <input type="number" step="0.1" min="0.1" name="peso" value="${escapeHtml(pesaje.peso)}" placeholder=" " required autocomplete="off">
         <label>Peso (${escapeHtml(pesoUnidad)})</label>
       </div>
-      <div class="m3-field">
-        <input type="date" name="fecha" value="${escapeHtml(pesaje.fecha)}" placeholder=" " required>
-        <label>Fecha de Pesaje</label>
-      </div>
+      ${renderWeekDatePickerHtml('sub-peso-edit-fecha', pesaje.fecha || today)}
       <div class="m3-sub-sheet-actions-split">
-        <button type="button" class="btn-m3-tonal sub-sheet-btn-delete" id="sub-peso-delete">
+        <button type="button" class="btn-m3-tonal sub-sheet-btn-delete" id="sub-peso-delete" ${isLastPesaje ? 'aria-disabled="true" title="No puedes eliminar el último pesaje"' : ''}>
           <span class="material-icons" style="font-size: 18px;">delete_outline</span>
-          <span>Eliminar</span>
+          <span>Eliminar este registro</span>
         </button>
         <button type="submit" class="btn-m3-fill" id="sub-peso-save" style="flex: 1; justify-content: center;">
           <span class="material-icons" style="font-size: 18px;">save</span>
@@ -1057,7 +1455,13 @@ function openPesoDetailSheet(animal, pesaje, pesoUnidad, onReload) {
   `;
 
   openSubBottomSheet(html, (subSheet) => {
+    attachWeekDatePicker(subSheet, 'sub-peso-edit-fecha', today, null, { mode: 'peso' });
+
     subSheet.querySelector('#sub-peso-delete')?.addEventListener('click', () => {
+      if (isLastPesaje) {
+        showSnackbar('No puedes eliminar el último pesaje que queda', 'error');
+        return;
+      }
       window.Snackbar.confirm('¿Deseas eliminar este registro de pesaje?', async () => {
         try {
           if (db.animal_pesajes) {
@@ -1068,7 +1472,7 @@ function openPesoDetailSheet(animal, pesaje, pesoUnidad, onReload) {
           });
           showSnackbar('Pesaje eliminado ✓');
           closeSubBottomSheet();
-          if (onReload) onReload();
+          if (onReload) onReload({ expandPeso: true });
         } catch (err) {
           showSnackbar(err.message || 'Error al eliminar pesaje', 'error');
         }
@@ -1082,10 +1486,15 @@ function openPesoDetailSheet(animal, pesaje, pesoUnidad, onReload) {
       if (saveBtn) saveBtn.disabled = true;
 
       try {
-        const pesoVal = parseFloat(formData.get('peso'));
+        const pesoVal = Math.round((parseFloat(formData.get('peso')) || 0) * 10) / 10;
         const fechaPeso = formData.get('fecha');
         if (isNaN(pesoVal) || pesoVal <= 0) {
-          showSnackbar('Ingresa un peso válido', 'error');
+          showSnackbar('Ingresa un peso válido mayor a 0 kg', 'error');
+          if (saveBtn) saveBtn.disabled = false;
+          return;
+        }
+        if (!fechaPeso || fechaPeso > today) {
+          showSnackbar('La fecha de pesaje debe ser hoy o anterior', 'error');
           if (saveBtn) saveBtn.disabled = false;
           return;
         }
@@ -1100,7 +1509,7 @@ function openPesoDetailSheet(animal, pesaje, pesoUnidad, onReload) {
         syncTable('animal_pesajes');
         showSnackbar('Pesaje actualizado ✓');
         closeSubBottomSheet();
-        if (onReload) onReload();
+        if (onReload) onReload({ expandPeso: true, selectPesoId: pesaje.id });
       } catch (err) {
         showSnackbar(err.message || 'Error al actualizar pesaje', 'error');
         if (saveBtn) saveBtn.disabled = false;
@@ -1109,7 +1518,7 @@ function openPesoDetailSheet(animal, pesaje, pesoUnidad, onReload) {
   });
 }
 
-// ─── Catálogo de Vacunas y Productos con Dosis por Peso ──────────────────────
+// ─── Catálogo de Vacunas y Productos con Dosis por Peso (Supabase DB + Cache) ─
 
 function getCatalogStorageKey(type) {
   const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || 'default';
@@ -1123,6 +1532,85 @@ function getDosisCatalog(type) {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+async function persistCatalogItemToSupabase(type, cleanName, numKg) {
+  try {
+    const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+    if (!empId) return;
+    const isVac = type === 'vacunas';
+    const table = isVac ? 'animal_vacunas' : 'animal_fumigaciones';
+    const nameField = isVac ? 'nombre' : 'producto';
+
+    // Check if a Catalogo row already exists in Supabase for this name
+    let queryUrl = `/rest/v1/${table}?estado=eq.Catalogo&${nameField}=ilike.${encodeURIComponent(cleanName)}&empresa_id=eq.${encodeURIComponent(empId)}&select=id`;
+    const existing = await restFetch(queryUrl).catch(() => []);
+
+    if (Array.isArray(existing) && existing.length > 0 && existing[0]?.id) {
+      await restFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(existing[0].id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          [nameField]: cleanName,
+          dosis: String(numKg),
+          observaciones: `1 ml cada ${numKg} kg`
+        })
+      });
+    } else {
+      await supabase.from(table).insert({
+        animal_id: null,
+        empresa_id: empId,
+        [nameField]: cleanName,
+        dosis: String(numKg),
+        observaciones: `1 ml cada ${numKg} kg`,
+        fecha: getLocalToday(),
+        estado: 'Catalogo'
+      });
+    }
+  } catch (err) {
+    console.warn('Error guardando catálogo en Supabase:', err);
+  }
+}
+
+async function syncDosisCatalogFromSupabase(type) {
+  const localList = getDosisCatalog(type);
+  try {
+    const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+    if (!empId) return localList;
+    const isVac = type === 'vacunas';
+    const table = isVac ? 'animal_vacunas' : 'animal_fumigaciones';
+    const nameField = isVac ? 'nombre' : 'producto';
+
+    const rows = await restFetch(
+      `/rest/v1/${table}?empresa_id=eq.${encodeURIComponent(empId)}&estado=eq.Catalogo&order=created_at.desc&select=id,${nameField},dosis`
+    ).catch(() => []);
+
+    const dbMap = new Map();
+    for (const r of (rows || [])) {
+      const n = (r[nameField] || '').trim();
+      const kg = parseFloat(r.dosis);
+      if (n && !isNaN(kg) && kg > 0 && !dbMap.has(n.toLowerCase())) {
+        dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: kg });
+      }
+    }
+
+    // Automatically push any local items not yet in Supabase DB so nothing is lost
+    for (const loc of localList) {
+      const n = (loc.nombre || '').trim();
+      const kg = parseFloat(loc.kgPorMl);
+      if (n && !isNaN(kg) && kg > 0 && !dbMap.has(n.toLowerCase())) {
+        dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: kg });
+        persistCatalogItemToSupabase(type, n, kg);
+      }
+    }
+
+    const merged = Array.from(dbMap.values());
+    try {
+      localStorage.setItem(getCatalogStorageKey(type), JSON.stringify(merged));
+    } catch {}
+    return merged;
+  } catch {
+    return localList;
   }
 }
 
@@ -1140,7 +1628,178 @@ function saveToDosisCatalog(type, nombre, kgPorMl) {
   try {
     localStorage.setItem(getCatalogStorageKey(type), JSON.stringify(list));
   } catch {}
+  persistCatalogItemToSupabase(type, cleanName, numKg);
   return list;
+}
+
+function renderWeekDatePickerHtml(inputId, initialDate) {
+  return `
+    <div class="sheet-date-picker" data-picker-for="${inputId}">
+      <input type="hidden" name="fecha" id="${inputId}" value="${escapeHtml(initialDate)}" required>
+      <div class="sheet-date-picker-label">Fecha</div>
+      <div class="sheet-date-picker-box">
+        <div class="sheet-date-picker-nav">
+          <button type="button" class="sheet-dp-nav-btn" data-dp-action="prev" aria-label="Anterior">‹</button>
+          <div class="sheet-dp-current-label"></div>
+          <button type="button" class="sheet-dp-nav-btn" data-dp-action="next" aria-label="Siguiente">›</button>
+          <button type="button" class="sheet-dp-pill-btn" data-dp-action="today">Hoy</button>
+          <button type="button" class="sheet-dp-pill-btn" data-dp-action="toggle-mode">Ver mes</button>
+        </div>
+        <div class="sheet-dp-grid"></div>
+      </div>
+      <div class="sheet-date-picker-hint"></div>
+    </div>
+  `;
+}
+
+function attachWeekDatePicker(container, inputId, todayStr, onDateChange, opts = {}) {
+  const root = container.querySelector(`.sheet-date-picker[data-picker-for="${inputId}"]`);
+  const hiddenInput = container.querySelector(`#${inputId}`);
+  if (!root || !hiddenInput) return;
+
+  const labelEl = root.querySelector('.sheet-dp-current-label');
+  const gridEl = root.querySelector('.sheet-dp-grid');
+  const hintEl = root.querySelector('.sheet-date-picker-hint');
+  const modeBtn = root.querySelector('[data-dp-action="toggle-mode"]');
+
+  const DAY_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const MON_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const MON_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+  const parseYmd = (ymd) => {
+    const [y, m, d] = (ymd || todayStr).split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0);
+  };
+  const toYmd = (dt) => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const addDays = (dt, days) => {
+    const copy = new Date(dt);
+    copy.setDate(copy.getDate() + days);
+    return copy;
+  };
+
+  let selectedDate = hiddenInput.value || todayStr;
+  let anchorDate = selectedDate;
+  let viewMode = 'week';
+
+  const render = () => {
+    const selDt = parseYmd(selectedDate);
+    const anchDt = parseYmd(anchorDate);
+
+    if (hintEl) {
+      const isFuture = selectedDate > todayStr;
+      if (opts.mode === 'peso') {
+        hintEl.innerHTML = isFuture
+          ? '<span class="is-programada">Solo se permiten fechas de hoy o anteriores</span>'
+          : `Pesaje del <span class="is-aplicada">${escapeHtml(formatFecha(selectedDate))}</span>`;
+      } else {
+        hintEl.innerHTML = isFuture
+          ? `Se guardará como <span class="is-programada">Programada</span> para ${escapeHtml(formatFecha(selectedDate))}`
+          : `Se guardará como <span class="is-aplicada">Aplicada</span> · ${escapeHtml(formatFecha(selectedDate))}`;
+      }
+    }
+
+    if (modeBtn) {
+      modeBtn.textContent = viewMode === 'week' ? 'Ver mes' : 'Ver semana';
+    }
+
+    if (viewMode === 'week') {
+      if (labelEl) {
+        labelEl.textContent = `${DAY_SHORT[selDt.getDay()]}, ${selDt.getDate()} ${MON_SHORT[selDt.getMonth()]}`;
+      }
+      // Monday-start week around anchorDate
+      const dow = anchDt.getDay();
+      const diffToMon = dow === 0 ? -6 : 1 - dow;
+      const monday = addDays(anchDt, diffToMon);
+      gridEl.className = 'sheet-dp-grid is-week';
+      let daysHtml = '';
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(monday, i);
+        const ymd = toYmd(d);
+        const isToday = ymd === todayStr;
+        const isSelected = ymd === selectedDate;
+        daysHtml += `
+          <button type="button" class="sheet-dp-day ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}" data-dp-date="${ymd}">
+            <span class="sheet-dp-day-name">${DAY_SHORT[d.getDay()]}</span>
+            <span class="sheet-dp-day-num">${d.getDate()}</span>
+          </button>
+        `;
+      }
+      gridEl.innerHTML = daysHtml;
+    } else {
+      const year = anchDt.getFullYear();
+      const month = anchDt.getMonth();
+      if (labelEl) {
+        labelEl.textContent = `${MON_FULL[month]} ${year}`;
+      }
+      const firstOfMonth = new Date(year, month, 1, 12, 0, 0);
+      const firstDow = firstOfMonth.getDay();
+      const leadDays = firstDow === 0 ? 6 : firstDow - 1;
+      const gridStart = addDays(firstOfMonth, -leadDays);
+
+      gridEl.className = 'sheet-dp-grid is-month';
+      let html = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+        .map(w => `<div class="sheet-dp-weekday">${w}</div>`).join('');
+
+      for (let i = 0; i < 42; i++) {
+        const d = addDays(gridStart, i);
+        const ymd = toYmd(d);
+        const isOtherMonth = d.getMonth() !== month;
+        const isToday = ymd === todayStr;
+        const isSelected = ymd === selectedDate;
+        html += `
+          <button type="button" class="sheet-dp-day is-compact ${isOtherMonth ? 'is-muted' : ''} ${isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}" data-dp-date="${ymd}">
+            <span class="sheet-dp-day-num">${d.getDate()}</span>
+          </button>
+        `;
+      }
+      gridEl.innerHTML = html;
+    }
+  };
+
+  const selectDate = (ymd) => {
+    selectedDate = ymd;
+    anchorDate = ymd;
+    hiddenInput.value = ymd;
+    hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    if (typeof onDateChange === 'function') onDateChange(ymd);
+    render();
+  };
+
+  root.addEventListener('click', (e) => {
+    const dayBtn = e.target.closest('[data-dp-date]');
+    if (dayBtn) {
+      selectDate(dayBtn.dataset.dpDate);
+      return;
+    }
+    const actionBtn = e.target.closest('[data-dp-action]');
+    if (!actionBtn) return;
+    const action = actionBtn.dataset.dpAction;
+    if (action === 'prev') {
+      const dt = parseYmd(anchorDate);
+      if (viewMode === 'week') anchorDate = toYmd(addDays(dt, -7));
+      else anchorDate = toYmd(new Date(dt.getFullYear(), dt.getMonth() - 1, 1, 12, 0, 0));
+      render();
+    } else if (action === 'next') {
+      const dt = parseYmd(anchorDate);
+      if (viewMode === 'week') anchorDate = toYmd(addDays(dt, 7));
+      else anchorDate = toYmd(new Date(dt.getFullYear(), dt.getMonth() + 1, 1, 12, 0, 0));
+      render();
+    } else if (action === 'today') {
+      selectDate(todayStr);
+    } else if (action === 'toggle-mode') {
+      viewMode = viewMode === 'week' ? 'month' : 'week';
+      anchorDate = selectedDate;
+      render();
+    }
+  });
+
+  render();
+  if (typeof onDateChange === 'function') onDateChange(selectedDate);
 }
 
 // ─── Sub-Bottom Sheets: Vacunas ──────────────────────────────────────────────
@@ -1181,7 +1840,7 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
         </button>
       </div>
 
-      <div id="sub-vacuna-new-box" style="display: ${catalog.length === 0 ? 'flex' : 'none'}; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
+      <div id="sub-vacuna-new-box" style="display: none; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <span style="font-size: 12px; font-weight: 800; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px;">
             <span class="material-icons" style="font-size: 16px;">playlist_add</span>
@@ -1207,10 +1866,7 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
 
       <input type="hidden" name="nombre" id="sub-vacuna-nombre" value="">
 
-      <div class="m3-field">
-        <input type="date" name="fecha" id="sub-vacuna-fecha" value="${today}" placeholder=" " required>
-        <label>Fecha de Aplicación</label>
-      </div>
+      ${renderWeekDatePickerHtml('sub-vacuna-fecha', today)}
       <div class="m3-field">
         <input type="number" step="any" id="sub-vacuna-dosis-base" placeholder=" " autocomplete="off">
         <label>Dosis por peso (1 ml cada X kg)</label>
@@ -1227,7 +1883,7 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
         <button type="button" class="btn-m3-tonal" id="sub-vacuna-cancel">Cancelar</button>
         <button type="submit" class="btn-m3-fill" id="sub-vacuna-submit">
           <span class="material-icons" style="font-size: 18px;">check</span>
-          <span id="sub-vacuna-submit-label">Guardar Vacuna</span>
+          <span id="sub-vacuna-submit-label">Registrar aplicada</span>
         </button>
       </div>
     </form>
@@ -1260,6 +1916,13 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
     };
 
     dosisBaseInput?.addEventListener('input', recalcularDosis);
+
+    syncDosisCatalogFromSupabase('vacunas').then((dbList) => {
+      if (catalogSelect && Array.isArray(dbList)) {
+        const currentSelected = catalogSelect.value || '';
+        catalogSelect.innerHTML = buildSelectOptions(dbList, currentSelected);
+      }
+    });
 
     catalogSelect?.addEventListener('change', () => {
       const selOpt = catalogSelect.options[catalogSelect.selectedIndex];
@@ -1315,9 +1978,9 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
       const val = fechaInput?.value || today;
       const isFuture = val > today;
       if (titleEl) titleEl.textContent = isFuture ? 'Programar Vacuna' : 'Registrar Vacuna';
-      if (submitLabelEl) submitLabelEl.textContent = isFuture ? 'Programar Vacuna' : 'Guardar Vacuna';
+      if (submitLabelEl) submitLabelEl.textContent = isFuture ? 'Programar' : 'Registrar aplicada';
     };
-    fechaInput?.addEventListener('change', updateModeLabel);
+    attachWeekDatePicker(subSheet, 'sub-vacuna-fecha', today, updateModeLabel);
 
     subSheet.querySelector('#sub-vacuna-cancel')?.addEventListener('click', closeSubBottomSheet);
     subSheet.querySelector('#sub-sheet-form-vacuna')?.addEventListener('submit', async (e) => {
@@ -1550,7 +2213,7 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
         </button>
       </div>
 
-      <div id="sub-fumig-new-box" style="display: ${catalog.length === 0 ? 'flex' : 'none'}; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
+      <div id="sub-fumig-new-box" style="display: none; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <span style="font-size: 12px; font-weight: 800; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px;">
             <span class="material-icons" style="font-size: 16px;">playlist_add</span>
@@ -1576,10 +2239,7 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
 
       <input type="hidden" name="producto" id="sub-fumig-producto" value="">
 
-      <div class="m3-field">
-        <input type="date" name="fecha" id="sub-fumig-fecha" value="${today}" placeholder=" " required>
-        <label>Fecha</label>
-      </div>
+      ${renderWeekDatePickerHtml('sub-fumig-fecha', today)}
       <div class="m3-field">
         <input type="number" step="any" id="sub-fumig-dosis-base" placeholder=" " autocomplete="off">
         <label>Dosis por peso (1 ml cada X kg)</label>
@@ -1596,7 +2256,7 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
         <button type="button" class="btn-m3-tonal" id="sub-fumig-cancel">Cancelar</button>
         <button type="submit" class="btn-m3-fill" id="sub-fumig-submit">
           <span class="material-icons" style="font-size: 18px;">check</span>
-          <span id="sub-fumig-submit-label">Guardar Fumigación</span>
+          <span id="sub-fumig-submit-label">Registrar aplicada</span>
         </button>
       </div>
     </form>
@@ -1629,6 +2289,13 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
     };
 
     dosisBaseInput?.addEventListener('input', recalcularDosis);
+
+    syncDosisCatalogFromSupabase('fumigaciones').then((dbList) => {
+      if (catalogSelect && Array.isArray(dbList)) {
+        const currentSelected = catalogSelect.value || '';
+        catalogSelect.innerHTML = buildSelectOptions(dbList, currentSelected);
+      }
+    });
 
     catalogSelect?.addEventListener('change', () => {
       const selOpt = catalogSelect.options[catalogSelect.selectedIndex];
@@ -1684,9 +2351,9 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
       const val = fechaInput?.value || today;
       const isFuture = val > today;
       if (titleEl) titleEl.textContent = isFuture ? 'Programar Fumigación / Baño' : 'Registrar Fumigación / Baño';
-      if (submitLabelEl) submitLabelEl.textContent = isFuture ? 'Programar Fumigación' : 'Guardar Fumigación';
+      if (submitLabelEl) submitLabelEl.textContent = isFuture ? 'Programar' : 'Registrar aplicada';
     };
-    fechaInput?.addEventListener('change', updateModeLabel);
+    attachWeekDatePicker(subSheet, 'sub-fumig-fecha', today, updateModeLabel);
 
     subSheet.querySelector('#sub-fumig-cancel')?.addEventListener('click', closeSubBottomSheet);
     subSheet.querySelector('#sub-sheet-form-fumig')?.addEventListener('submit', async (e) => {
