@@ -93,7 +93,9 @@ export async function registerPushToken(explicitUserId = null) {
 
   const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
     scope: '/firebase-cloud-messaging-push-scope',
+    updateViaCache: 'none',
   });
+  swReg.update().catch(() => {});
 
   const token = await getToken(inst.messaging, {
     vapidKey: inst.config.vapidKey,
@@ -156,6 +158,7 @@ export async function initForegroundPush(onReceive) {
             requireInteraction: true,
             renotify: true,
             tag,
+            actions: [{ action: 'open', title: 'Ver' }],
             data: { url, notifId },
           });
         }

@@ -1,4 +1,11 @@
 /* eslint-disable no-undef */
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 try {
@@ -35,6 +42,7 @@ if (self.__FIREBASE_CONFIG__ && self.__FIREBASE_CONFIG__.apiKey) {
       requireInteraction: true,
       renotify: true,
       tag,
+      actions: [{ action: 'open', title: 'Ver' }],
       data: { url, notifId },
     });
   });
