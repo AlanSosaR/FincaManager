@@ -142,8 +142,8 @@ Deno.serve(async (req) => {
 
     const accessToken = await getFcmAccessToken(sa);
     const siteUrl = Deno.env.get("PUBLIC_SITE_URL") || "https://finca-manager.vercel.app";
-    const iconUrl = `${siteUrl}/pwa-512x512.svg`;
-    const badgeUrl = `${siteUrl}/pwa-512x512.svg`;
+    const iconUrl = `${siteUrl}/pwa-192x192.png`;
+    const badgeUrl = `${siteUrl}/pwa-192x192.png`;
     const targetUrl = record.url || (record.type === "motor_aceite" ? "/#motores" : "/#ganado");
 
     let sent = 0;
@@ -161,31 +161,22 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             message: {
               token: row.token,
-              notification: {
-                title: record.title,
-                body: record.body,
-              },
               webpush: {
                 headers: {
                   Urgency: "high",
-                },
-                notification: {
-                  title: record.title,
-                  body: record.body,
-                  icon: iconUrl,
-                  badge: badgeUrl,
-                  vibrate: [200, 100, 200],
-                  requireInteraction: true,
-                  tag: String(record.ref_id || record.type || "finca-notif"),
                 },
                 fcm_options: {
                   link: `${siteUrl}${targetUrl.startsWith("/") ? targetUrl : `/${targetUrl}`}`,
                 },
               },
               data: {
+                title: String(record.title || "Finca Manager"),
+                body: String(record.body || ""),
                 type: String(record.type || "general"),
                 url: targetUrl,
                 ref_id: String(record.ref_id || ""),
+                icon: iconUrl,
+                badge: badgeUrl,
               },
             },
           }),

@@ -145,14 +145,14 @@ export async function initForegroundPush(onReceive) {
       window.Snackbar?.show(`${title}: ${body}`);
     }
 
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
       try {
         const reg = await navigator.serviceWorker?.getRegistration('/firebase-cloud-messaging-push-scope');
         if (reg?.showNotification) {
           await reg.showNotification(title, {
             body,
-            icon: '/pwa-512x512.svg',
-            badge: '/pwa-512x512.svg',
+            icon: '/pwa-192x192.png',
+            badge: '/pwa-192x192.png',
             vibrate: [200, 100, 200],
             requireInteraction: true,
             tag,

@@ -30,8 +30,8 @@ if (self.__FIREBASE_CONFIG__ && self.__FIREBASE_CONFIG__.apiKey) {
     const tag = payload?.data?.ref_id || payload?.data?.type || 'finca-notif';
     return self.registration.showNotification(title, {
       body,
-      icon: '/pwa-512x512.svg',
-      badge: '/pwa-512x512.svg',
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
       vibrate: [200, 100, 200],
       requireInteraction: true,
       renotify: true,
@@ -44,16 +44,20 @@ if (self.__FIREBASE_CONFIG__ && self.__FIREBASE_CONFIG__.apiKey) {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = event.notification?.data?.url || '/#dashboard';
+  const fullUrl = new URL(targetUrl, self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client) {
-          client.navigate(targetUrl).catch(() => {});
+          client.postMessage({ type: 'PUSH_NAVIGATE', url: targetUrl });
+          if ('navigate' in client) {
+            client.navigate(fullUrl).catch(() => {});
+          }
           return client.focus();
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
+        return self.clients.openWindow(fullUrl);
       }
     }),
   );

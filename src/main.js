@@ -13,6 +13,16 @@ let refreshing = false;
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
   if (!refreshing) { refreshing = true; window.location.reload(); }
 });
+navigator.serviceWorker?.addEventListener('message', (event) => {
+  if (event.data?.type === 'PUSH_NAVIGATE' && event.data?.url) {
+    const parts = String(event.data.url).replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+    if (parts[0] && typeof window.navigateTo === 'function') {
+      window.navigateTo(parts[0], ...parts.slice(1));
+    } else {
+      window.location.hash = String(event.data.url).replace(/^\/?#?/, '#');
+    }
+  }
+});
 
 let _swRegistration = null;
 const updateSW = registerSW({
