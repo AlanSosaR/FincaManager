@@ -14,7 +14,34 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
   if (!refreshing) { refreshing = true; window.location.reload(); }
 });
 
-registerSW({ immediate: true, onNeedRefresh() { window.location.reload(); } });
+let _swRegistration = null;
+const updateSW = registerSW({
+  immediate: true,
+  onRegistered(r) {
+    _swRegistration = r || null;
+    if (r) {
+      setInterval(() => {
+        if (navigator.onLine) r.update().catch(() => {});
+      }, 10 * 60 * 1000);
+    }
+  },
+  onNeedRefresh() {
+    addNotif(
+      'app-update',
+      'system_update',
+      'Nueva versión disponible',
+      'Hay una nueva versión de Finca Manager lista para instalar.',
+      [
+        {
+          label: 'Actualizar',
+          handler: () => {
+            updateSW(true);
+          },
+        },
+      ]
+    );
+  },
+});
 
 import { isOnline, processSyncQueue, incrementalSync, fullDownload } from './sync.js';
 import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan, checkPartosProximos } from './wa.js';
@@ -45,14 +72,13 @@ function removeNotif(id) {
 }
 
 function updateNotifUI() {
-  const activeNotifs = notifs.filter(n => n.id !== 'conn-status');
   const unread = notifs.filter(n => !n.read).length;
   const syncArea = document.getElementById('sync-status-area');
   if (syncArea) {
-    syncArea.style.display = (activeNotifs.length > 0 || notifOpen) ? 'inline-flex' : 'none';
+    syncArea.style.display = (notifs.length > 0 || notifOpen) ? 'inline-flex' : 'none';
   }
   if (syncIcon) {
-    syncIcon.style.color = activeNotifs.length > 0 ? '#ea580c' : '';
+    syncIcon.style.color = notifs.length > 0 ? '#ea580c' : '';
   }
   if (syncBadge) {
     syncBadge.style.display = unread ? 'flex' : 'none';
@@ -143,28 +169,43 @@ async function initApp() {
   const syncArea = document.getElementById('sync-status-area');
   if (syncArea) syncArea.style.display = 'inline-flex';
 
-  const updateConnectionNotif = () => {
-    if (isOnline()) {
-      removeNotif('offline');
-      const dlAt = localStorage.getItem('offline_data_downloaded_at');
-      const desc = dlAt
-        ? 'Sincronización activa · Datos listos para usar sin internet.'
-        : 'Sincronización en línea activa.';
-      addNotif('conn-status', 'cloud_done', 'Conectado a internet', desc, null, { read: true });
-    } else {
-      removeNotif('conn-status');
-      addNotif(
-        'offline',
-        'cloud_off',
-        'Sin conexión a internet',
-        'Usando datos locales. Los cambios se sincronizarán al volver la conexión.'
-      );
-    }
+  let wasOffline = !isOnline();
+
+  const showOfflineNotif = () => {
+    removeNotif('back-online');
+    addNotif(
+      'offline',
+      'cloud_off',
+      'Sin conexión a internet',
+      'Usando datos locales. Los cambios se sincronizarán al volver la conexión.'
+    );
+  };
+
+  const showBackOnlineNotif = () => {
+    removeNotif('offline');
+    addNotif(
+      'back-online',
+      'wifi',
+      'Conectado a internet',
+      'Se restableció la conexión. Los cambios se sincronizarán automáticamente.',
+      [
+        {
+          label: 'Aceptar',
+          handler: () => {
+            removeNotif('back-online');
+            if (notifOpen && notifs.length === 0) {
+              notifOpen = false;
+              if (notifDropdown) notifDropdown.style.display = 'none';
+              updateNotifUI();
+            }
+          },
+        },
+      ]
+    );
   };
 
   window.__onOfflineDownloadComplete = () => {
     removeNotif('offline-download');
-    updateConnectionNotif();
   };
 
   const maybePromptOfflineDownload = () => {
@@ -216,18 +257,26 @@ async function initApp() {
   };
 
   window.addEventListener('offline', () => {
-    updateConnectionNotif();
+    wasOffline = true;
+    showOfflineNotif();
   });
   window.addEventListener('online', () => {
-    updateConnectionNotif();
+    if (wasOffline) {
+      wasOffline = false;
+      showBackOnlineNotif();
+    } else {
+      removeNotif('offline');
+    }
+    _swRegistration?.update().catch(() => {});
     maybePromptOfflineDownload();
   });
 
-  updateConnectionNotif();
   if (isOnline()) {
     initOnlineSync();
     initRealtime();
     maybePromptOfflineDownload();
+  } else {
+    showOfflineNotif();
   }
 }
 initApp();

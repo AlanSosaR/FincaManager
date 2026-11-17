@@ -202,14 +202,20 @@ export async function renderConfiguracion() {
               ${localStorage.getItem('offline_data_downloaded_at') ? '✓ Descargado' : (localStorage.getItem('offline_download_dismissed') === '1' ? 'Omitido' : 'Pendiente')}
             </span>
           </div>
-          <p id="config-offline-desc" style="font-size:12.5px;color:#556b53;margin:0 0 12px;line-height:1.4;">
+          <p id="config-offline-desc" style="font-size:12.5px;color:#556b53;margin:0 0 10px;line-height:1.4;">
             ${localStorage.getItem('offline_data_downloaded_at')
               ? `Última descarga: ${new Date(localStorage.getItem('offline_data_downloaded_at')).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}. Puedes actualizar todos los datos cuando quieras.`
               : 'Descarga todos los datos de la finca para que todos los módulos funcionen sin conexión a internet.'}
           </p>
-          <button id="btn-config-download" class="btn-m3-primary" style="width:100%;padding:13px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
-            <span class="material-icons">cloud_download</span> ${localStorage.getItem('offline_data_downloaded_at') ? 'Actualizar datos sin internet' : 'Descargar todos los datos'}
-          </button>
+          <div id="config-offline-modules" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>
+          <div style="display:grid;gap:8px;">
+            <button id="btn-config-download" class="btn-m3-primary" style="width:100%;padding:13px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <span class="material-icons">cloud_download</span> ${localStorage.getItem('offline_data_downloaded_at') ? 'Actualizar datos sin internet' : 'Descargar todos los datos'}
+            </button>
+            <button id="btn-config-delete-offline" type="button" style="display:${localStorage.getItem('offline_data_downloaded_at') ? 'flex' : 'none'};width:100%;padding:11px;border-radius:12px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;font-weight:700;font-size:13px;cursor:pointer;font-family:'Work Sans',sans-serif;align-items:center;justify-content:center;gap:6px;">
+              <span class="material-icons" style="font-size:18px;">delete_outline</span> Borrar datos descargados
+            </button>
+          </div>
         </div>
         <button id="btn-config-clear-cache" class="btn-m3-tonal" style="width:100%;padding:14px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
           <span class="material-icons">cleaning_services</span> Limpiar caché
@@ -579,6 +585,66 @@ export function initConfiguracion() {
 
   initPuntoReferencia();
 
+  const refreshOfflineModulesUI = async () => {
+    const modBox = document.getElementById('config-offline-modules');
+    const delBtn = document.getElementById('btn-config-delete-offline');
+    if (!modBox) return;
+    const empId = window._currentEmpresaId;
+    const countTable = async (name) => {
+      try {
+        const rows = await db.table(name).toArray();
+        return empId ? rows.filter(r => !r.empresa_id || r.empresa_id === empId).length : rows.length;
+      } catch { return 0; }
+    };
+    const [ganado, motores, herramientas, potreros, lotes, personal, gastos, cultivos] = await Promise.all([
+      countTable('ganado'),
+      countTable('motores'),
+      countTable('herramientas'),
+      countTable('potreros'),
+      countTable('lotes'),
+      countTable('personal'),
+      countTable('gastos'),
+      countTable('cultivos'),
+    ]);
+    let fotos = 0;
+    try {
+      if (typeof caches !== 'undefined') {
+        const c = await caches.open('finca-images-offline-v1');
+        fotos = (await c.keys()).length;
+      }
+    } catch {}
+
+    const modules = [
+      { label: 'Ganado', count: ganado, icon: 'pets' },
+      { label: 'Motores', count: motores, icon: 'precision_manufacturing' },
+      { label: 'Herramientas', count: herramientas, icon: 'handyman' },
+      { label: 'Potreros', count: potreros, icon: 'fence' },
+      { label: 'Cafetal', count: lotes, icon: 'park' },
+      { label: 'Personal', count: personal, icon: 'group' },
+      { label: 'Gastos', count: gastos, icon: 'payments' },
+      { label: 'Cultivos', count: cultivos, icon: 'eco' },
+      { label: 'Fotos', count: fotos, icon: 'photo_library' },
+    ];
+    const hasAny = !!localStorage.getItem('offline_data_downloaded_at') || modules.some(m => m.count > 0);
+    if (!hasAny) {
+      modBox.innerHTML = '';
+      modBox.style.display = 'none';
+      if (delBtn) delBtn.style.display = 'none';
+      return;
+    }
+    modBox.style.display = 'flex';
+    modBox.innerHTML = modules
+      .filter(m => m.count > 0 || localStorage.getItem('offline_data_downloaded_at'))
+      .map(m => `
+        <span style="display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;background:#ffffff;border:1px solid #d5e0d4;font-size:11.5px;font-weight:700;color:#2d3e2c;">
+          <span class="material-icons" style="font-size:13px;color:#4a6b48;">${m.icon}</span>
+          <span>${m.label} (${m.count})</span>
+        </span>
+      `).join('');
+    if (delBtn) delBtn.style.display = 'flex';
+  };
+  refreshOfflineModulesUI();
+
   document.getElementById('btn-config-download')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-config-download');
     if (!navigator.onLine) {
@@ -604,12 +670,53 @@ export function initConfiguracion() {
       if (desc) {
         desc.textContent = `Última descarga: ${new Date().toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}. Puedes actualizar todos los datos cuando quieras.`;
       }
+      await refreshOfflineModulesUI();
       window.Snackbar?.show('Todos los datos descargados para uso sin internet ✓');
     }
     btn.disabled = false;
     btn.innerHTML = started
-      ? '<span class="material-icons">check_circle</span> Datos actualizados'
+      ? '<span class="material-icons">check_circle</span> Actualizar datos sin internet'
       : '<span class="material-icons">cloud_download</span> Descargar todos los datos';
+  });
+
+  document.getElementById('btn-config-delete-offline')?.addEventListener('click', async () => {
+    const pendingCount = await db._sync_queue.count().catch(() => 0);
+    const msg = pendingCount > 0
+      ? `Hay ${pendingCount} cambio(s) pendiente(s) de subir. ¿Borrar los datos descargados sin internet?`
+      : '¿Borrar los datos y fotos descargados para uso sin internet? Tus datos en la nube no se borrarán.';
+    window.Snackbar?.confirm(msg, async () => {
+      const TABLES_TO_CLEAR = [
+        'motores', 'motor_sesiones', 'motor_mantenimientos',
+        'potreros', 'ganado', 'herramientas', 'potrero_eventos',
+        'animal_pesajes', 'animal_vacunas', 'animal_fumigaciones', 'animal_ventas',
+        'animal_preñez', 'herramienta_mantenimientos', 'lotes', 'lote_aplicaciones',
+        'lote_personal', 'personal', 'personal_asistencia', 'gastos', 'cultivos',
+      ];
+      for (const t of TABLES_TO_CLEAR) {
+        await db.table(t).clear().catch(() => {});
+      }
+      if (typeof caches !== 'undefined') {
+        await caches.delete('finca-images-offline-v1').catch(() => {});
+      }
+      localStorage.removeItem('offline_data_downloaded_at');
+      localStorage.removeItem('offline_download_dismissed');
+      const badge = document.getElementById('config-offline-badge');
+      const desc = document.getElementById('config-offline-desc');
+      const dlBtn = document.getElementById('btn-config-download');
+      if (badge) {
+        badge.textContent = 'Pendiente';
+        badge.style.background = '#fef3c7';
+        badge.style.color = '#92400e';
+      }
+      if (desc) {
+        desc.textContent = 'Descarga todos los datos de la finca para que todos los módulos funcionen sin conexión a internet.';
+      }
+      if (dlBtn) {
+        dlBtn.innerHTML = '<span class="material-icons">cloud_download</span> Descargar todos los datos';
+      }
+      await refreshOfflineModulesUI();
+      window.Snackbar?.show('Datos sin internet borrados ✓');
+    });
   });
 
   document.getElementById('btn-config-clear-cache')?.addEventListener('click', () => {

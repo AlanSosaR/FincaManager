@@ -13,7 +13,7 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'pwa-512x512.svg'],
       manifest: {
@@ -33,7 +33,6 @@ export default defineConfig({
       },
       workbox: {
         cacheId: 'finca-manager-v2',
-        skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,ico,png}'],
         cleanupOutdatedCaches: true,
