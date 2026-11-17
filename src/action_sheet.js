@@ -49,7 +49,7 @@ export function closeSubBottomSheet() {
   }, 260);
 }
 
-export function openSubBottomSheet(contentHtml, onMount) {
+export function openSubBottomSheet(contentHtml, onMount, { expanded = false } = {}) {
   let scrim = document.getElementById('m3-sub-action-sheet-scrim');
   let sheet = document.getElementById('m3-sub-action-sheet');
 
@@ -73,7 +73,7 @@ export function openSubBottomSheet(contentHtml, onMount) {
     document.body.appendChild(sheet);
   }
 
-  sheet.classList.remove('expanded');
+  sheet.classList.toggle('expanded', Boolean(expanded));
   sheet.scrollTop = 0;
 
   sheet.innerHTML = `
@@ -362,10 +362,20 @@ export async function openActionBottomSheet(btn, menu) {
 
   document.getElementById('sheet-handle-box')?.addEventListener('click', toggleExpand);
 
+  const detailsContainerEl = sheet.querySelector('#sheet-expanded-details');
+  if (detailsContainerEl) {
+    detailsContainerEl.addEventListener('scroll', () => {
+      if (detailsContainerEl.scrollTop > 10 && !sheet.classList.contains('expanded')) {
+        setExpanded(true);
+      }
+    }, { passive: true });
+  }
+
   // Gesture handling
   setupSheetGestures(sheet, setExpanded);
 
-  // Show in peek mode
+  // Open full height for animal detail sheet
+  if (animalId) setExpanded(true);
   scrim.style.display = 'block';
   sheet.style.display = animalId ? 'flex' : 'block';
   sheet.style.transform = '';
@@ -644,38 +654,6 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
       if (foundIdx >= 0) selectedPesoIdx = foundIdx;
     }
 
-    const renderPesoDetailPanelHtml = (idx) => {
-      const s = pesoStats[idx];
-      if (!s) return '';
-      if (s.isFirst) {
-        return `
-          <div class="sheet-peso-detail-panel is-first">
-            <div class="sheet-peso-detail-circle is-first" aria-hidden="true">1.º</div>
-            <div class="sheet-peso-detail-copy">
-              <div class="sheet-peso-detail-title">Primer pesaje: ${escapeHtml(formatKgNum(s.kg))} kg</div>
-              <div class="sheet-peso-detail-meta">Registrado el ${escapeHtml(formatFecha(s.fecha))} · Aún sin comparación</div>
-            </div>
-          </div>
-        `;
-      }
-      const prev = s.prev;
-      const icon = s.trend === 'up' ? '↑' : (s.trend === 'down' ? '↓' : '→');
-      const headline = s.trend === 'up'
-        ? `Subió ${formatKgNum(s.delta)} kg`
-        : (s.trend === 'down' ? `Bajó ${formatKgNum(Math.abs(s.delta))} kg` : 'Se mantuvo igual');
-      const daysText = `${s.days} ${s.days === 1 ? 'día' : 'días'}`;
-      const rateText = s.rate !== null ? ` · ${s.rate} kg/día` : '';
-      return `
-        <div class="sheet-peso-detail-panel is-${s.trend}">
-          <div class="sheet-peso-detail-circle is-${s.trend}" aria-hidden="true">${icon}</div>
-          <div class="sheet-peso-detail-copy">
-            <div class="sheet-peso-detail-title">${escapeHtml(headline)}</div>
-            <div class="sheet-peso-detail-meta">De ${escapeHtml(formatKgNum(prev.kg))} kg (${escapeHtml(formatFecha(prev.fecha))}) a ${escapeHtml(formatKgNum(s.kg))} kg (${escapeHtml(formatFecha(s.fecha))}) · ${escapeHtml(daysText)}${escapeHtml(rateText)}</div>
-          </div>
-        </div>
-      `;
-    };
-
     const buildPesoExpandedBodyHtml = () => {
       if (pesoStats.length === 0) {
         return '<p style="font-size: 12.5px; color: var(--m3-on-surface-variant, #666); margin: 0;">Sin pesajes registrados</p>';
@@ -714,23 +692,12 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
         const last = pesoStats[pesoStats.length - 1];
         const totalDelta = Math.round((last.kg - first.kg) * 10) / 10;
         const totalDays = daysBetween(first.fecha, last.fecha);
-        const totalTrend = totalDelta > 0 ? 'up' : (totalDelta < 0 ? 'down' : 'same');
-        const totalBadgeText = totalDelta > 0
-          ? `↑ +${formatKgNum(totalDelta)} kg`
-          : (totalDelta < 0 ? `↓ −${formatKgNum(Math.abs(totalDelta))} kg` : '→ 0 kg');
         const avgDailyText = (totalDelta !== 0 && totalDays > 0)
           ? `${(totalDelta / totalDays).toFixed(2)} kg/día`
           : 'Sin cambio';
 
         summaryRowsHtml = `
           <div class="sheet-peso-summary-rows">
-            <div class="sheet-peso-summary-row">
-              <div>
-                <div class="sheet-peso-summary-title">Desde el primer pesaje</div>
-                <div class="sheet-peso-summary-sub">${escapeHtml(formatFecha(first.fecha))} · ${totalDays} ${totalDays === 1 ? 'día' : 'días'}</div>
-              </div>
-              <span class="sheet-peso-status-pill is-${totalTrend}">${escapeHtml(totalBadgeText)}</span>
-            </div>
             <div class="sheet-peso-summary-row">
               <div class="sheet-peso-summary-title">Ganancia diaria promedio</div>
               <div class="sheet-peso-summary-val">${escapeHtml(avgDailyText)}</div>
@@ -767,8 +734,6 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
         <div class="sheet-peso-chart-scroll">
           <div class="sheet-peso-bars">${barsHtml}</div>
         </div>
-        <div id="sheet-peso-detail-panel">${renderPesoDetailPanelHtml(selectedPesoIdx)}</div>
-        <p class="sheet-peso-legend">Toca una barra para ver el detalle. Verde ↑ subió · Rojo ↓ bajó · Gris igual o primero. La altura es solo comparativa.</p>
         ${summaryRowsHtml}
         <div class="sheet-peso-history-list">${listHtml}</div>
       `;
@@ -795,6 +760,16 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
     const animalImgUrl = a.image_url || `https://api.dicebear.com/7.x/adventurer-neutral/svg?seed=${animalSeed}&backgroundColor=f0ebe3&radius=16`;
 
     // Populating detailsContainer
+    const titleEl = sheet.querySelector('.m3-action-sheet-title');
+    if (titleEl) {
+      const sexoText = escapeHtml(a.sexo || '-');
+      const razaText = escapeHtml(a.raza || 'Bovino');
+      titleEl.innerHTML = `
+        <span>${escapeHtml(a.nombre || 'Animal')}</span>
+        <span class="sheet-title-meta-pill">${sexoText} • <span class="is-raza">${razaText}</span></span>
+      `;
+    }
+
     detailsContainer.innerHTML = `
       <!-- Ficha de Identificación -->
       <div class="sheet-detail-card" style="position: relative;">
@@ -814,10 +789,6 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
           <div class="sheet-detail-item">
             <span class="sheet-detail-label">Edad</span>
             <span class="sheet-detail-value">${edadDisplay ? `${escapeHtml(edadDisplay)}${a.fecha_nacimiento ? ` <small style="font-weight:500;color:#666;">(${formatFecha(a.fecha_nacimiento)})</small>` : ''}` : 'No registrada'}</span>
-          </div>
-          <div class="sheet-detail-item">
-            <span class="sheet-detail-label">Sexo / Raza</span>
-            <span class="sheet-detail-value">${escapeHtml(a.sexo || '-')} • <span style="color: #e65100; font-weight: 800;">${escapeHtml(a.raza || 'Bovino')}</span></span>
           </div>
           ${!/macho|male|toro|torete/i.test(a.sexo || '') ? `
           <div class="sheet-detail-item">
@@ -911,37 +882,42 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
             : (diffRest === 0 ? '¡Parto hoy!' : `Atrasado ${Math.abs(diffRest)} días`);
 
           activeBannerHtml = `
-            <div class="sheet-gestation-card">
-              <div class="sheet-gestation-top">
-                <span class="sheet-gestation-pill">Gestación en curso</span>
-                <div class="sheet-gestation-top-right">
-                  <span class="sheet-gestation-pct">${pct} %</span>
-                  <button type="button" class="sheet-gestation-edit-icon" data-open-sheet="edit-prenez" title="Editar preñez" aria-label="Editar preñez">
-                    <span class="material-icons">edit</span>
-                  </button>
+            <div class="sheet-gestation-card sheet-collapsible-card" data-collapsible="gestacion">
+              <div class="sheet-collapsible-trigger sheet-gestation-trigger" role="button" tabindex="0" aria-expanded="false">
+                <div class="sheet-gestation-top">
+                  <span class="sheet-gestation-pill">Gestación en curso</span>
+                  <div class="sheet-gestation-top-right">
+                    <span class="sheet-gestation-pct">${pct} %</span>
+                    <button type="button" class="sheet-gestation-edit-icon" data-open-sheet="edit-prenez" title="Editar preñez" aria-label="Editar preñez">
+                      <span class="material-icons">edit</span>
+                    </button>
+                    <span class="material-icons sheet-collapsible-chevron">chevron_right</span>
+                  </div>
+                </div>
+                <div class="sheet-gestation-month-row">
+                  <span class="sheet-gestation-month">Mes ${mesActual}</span>
+                  <span class="sheet-gestation-of">de 9</span>
+                </div>
+                <div class="sheet-gestation-sub">Monta ${escapeHtml(formatFecha(activePreg.fecha_monta))} · ${escapeHtml(elapsedStr)}</div>
+                <div class="sheet-gestation-progress">
+                  <div class="sheet-gestation-progress-fill" style="width: ${pct}%;"></div>
                 </div>
               </div>
-              <div class="sheet-gestation-month-row">
-                <span class="sheet-gestation-month">Mes ${mesActual}</span>
-                <span class="sheet-gestation-of">de 9</span>
-              </div>
-              <div class="sheet-gestation-sub">Monta ${escapeHtml(formatFecha(activePreg.fecha_monta))} · ${escapeHtml(elapsedStr)}</div>
-              <div class="sheet-gestation-progress">
-                <div class="sheet-gestation-progress-fill" style="width: ${pct}%;"></div>
-              </div>
-              <div class="sheet-gestation-info-box">
-                <div>
-                  <span class="sheet-gestation-info-label">PARTO ESTIMADO</span>
-                  <span class="sheet-gestation-info-val is-accent">${escapeHtml(formatFecha(fPartoProb))}</span>
+              <div class="sheet-collapsible-body sheet-gestation-body">
+                <div class="sheet-gestation-info-box">
+                  <div>
+                    <span class="sheet-gestation-info-label">PARTO ESTIMADO</span>
+                    <span class="sheet-gestation-info-val is-accent">${escapeHtml(formatFecha(fPartoProb))}</span>
+                  </div>
+                  <div>
+                    <span class="sheet-gestation-info-label">FALTAN</span>
+                    <span class="sheet-gestation-info-val">${escapeHtml(remainingStr)}</span>
+                  </div>
                 </div>
-                <div>
-                  <span class="sheet-gestation-info-label">FALTAN</span>
-                  <span class="sheet-gestation-info-val">${escapeHtml(remainingStr)}</span>
+                <div class="sheet-gestation-actions">
+                  <button type="button" class="sheet-gestation-btn sheet-gestation-btn--primary" data-open-sheet="parto-prenez">Registrar parto</button>
+                  <button type="button" class="sheet-gestation-btn sheet-gestation-btn--abort" data-open-sheet="abort-prenez">Aborto</button>
                 </div>
-              </div>
-              <div class="sheet-gestation-actions">
-                <button type="button" class="sheet-gestation-btn sheet-gestation-btn--primary" data-open-sheet="parto-prenez">Registrar parto</button>
-                <button type="button" class="sheet-gestation-btn sheet-gestation-btn--abort" data-open-sheet="abort-prenez">Aborto</button>
               </div>
             </div>
           `;
@@ -1026,7 +1002,8 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
     `;
 
     detailsContainer.querySelectorAll('.sheet-collapsible-trigger').forEach((trigger) => {
-      trigger.addEventListener('click', () => {
+      trigger.addEventListener('click', (e) => {
+        if (e.target.closest('.sheet-gestation-edit-icon')) return;
         const card = trigger.closest('.sheet-collapsible-card');
         if (!card) return;
         const isOpen = card.classList.toggle('is-open');
@@ -1048,7 +1025,6 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
       notifyParentRefresh();
     };
 
-    const detailPanelEl = detailsContainer.querySelector('#sheet-peso-detail-panel');
     detailsContainer.querySelectorAll('.sheet-peso-bar-btn').forEach((barBtn) => {
       barBtn.addEventListener('click', () => {
         const idx = parseInt(barBtn.dataset.pesoIdx, 10);
@@ -1059,9 +1035,6 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
           b.classList.toggle('is-selected', active);
           b.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
-        if (detailPanelEl) {
-          detailPanelEl.innerHTML = renderPesoDetailPanelHtml(idx);
-        }
       });
     });
 
@@ -1571,13 +1544,16 @@ function getDosisCatalog(type) {
   }
 }
 
-async function persistCatalogItemToSupabase(type, cleanName, numKg) {
+async function persistCatalogItemToSupabase(type, cleanName, numKgPorMl, dosisMl = 0, rawKg = 0) {
   try {
     const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
     if (!empId) return;
     const isVac = type === 'vacunas';
     const table = isVac ? 'animal_vacunas' : 'animal_fumigaciones';
     const nameField = isVac ? 'nombre' : 'producto';
+    const hasKg = numKgPorMl > 0 && rawKg > 0;
+    const dosisVal = hasKg ? String(numKgPorMl) : (dosisMl > 0 ? `${dosisMl} ml` : '');
+    const obsText = hasKg ? `${dosisMl} ml cada ${rawKg} kg` : (dosisMl > 0 ? `${dosisMl} ml` : '');
 
     // Check if a Catalogo row already exists in Supabase for this name
     let queryUrl = `/rest/v1/${table}?estado=eq.Catalogo&${nameField}=ilike.${encodeURIComponent(cleanName)}&empresa_id=eq.${encodeURIComponent(empId)}&select=id`;
@@ -1588,8 +1564,8 @@ async function persistCatalogItemToSupabase(type, cleanName, numKg) {
         method: 'PATCH',
         body: JSON.stringify({
           [nameField]: cleanName,
-          dosis: String(numKg),
-          observaciones: `1 ml cada ${numKg} kg`
+          dosis: dosisVal,
+          observaciones: obsText
         })
       });
     } else {
@@ -1597,8 +1573,8 @@ async function persistCatalogItemToSupabase(type, cleanName, numKg) {
         animal_id: null,
         empresa_id: empId,
         [nameField]: cleanName,
-        dosis: String(numKg),
-        observaciones: `1 ml cada ${numKg} kg`,
+        dosis: dosisVal,
+        observaciones: obsText,
         fecha: getLocalToday(),
         estado: 'Catalogo'
       });
@@ -1618,25 +1594,44 @@ async function syncDosisCatalogFromSupabase(type) {
     const nameField = isVac ? 'nombre' : 'producto';
 
     const rows = await restFetch(
-      `/rest/v1/${table}?empresa_id=eq.${encodeURIComponent(empId)}&estado=eq.Catalogo&order=created_at.desc&select=id,${nameField},dosis`
+      `/rest/v1/${table}?empresa_id=eq.${encodeURIComponent(empId)}&estado=eq.Catalogo&order=created_at.desc&select=id,${nameField},dosis,observaciones`
     ).catch(() => []);
 
     const dbMap = new Map();
     for (const r of (rows || [])) {
       const n = (r[nameField] || '').trim();
-      const kg = parseFloat(r.dosis);
-      if (n && !isNaN(kg) && kg > 0 && !dbMap.has(n.toLowerCase())) {
-        dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: kg });
+      if (!n || dbMap.has(n.toLowerCase())) continue;
+      const obsMatch = (r.observaciones || '').match(/(\d+(?:\.\d+)?)\s*ml\s*cada\s*(\d+(?:\.\d+)?)\s*kg/i);
+      const mlOnlyMatch = String(r.dosis || '').match(/^(\d+(?:\.\d+)?)\s*ml$/i);
+      if (obsMatch) {
+        const dosisMl = parseFloat(obsMatch[1]);
+        const rawKg = parseFloat(obsMatch[2]);
+        const kgPorMl = parseFloat(r.dosis) || Number((rawKg / dosisMl).toFixed(4));
+        dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl, dosisMl, kg: rawKg });
+      } else if (mlOnlyMatch) {
+        const dosisMl = parseFloat(mlOnlyMatch[1]);
+        if (!isNaN(dosisMl) && dosisMl > 0) {
+          dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: 0, dosisMl, kg: 0 });
+        }
+      } else {
+        const kg = parseFloat(r.dosis);
+        if (!isNaN(kg) && kg > 0) {
+          dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: kg, dosisMl: 1, kg });
+        } else {
+          dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: 0, dosisMl: 0, kg: 0 });
+        }
       }
     }
 
     // Automatically push any local items not yet in Supabase DB so nothing is lost
     for (const loc of localList) {
       const n = (loc.nombre || '').trim();
-      const kg = parseFloat(loc.kgPorMl);
-      if (n && !isNaN(kg) && kg > 0 && !dbMap.has(n.toLowerCase())) {
-        dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: kg });
-        persistCatalogItemToSupabase(type, n, kg);
+      const kg = parseFloat(loc.kgPorMl) || 0;
+      const dMl = parseFloat(loc.dosisMl) || 0;
+      if (n && !dbMap.has(n.toLowerCase())) {
+        const rKg = parseFloat(loc.kg) || kg;
+        dbMap.set(n.toLowerCase(), { nombre: n, kgPorMl: kg, dosisMl: dMl, kg: rKg });
+        persistCatalogItemToSupabase(type, n, kg, dMl, rKg);
       }
     }
 
@@ -1650,22 +1645,235 @@ async function syncDosisCatalogFromSupabase(type) {
   }
 }
 
-function saveToDosisCatalog(type, nombre, kgPorMl) {
+function saveToDosisCatalog(type, nombre, kgPorMl, dosisMl = 0, rawKg = 0) {
   const cleanName = (nombre || '').trim();
-  const numKg = parseFloat(kgPorMl);
-  if (!cleanName || isNaN(numKg) || numKg <= 0) return getDosisCatalog(type);
+  const numKg = parseFloat(kgPorMl) || 0;
+  const numMl = parseFloat(dosisMl) || 0;
+  const numRawKg = parseFloat(rawKg) || 0;
+  if (!cleanName) return getDosisCatalog(type);
   const list = getDosisCatalog(type);
+  const entry = { nombre: cleanName, kgPorMl: numKg, dosisMl: numMl, kg: numRawKg };
   const existingIdx = list.findIndex(item => item.nombre.toLowerCase() === cleanName.toLowerCase());
   if (existingIdx >= 0) {
-    list[existingIdx] = { nombre: cleanName, kgPorMl: numKg };
+    list[existingIdx] = entry;
   } else {
-    list.unshift({ nombre: cleanName, kgPorMl: numKg });
+    list.unshift(entry);
   }
   try {
     localStorage.setItem(getCatalogStorageKey(type), JSON.stringify(list));
   } catch {}
-  persistCatalogItemToSupabase(type, cleanName, numKg);
+  persistCatalogItemToSupabase(type, cleanName, numKg, entry.dosisMl, numRawKg);
   return list;
+}
+
+function deleteFromDosisCatalog(type, nombre) {
+  const cleanName = (nombre || '').trim();
+  if (!cleanName) return getDosisCatalog(type);
+  const list = getDosisCatalog(type).filter(
+    item => (item.nombre || '').trim().toLowerCase() !== cleanName.toLowerCase()
+  );
+  try {
+    localStorage.setItem(getCatalogStorageKey(type), JSON.stringify(list));
+  } catch {}
+  try {
+    const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+    if (empId) {
+      const isVac = type === 'vacunas';
+      const table = isVac ? 'animal_vacunas' : 'animal_fumigaciones';
+      const nameField = isVac ? 'nombre' : 'producto';
+      restFetch(
+        `/rest/v1/${table}?estado=eq.Catalogo&${nameField}=ilike.${encodeURIComponent(cleanName)}&empresa_id=eq.${encodeURIComponent(empId)}`,
+        { method: 'DELETE' }
+      ).catch(() => {});
+    }
+  } catch {}
+  return list;
+}
+
+function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
+  const isVac = type === 'vacunas';
+  const title = isVac ? 'Nueva Vacuna' : 'Nuevo Producto';
+  const nameLabel = isVac ? 'Nombre de la nueva vacuna' : 'Nombre del nuevo producto';
+  const submitLabel = isVac ? 'Guardar nueva vacuna' : 'Guardar nuevo producto';
+  const parsedDefaultKg = parseFloat(defaultKg);
+  const initialKgVal = !isNaN(parsedDefaultKg) && parsedDefaultKg > 0 ? String(parsedDefaultKg) : '';
+
+  document.getElementById('m3-catalog-new-scrim')?.remove();
+  document.getElementById('m3-catalog-new-sheet')?.remove();
+
+  const scrim = document.createElement('div');
+  scrim.id = 'm3-catalog-new-scrim';
+  scrim.className = 'm3-sub-action-sheet-scrim';
+  scrim.style.zIndex = '10010';
+
+  const sheet = document.createElement('div');
+  sheet.id = 'm3-catalog-new-sheet';
+  sheet.className = 'm3-sub-action-sheet';
+  sheet.style.zIndex = '10011';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+
+  sheet.innerHTML = `
+    <button type="button" class="m3-action-sheet-close-btn" id="catalog-new-close" aria-label="Cerrar">
+      <span class="material-icons">close</span>
+    </button>
+    <div class="m3-action-sheet-handle-box">
+      <div class="m3-action-sheet-handle"></div>
+    </div>
+    <div class="m3-sub-sheet-header">
+      <div class="m3-sub-sheet-icon">
+        <span class="material-icons">${isVac ? 'vaccines' : 'pest_control'}</span>
+      </div>
+      <div style="flex: 1; min-width: 0;">
+        <h4 class="m3-sub-sheet-title">${title}</h4>
+        <p class="m3-sub-sheet-subtitle">Guárdala en tu catálogo (la dosis es opcional)</p>
+      </div>
+    </div>
+    <form id="catalog-new-form" class="m3-sub-sheet-form" novalidate>
+      <div class="m3-field-group">
+        <div class="m3-field" id="catalog-new-nombre-field">
+          <input type="text" id="catalog-new-nombre" placeholder=" " autocomplete="off">
+          <label>${nameLabel}</label>
+        </div>
+        <div class="m3-field-error" id="catalog-new-nombre-error" role="alert"></div>
+      </div>
+      <div class="m3-field-group">
+        <div class="m3-field" id="catalog-new-ml-field">
+          <input type="number" step="any" min="0.01" id="catalog-new-ml" placeholder=" " autocomplete="off">
+          <label>Dosis (ml) (opcional)</label>
+        </div>
+        <div class="m3-field-error" id="catalog-new-ml-error" role="alert"></div>
+      </div>
+      <div class="m3-field-group">
+        <div class="m3-field" id="catalog-new-kg-field">
+          <input type="number" step="any" min="0.01" id="catalog-new-kg" value="${escapeHtml(initialKgVal)}" placeholder=" " autocomplete="off">
+          <label>Peso en kg actual</label>
+        </div>
+        <div class="m3-field-error" id="catalog-new-kg-error" role="alert"></div>
+      </div>
+      <div class="m3-sub-sheet-actions">
+        <button type="button" class="btn-m3-tonal" id="catalog-new-cancel">Cancelar</button>
+        <button type="submit" class="btn-m3-fill">
+          <span class="material-icons" style="font-size: 18px;">save</span>
+          <span>${submitLabel}</span>
+        </button>
+      </div>
+    </form>
+  `;
+
+  document.body.appendChild(scrim);
+  document.body.appendChild(sheet);
+
+  const closeCatSheet = () => {
+    sheet.classList.remove('open');
+    scrim.classList.remove('open');
+    setTimeout(() => {
+      scrim.remove();
+      sheet.remove();
+    }, 260);
+  };
+
+  scrim.onclick = closeCatSheet;
+  sheet.querySelector('#catalog-new-close')?.addEventListener('click', closeCatSheet);
+  sheet.querySelector('#catalog-new-cancel')?.addEventListener('click', closeCatSheet);
+
+  const nameInput = sheet.querySelector('#catalog-new-nombre');
+  const nameField = sheet.querySelector('#catalog-new-nombre-field');
+  const nameError = sheet.querySelector('#catalog-new-nombre-error');
+  const mlInput = sheet.querySelector('#catalog-new-ml');
+  const mlField = sheet.querySelector('#catalog-new-ml-field');
+  const mlError = sheet.querySelector('#catalog-new-ml-error');
+  const kgInput = sheet.querySelector('#catalog-new-kg');
+  const kgField = sheet.querySelector('#catalog-new-kg-field');
+  const kgGroup = kgField?.closest('.m3-field-group');
+  const kgError = sheet.querySelector('#catalog-new-kg-error');
+
+  const setFieldError = (fieldEl, errorEl, msg) => {
+    if (fieldEl) fieldEl.classList.toggle('is-error', Boolean(msg));
+    if (errorEl) errorEl.textContent = msg || '';
+  };
+
+  const syncKgVisibility = () => {
+    const hasMl = Boolean((mlInput?.value || '').trim());
+    if (kgGroup) kgGroup.style.display = hasMl ? 'none' : '';
+    if (hasMl) setFieldError(kgField, kgError, '');
+  };
+
+  nameInput?.addEventListener('input', () => setFieldError(nameField, nameError, ''));
+  mlInput?.addEventListener('input', () => {
+    setFieldError(mlField, mlError, '');
+    syncKgVisibility();
+  });
+  kgInput?.addEventListener('input', () => setFieldError(kgField, kgError, ''));
+
+  sheet.querySelector('#catalog-new-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const newName = (nameInput?.value || '').trim();
+    const rawMl = (mlInput?.value || '').trim();
+    const rawKgStr = rawMl !== '' ? '' : (kgInput?.value || '').trim();
+    let hasError = false;
+    let firstInvalidInput = null;
+
+    if (!newName) {
+      setFieldError(nameField, nameError, isVac ? 'Escribe el nombre de la vacuna' : 'Escribe el nombre del producto');
+      hasError = true;
+      firstInvalidInput = firstInvalidInput || nameInput;
+    } else {
+      setFieldError(nameField, nameError, '');
+    }
+
+    let dosisMl = 0;
+    if (rawMl !== '') {
+      const parsedMl = parseFloat(rawMl);
+      if (isNaN(parsedMl) || parsedMl <= 0) {
+        setFieldError(mlField, mlError, 'La dosis debe ser mayor a 0');
+        hasError = true;
+        firstInvalidInput = firstInvalidInput || mlInput;
+      } else {
+        dosisMl = parsedMl;
+        setFieldError(mlField, mlError, '');
+      }
+    } else {
+      setFieldError(mlField, mlError, '');
+    }
+
+    let rawKg = 0;
+    if (rawKgStr !== '') {
+      const parsedKg = parseFloat(rawKgStr);
+      if (isNaN(parsedKg) || parsedKg <= 0) {
+        setFieldError(kgField, kgError, 'El peso en kg debe ser mayor a 0');
+        hasError = true;
+        firstInvalidInput = firstInvalidInput || kgInput;
+      } else {
+        rawKg = parsedKg;
+        setFieldError(kgField, kgError, '');
+      }
+    } else {
+      setFieldError(kgField, kgError, '');
+    }
+
+    if (hasError) {
+      firstInvalidInput?.focus();
+      return;
+    }
+
+    const effectiveMl = rawKg > 0 && dosisMl === 0 ? 1 : dosisMl;
+    const kgPorMl = rawKg > 0 ? Number((rawKg / effectiveMl).toFixed(4)) : 0;
+    const updatedList = saveToDosisCatalog(type, newName, kgPorMl, effectiveMl, rawKg);
+    closeCatSheet();
+    showSnackbar(`${isVac ? 'Vacuna' : 'Producto'} "${newName}" guardado ✓`);
+    if (typeof onSaved === 'function') {
+      onSaved(updatedList, { nombre: newName, kgPorMl, dosisMl: effectiveMl, kg: rawKg });
+    }
+  });
+
+  scrim.style.display = 'block';
+  sheet.style.display = 'block';
+  requestAnimationFrame(() => {
+    scrim.classList.add('open');
+    sheet.classList.add('open');
+    setTimeout(() => sheet.querySelector('#catalog-new-nombre')?.focus(), 180);
+  });
 }
 
 function renderWeekDatePickerHtml(inputId, initialDate) {
@@ -1678,7 +1886,6 @@ function renderWeekDatePickerHtml(inputId, initialDate) {
           <button type="button" class="sheet-dp-nav-btn" data-dp-action="prev" aria-label="Anterior">‹</button>
           <div class="sheet-dp-current-label"></div>
           <button type="button" class="sheet-dp-nav-btn" data-dp-action="next" aria-label="Siguiente">›</button>
-          <button type="button" class="sheet-dp-pill-btn" data-dp-action="today">Hoy</button>
           <button type="button" class="sheet-dp-pill-btn" data-dp-action="toggle-mode">Ver mes</button>
         </div>
         <div class="sheet-dp-grid"></div>
@@ -1838,19 +2045,226 @@ function attachWeekDatePicker(container, inputId, todayStr, onDateChange, opts =
   if (typeof onDateChange === 'function') onDateChange(selectedDate);
 }
 
+// ─── Material 3 Filtering Autocomplete Dropdown ──────────────────────────────
+
+function renderM3AutocompleteField({ id, label }) {
+  return `
+    <div class="m3-ac-wrap" id="${id}-wrap">
+      <div class="m3-field">
+        <input type="text" id="${id}-input" class="m3-ac-input" placeholder=" " autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list">
+        <label>${escapeHtml(label)}</label>
+        <button type="button" id="${id}-toggle" class="m3-ac-toggle" aria-label="Mostrar opciones">
+          <span class="material-icons">arrow_drop_down</span>
+        </button>
+      </div>
+      <div class="m3-ac-menu" id="${id}-menu" role="listbox"></div>
+    </div>
+  `;
+}
+
+function initM3Autocomplete(root, id, initialItems = [], { onSelect, onInput, onDelete } = {}) {
+  const wrap = root.querySelector(`#${id}-wrap`);
+  const input = root.querySelector(`#${id}-input`);
+  const toggleBtn = root.querySelector(`#${id}-toggle`);
+  const menu = root.querySelector(`#${id}-menu`);
+  if (!wrap || !input || !toggleBtn || !menu) {
+    return { updateItems: () => {} };
+  }
+
+  let items = Array.isArray(initialItems) ? initialItems : [];
+  let selectedName = '';
+
+  const renderMenu = (filterText = '') => {
+    const q = (filterText || '').trim().toLowerCase();
+    const filtered = q
+      ? items.filter(it => (it.nombre || '').toLowerCase().includes(q) || String(it.kgPorMl || '').includes(q))
+      : items;
+
+    if (filtered.length === 0) {
+      menu.innerHTML = `<div class="m3-ac-empty">${items.length === 0 ? 'Sin opciones guardadas aún' : 'Sin coincidencias'}</div>`;
+      return;
+    }
+
+    menu.innerHTML = filtered.map((it, idx) => {
+      const isSel = selectedName && (it.nombre || '').toLowerCase() === selectedName.toLowerCase();
+      return `
+        <div class="m3-ac-swipe-row" data-ac-row="${idx}">
+          ${typeof onDelete === 'function' ? `
+            <div class="m3-ac-swipe-bg" aria-hidden="true">
+              <span class="material-icons" style="font-size: 18px;">delete_outline</span>
+              <span>Eliminar</span>
+            </div>
+          ` : ''}
+          <button type="button" class="m3-ac-option ${isSel ? 'is-selected' : ''}" data-ac-idx="${idx}" role="option" aria-selected="${isSel ? 'true' : 'false'}">
+            ${isSel ? '<span class="material-icons m3-ac-option-check">check</span>' : '<span class="m3-ac-option-check" aria-hidden="true"></span>'}
+            <span class="m3-ac-option-text">
+              <span class="m3-ac-option-name">${escapeHtml(it.nombre)}</span>
+              ${it.kgPorMl > 0 ? `<span class="m3-ac-option-sub">${it.dosisMl && it.kg ? `${escapeHtml(it.dosisMl)} ml cada ${escapeHtml(it.kg)} kg` : `1 ml cada ${escapeHtml(it.kgPorMl)} kg`}</span>` : (it.dosisMl > 0 ? `<span class="m3-ac-option-sub">${escapeHtml(it.dosisMl)} ml</span>` : '')}
+            </span>
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    menu.querySelectorAll('.m3-ac-swipe-row').forEach((row, idx) => {
+      const btn = row.querySelector('.m3-ac-option');
+      const bg = row.querySelector('.m3-ac-swipe-bg');
+      const chosen = filtered[idx];
+      if (!btn || !chosen) return;
+
+      let startX = 0;
+      let startY = 0;
+      let currentDx = 0;
+      let isDragging = false;
+      let didSwipe = false;
+
+      if (typeof onDelete === 'function') {
+        btn.addEventListener('pointerdown', (e) => {
+          if (e.button && e.button !== 0) return;
+          startX = e.clientX;
+          startY = e.clientY;
+          currentDx = 0;
+          isDragging = false;
+          didSwipe = false;
+        });
+
+        btn.addEventListener('pointermove', (e) => {
+          if (startX === 0 && startY === 0) return;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+
+          if (!isDragging) {
+            if (dx > 8 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+              isDragging = true;
+              didSwipe = true;
+              btn.style.transition = 'none';
+              try { btn.setPointerCapture(e.pointerId); } catch {}
+            } else if (Math.abs(dy) > 10) {
+              startX = 0;
+              startY = 0;
+              return;
+            }
+          }
+
+          if (isDragging) {
+            currentDx = Math.max(0, Math.min(dx, row.offsetWidth || 260));
+            btn.style.transform = `translateX(${currentDx}px)`;
+            if (bg) bg.style.opacity = String(Math.min(1, currentDx / 70));
+          }
+        });
+
+        const endSwipe = () => {
+          if (!isDragging) {
+            startX = 0;
+            startY = 0;
+            return;
+          }
+          isDragging = false;
+          startX = 0;
+          startY = 0;
+          const threshold = Math.min(95, (row.offsetWidth || 240) * 0.32);
+          btn.style.transition = 'transform 0.2s cubic-bezier(0.2, 0, 0, 1)';
+
+          if (currentDx >= threshold) {
+            btn.style.transform = 'translateX(105%)';
+            row.style.maxHeight = `${row.offsetHeight}px`;
+            row.style.transition = 'max-height 0.2s ease, opacity 0.2s ease';
+            requestAnimationFrame(() => {
+              row.style.maxHeight = '0px';
+              row.style.opacity = '0';
+            });
+            setTimeout(() => {
+              const targetName = (chosen.nombre || '').toLowerCase();
+              items = items.filter(it => (it.nombre || '').toLowerCase() !== targetName);
+              if (selectedName.toLowerCase() === targetName) {
+                selectedName = '';
+                input.value = '';
+                if (typeof onInput === 'function') onInput('');
+              }
+              const nextItems = onDelete(chosen);
+              if (Array.isArray(nextItems)) items = nextItems;
+              renderMenu(input.value);
+            }, 200);
+          } else {
+            btn.style.transform = 'translateX(0)';
+            if (bg) bg.style.opacity = '0';
+            setTimeout(() => { didSwipe = false; }, 60);
+          }
+        };
+
+        btn.addEventListener('pointerup', endSwipe);
+        btn.addEventListener('pointercancel', endSwipe);
+      }
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (didSwipe) {
+          didSwipe = false;
+          return;
+        }
+        selectedName = chosen.nombre || '';
+        input.value = selectedName;
+        closeMenu();
+        if (typeof onSelect === 'function') onSelect(chosen);
+      });
+    });
+  };
+
+  const openMenu = (showAll = false) => {
+    renderMenu(showAll ? '' : input.value);
+    wrap.classList.add('is-open');
+    input.setAttribute('aria-expanded', 'true');
+  };
+
+  const closeMenu = () => {
+    wrap.classList.remove('is-open');
+    input.setAttribute('aria-expanded', 'false');
+  };
+
+  input.addEventListener('focus', () => openMenu(true));
+  input.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openMenu(true);
+  });
+  input.addEventListener('input', () => {
+    selectedName = input.value;
+    if (typeof onInput === 'function') onInput(input.value);
+    openMenu(false);
+  });
+
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (wrap.classList.contains('is-open')) closeMenu();
+    else {
+      openMenu(true);
+      input.focus();
+    }
+  });
+
+  const onOutsideClick = (e) => {
+    if (!wrap.contains(e.target)) closeMenu();
+  };
+  root.addEventListener('click', onOutsideClick);
+
+  renderMenu('');
+
+  return {
+    updateItems: (newItems, selectName = null) => {
+      items = Array.isArray(newItems) ? newItems : [];
+      if (selectName !== null) {
+        selectedName = selectName;
+        input.value = selectName;
+      }
+      renderMenu(wrap.classList.contains('is-open') ? input.value : '');
+    }
+  };
+}
+
 // ─── Sub-Bottom Sheets: Vacunas ──────────────────────────────────────────────
 
 function openVacunaFormSheet(animal, pesoActual, onReload) {
   const today = getLocalToday();
   const catalog = getDosisCatalog('vacunas');
-
-  const buildSelectOptions = (list, selectedName = '') => {
-    const opts = list.map(item => {
-      const isSel = item.nombre.toLowerCase() === (selectedName || '').toLowerCase() ? 'selected' : '';
-      return `<option value="${escapeHtml(item.nombre)}" data-kg="${escapeHtml(item.kgPorMl)}" ${isSel}>${escapeHtml(item.nombre)} (1 ml cada ${escapeHtml(item.kgPorMl)} kg)</option>`;
-    }).join('');
-    return `<option value="">-- Seleccionar vacuna guardada --</option>${opts}`;
-  };
 
   const html = `
     <div class="m3-sub-sheet-header">
@@ -1864,40 +2278,11 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
     </div>
     <form id="sub-sheet-form-vacuna" class="m3-sub-sheet-form">
       <div style="display: flex; gap: 8px; align-items: stretch;">
-        <div class="m3-field" style="flex: 1; margin-bottom: 0;">
-          <select id="sub-vacuna-catalog-select" style="width: 100%; height: 54px; border-radius: 12px; border: 1.5px solid rgba(45,62,44,0.28); padding: 18px 14px 6px; font-size: 14px; font-weight: 700; color: #1e3e2b; background: #fff; outline: none; font-family: inherit;">
-            ${buildSelectOptions(catalog)}
-          </select>
-          <label style="top: 10px; font-size: 10.5px; font-weight: 800; color: #2d3e2c; text-transform: uppercase;">Nombre de la Vacuna / Tratamiento</label>
-        </div>
+        ${renderM3AutocompleteField({ id: 'sub-vacuna-ac', label: 'Vacuna / Tratamiento' })}
         <button type="button" id="sub-vacuna-toggle-new" class="btn-m3-tonal" style="height: 54px; padding: 0 14px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 12.5px; background: #eef5ee; color: #2d3e2c; border: 1.5px solid #c8dcc6; white-space: nowrap; flex-shrink: 0;">
           <span class="material-icons" style="font-size: 18px;">add</span>
           <span>Nueva</span>
         </button>
-      </div>
-
-      <div id="sub-vacuna-new-box" style="display: none; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-          <span style="font-size: 12px; font-weight: 800; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">playlist_add</span>
-            Crear nueva vacuna con su dosis
-          </span>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="text" id="sub-vacuna-new-nombre" placeholder=" " autocomplete="off">
-          <label>Nombre de la nueva vacuna</label>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="number" step="any" id="sub-vacuna-new-kg" placeholder=" " autocomplete="off">
-          <label>Peso en kg por cada 1 ml (ej. 50)</label>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button type="button" id="sub-vacuna-cancel-new" class="btn-m3-tonal" style="padding: 8px 14px; font-size: 12.5px; border-radius: 10px;">Cerrar</button>
-          <button type="button" id="sub-vacuna-save-new" class="btn-m3-fill" style="padding: 8px 16px; font-size: 12.5px; border-radius: 10px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">save</span>
-            <span>Guardar y Seleccionar</span>
-          </button>
-        </div>
       </div>
 
       <input type="hidden" name="nombre" id="sub-vacuna-nombre" value="">
@@ -1919,7 +2304,7 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
         <button type="button" class="btn-m3-tonal" id="sub-vacuna-cancel">Cancelar</button>
         <button type="submit" class="btn-m3-fill" id="sub-vacuna-submit">
           <span class="material-icons" style="font-size: 18px;">check</span>
-          <span id="sub-vacuna-submit-label">Registrar aplicada</span>
+          <span id="sub-vacuna-submit-label">Aplicar vacuna</span>
         </button>
       </div>
     </form>
@@ -1929,17 +2314,19 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
     const fechaInput = subSheet.querySelector('#sub-vacuna-fecha');
     const titleEl = subSheet.querySelector('#sub-vacuna-title');
     const submitLabelEl = subSheet.querySelector('#sub-vacuna-submit-label');
-    const catalogSelect = subSheet.querySelector('#sub-vacuna-catalog-select');
     const hiddenNombreInput = subSheet.querySelector('#sub-vacuna-nombre');
     const toggleNewBtn = subSheet.querySelector('#sub-vacuna-toggle-new');
-    const newBox = subSheet.querySelector('#sub-vacuna-new-box');
-    const newNombreInput = subSheet.querySelector('#sub-vacuna-new-nombre');
-    const newKgInput = subSheet.querySelector('#sub-vacuna-new-kg');
-    const cancelNewBtn = subSheet.querySelector('#sub-vacuna-cancel-new');
-    const saveNewBtn = subSheet.querySelector('#sub-vacuna-save-new');
     const dosisBaseInput = subSheet.querySelector('#sub-vacuna-dosis-base');
+    const dosisBaseField = dosisBaseInput?.closest('.m3-field');
     const dosisAplicarInput = subSheet.querySelector('#sub-vacuna-dosis');
     const pesoNum = parseFloat(pesoActual) || 0;
+
+    const syncDosisBaseVisibility = () => {
+      if (!dosisBaseField) return;
+      const hasBase = Boolean(dosisBaseInput?.value?.trim());
+      const hasApplied = Boolean(dosisAplicarInput?.value?.trim());
+      dosisBaseField.style.display = (!hasBase && hasApplied) ? 'none' : '';
+    };
 
     const recalcularDosis = () => {
       const divisor = parseFloat(dosisBaseInput?.value);
@@ -1949,72 +2336,61 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
       } else if (!dosisBaseInput?.value && dosisAplicarInput) {
         dosisAplicarInput.value = '';
       }
+      syncDosisBaseVisibility();
     };
 
     dosisBaseInput?.addEventListener('input', recalcularDosis);
+    dosisAplicarInput?.addEventListener('input', syncDosisBaseVisibility);
 
-    syncDosisCatalogFromSupabase('vacunas').then((dbList) => {
-      if (catalogSelect && Array.isArray(dbList)) {
-        const currentSelected = catalogSelect.value || '';
-        catalogSelect.innerHTML = buildSelectOptions(dbList, currentSelected);
+    const applyCatalogSelection = (item) => {
+      if (hiddenNombreInput) hiddenNombreInput.value = item.nombre || '';
+      if (item.kgPorMl > 0 && dosisBaseInput) {
+        dosisBaseInput.value = item.kgPorMl;
+        recalcularDosis();
+      } else if (item.dosisMl > 0) {
+        if (dosisBaseInput) dosisBaseInput.value = '';
+        if (dosisAplicarInput) dosisAplicarInput.value = `${item.dosisMl} ml`;
+        syncDosisBaseVisibility();
+      } else {
+        if (dosisBaseInput) dosisBaseInput.value = '';
+        if (dosisAplicarInput) dosisAplicarInput.value = '';
+        syncDosisBaseVisibility();
+      }
+    };
+
+    const vacAc = initM3Autocomplete(subSheet, 'sub-vacuna-ac', catalog, {
+      onSelect: applyCatalogSelection,
+      onInput: (val) => {
+        if (hiddenNombreInput) hiddenNombreInput.value = val;
+      },
+      onDelete: (item) => {
+        const updated = deleteFromDosisCatalog('vacunas', item.nombre);
+        if (hiddenNombreInput && hiddenNombreInput.value.toLowerCase() === (item.nombre || '').toLowerCase()) {
+          hiddenNombreInput.value = '';
+        }
+        showSnackbar(`Vacuna "${item.nombre}" eliminada ✓`);
+        return updated;
       }
     });
 
-    catalogSelect?.addEventListener('change', () => {
-      const selOpt = catalogSelect.options[catalogSelect.selectedIndex];
-      const val = catalogSelect.value || '';
-      if (hiddenNombreInput) hiddenNombreInput.value = val;
-      const kg = selOpt?.getAttribute('data-kg');
-      if (kg && dosisBaseInput) {
-        dosisBaseInput.value = kg;
-        recalcularDosis();
+    syncDosisCatalogFromSupabase('vacunas').then((dbList) => {
+      if (Array.isArray(dbList)) {
+        vacAc.updateItems(dbList);
       }
     });
 
     toggleNewBtn?.addEventListener('click', () => {
-      if (!newBox) return;
-      const isHidden = newBox.style.display === 'none';
-      newBox.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) setTimeout(() => newNombreInput?.focus(), 60);
-    });
-
-    cancelNewBtn?.addEventListener('click', () => {
-      if (newBox) newBox.style.display = 'none';
-    });
-
-    saveNewBtn?.addEventListener('click', () => {
-      const newName = (newNombreInput?.value || '').trim();
-      const newKg = parseFloat(newKgInput?.value);
-      if (!newName) {
-        showSnackbar('Escribe el nombre de la vacuna', 'error');
-        newNombreInput?.focus();
-        return;
-      }
-      if (isNaN(newKg) || newKg <= 0) {
-        showSnackbar('Escribe los kg de peso por cada 1 ml (ej. 50)', 'error');
-        newKgInput?.focus();
-        return;
-      }
-      const updatedList = saveToDosisCatalog('vacunas', newName, newKg);
-      if (catalogSelect) {
-        catalogSelect.innerHTML = buildSelectOptions(updatedList, newName);
-      }
-      if (hiddenNombreInput) hiddenNombreInput.value = newName;
-      if (dosisBaseInput) {
-        dosisBaseInput.value = String(newKg);
-        recalcularDosis();
-      }
-      if (newNombreInput) newNombreInput.value = '';
-      if (newKgInput) newKgInput.value = '';
-      if (newBox) newBox.style.display = 'none';
-      showSnackbar(`Vacuna "${newName}" guardada y cargada ✓`);
+      openCatalogNewBottomSheet('vacunas', (updatedList, savedItem) => {
+        vacAc.updateItems(updatedList, savedItem.nombre);
+        applyCatalogSelection(savedItem);
+      }, pesoActual);
     });
 
     const updateModeLabel = () => {
       const val = fechaInput?.value || today;
       const isFuture = val > today;
       if (titleEl) titleEl.textContent = isFuture ? 'Programar Vacuna' : 'Registrar Vacuna';
-      if (submitLabelEl) submitLabelEl.textContent = isFuture ? 'Programar' : 'Registrar aplicada';
+      if (submitLabelEl) submitLabelEl.textContent = isFuture ? 'Programar' : 'Aplicar vacuna';
     };
     attachWeekDatePicker(subSheet, 'sub-vacuna-fecha', today, updateModeLabel);
 
@@ -2024,14 +2400,14 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
       const formData = new FormData(e.target);
       const submitBtn = subSheet.querySelector('#sub-vacuna-submit');
 
-      let nombre = (formData.get('nombre') || catalogSelect?.value || newNombreInput?.value || '').trim();
+      let nombre = (formData.get('nombre') || subSheet.querySelector('#sub-vacuna-ac-input')?.value || '').trim();
       if (!nombre) {
         showSnackbar('Selecciona o crea una vacuna primero', 'error');
         return;
       }
       if (submitBtn) submitBtn.disabled = true;
 
-      const baseKgVal = parseFloat(dosisBaseInput?.value || newKgInput?.value);
+      const baseKgVal = parseFloat(dosisBaseInput?.value);
       if (!isNaN(baseKgVal) && baseKgVal > 0) {
         saveToDosisCatalog('vacunas', nombre, baseKgVal);
       }
@@ -2075,7 +2451,7 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
         if (submitBtn) submitBtn.disabled = false;
       }
     });
-  });
+  }, { expanded: true });
 }
 
 function openVacunaDetailSheet(animal, vacuna, onReload) {
@@ -2217,14 +2593,6 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
   const today = getLocalToday();
   const catalog = getDosisCatalog('fumigaciones');
 
-  const buildSelectOptions = (list, selectedName = '') => {
-    const opts = list.map(item => {
-      const isSel = item.nombre.toLowerCase() === (selectedName || '').toLowerCase() ? 'selected' : '';
-      return `<option value="${escapeHtml(item.nombre)}" data-kg="${escapeHtml(item.kgPorMl)}" ${isSel}>${escapeHtml(item.nombre)} (1 ml cada ${escapeHtml(item.kgPorMl)} kg)</option>`;
-    }).join('');
-    return `<option value="">-- Seleccionar producto guardado --</option>${opts}`;
-  };
-
   const html = `
     <div class="m3-sub-sheet-header">
       <div class="m3-sub-sheet-icon">
@@ -2237,40 +2605,11 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
     </div>
     <form id="sub-sheet-form-fumig" class="m3-sub-sheet-form">
       <div style="display: flex; gap: 8px; align-items: stretch;">
-        <div class="m3-field" style="flex: 1; margin-bottom: 0;">
-          <select id="sub-fumig-catalog-select" style="width: 100%; height: 54px; border-radius: 12px; border: 1.5px solid rgba(45,62,44,0.28); padding: 18px 14px 6px; font-size: 14px; font-weight: 700; color: #1e3e2b; background: #fff; outline: none; font-family: inherit;">
-            ${buildSelectOptions(catalog)}
-          </select>
-          <label style="top: 10px; font-size: 10.5px; font-weight: 800; color: #2d3e2c; text-transform: uppercase;">Producto / Químico</label>
-        </div>
+        ${renderM3AutocompleteField({ id: 'sub-fumig-ac', label: 'Producto / Químico' })}
         <button type="button" id="sub-fumig-toggle-new" class="btn-m3-tonal" style="height: 54px; padding: 0 14px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; font-weight: 800; font-size: 12.5px; background: #eef5ee; color: #2d3e2c; border: 1.5px solid #c8dcc6; white-space: nowrap; flex-shrink: 0;">
           <span class="material-icons" style="font-size: 18px;">add</span>
           <span>Nuevo</span>
         </button>
-      </div>
-
-      <div id="sub-fumig-new-box" style="display: none; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-          <span style="font-size: 12px; font-weight: 800; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">playlist_add</span>
-            Crear nuevo producto con su dosis
-          </span>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="text" id="sub-fumig-new-nombre" placeholder=" " autocomplete="off">
-          <label>Nombre del nuevo producto</label>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="number" step="any" id="sub-fumig-new-kg" placeholder=" " autocomplete="off">
-          <label>Peso en kg por cada 1 ml (ej. 50)</label>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button type="button" id="sub-fumig-cancel-new" class="btn-m3-tonal" style="padding: 8px 14px; font-size: 12.5px; border-radius: 10px;">Cerrar</button>
-          <button type="button" id="sub-fumig-save-new" class="btn-m3-fill" style="padding: 8px 16px; font-size: 12.5px; border-radius: 10px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">save</span>
-            <span>Guardar y Seleccionar</span>
-          </button>
-        </div>
       </div>
 
       <input type="hidden" name="producto" id="sub-fumig-producto" value="">
@@ -2302,17 +2641,19 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
     const fechaInput = subSheet.querySelector('#sub-fumig-fecha');
     const titleEl = subSheet.querySelector('#sub-fumig-title');
     const submitLabelEl = subSheet.querySelector('#sub-fumig-submit-label');
-    const catalogSelect = subSheet.querySelector('#sub-fumig-catalog-select');
     const hiddenProductoInput = subSheet.querySelector('#sub-fumig-producto');
     const toggleNewBtn = subSheet.querySelector('#sub-fumig-toggle-new');
-    const newBox = subSheet.querySelector('#sub-fumig-new-box');
-    const newNombreInput = subSheet.querySelector('#sub-fumig-new-nombre');
-    const newKgInput = subSheet.querySelector('#sub-fumig-new-kg');
-    const cancelNewBtn = subSheet.querySelector('#sub-fumig-cancel-new');
-    const saveNewBtn = subSheet.querySelector('#sub-fumig-save-new');
     const dosisBaseInput = subSheet.querySelector('#sub-fumig-dosis-base');
+    const dosisBaseField = dosisBaseInput?.closest('.m3-field');
     const dosisAplicarInput = subSheet.querySelector('#sub-fumig-dosis');
     const pesoNum = parseFloat(pesoActual) || 0;
+
+    const syncDosisBaseVisibility = () => {
+      if (!dosisBaseField) return;
+      const hasBase = Boolean(dosisBaseInput?.value?.trim());
+      const hasApplied = Boolean(dosisAplicarInput?.value?.trim());
+      dosisBaseField.style.display = (!hasBase && hasApplied) ? 'none' : '';
+    };
 
     const recalcularDosis = () => {
       const divisor = parseFloat(dosisBaseInput?.value);
@@ -2322,65 +2663,54 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
       } else if (!dosisBaseInput?.value && dosisAplicarInput) {
         dosisAplicarInput.value = '';
       }
+      syncDosisBaseVisibility();
     };
 
     dosisBaseInput?.addEventListener('input', recalcularDosis);
+    dosisAplicarInput?.addEventListener('input', syncDosisBaseVisibility);
 
-    syncDosisCatalogFromSupabase('fumigaciones').then((dbList) => {
-      if (catalogSelect && Array.isArray(dbList)) {
-        const currentSelected = catalogSelect.value || '';
-        catalogSelect.innerHTML = buildSelectOptions(dbList, currentSelected);
+    const applyCatalogSelection = (item) => {
+      if (hiddenProductoInput) hiddenProductoInput.value = item.nombre || '';
+      if (item.kgPorMl > 0 && dosisBaseInput) {
+        dosisBaseInput.value = item.kgPorMl;
+        recalcularDosis();
+      } else if (item.dosisMl > 0) {
+        if (dosisBaseInput) dosisBaseInput.value = '';
+        if (dosisAplicarInput) dosisAplicarInput.value = `${item.dosisMl} ml`;
+        syncDosisBaseVisibility();
+      } else {
+        if (dosisBaseInput) dosisBaseInput.value = '';
+        if (dosisAplicarInput) dosisAplicarInput.value = '';
+        syncDosisBaseVisibility();
+      }
+    };
+
+    const fumigAc = initM3Autocomplete(subSheet, 'sub-fumig-ac', catalog, {
+      onSelect: applyCatalogSelection,
+      onInput: (val) => {
+        if (hiddenProductoInput) hiddenProductoInput.value = val;
+      },
+      onDelete: (item) => {
+        const updated = deleteFromDosisCatalog('fumigaciones', item.nombre);
+        if (hiddenProductoInput && hiddenProductoInput.value.toLowerCase() === (item.nombre || '').toLowerCase()) {
+          hiddenProductoInput.value = '';
+        }
+        showSnackbar(`Producto "${item.nombre}" eliminado ✓`);
+        return updated;
       }
     });
 
-    catalogSelect?.addEventListener('change', () => {
-      const selOpt = catalogSelect.options[catalogSelect.selectedIndex];
-      const val = catalogSelect.value || '';
-      if (hiddenProductoInput) hiddenProductoInput.value = val;
-      const kg = selOpt?.getAttribute('data-kg');
-      if (kg && dosisBaseInput) {
-        dosisBaseInput.value = kg;
-        recalcularDosis();
+    syncDosisCatalogFromSupabase('fumigaciones').then((dbList) => {
+      if (Array.isArray(dbList)) {
+        fumigAc.updateItems(dbList);
       }
     });
 
     toggleNewBtn?.addEventListener('click', () => {
-      if (!newBox) return;
-      const isHidden = newBox.style.display === 'none';
-      newBox.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) setTimeout(() => newNombreInput?.focus(), 60);
-    });
-
-    cancelNewBtn?.addEventListener('click', () => {
-      if (newBox) newBox.style.display = 'none';
-    });
-
-    saveNewBtn?.addEventListener('click', () => {
-      const newName = (newNombreInput?.value || '').trim();
-      const newKg = parseFloat(newKgInput?.value);
-      if (!newName) {
-        showSnackbar('Escribe el nombre del producto', 'error');
-        newNombreInput?.focus();
-        return;
-      }
-      if (isNaN(newKg) || newKg <= 0) {
-        showSnackbar('Escribe los kg de peso por cada 1 ml (ej. 50)', 'error');
-        newKgInput?.focus();
-        return;
-      }
-      const updatedList = saveToDosisCatalog('fumigaciones', newName, newKg);
-      if (catalogSelect) {
-        catalogSelect.innerHTML = buildSelectOptions(updatedList, newName);
-      }
-      if (hiddenProductoInput) hiddenProductoInput.value = newName;
-      if (dosisBaseInput) {
-        dosisBaseInput.value = String(newKg);
-        recalcularDosis();
-      }
-      if (newNombreInput) newNombreInput.value = '';
-      if (newKgInput) newKgInput.value = '';
-      if (newBox) newBox.style.display = 'none';
-      showSnackbar(`Producto "${newName}" guardado y cargado ✓`);
+      openCatalogNewBottomSheet('fumigaciones', (updatedList, savedItem) => {
+        fumigAc.updateItems(updatedList, savedItem.nombre);
+        applyCatalogSelection(savedItem);
+      }, pesoActual);
     });
 
     const updateModeLabel = () => {
@@ -2397,14 +2727,14 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
       const formData = new FormData(e.target);
       const submitBtn = subSheet.querySelector('#sub-fumig-submit');
 
-      let producto = (formData.get('producto') || catalogSelect?.value || newNombreInput?.value || '').trim();
+      let producto = (formData.get('producto') || subSheet.querySelector('#sub-fumig-ac-input')?.value || '').trim();
       if (!producto) {
         showSnackbar('Selecciona o crea un producto primero', 'error');
         return;
       }
       if (submitBtn) submitBtn.disabled = true;
 
-      const baseKgVal = parseFloat(dosisBaseInput?.value || newKgInput?.value);
+      const baseKgVal = parseFloat(dosisBaseInput?.value);
       if (!isNaN(baseKgVal) && baseKgVal > 0) {
         saveToDosisCatalog('fumigaciones', producto, baseKgVal);
       }
@@ -2448,7 +2778,7 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
         if (submitBtn) submitBtn.disabled = false;
       }
     });
-  });
+  }, { expanded: true });
 }
 
 function openFumigDetailSheet(animal, fumig, onReload) {
@@ -2595,7 +2925,11 @@ function setupSheetGestures(sheet, setExpanded) {
   let currentY = 0;
   let isTracking = false;
 
-  sheet.addEventListener('touchstart', (e) => {
+  sheet.onTouchStartMain && sheet.removeEventListener('touchstart', sheet.onTouchStartMain);
+  sheet.onTouchMoveMain && sheet.removeEventListener('touchmove', sheet.onTouchMoveMain);
+  sheet.onTouchEndMain && sheet.removeEventListener('touchend', sheet.onTouchEndMain);
+
+  sheet.onTouchStartMain = (e) => {
     if (e.touches.length !== 1) return;
     const target = e.target;
     if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('textarea') || target.closest('select')) {
@@ -2606,14 +2940,14 @@ function setupSheetGestures(sheet, setExpanded) {
     startX = e.touches[0].clientX;
     currentY = startY;
     isTracking = true;
-  }, { passive: true });
+  };
 
-  sheet.addEventListener('touchmove', (e) => {
+  sheet.onTouchMoveMain = (e) => {
     if (!isTracking || e.touches.length !== 1) return;
     currentY = e.touches[0].clientY;
-  }, { passive: true });
+  };
 
-  sheet.addEventListener('touchend', (e) => {
+  sheet.onTouchEndMain = (e) => {
     if (!isTracking) return;
     isTracking = false;
 
@@ -2633,14 +2967,20 @@ function setupSheetGestures(sheet, setExpanded) {
     else if (deltaY > 35) {
       if (sheet.classList.contains('expanded')) {
         // If scrolled down inside details, let normal scroll happen
-        if (sheet.scrollTop > 15) return;
+        const detailsEl = sheet.querySelector('#sheet-expanded-details');
+        const scTop = detailsEl ? detailsEl.scrollTop : sheet.scrollTop;
+        if (scTop > 15) return;
         setExpanded(false);
       } else {
         // In peek mode, swipe down closes
         closeActionBottomSheet();
       }
     }
-  }, { passive: true });
+  };
+
+  sheet.addEventListener('touchstart', sheet.onTouchStartMain, { passive: true });
+  sheet.addEventListener('touchmove', sheet.onTouchMoveMain, { passive: true });
+  sheet.addEventListener('touchend', sheet.onTouchEndMain, { passive: true });
 }
 
 function formatFecha(fecha) {
@@ -3038,3 +3378,80 @@ window.closeActionBottomSheet = closeActionBottomSheet;
 window.isActionBottomSheetOpen = isActionBottomSheetOpen;
 window.openSubBottomSheet = openSubBottomSheet;
 window.closeSubBottomSheet = closeSubBottomSheet;
+
+export function openMobileMenuBottomSheet(menuEl) {
+  if (!menuEl) return;
+  const buttons = Array.from(menuEl.querySelectorAll('button'));
+  if (buttons.length === 0) return;
+
+  document.getElementById('m3-menu-sheet-scrim')?.remove();
+  document.getElementById('m3-menu-sheet')?.remove();
+
+  const scrim = document.createElement('div');
+  scrim.id = 'm3-menu-sheet-scrim';
+  scrim.className = 'm3-action-sheet-scrim';
+  scrim.style.zIndex = '10020';
+
+  const sheet = document.createElement('div');
+  sheet.id = 'm3-menu-sheet';
+  sheet.className = 'm3-menu-bottom-sheet';
+  sheet.style.zIndex = '10021';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+
+  const itemsHtml = buttons.map((origBtn, idx) => {
+    const iconText = origBtn.querySelector('.material-icons')?.textContent?.trim() || 'chevron_right';
+    const clone = origBtn.cloneNode(true);
+    clone.querySelectorAll('.material-icons').forEach(el => el.remove());
+    const label = clone.textContent.trim();
+    const isDelete = origBtn.classList.contains('delete') || iconText.includes('delete');
+    return `
+      <button type="button" class="m3-menu-sheet-item ${isDelete ? 'is-delete' : ''}" data-menu-idx="${idx}">
+        <span class="material-icons m3-menu-sheet-icon">${escapeHtml(iconText)}</span>
+        <span class="m3-menu-sheet-label">${escapeHtml(label)}</span>
+      </button>
+    `;
+  }).join('');
+
+  sheet.innerHTML = `
+    <div class="m3-menu-sheet-handle" aria-hidden="true"></div>
+    <div class="m3-menu-sheet-list">
+      ${itemsHtml}
+    </div>
+  `;
+
+  document.body.appendChild(scrim);
+  document.body.appendChild(sheet);
+
+  const closeMenuSheet = () => {
+    sheet.classList.remove('open');
+    scrim.classList.remove('open');
+    setTimeout(() => {
+      scrim.remove();
+      sheet.remove();
+    }, 220);
+  };
+
+  scrim.onclick = closeMenuSheet;
+
+  sheet.querySelectorAll('.m3-menu-sheet-item').forEach((itemBtn) => {
+    itemBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(itemBtn.dataset.menuIdx, 10);
+      const targetBtn = buttons[idx];
+      closeMenuSheet();
+      if (targetBtn) {
+        setTimeout(() => targetBtn.click(), 60);
+      }
+    });
+  });
+
+  scrim.style.display = 'block';
+  sheet.style.display = 'block';
+  requestAnimationFrame(() => {
+    scrim.classList.add('open');
+    sheet.classList.add('open');
+  });
+}
+
+window.openMobileMenuBottomSheet = openMobileMenuBottomSheet;

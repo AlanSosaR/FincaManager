@@ -133,9 +133,8 @@ export async function renderMotores(page = 1, filter = 'all') {
           placeholder: 'Buscar equipo...',
           value: currentMotorsSearchQuery,
           extraHtml: `
-            <span class="ganado-split-ctrl-sep"></span>
-            <button class="ganado-split-ctrl-reg" onclick="window.toggleMotorsSplitMenu(event)" title="Más opciones">
-              <span class="material-icons">arrow_drop_down</span>
+            <button class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.toggleMotorsSplitMenu(event)" title="Más opciones" aria-label="Más opciones">
+              <span class="material-icons">more_vert</span>
             </button>
             <div class="ganado-split-menu" id="motors-split-menu">
               <button class="ganado-split-item" onclick="window.navigateTo('nuevo_motor'); document.getElementById('motors-split-menu').classList.remove('open');">
@@ -147,9 +146,13 @@ export async function renderMotores(page = 1, filter = 'all') {
       </div>
 
       <section style="position: sticky; top: 0; z-index: 20; background: #ffffff; padding: 10px 0 12px; margin: 0 0 12px;">
-        <div class="m3-flex m3-items-center m3-justify-between m3-gap-4">
-          <h1 class="m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="font-size: 24px; line-height: 1.2; margin: 0;">Motores &amp; Equipos</h1>
-          <span class="m3-font-extrabold m3-font-manrope" style="font-size: 24px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--primary, #2d3e2c);">${totalFilteredCount}</span>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <button type="button" class="motores-card-filter press-effect" data-filter="all" style="padding: 8px 18px; border-radius: 9999px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid ${currentMotorsFilter === 'all' ? '#2d6a2e' : '#d5e0d4'}; background: ${currentMotorsFilter === 'all' ? '#2d6a2e' : '#f2f6f2'}; color: ${currentMotorsFilter === 'all' ? '#ffffff' : '#2d3e2c'}; transition: all 0.15s ease;">
+            <span>Todos · ${totalMachinery ?? (allMotors || []).length}</span>
+          </button>
+          <button type="button" class="motores-card-filter press-effect" data-filter="urgent" style="padding: 8px 18px; border-radius: 9999px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid ${currentMotorsFilter === 'urgent' ? '#9a3412' : '#f5d0b5'}; background: ${currentMotorsFilter === 'urgent' ? '#9a3412' : '#fff1e6'}; color: ${currentMotorsFilter === 'urgent' ? '#ffffff' : '#8a3b08'}; transition: all 0.15s ease;">
+            <span>Urgentes · ${urgentCount}</span>
+          </button>
         </div>
       </section>
 
@@ -409,54 +412,72 @@ export function initMotores() {
 // ─── Row renderer ─────────────────────────────────────────────────────────────
 
 function renderMotorCard(eq, customMaxHours = null) {
-  const hours    = Number((parseFloat(eq.horas) || 0).toFixed(1));
-  const maxHours = customMaxHours || eq.max_horas || 100;
-  const pct      = Math.min(100, Math.round((hours / maxHours) * 100));
-  const needsOil = pct >= 95;
+  const hours     = Number((parseFloat(eq.horas) || 0).toFixed(1));
+  const maxHours  = customMaxHours || eq.max_horas || 100;
+  const pct       = Math.min(100, Math.round((hours / maxHours) * 100));
+  const remaining = Math.max(0, Number((maxHours - hours).toFixed(1)));
+  const isLimit   = hours >= maxHours || pct >= 100;
+  const isNear    = !isLimit && pct >= 90;
+  const needsOil  = isLimit;
+  const barWidth  = isLimit ? 100 : (hours > 0 ? Math.max(3, pct) : 0);
+
+  const statusColor = isLimit ? '#c2410c' : (isNear ? '#a16207' : '#2d6a2e');
+  const trackBg     = isLimit ? '#fde4d8' : (isNear ? '#f5ebd6' : '#e6ede6');
+  const fillBg      = isLimit ? '#c2410c' : (isNear ? '#b7791f' : '#2d6a2e');
+  const rightText   = isLimit ? 'Toca cambiarlo' : `Faltan ${remaining} h`;
 
   const imgHtml = eq.image_url
     ? `<img src="${eq.image_url}" alt="${eq.nombre}" style="width: 100%; height: 100%; object-fit: cover;">`
     : `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f5f5f5; color: #ccc;"><span class="material-icons">settings</span></div>`;
 
   return `
-    <div class="motor-card-compact" data-id="${eq.id}" data-nombre="${(eq.nombre || '').replace(/"/g, '&quot;')}" data-horas="${hours}" data-max-horas="${maxHours}" data-image-url="${(eq.image_url || '').replace(/"/g, '&quot;')}" onclick="window.handleMotorCardClick(event, this)" style="${needsOil ? 'border-color: #fdba74; background: #fffaf6;' : ''}">
-      
-      <!-- Image with Status Indicator -->
-      <div class="motor-compact-img">
-        ${imgHtml}
-        ${needsOil ? `
-        <div style="position: absolute; bottom: 2px; right: 2px; width: 18px; height: 18px; background: #ff4103; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid #ffffff;">
-          <span class="material-icons" style="font-size: 12px; color: #ffffff;">warning</span>
-        </div>` : ''}
-      </div>
-      <!-- Info Group -->
-      <div class="motor-compact-info">
-        <span class="motor-compact-label">S/N</span>
-        <h3 class="motor-compact-title">${eq.nombre}</h3>
-        ${needsOil ? `
-        <span style="display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 9999px; background: #ffedd5; color: #c2410c; font-size: 10.5px; font-weight: 800;">
-          <span class="material-symbols-outlined" style="font-size: 13px;">oil_barrel</span>
-          <span>Cambio de aceite</span>
-        </span>` : ''}
-      </div>
-      <!-- Usage Stat -->
-      <div class="motor-compact-usage">
-        <div class="motor-compact-usage-val" style="${needsOil ? 'color: #ff4103;' : ''}">${hours}/${maxHours}h</div>
-        <span style="display: block; font-size: 10.5px; font-weight: 800; margin-top: 2px; color: ${needsOil ? '#ea580c' : '#2e7d32'};">${needsOil ? 'Límite alcanzado' : 'Operativo'}</span>
-      </div>
-      <!-- More Actions -->
-      <div style="position: relative;">
-        <button onclick="event.stopPropagation(); window.toggleActionMenu(this)" style="border: none; background: transparent; color: #666; cursor: pointer; padding: 8px; border-radius: 50%;">
-          <span class="material-icons">more_vert</span>
-        </button>
-        <div class="action-menu" style="right: 0; bottom: auto; top: 100%;">
-          <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_motor', '${eq.id}')">
-            <span class="material-icons">edit</span><span>Editar</span>
-          </button>
-          <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteMotor('${eq.id}', '${eq.nombre}')">
-            <span class="material-icons">delete</span><span>Eliminar</span>
-          </button>
+    <div class="motor-card-compact" data-id="${eq.id}" data-nombre="${(eq.nombre || '').replace(/"/g, '&quot;')}" data-horas="${hours}" data-max-horas="${maxHours}" data-image-url="${(eq.image_url || '').replace(/"/g, '&quot;')}" onclick="window.handleMotorCardClick(event, this)" style="flex-direction: column; align-items: stretch; gap: 12px; ${isLimit ? 'border-color: #fdba74; background: #fffaf6;' : isNear ? 'border-color: #fde68a; background: #fffdf5;' : ''}">
+      <div style="display: flex; align-items: center; gap: 14px; width: 100%;">
+        <!-- Image with Status Indicator -->
+        <div class="motor-compact-img">
+          ${imgHtml}
+          ${needsOil ? `
+          <div style="position: absolute; bottom: 2px; right: 2px; width: 18px; height: 18px; background: #ff4103; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid #ffffff;">
+            <span class="material-icons" style="font-size: 12px; color: #ffffff;">warning</span>
+          </div>` : ''}
         </div>
+        <!-- Info Group -->
+        <div class="motor-compact-info">
+          <span class="motor-compact-label">S/N</span>
+          <h3 class="motor-compact-title">${eq.nombre}</h3>
+        </div>
+        <!-- More Actions -->
+        <div style="position: relative;">
+          <button onclick="event.stopPropagation(); window.toggleActionMenu(this)" style="border: none; background: transparent; color: #666; cursor: pointer; padding: 8px; border-radius: 50%;">
+            <span class="material-icons">more_vert</span>
+          </button>
+          <div class="action-menu" style="right: 0; bottom: auto; top: 100%;">
+            <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_motor', '${eq.id}')">
+              <span class="material-icons">edit</span><span>Editar</span>
+            </button>
+            <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteMotor('${eq.id}', '${eq.nombre}')">
+              <span class="material-icons">delete</span><span>Eliminar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cambio de aceite -->
+      <div style="width: 100%; padding-top: 10px; border-top: 1px solid ${isLimit ? 'rgba(253, 186, 116, 0.35)' : isNear ? 'rgba(253, 230, 138, 0.5)' : '#f0f3ef'};">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: #3c423c;">
+            <span class="material-symbols-outlined" style="font-size: 18px; color: #525852;">water_drop</span>
+            <span>Cambio de aceite</span>
+          </span>
+          <span style="font-size: 13.5px; font-weight: 700; color: ${statusColor};">${rightText}</span>
+        </div>
+        <div style="height: 6px; background: ${trackBg}; border-radius: 9999px; overflow: hidden;">
+          <div style="width: ${barWidth}%; height: 100%; background: ${fillBg}; border-radius: 9999px; transition: width 0.35s ease-out;"></div>
+        </div>
+        ${isLimit ? `
+        <div style="margin-top: 7px; font-size: 12px; font-weight: 600; color: #555b55;">
+          Llegó a las ${maxHours} h programadas
+        </div>` : ''}
       </div>
     </div>
   `;

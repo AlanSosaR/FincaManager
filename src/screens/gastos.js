@@ -1372,9 +1372,8 @@ export async function renderGastos() {
           placeholder: 'Buscar gasto...',
           value: currentGastosSearchQuery,
           extraHtml: `
-            <span class="ganado-split-ctrl-sep"></span>
-            <button class="ganado-split-ctrl-reg" onclick="window.toggleGastosSplitMenu(event)" title="Más opciones">
-              <span class="material-icons">arrow_drop_down</span>
+            <button class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.toggleGastosSplitMenu(event)" title="Más opciones" aria-label="Más opciones">
+              <span class="material-icons">more_vert</span>
             </button>
             <div class="ganado-split-menu" id="gastos-split-menu">
               <button class="ganado-split-item" onclick="window.navigateTo('nuevo_gasto'); document.getElementById('gastos-split-menu').classList.remove('open');">

@@ -530,8 +530,7 @@ export async function renderDashboard() {
             placeholder: 'Buscar lote...',
             value: currentLotesSearchQuery,
             extraHtml: `
-              <span class="ganado-split-ctrl-sep"></span>
-              <button class="ganado-split-ctrl-reg" onclick="window.navigateTo('nuevo_lote')" title="Nuevo Lote">
+              <button class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.navigateTo('nuevo_lote')" title="Nuevo Lote" aria-label="Nuevo Lote">
                 <span class="material-icons">add</span>
               </button>
             `

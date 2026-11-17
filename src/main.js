@@ -481,6 +481,134 @@ document.addEventListener('DOMContentLoaded', () => {
         return screenId + (args.length ? '/' + args.join('/') : '');
     }
 
+    function runFormInit(screenId, args) {
+        if (screenId === 'nuevo_motor') initNuevoMotor(...args);
+        else if (screenId === 'nueva_herramienta') initNuevaHerramienta(...args);
+        else if (screenId === 'nuevo_gasto') initNuevoGasto(...args);
+        else if (screenId === 'nuevo_cultivo') initNuevoCultivo(...args);
+        else if (screenId === 'nuevo_animal') initNuevoAnimal(...args);
+        else if (screenId === 'nuevo_potrero') initNuevoPotrero(...args);
+        else if (screenId === 'nuevo_lote') setupNuevoLoteListeners();
+        else if (screenId === 'nueva_actividad') initNuevaActividad(...args);
+        else if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
+    }
+
+    function hideMobileFab(removeAfter = true) {
+        const fab = document.getElementById('mobile-screen-fab');
+        if (!fab) return;
+        fab.classList.remove('is-visible');
+        if (removeAfter) {
+            clearTimeout(fab._hideTimer);
+            fab._hideTimer = setTimeout(() => {
+                if (!fab.classList.contains('is-visible')) {
+                    fab.remove();
+                }
+            }, 220);
+        }
+    }
+
+    function closeMobileFormSheet() {
+        const scrim = document.getElementById('mobile-form-sheet-scrim');
+        const sheet = document.getElementById('mobile-form-sheet');
+        if (!sheet) return;
+        sheet.classList.remove('open');
+        if (scrim) scrim.classList.remove('open');
+        const fab = document.getElementById('mobile-screen-fab');
+        if (fab) {
+            clearTimeout(fab._hideTimer);
+            requestAnimationFrame(() => fab.classList.add('is-visible'));
+        }
+        const restoreInvite = sheet.dataset.restoreInvite === '1';
+        if (restoreInvite) {
+            const inviteEl = document.getElementById('invite-inline-container');
+            const membersList = document.getElementById('members-list');
+            if (inviteEl && membersList && membersList.parentElement) {
+                inviteEl.innerHTML = '';
+                membersList.after(inviteEl);
+            }
+            delete sheet.dataset.restoreInvite;
+        }
+        setTimeout(() => {
+            if (!sheet.classList.contains('open')) {
+                sheet.style.display = 'none';
+                if (scrim) scrim.style.display = 'none';
+                const body = document.getElementById('mobile-form-sheet-body');
+                if (body) body.innerHTML = '';
+                const footer = document.getElementById('mobile-form-sheet-footer');
+                if (footer) {
+                    footer.innerHTML = '';
+                    footer.style.display = 'none';
+                }
+            }
+        }, 260);
+    }
+
+    async function openMobileFormSheet(titleText, onMount) {
+        let scrim = document.getElementById('mobile-form-sheet-scrim');
+        let sheet = document.getElementById('mobile-form-sheet');
+        if (!scrim) {
+            scrim = document.createElement('div');
+            scrim.id = 'mobile-form-sheet-scrim';
+            scrim.className = 'm3-sub-action-sheet-scrim';
+            scrim.onclick = closeMobileFormSheet;
+            document.body.appendChild(scrim);
+        }
+        if (!sheet) {
+            sheet = document.createElement('div');
+            sheet.id = 'mobile-form-sheet';
+            sheet.className = 'm3-sub-action-sheet m3-mobile-form-sheet expanded';
+            sheet.setAttribute('role', 'dialog');
+            sheet.setAttribute('aria-modal', 'true');
+            document.body.appendChild(sheet);
+        }
+        sheet.scrollTop = 0;
+        sheet.innerHTML = `
+            <div class="m3-mobile-form-sheet-header">
+                <div class="m3-action-sheet-handle-box" id="mobile-form-sheet-handle">
+                    <div class="m3-action-sheet-handle"></div>
+                </div>
+                <div class="m3-mobile-form-sheet-title-row">
+                    <h3 class="m3-mobile-form-sheet-title">${titleText}</h3>
+                    <button type="button" class="m3-action-sheet-close-btn" id="mobile-form-sheet-close" aria-label="Cerrar">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="m3-mobile-form-sheet-body" id="mobile-form-sheet-body">
+                <div style="padding: 32px; text-align: center; color: #666;">Cargando...</div>
+            </div>
+            <div class="m3-mobile-form-sheet-footer" id="mobile-form-sheet-footer" style="display: none;"></div>
+        `;
+        sheet.querySelector('#mobile-form-sheet-close')?.addEventListener('click', closeMobileFormSheet);
+        hideMobileFab(false);
+        scrim.style.display = 'block';
+        sheet.style.display = 'flex';
+        requestAnimationFrame(() => {
+            scrim.classList.add('open');
+            sheet.classList.add('open');
+        });
+        const bodyEl = document.getElementById('mobile-form-sheet-body');
+        const footerEl = document.getElementById('mobile-form-sheet-footer');
+        if (bodyEl && typeof onMount === 'function') {
+            await onMount(bodyEl, sheet);
+            const actionsEl = bodyEl.querySelector('.da-form-actions, .m3-form-actions')
+                || bodyEl.querySelector('#invite-submit')?.parentElement;
+            if (actionsEl && footerEl) {
+                const parentForm = actionsEl.closest('form');
+                if (parentForm) {
+                    if (!parentForm.id) parentForm.id = 'mobile-sheet-active-form';
+                    actionsEl.querySelectorAll('button[type="submit"], button:not([type])').forEach(btn => {
+                        if (!btn.getAttribute('form')) btn.setAttribute('form', parentForm.id);
+                    });
+                }
+                actionsEl.querySelector('#invite-cancel-inline')?.addEventListener('click', closeMobileFormSheet);
+                footerEl.innerHTML = '';
+                footerEl.appendChild(actionsEl);
+                footerEl.style.display = 'block';
+            }
+        }
+    }
+
     async function renderAndInit(screenId, args, html) {
         if (window.__screenCleanup) {
             try { window.__screenCleanup(); } catch(e) { console.warn('Cleanup error:', e); }
@@ -499,30 +627,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const { initDetalleMotor } = await import('./screens/detalle_motor.js');
             initDetalleMotor(...args);
         }
-        if (screenId === 'nuevo_motor')  initNuevoMotor(...args);
-        if (screenId === 'nueva_herramienta') initNuevaHerramienta(...args);
+        runFormInit(screenId, args);
         if (screenId === 'motores')      initMotores();
         if (screenId === 'herramientas') initHerramientas();
         if (screenId === 'gastos') initGastos();
-        if (screenId === 'nuevo_gasto') initNuevoGasto(...args);
         if (screenId === 'cultivos') initCultivos();
-        if (screenId === 'nuevo_cultivo') initNuevoCultivo(...args);
         if (screenId === 'ganado')       initGanado();
         if (screenId === 'personal')     initListaPersonal();
-        if (screenId === 'nuevo_animal') initNuevoAnimal(...args);
         if (screenId === 'detalle_animal') initDetalleAnimal(...args);
-        if (screenId === 'nuevo_potrero')  initNuevoPotrero(...args);
         if (screenId === 'potreros')     initPotreros();
         if (screenId === 'detalle_potrero') initDetallePotrero(...args);
         if (screenId === 'detalle_herramienta') {
             const { initDetalleHerramienta } = await import('./screens/detalle_herramienta.js');
             initDetalleHerramienta(...args);
         }
-        if (screenId === 'nuevo_lote') setupNuevoLoteListeners();
         if (screenId === 'detalle_lote') initDetalleLote(...args);
         if (screenId === 'dashboard') initDashboard();
-        if (screenId === 'nueva_actividad') initNuevaActividad(...args);
-        if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
         if (screenId === 'detalle_personal') initDetallePersonal(...args);
         if (screenId === 'plan_ifcafe') initPlanIfcafe();
         if (screenId === 'mapa_lotes') initMapaLotes();
@@ -548,6 +668,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function promoteSplitCtrlToTopbar(screenId) {
         const isMobile = window.matchMedia('(max-width: 768px)').matches;
         const topbarActions = document.getElementById('topbar-actions');
+        const prevFab = document.getElementById('mobile-screen-fab');
+        const hadPrevFab = Boolean(prevFab);
+        if (prevFab) prevFab.remove();
         if (!topbarActions) return;
 
         const currentScreenId = screenId || (typeof getHashParts === 'function' ? getHashParts()[0] : '') || 'dashboard';
@@ -565,8 +688,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 inPageCtrl.classList.add('expanded');
                 topbarActions.appendChild(inPageCtrl);
                 const parent = inPageCtrl.parentElement;
-                if (parent && (parent.classList.contains('equipo-top-search-container') || parent.classList.contains('ganado-top-actions-container'))) {
+                if (parent && (parent.classList.contains('equipo-top-search-container') || parent.classList.contains('ganado-top-actions-container') || parent.classList.contains('motores-top-actions-container'))) {
                     parent.style.display = 'none';
+                }
+            }
+            const ctrl = inPageCtrl || topbarActions.querySelector('.ganado-split-ctrl');
+            if (ctrl) {
+                const primaryAction = ctrl.querySelector('.ganado-split-menu .ganado-split-item') || ctrl.querySelector('.ganado-split-ctrl-reg[onclick]');
+                if (primaryAction) {
+                    const fab = document.createElement('button');
+                    fab.type = 'button';
+                    fab.id = 'mobile-screen-fab';
+                    fab.className = 'm3-fab m3-mobile-fab';
+                    fab.setAttribute('aria-label', primaryAction.getAttribute('title') || primaryAction.textContent.trim() || 'Agregar');
+                    fab.innerHTML = '<span class="material-icons">add</span>';
+                    fab.onclick = (e) => {
+                        e.stopPropagation();
+                        const onclickCode = primaryAction.getAttribute('onclick') || '';
+                        const navMatch = onclickCode.match(/navigateTo\(([^)]+)\)/);
+                        if (navMatch) {
+                            const parsedArgs = Array.from(navMatch[1].matchAll(/['"]([^'"]*)['"]/g)).map(m => m[1]);
+                            const targetId = parsedArgs[0];
+                            const targetArgs = parsedArgs.slice(1);
+                            const targetCfg = screens[targetId];
+                            if (targetCfg && typeof targetCfg.render === 'function') {
+                                openMobileFormSheet(targetCfg.title || 'Registrar', async (bodyEl) => {
+                                    bodyEl.innerHTML = await targetCfg.render(...targetArgs);
+                                    runFormInit(targetId, targetArgs);
+                                });
+                                return;
+                            }
+                        }
+                        if (onclickCode.includes('toggleInviteInline')) {
+                            openMobileFormSheet('Invitar miembro', (bodyEl, sheetEl) => {
+                                const inviteEl = document.getElementById('invite-inline-container');
+                                if (inviteEl) {
+                                    sheetEl.dataset.restoreInvite = '1';
+                                    inviteEl.innerHTML = '';
+                                    bodyEl.appendChild(inviteEl);
+                                    window.toggleInviteInline?.();
+                                }
+                            });
+                            return;
+                        }
+                        primaryAction.click();
+                    };
+                    document.body.appendChild(fab);
+                    if (hadPrevFab) {
+                        setTimeout(() => fab.classList.add('is-visible'), 120);
+                    } else {
+                        requestAnimationFrame(() => requestAnimationFrame(() => fab.classList.add('is-visible')));
+                    }
                 }
             }
         }
@@ -646,7 +818,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!_empresaList.length) initEmpresaSelector();
         }
 
-        // Clear topbar actions on any screen transition
+        // Clear topbar actions, mobile FAB, and mobile form sheet on any screen transition
+        closeMobileFormSheet();
+        hideMobileFab(true);
         const topbarActionsEl = document.getElementById('topbar-actions');
         if (topbarActionsEl) topbarActionsEl.innerHTML = '';
         if (titleElement) titleElement.style.display = '';

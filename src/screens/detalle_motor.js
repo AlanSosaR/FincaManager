@@ -255,6 +255,23 @@ export async function renderDetalleMotor(motorId) {
         .motor-session-sheet.open {
           transform: translateY(0) !important;
         }
+        .motor-session-sheet.expanded {
+          top: 0 !important;
+          height: 100dvh !important;
+          max-height: 100dvh !important;
+          border-top-left-radius: 0 !important;
+          border-top-right-radius: 0 !important;
+        }
+        .motor-manual-sticky-footer {
+          position: sticky;
+          bottom: -24px;
+          z-index: 15;
+          background: #ffffff;
+          border-top: 1px solid #e4ede3;
+          margin: 8px -18px -24px -18px;
+          padding: 12px 18px calc(18px + env(safe-area-inset-bottom, 12px)) 18px;
+          box-shadow: 0 -6px 18px rgba(30, 62, 43, 0.06);
+        }
 
         .motor-sheet-handle-box {
           width: 100%;
@@ -657,7 +674,9 @@ export async function renderDetalleMotor(motorId) {
       <!-- Bottom Sheet Scrim & Container para Cronómetro / Registro Manual -->
       <div id="motor-action-scrim" class="motor-sheet-scrim"></div>
       <div id="motor-action-sheet" class="motor-session-sheet">
-        <div style="width: 36px; height: 4px; background: #d0d7cf; border-radius: 9999px; margin: 0 auto 14px;"></div>
+        <div id="motor-action-sheet-handle" class="motor-sheet-handle-box">
+          <div class="motor-sheet-handle"></div>
+        </div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;">
           <h3 id="motor-action-sheet-title" style="margin: 0; font-size: 18px; font-weight: 800; color: #1e3e2b;">Cronómetro en Vivo</h3>
           <button type="button" id="motor-action-sheet-close" class="motor-float-close" title="Cerrar">
@@ -854,10 +873,12 @@ export async function renderDetalleMotor(motorId) {
                 </div>
 
                 <!-- Botón Guardar Sesión -->
-                <button id="btn-save-manual" class="btn-m3-fill press-effect" style="width: 100%; margin-top: 6px; padding: 14px; border-radius: 9999px; background: #2d3e2c; color: #ffffff; border: none; font-size: 14.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 14px rgba(45, 62, 44, 0.25);">
-                  <span class="material-symbols-outlined" style="font-size: 20px;">save</span>
-                  <span>Guardar Sesión</span>
-                </button>
+                <div class="motor-manual-sticky-footer">
+                  <button id="btn-save-manual" class="btn-m3-fill press-effect" style="width: 100%; padding: 14px; border-radius: 9999px; background: #2d3e2c; color: #ffffff; border: none; font-size: 14.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 14px rgba(45, 62, 44, 0.25);">
+                    <span class="material-symbols-outlined" style="font-size: 20px;">save</span>
+                    <span>Guardar Sesión</span>
+                  </button>
+                </div>
 
               </div>
 
@@ -1001,6 +1022,9 @@ export function initDetalleMotor(motorId) {
     const scrim = document.getElementById('motor-action-scrim');
     const sheet = document.getElementById('motor-action-sheet');
     if (!scrim || !sheet) return;
+    sheet.classList.remove('expanded');
+    sheet.scrollTop = 0;
+    setupMotorSheetExpand(sheet, window.closeMotorActionSheet, document.getElementById('motor-action-sheet-handle'));
     requestAnimationFrame(() => {
       scrim.classList.add('open');
       sheet.classList.add('open');
@@ -1011,7 +1035,7 @@ export function initDetalleMotor(motorId) {
     const scrim = document.getElementById('motor-action-scrim');
     const sheet = document.getElementById('motor-action-sheet');
     if (scrim) scrim.classList.remove('open');
-    if (sheet) sheet.classList.remove('open');
+    if (sheet) sheet.classList.remove('open', 'expanded');
     document.getElementById('seg-btn-live')?.classList.remove('active');
     document.getElementById('seg-btn-manual')?.classList.remove('active');
     if (isRunning || savedElapsed > 0) {
@@ -1434,6 +1458,74 @@ export function initDetalleMotor(motorId) {
   });
 }
 
+function setupMotorSheetExpand(sheet, onClose, handleEl) {
+  if (!sheet) return;
+  if (handleEl) {
+    handleEl.onclick = (e) => {
+      e.stopPropagation();
+      sheet.classList.toggle('expanded');
+    };
+  }
+
+  if (sheet._motorScrollHandler) sheet.removeEventListener('scroll', sheet._motorScrollHandler);
+  if (sheet._motorTouchStart) sheet.removeEventListener('touchstart', sheet._motorTouchStart);
+  if (sheet._motorTouchMove) sheet.removeEventListener('touchmove', sheet._motorTouchMove);
+  if (sheet._motorTouchEnd) sheet.removeEventListener('touchend', sheet._motorTouchEnd);
+
+  sheet._motorScrollHandler = () => {
+    if (sheet.scrollTop > 10 && !sheet.classList.contains('expanded')) {
+      sheet.classList.add('expanded');
+    }
+  };
+  sheet.addEventListener('scroll', sheet._motorScrollHandler, { passive: true });
+
+  let startY = 0;
+  let startX = 0;
+  let currentY = 0;
+  let isTracking = false;
+
+  sheet._motorTouchStart = (e) => {
+    if (e.touches.length !== 1) return;
+    const target = e.target;
+    if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('textarea') || target.closest('select')) {
+      isTracking = false;
+      return;
+    }
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
+    currentY = startY;
+    isTracking = true;
+  };
+
+  sheet._motorTouchMove = (e) => {
+    if (!isTracking || e.touches.length !== 1) return;
+    currentY = e.touches[0].clientY;
+  };
+
+  sheet._motorTouchEnd = (e) => {
+    if (!isTracking) return;
+    isTracking = false;
+    const deltaY = currentY - startY;
+    const deltaX = Math.abs((e.changedTouches[0]?.clientX || startX) - startX);
+    if (Math.abs(deltaY) < 25 || Math.abs(deltaY) < deltaX * 1.1) return;
+
+    if (deltaY < -30) {
+      sheet.classList.add('expanded');
+    } else if (deltaY > 35) {
+      if (sheet.classList.contains('expanded')) {
+        if (sheet.scrollTop > 15) return;
+        sheet.classList.remove('expanded');
+      } else if (typeof onClose === 'function') {
+        onClose();
+      }
+    }
+  };
+
+  sheet.addEventListener('touchstart', sheet._motorTouchStart, { passive: true });
+  sheet.addEventListener('touchmove', sheet._motorTouchMove, { passive: true });
+  sheet.addEventListener('touchend', sheet._motorTouchEnd, { passive: true });
+}
+
 function showMotorSessionDetailSheet(s, motor, sheet, scrim, opMap = {}) {
   const rawOp = s.operador || '';
   const opName = rawOp.includes('@') ? (opMap[rawOp] || rawOp.split('@')[0]) : (rawOp || 'Alan Rodezno');
@@ -1594,14 +1686,17 @@ function showMotorSessionDetailSheet(s, motor, sheet, scrim, opMap = {}) {
   `;
 
   const close = () => {
-    sheet.classList.remove('open');
+    sheet.classList.remove('open', 'expanded');
     scrim.classList.remove('open');
     setTimeout(() => { sheet.innerHTML = ''; }, 350);
   };
 
+  sheet.classList.remove('expanded');
+  sheet.scrollTop = 0;
+  setupMotorSheetExpand(sheet, close, document.getElementById('motor-sheet-handle-box'));
+
   document.getElementById('motor-sheet-close')?.addEventListener('click', close);
   document.getElementById('motor-sheet-btn-close')?.addEventListener('click', close);
-  document.getElementById('motor-sheet-handle-box')?.addEventListener('click', close);
   scrim.onclick = close;
 
   requestAnimationFrame(() => {

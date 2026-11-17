@@ -171,7 +171,7 @@ export async function renderListaPersonal() {
       </style>
       <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-max-w-3xl m3-mx-auto m3-font-work-sans">
         <!-- Search + Register split control -->
-        <div style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
+        <div class="ganado-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">
           ${renderM3SearchBar({
             wrapperId: 'personal-search-wrapper',
             toggleId: 'personal-search-toggle',
@@ -180,9 +180,8 @@ export async function renderListaPersonal() {
             placeholder: 'Buscar por nombre...',
             value: currentPersonalSearchQuery,
             extraHtml: `
-              <span class="ganado-split-ctrl-sep"></span>
-              <button class="ganado-split-ctrl-reg" onclick="window.togglePersonalSplitMenu(event)" title="Más opciones">
-                <span class="material-icons">arrow_drop_down</span>
+              <button class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.togglePersonalSplitMenu(event)" title="Más opciones" aria-label="Más opciones">
+                <span class="material-icons">more_vert</span>
               </button>
               <div class="ganado-split-menu" id="personal-split-menu">
                 <button class="ganado-split-item" onclick="window.navigateTo('nuevo_personal', '', 'personal'); document.getElementById('personal-split-menu').classList.remove('open');">

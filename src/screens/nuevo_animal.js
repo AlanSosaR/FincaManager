@@ -158,12 +158,12 @@ export async function renderNuevoAnimal(id) {
               </div>
               
               <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0;">
+                <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('${isEdit ? 'detalle_animal' : 'ganado'}'${isEdit ? `, '${id}'` : ''})">
+                  Cancelar
+                </button>
                 <button type="button" class="da-action-btn primary" id="btn-save-animal">
                   <span class="material-icons">${isEdit ? 'save' : 'add_circle'}</span>
                   <span id="save-label">${isEdit ? 'Guardar' : 'Registrar'}</span>
-                </button>
-                <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('${isEdit ? 'detalle_animal' : 'ganado'}'${isEdit ? `, '${id}'` : ''})">
-                  Cancelar
                 </button>
               </div>
             </div>

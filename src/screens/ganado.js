@@ -1001,9 +1001,9 @@ export function initGanado() {
   };
   updateTopBarHeight();
   window.addEventListener('resize', updateTopBarHeight);
-  // Hide the redundant screen title in header so search is wide and permanently open
+  // Hide the redundant screen title in header on desktop so search is wide and permanently open
   const titleEl = document.getElementById('current-screen-title');
-  if (titleEl) {
+  if (titleEl && !window.matchMedia('(max-width: 768px)').matches) {
     titleEl.innerHTML = '';
     titleEl.style.display = 'none';
   }
@@ -1020,9 +1020,8 @@ export function initGanado() {
         <button type="button" id="ganado-search-clear" class="m3-search-icon-btn" style="display: ${currentSearchQuery ? 'inline-flex' : 'none'};" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">
           <span class="material-icons" style="font-size: 19px;">close</span>
         </button>
-        <span class="ganado-split-ctrl-sep"></span>
         <button type="button" class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.toggleGanadoSplitMenu(event)" title="Más opciones" aria-label="Más opciones">
-          <span class="material-icons">arrow_drop_down</span>
+          <span class="material-icons">more_vert</span>
         </button>
         <div class="ganado-split-menu" id="ganado-split-menu">
           <button type="button" class="ganado-split-item" onclick="window.navigateTo('nuevo_animal'); document.getElementById('ganado-split-menu')?.classList.remove('open');">
@@ -1074,16 +1073,28 @@ export function initGanado() {
     const menu = btn.nextElementSibling;
     if (!menu) return;
 
+    const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+    document.querySelectorAll('.action-menu.active').forEach(m => {
+      if (isMobile || m !== menu) {
+        m.classList.remove('active');
+        const r = m.closest('.ganado-row');
+        if (r) r.classList.remove('menu-open');
+      }
+    });
+
+    if (isMobile && window.openMobileMenuBottomSheet) {
+      window.openMobileMenuBottomSheet(menu);
+      return;
+    }
+
     const row = btn.closest('.ganado-row');
     const isActive = menu.classList.contains('active');
-    document.querySelectorAll('.action-menu.active').forEach(m => {
-      m.classList.remove('active');
-      const r = m.closest('.ganado-row');
-      if (r) r.classList.remove('menu-open');
-    });
     if (!isActive) {
       menu.classList.add('active');
       if (row) row.classList.add('menu-open');
+    } else {
+      menu.classList.remove('active');
+      if (row) row.classList.remove('menu-open');
     }
   };
 

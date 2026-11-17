@@ -103,9 +103,8 @@ export async function renderHerramientas() {
           placeholder: 'Buscar herramienta...',
           value: currentToolsSearchQuery,
           extraHtml: `
-            <span class="ganado-split-ctrl-sep"></span>
-            <button class="ganado-split-ctrl-reg" onclick="window.toggleToolsSplitMenu(event)" title="Más opciones">
-              <span class="material-icons">arrow_drop_down</span>
+            <button class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.toggleToolsSplitMenu(event)" title="Más opciones" aria-label="Más opciones">
+              <span class="material-icons">more_vert</span>
             </button>
             <div class="ganado-split-menu" id="tools-split-menu">
               <button class="ganado-split-item" onclick="window.navigateTo('nueva_herramienta'); document.getElementById('tools-split-menu').classList.remove('open');">

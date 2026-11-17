@@ -127,9 +127,8 @@ export async function renderCultivos() {
           placeholder: 'Buscar por tipo...',
           value: currentCultivosSearchQuery,
           extraHtml: `
-            <span class="ganado-split-ctrl-sep"></span>
-            <button class="ganado-split-ctrl-reg" onclick="window.toggleCultivosSplitMenu(event)" title="Más opciones">
-              <span class="material-icons">arrow_drop_down</span>
+            <button class="ganado-split-ctrl-reg m3-search-split-btn" onclick="window.toggleCultivosSplitMenu(event)" title="Más opciones" aria-label="Más opciones">
+              <span class="material-icons">more_vert</span>
             </button>
             <div class="ganado-split-menu" id="cultivos-split-menu">
               <button class="ganado-split-item" onclick="window.navigateTo('nuevo_cultivo'); document.getElementById('cultivos-split-menu').classList.remove('open');">
