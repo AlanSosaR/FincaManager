@@ -69,12 +69,12 @@ export async function renderNuevoCultivo(id) {
             </div>
 
             <div class="da-form-actions">
+              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('cultivos')">
+                Cancelar
+              </button>
               <button type="button" class="da-action-btn primary" id="btn-save-cultivo">
                 <span class="material-icons">${isEdit ? 'update' : 'save'}</span>
                 <span>${isEdit ? 'Actualizar cultivo' : 'Guardar cultivo'}</span>
-              </button>
-              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('cultivos')">
-                Cancelar
               </button>
             </div>
           </form>

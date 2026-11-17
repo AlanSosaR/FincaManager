@@ -351,6 +351,10 @@ export function getAccessToken() {
   return session?.access_token || '';
 }
 
+export function getSessionUserId() {
+  return getSession()?.user?.id || null;
+}
+
 export async function tryRefreshSession() {
   const session = getSession();
   if (!session?.refresh_token) return false;

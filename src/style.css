@@ -1890,3 +1890,23 @@ body.screen-auth #app .main-content {
     display: block !important;
   }
 }
+
+/* Ocultar barras de scroll visibles manteniendo el desplazamiento funcional */
+html,
+body,
+.main-content,
+.preview-container,
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.main-content::-webkit-scrollbar,
+.preview-container::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

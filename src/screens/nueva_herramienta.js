@@ -72,12 +72,12 @@ export async function renderNuevaHerramienta(id) {
             </div>
 
             <div class="da-form-actions">
+              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('herramientas')">
+                Cancelar
+              </button>
               <button type="button" class="da-action-btn primary" id="btn-save-tool">
                 <span class="material-icons">${isEdit ? 'update' : 'save'}</span>
                 <span>${isEdit ? 'Actualizar herramienta' : 'Guardar herramienta'}</span>
-              </button>
-              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('herramientas')">
-                Cancelar
               </button>
             </div>
           </form>

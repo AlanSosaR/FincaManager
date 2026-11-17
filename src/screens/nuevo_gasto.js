@@ -81,12 +81,12 @@ export async function renderNuevoGasto(id) {
             </div>
 
             <div class="da-form-actions">
+              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('gastos')">
+                Cancelar
+              </button>
               <button type="button" class="da-action-btn primary" id="btn-save-gasto">
                 <span class="material-icons">${isEdit ? 'update' : 'save'}</span>
                 <span>${isEdit ? 'Actualizar gasto' : 'Guardar gasto'}</span>
-              </button>
-              <button type="button" class="da-action-btn secondary" onclick="window.navigateTo('gastos')">
-                Cancelar
               </button>
             </div>
           </form>

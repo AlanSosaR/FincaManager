@@ -1,6 +1,7 @@
 import { logout, getUser, saveWhatsAppConfig, loadWhatsAppConfig, restFetch, loadPuntoReferencia, savePuntoReferencia } from '../auth.js';
 import db from '../db.js';
 import { fullDownload } from '../sync.js';
+import { registerPushToken, getPushStatus, checkPushAlerts } from '../push/push.js';
 import { createInstance, deleteInstance, getQR, connectPairing, checkConnection, listGroups, sendWhatsApp } from '../wa.js';
 
 let userRole = 'visor';
@@ -216,6 +217,21 @@ export async function renderConfiguracion() {
               <span class="material-icons" style="font-size:18px;">delete_outline</span> Borrar datos descargados
             </button>
           </div>
+        </div>
+        <div style="padding:14px 16px;border-radius:14px;background:#f4f7f3;border:1px solid #dce5db;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="material-icons" style="color:#2d3e2c;font-size:20px;">notifications_active</span>
+              <span style="font-weight:700;font-size:14px;color:#2d3e2c;">Notificaciones Push</span>
+            </div>
+            <span id="config-push-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#92400e;">Verificando...</span>
+          </div>
+          <p style="font-size:12.5px;color:#556b53;margin:0 0 10px;line-height:1.4;">
+            Recibe alertas en tu celular cuando toque cambio de aceite en Motores o cuando un ternero esté próximo a nacer.
+          </p>
+          <button id="btn-config-push" type="button" class="btn-m3-primary" style="width:100%;padding:12px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:13.5px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span class="material-icons" style="font-size:18px;">notifications</span> Activar notificaciones push
+          </button>
         </div>
         <button id="btn-config-clear-cache" class="btn-m3-tonal" style="width:100%;padding:14px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
           <span class="material-icons">cleaning_services</span> Limpiar caché
@@ -644,6 +660,55 @@ export function initConfiguracion() {
     if (delBtn) delBtn.style.display = 'flex';
   };
   refreshOfflineModulesUI();
+
+  const refreshPushUI = async () => {
+    const badge = document.getElementById('config-push-badge');
+    const btn = document.getElementById('btn-config-push');
+    if (!badge || !btn) return;
+    const status = await getPushStatus();
+    if (status === 'enabled') {
+      badge.textContent = '✓ Activas';
+      badge.style.background = '#dcfce7';
+      badge.style.color = '#166534';
+      btn.innerHTML = '<span class="material-icons" style="font-size:18px;">sync</span> Verificar alertas y token';
+    } else if (status === 'denied') {
+      badge.textContent = 'Bloqueadas';
+      badge.style.background = '#fee2e2';
+      badge.style.color = '#b91c1c';
+    } else if (status === 'unconfigured') {
+      badge.textContent = 'Falta Firebase';
+      badge.style.background = '#fef3c7';
+      badge.style.color = '#92400e';
+    } else if (status === 'unsupported') {
+      badge.textContent = 'No compatible';
+      badge.style.background = '#f3f4f6';
+      badge.style.color = '#4b5563';
+      btn.disabled = true;
+    } else {
+      badge.textContent = 'Inactivas';
+      badge.style.background = '#fef3c7';
+      badge.style.color = '#92400e';
+    }
+  };
+  refreshPushUI();
+
+  document.getElementById('btn-config-push')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-config-push');
+    btn.disabled = true;
+    const res = await registerPushToken();
+    if (res.ok) {
+      await checkPushAlerts();
+      window.Snackbar?.show('Notificaciones push activadas ✓');
+    } else if (res.reason === 'missing_config') {
+      window.Snackbar?.show('Configura las variables FIREBASE_* en Vercel/.env primero', { type: 'warning' });
+    } else if (res.reason === 'denied') {
+      window.Snackbar?.show('Permiso de notificaciones bloqueado en el navegador', { type: 'error' });
+    } else {
+      window.Snackbar?.show('No se pudo activar push: ' + (res.reason || 'error'), { type: 'warning' });
+    }
+    btn.disabled = false;
+    refreshPushUI();
+  });
 
   document.getElementById('btn-config-download')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-config-download');

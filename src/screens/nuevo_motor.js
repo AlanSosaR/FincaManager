@@ -20,14 +20,6 @@ export async function renderNuevoMotor(id) {
                   </div>
                 </div>
               </div>
-
-              <div class="m3-pro-tip">
-                <span class="material-icons icon">lightbulb</span>
-                <div>
-                  <h4>CONSEJO</h4>
-                  <p>Registrar las horas iniciales garantiza alertas de mantenimiento precisas.</p>
-                </div>
-              </div>
             </div>
 
             <!-- Right Side: Fields -->
@@ -71,12 +63,12 @@ export async function renderNuevoMotor(id) {
               </div>
 
               <div class="da-form-actions" style="border-top: none; margin-top: 24px; padding-top: 0;">
+                <button type="button" class="da-action-btn secondary" onclick="${isEdit ? `window.navigateTo('detalle_motor', '${id}')` : `window.navigateTo('motores')`}">
+                  Cancelar
+                </button>
                 <button type="button" class="da-action-btn primary" id="btn-save-motor">
                   <span class="material-icons">${isEdit ? 'update' : 'save'}</span>
                   <span>${isEdit ? 'Actualizar' : 'Guardar'}</span>
-                </button>
-                <button type="button" class="da-action-btn secondary" onclick="${isEdit ? `window.navigateTo('detalle_motor', '${id}')` : `window.navigateTo('motores')`}">
-                  Cancelar
                 </button>
               </div>
             </div>

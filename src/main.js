@@ -44,6 +44,7 @@ const updateSW = registerSW({
 });
 
 import { isOnline, processSyncQueue, incrementalSync, fullDownload } from './sync.js';
+import { registerPushToken, initForegroundPush, checkPushAlerts } from './push/push.js';
 import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan, checkPartosProximos } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
@@ -275,6 +276,21 @@ async function initApp() {
     initOnlineSync();
     initRealtime();
     maybePromptOfflineDownload();
+    initForegroundPush(({ title, body, url }) => {
+      addNotif(`push-${Date.now()}`, 'notifications_active', title, body, [
+        {
+          label: 'Ver',
+          handler: () => {
+            if (url) window.location.hash = url.replace(/^\/?#?/, '#');
+          },
+        },
+      ]);
+      window.Snackbar?.show(`${title}: ${body}`);
+    });
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      registerPushToken().catch(() => {});
+    }
+    setTimeout(() => checkPushAlerts().catch(() => {}), 6000);
   } else {
     showOfflineNotif();
   }
