@@ -146,7 +146,7 @@ export async function initForegroundPush(onReceive) {
       window.Snackbar?.show(`${title}: ${body}`);
     }
 
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       try {
         const reg = await navigator.serviceWorker?.getRegistration('/firebase-cloud-messaging-push-scope');
         if (reg?.showNotification) {
@@ -154,6 +154,7 @@ export async function initForegroundPush(onReceive) {
             body,
             vibrate: [200, 100, 200],
             requireInteraction: true,
+            renotify: true,
             tag,
             data: { url, notifId },
           });
