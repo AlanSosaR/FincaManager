@@ -9583,6 +9583,38 @@ input[id$="-search-input"]::placeholder {
   color: #ba1a1a;
 }
 
+/* ─── M3 Segmented Tabs (Catalog Bottom Sheet) ──────────────────────────── */
+.m3-segmented-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  background: #eef3ed;
+  border: 1px solid #d5e0d4;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+
+.m3-seg-tab {
+  border: none;
+  background: transparent;
+  color: #425441;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 9px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m3-seg-tab.is-active {
+  background: #2d3e2c;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(45, 62, 44, 0.22);
+}
+
 .m3-ac-empty {
   padding: 14px 12px;
   text-align: center;

@@ -32,11 +32,21 @@ export default defineConfig({
         ]
       },
       workbox: {
+        cacheId: 'finca-manager-v2',
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,ico,png}'],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'finca-images-offline-v1',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 1000, maxAgeSeconds: 86400 * 90 }
+            }
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'StaleWhileRevalidate',

@@ -87,6 +87,8 @@ export async function fullDownload(onProgress) {
 
     const total = SUPABASE_TABLES.length;
     let done = 0;
+    const imageUrls = new Set();
+    const IMAGE_FIELDS = ['foto_url', 'foto', 'imagen', 'imagen_url', 'avatar_url'];
     for (const tableName of SUPABASE_TABLES) {
       try {
         let allData = [];
@@ -104,6 +106,14 @@ export async function fullDownload(onProgress) {
           allData = allData.concat(data);
           from += limit;
           if (data.length < limit) break;
+        }
+        for (const row of allData) {
+          for (const field of IMAGE_FIELDS) {
+            const val = row?.[field];
+            if (typeof val === 'string' && /^https?:\/\//i.test(val.trim())) {
+              imageUrls.add(val.trim());
+            }
+          }
         }
         const dexieTable = db.table(tableName);
 
@@ -124,7 +134,38 @@ export async function fullDownload(onProgress) {
         console.warn(`fullDownload: error en tabla ${tableName}, continuando...`, tableErr);
       } finally {
         done += 1;
-        onProgress?.(Math.round((done / total) * 100));
+        onProgress?.(Math.round((done / total) * 75));
+      }
+    }
+
+    // Descargar y cachear todas las fotos (ganado, motores, herramientas, etc.) para uso sin internet
+    if (imageUrls.size > 0 && typeof caches !== 'undefined') {
+      try {
+        const imgCache = await caches.open('finca-images-offline-v1');
+        const urls = Array.from(imageUrls);
+        let imgDone = 0;
+        const CONCURRENCY = 4;
+        for (let i = 0; i < urls.length; i += CONCURRENCY) {
+          const batch = urls.slice(i, i + CONCURRENCY);
+          await Promise.all(batch.map(async (url) => {
+            try {
+              const existing = await imgCache.match(url);
+              if (!existing) {
+                let res = await fetch(url, { mode: 'cors' }).catch(() => null);
+                if (!res || !res.ok) {
+                  res = await fetch(url, { mode: 'no-cors' }).catch(() => null);
+                }
+                if (res && (res.ok || res.type === 'opaque')) {
+                  await imgCache.put(url, res.clone());
+                }
+              }
+            } catch {}
+            imgDone += 1;
+          }));
+          onProgress?.(75 + Math.round((imgDone / urls.length) * 25));
+        }
+      } catch (imgErr) {
+        console.warn('fullDownload: error cacheando imágenes offline:', imgErr);
       }
     }
     const nowIso = new Date().toISOString();

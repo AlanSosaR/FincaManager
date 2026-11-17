@@ -1692,13 +1692,11 @@ function deleteFromDosisCatalog(type, nombre) {
   return list;
 }
 
-function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
+function openCatalogNewBottomSheet(type, onSaved) {
   const isVac = type === 'vacunas';
   const title = isVac ? 'Nueva Vacuna' : 'Nuevo Producto';
   const nameLabel = isVac ? 'Nombre de la nueva vacuna' : 'Nombre del nuevo producto';
   const submitLabel = isVac ? 'Guardar nueva vacuna' : 'Guardar nuevo producto';
-  const parsedDefaultKg = parseFloat(defaultKg);
-  const initialKgVal = !isNaN(parsedDefaultKg) && parsedDefaultKg > 0 ? String(parsedDefaultKg) : '';
 
   document.getElementById('m3-catalog-new-scrim')?.remove();
   document.getElementById('m3-catalog-new-sheet')?.remove();
@@ -1728,8 +1726,12 @@ function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
       </div>
       <div style="flex: 1; min-width: 0;">
         <h4 class="m3-sub-sheet-title">${title}</h4>
-        <p class="m3-sub-sheet-subtitle">Guárdala en tu catálogo (la dosis es opcional)</p>
+        <p class="m3-sub-sheet-subtitle">Elige cómo calcular o guardar su dosis</p>
       </div>
+    </div>
+    <div class="m3-segmented-tabs" role="tablist">
+      <button type="button" class="m3-seg-tab is-active" data-cat-tab="peso" role="tab" aria-selected="true">Por peso (1 ml / kg)</button>
+      <button type="button" class="m3-seg-tab" data-cat-tab="fija" role="tab" aria-selected="false">Dosis fija (ml)</button>
     </div>
     <form id="catalog-new-form" class="m3-sub-sheet-form" novalidate>
       <div class="m3-field-group">
@@ -1739,19 +1741,19 @@ function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
         </div>
         <div class="m3-field-error" id="catalog-new-nombre-error" role="alert"></div>
       </div>
-      <div class="m3-field-group">
+      <div class="m3-field-group" id="catalog-new-kg-group">
+        <div class="m3-field" id="catalog-new-kg-field">
+          <input type="number" step="any" min="0.01" id="catalog-new-kg" placeholder=" " autocomplete="off">
+          <label>Peso en kg por cada 1 ml (ej. 50)</label>
+        </div>
+        <div class="m3-field-error" id="catalog-new-kg-error" role="alert"></div>
+      </div>
+      <div class="m3-field-group" id="catalog-new-ml-group" style="display: none;">
         <div class="m3-field" id="catalog-new-ml-field">
           <input type="number" step="any" min="0.01" id="catalog-new-ml" placeholder=" " autocomplete="off">
           <label>Dosis (ml) (opcional)</label>
         </div>
         <div class="m3-field-error" id="catalog-new-ml-error" role="alert"></div>
-      </div>
-      <div class="m3-field-group">
-        <div class="m3-field" id="catalog-new-kg-field">
-          <input type="number" step="any" min="0.01" id="catalog-new-kg" value="${escapeHtml(initialKgVal)}" placeholder=" " autocomplete="off">
-          <label>Peso en kg por cada 1 ml (ej. 50)</label>
-        </div>
-        <div class="m3-field-error" id="catalog-new-kg-error" role="alert"></div>
       </div>
       <div class="m3-sub-sheet-actions">
         <button type="button" class="btn-m3-tonal" id="catalog-new-cancel">Cancelar</button>
@@ -1779,30 +1781,48 @@ function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
   sheet.querySelector('#catalog-new-close')?.addEventListener('click', closeCatSheet);
   sheet.querySelector('#catalog-new-cancel')?.addEventListener('click', closeCatSheet);
 
+  let activeTab = 'peso';
   const nameInput = sheet.querySelector('#catalog-new-nombre');
   const nameField = sheet.querySelector('#catalog-new-nombre-field');
   const nameError = sheet.querySelector('#catalog-new-nombre-error');
-  const mlInput = sheet.querySelector('#catalog-new-ml');
-  const mlField = sheet.querySelector('#catalog-new-ml-field');
-  const mlError = sheet.querySelector('#catalog-new-ml-error');
+  const kgGroup = sheet.querySelector('#catalog-new-kg-group');
   const kgInput = sheet.querySelector('#catalog-new-kg');
   const kgField = sheet.querySelector('#catalog-new-kg-field');
   const kgError = sheet.querySelector('#catalog-new-kg-error');
+  const mlGroup = sheet.querySelector('#catalog-new-ml-group');
+  const mlInput = sheet.querySelector('#catalog-new-ml');
+  const mlField = sheet.querySelector('#catalog-new-ml-field');
+  const mlError = sheet.querySelector('#catalog-new-ml-error');
 
   const setFieldError = (fieldEl, errorEl, msg) => {
     if (fieldEl) fieldEl.classList.toggle('is-error', Boolean(msg));
     if (errorEl) errorEl.textContent = msg || '';
   };
 
+  sheet.querySelectorAll('.m3-seg-tab').forEach((tabBtn) => {
+    tabBtn.addEventListener('click', () => {
+      const next = tabBtn.dataset.catTab;
+      if (!next || next === activeTab) return;
+      activeTab = next;
+      sheet.querySelectorAll('.m3-seg-tab').forEach((b) => {
+        const isOn = b.dataset.catTab === activeTab;
+        b.classList.toggle('is-active', isOn);
+        b.setAttribute('aria-selected', String(isOn));
+      });
+      if (kgGroup) kgGroup.style.display = activeTab === 'peso' ? '' : 'none';
+      if (mlGroup) mlGroup.style.display = activeTab === 'fija' ? '' : 'none';
+      setFieldError(kgField, kgError, '');
+      setFieldError(mlField, mlError, '');
+    });
+  });
+
   nameInput?.addEventListener('input', () => setFieldError(nameField, nameError, ''));
-  mlInput?.addEventListener('input', () => setFieldError(mlField, mlError, ''));
   kgInput?.addEventListener('input', () => setFieldError(kgField, kgError, ''));
+  mlInput?.addEventListener('input', () => setFieldError(mlField, mlError, ''));
 
   sheet.querySelector('#catalog-new-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const newName = (nameInput?.value || '').trim();
-    const rawMl = (mlInput?.value || '').trim();
-    const rawKgStr = (kgInput?.value || '').trim();
     let hasError = false;
     let firstInvalidInput = null;
 
@@ -1814,6 +1834,33 @@ function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
       setFieldError(nameField, nameError, '');
     }
 
+    if (activeTab === 'peso') {
+      const rawKgStr = (kgInput?.value || '').trim();
+      const newKg = parseFloat(rawKgStr);
+      if (!rawKgStr || isNaN(newKg) || newKg <= 0) {
+        setFieldError(kgField, kgError, 'Escribe los kg por 1 ml (ej. 50)');
+        hasError = true;
+        firstInvalidInput = firstInvalidInput || kgInput;
+      } else {
+        setFieldError(kgField, kgError, '');
+      }
+
+      if (hasError) {
+        firstInvalidInput?.focus();
+        return;
+      }
+
+      const updatedList = saveToDosisCatalog(type, newName, newKg, 1, newKg);
+      closeCatSheet();
+      showSnackbar(`${isVac ? 'Vacuna' : 'Producto'} "${newName}" guardado ✓`);
+      if (typeof onSaved === 'function') {
+        onSaved(updatedList, { nombre: newName, kgPorMl: newKg, dosisMl: 1, kg: newKg });
+      }
+      return;
+    }
+
+    // Vista 2: Dosis fija (Nombre + ml opcional)
+    const rawMl = (mlInput?.value || '').trim();
     let dosisMl = 0;
     if (rawMl !== '') {
       const parsedMl = parseFloat(rawMl);
@@ -1829,33 +1876,16 @@ function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
       setFieldError(mlField, mlError, '');
     }
 
-    let rawKg = 0;
-    if (rawKgStr !== '') {
-      const parsedKg = parseFloat(rawKgStr);
-      if (isNaN(parsedKg) || parsedKg <= 0) {
-        setFieldError(kgField, kgError, 'El peso en kg debe ser mayor a 0');
-        hasError = true;
-        firstInvalidInput = firstInvalidInput || kgInput;
-      } else {
-        rawKg = parsedKg;
-        setFieldError(kgField, kgError, '');
-      }
-    } else {
-      setFieldError(kgField, kgError, '');
-    }
-
     if (hasError) {
       firstInvalidInput?.focus();
       return;
     }
 
-    const effectiveMl = rawKg > 0 && dosisMl === 0 ? 1 : dosisMl;
-    const kgPorMl = rawKg > 0 ? Number((rawKg / effectiveMl).toFixed(4)) : 0;
-    const updatedList = saveToDosisCatalog(type, newName, kgPorMl, effectiveMl, rawKg);
+    const updatedList = saveToDosisCatalog(type, newName, 0, dosisMl, 0);
     closeCatSheet();
     showSnackbar(`${isVac ? 'Vacuna' : 'Producto'} "${newName}" guardado ✓`);
     if (typeof onSaved === 'function') {
-      onSaved(updatedList, { nombre: newName, kgPorMl, dosisMl: effectiveMl, kg: rawKg });
+      onSaved(updatedList, { nombre: newName, kgPorMl: 0, dosisMl, kg: 0 });
     }
   });
 
@@ -2277,30 +2307,6 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
         </button>
       </div>
 
-      <div id="sub-vacuna-new-box" style="display: none; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-          <span style="font-size: 12px; font-weight: 800; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">playlist_add</span>
-            Crear nueva vacuna con su dosis
-          </span>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="text" id="sub-vacuna-new-nombre" placeholder=" " autocomplete="off">
-          <label>Nombre de la nueva vacuna</label>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="number" step="any" id="sub-vacuna-new-kg" placeholder=" " autocomplete="off">
-          <label>Peso en kg por cada 1 ml (ej. 50)</label>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button type="button" id="sub-vacuna-cancel-new" class="btn-m3-tonal" style="padding: 8px 14px; font-size: 12.5px; border-radius: 10px;">Cerrar</button>
-          <button type="button" id="sub-vacuna-save-new" class="btn-m3-fill" style="padding: 8px 16px; font-size: 12.5px; border-radius: 10px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">save</span>
-            <span>Guardar y Seleccionar</span>
-          </button>
-        </div>
-      </div>
-
       <input type="hidden" name="nombre" id="sub-vacuna-nombre" value="">
 
       ${renderWeekDatePickerHtml('sub-vacuna-fecha', today)}
@@ -2332,11 +2338,6 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
     const submitLabelEl = subSheet.querySelector('#sub-vacuna-submit-label');
     const hiddenNombreInput = subSheet.querySelector('#sub-vacuna-nombre');
     const toggleNewBtn = subSheet.querySelector('#sub-vacuna-toggle-new');
-    const newBox = subSheet.querySelector('#sub-vacuna-new-box');
-    const newNombreInput = subSheet.querySelector('#sub-vacuna-new-nombre');
-    const newKgInput = subSheet.querySelector('#sub-vacuna-new-kg');
-    const cancelNewBtn = subSheet.querySelector('#sub-vacuna-cancel-new');
-    const saveNewBtn = subSheet.querySelector('#sub-vacuna-save-new');
     const dosisBaseInput = subSheet.querySelector('#sub-vacuna-dosis-base');
     const dosisBaseField = dosisBaseInput?.closest('.m3-field');
     const dosisAplicarInput = subSheet.querySelector('#sub-vacuna-dosis');
@@ -2401,34 +2402,10 @@ function openVacunaFormSheet(animal, pesoActual, onReload) {
     });
 
     toggleNewBtn?.addEventListener('click', () => {
-      if (!newBox) return;
-      const isHidden = newBox.style.display === 'none' || !newBox.style.display;
-      newBox.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) setTimeout(() => newNombreInput?.focus(), 60);
-    });
-
-    cancelNewBtn?.addEventListener('click', () => {
-      if (newBox) newBox.style.display = 'none';
-    });
-
-    saveNewBtn?.addEventListener('click', () => {
-      const newName = (newNombreInput?.value || '').trim();
-      const newKg = parseFloat(newKgInput?.value);
-      if (!newName) {
-        showSnackbar('Escribe el nombre de la nueva vacuna', 'error');
-        return;
-      }
-      if (isNaN(newKg) || newKg <= 0) {
-        showSnackbar('Escribe los kg por 1 ml (ej. 50)', 'error');
-        return;
-      }
-      const updatedList = saveToDosisCatalog('vacunas', newName, newKg, 1, newKg);
-      vacAc.updateItems(updatedList, newName);
-      applyCatalogSelection({ nombre: newName, kgPorMl: newKg, dosisMl: 1, kg: newKg });
-      if (newNombreInput) newNombreInput.value = '';
-      if (newKgInput) newKgInput.value = '';
-      if (newBox) newBox.style.display = 'none';
-      showSnackbar(`Vacuna "${newName}" guardada y cargada ✓`);
+      openCatalogNewBottomSheet('vacunas', (updatedList, savedItem) => {
+        vacAc.updateItems(updatedList, savedItem.nombre);
+        applyCatalogSelection(savedItem);
+      });
     });
 
     const updateModeLabel = () => {
@@ -2662,30 +2639,6 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
         </button>
       </div>
 
-      <div id="sub-fumig-new-box" style="display: none; flex-direction: column; gap: 10px; background: #f4f8f3; border: 1.5px solid #cde0cb; border-radius: 16px; padding: 14px;">
-        <div style="display: flex; align-items: center; justify-content: space-between;">
-          <span style="font-size: 12px; font-weight: 800; color: #2d3e2c; text-transform: uppercase; letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">playlist_add</span>
-            Crear nuevo producto con su dosis
-          </span>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="text" id="sub-fumig-new-nombre" placeholder=" " autocomplete="off">
-          <label>Nombre del nuevo producto</label>
-        </div>
-        <div class="m3-field" style="margin-bottom: 0; background: #fff; border-radius: 12px;">
-          <input type="number" step="any" id="sub-fumig-new-kg" placeholder=" " autocomplete="off">
-          <label>Peso en kg por cada 1 ml (ej. 50)</label>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button type="button" id="sub-fumig-cancel-new" class="btn-m3-tonal" style="padding: 8px 14px; font-size: 12.5px; border-radius: 10px;">Cerrar</button>
-          <button type="button" id="sub-fumig-save-new" class="btn-m3-fill" style="padding: 8px 16px; font-size: 12.5px; border-radius: 10px; display: inline-flex; align-items: center; gap: 5px;">
-            <span class="material-icons" style="font-size: 16px;">save</span>
-            <span>Guardar y Seleccionar</span>
-          </button>
-        </div>
-      </div>
-
       <input type="hidden" name="producto" id="sub-fumig-producto" value="">
 
       ${renderWeekDatePickerHtml('sub-fumig-fecha', today)}
@@ -2717,11 +2670,6 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
     const submitLabelEl = subSheet.querySelector('#sub-fumig-submit-label');
     const hiddenProductoInput = subSheet.querySelector('#sub-fumig-producto');
     const toggleNewBtn = subSheet.querySelector('#sub-fumig-toggle-new');
-    const newBox = subSheet.querySelector('#sub-fumig-new-box');
-    const newNombreInput = subSheet.querySelector('#sub-fumig-new-nombre');
-    const newKgInput = subSheet.querySelector('#sub-fumig-new-kg');
-    const cancelNewBtn = subSheet.querySelector('#sub-fumig-cancel-new');
-    const saveNewBtn = subSheet.querySelector('#sub-fumig-save-new');
     const dosisBaseInput = subSheet.querySelector('#sub-fumig-dosis-base');
     const dosisBaseField = dosisBaseInput?.closest('.m3-field');
     const dosisAplicarInput = subSheet.querySelector('#sub-fumig-dosis');
@@ -2786,34 +2734,10 @@ function openFumigFormSheet(animal, pesoActual, onReload) {
     });
 
     toggleNewBtn?.addEventListener('click', () => {
-      if (!newBox) return;
-      const isHidden = newBox.style.display === 'none' || !newBox.style.display;
-      newBox.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) setTimeout(() => newNombreInput?.focus(), 60);
-    });
-
-    cancelNewBtn?.addEventListener('click', () => {
-      if (newBox) newBox.style.display = 'none';
-    });
-
-    saveNewBtn?.addEventListener('click', () => {
-      const newName = (newNombreInput?.value || '').trim();
-      const newKg = parseFloat(newKgInput?.value);
-      if (!newName) {
-        showSnackbar('Escribe el nombre del nuevo producto', 'error');
-        return;
-      }
-      if (isNaN(newKg) || newKg <= 0) {
-        showSnackbar('Escribe los kg por 1 ml (ej. 50)', 'error');
-        return;
-      }
-      const updatedList = saveToDosisCatalog('fumigaciones', newName, newKg, 1, newKg);
-      fumigAc.updateItems(updatedList, newName);
-      applyCatalogSelection({ nombre: newName, kgPorMl: newKg, dosisMl: 1, kg: newKg });
-      if (newNombreInput) newNombreInput.value = '';
-      if (newKgInput) newKgInput.value = '';
-      if (newBox) newBox.style.display = 'none';
-      showSnackbar(`Producto "${newName}" guardado y cargado ✓`);
+      openCatalogNewBottomSheet('fumigaciones', (updatedList, savedItem) => {
+        fumigAc.updateItems(updatedList, savedItem.nombre);
+        applyCatalogSelection(savedItem);
+      });
     });
 
     const updateModeLabel = () => {

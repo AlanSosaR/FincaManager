@@ -30,12 +30,12 @@ const notifDropdown = document.getElementById('notif-dropdown');
 let notifs = [];
 let notifOpen = false;
 
-function addNotif(id, icon, title, desc, actionOrActions) {
+function addNotif(id, icon, title, desc, actionOrActions, opts = {}) {
   notifs = notifs.filter(n => n.id !== id);
   const actions = Array.isArray(actionOrActions)
     ? actionOrActions
     : (actionOrActions ? [actionOrActions] : []);
-  notifs.unshift({ id, icon, title, desc, actions, read: false });
+  notifs.unshift({ id, icon, title, desc, actions, read: Boolean(opts.read) });
   updateNotifUI();
 }
 
@@ -45,7 +45,15 @@ function removeNotif(id) {
 }
 
 function updateNotifUI() {
+  const activeNotifs = notifs.filter(n => n.id !== 'conn-status');
   const unread = notifs.filter(n => !n.read).length;
+  const syncArea = document.getElementById('sync-status-area');
+  if (syncArea) {
+    syncArea.style.display = (activeNotifs.length > 0 || notifOpen) ? 'inline-flex' : 'none';
+  }
+  if (syncIcon) {
+    syncIcon.style.color = activeNotifs.length > 0 ? '#ea580c' : '';
+  }
   if (syncBadge) {
     syncBadge.style.display = unread ? 'flex' : 'none';
     syncBadge.textContent = unread > 9 ? '9+' : unread;
@@ -93,12 +101,13 @@ function toggleNotif() {
   }
 }
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('#sync-status-area')) {
-    notifOpen = false;
-    notifDropdown.style.display = 'none';
-  }
-});
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#sync-status-area')) {
+      notifOpen = false;
+      if (notifDropdown) notifDropdown.style.display = 'none';
+      updateNotifUI();
+    }
+  });
 
 const container = document.getElementById('screen-container');
 
@@ -134,8 +143,28 @@ async function initApp() {
   const syncArea = document.getElementById('sync-status-area');
   if (syncArea) syncArea.style.display = 'inline-flex';
 
+  const updateConnectionNotif = () => {
+    if (isOnline()) {
+      removeNotif('offline');
+      const dlAt = localStorage.getItem('offline_data_downloaded_at');
+      const desc = dlAt
+        ? 'Sincronización activa · Datos listos para usar sin internet.'
+        : 'Sincronización en línea activa.';
+      addNotif('conn-status', 'cloud_done', 'Conectado a internet', desc, null, { read: true });
+    } else {
+      removeNotif('conn-status');
+      addNotif(
+        'offline',
+        'cloud_off',
+        'Sin conexión a internet',
+        'Usando datos locales. Los cambios se sincronizarán al volver la conexión.'
+      );
+    }
+  };
+
   window.__onOfflineDownloadComplete = () => {
     removeNotif('offline-download');
+    updateConnectionNotif();
   };
 
   const maybePromptOfflineDownload = () => {
@@ -187,19 +216,18 @@ async function initApp() {
   };
 
   window.addEventListener('offline', () => {
-    addNotif('offline', 'cloud_off', 'Sin conexión', 'Usando datos locales. Los cambios se sincronizarán al volver la conexión.');
+    updateConnectionNotif();
   });
   window.addEventListener('online', () => {
-    removeNotif('offline');
+    updateConnectionNotif();
     maybePromptOfflineDownload();
   });
 
+  updateConnectionNotif();
   if (isOnline()) {
     initOnlineSync();
     initRealtime();
     maybePromptOfflineDownload();
-  } else {
-    addNotif('offline', 'cloud_off', 'Sin conexión', 'Usando datos locales. Los cambios se sincronizarán al volver la conexión.');
   }
 }
 initApp();
