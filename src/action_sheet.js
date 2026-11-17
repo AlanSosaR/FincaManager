@@ -491,6 +491,7 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
         <div class="sheet-tag-row sheet-peso-swipe-card" style="padding: 6px 10px;">
           <div style="min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
             <span style="font-weight: 700; color: #1e3e2b; font-size: 12px;">${escapeHtml(v.nombre)}</span>
+            ${v.dosis ? `<span style="color: #2d3e2c; font-size: 10.5px; font-weight: 600; margin-left: 4px;">· ${escapeHtml(v.dosis)}</span>` : ''}
             <span style="color: #666; font-size: 10px; margin-left: 3px;">(${formatFecha(v.fecha)})</span>
           </div>
           <span class="${v.estado === 'Aplicada' ? 'badge-ok' : 'badge-pending'}" style="font-size: 9.5px; padding: 2px 6px;">${escapeHtml(v.estado || 'Aplicada')}</span>
