@@ -34,8 +34,43 @@ const updateSW = registerSW({
       [
         {
           label: 'Actualizar',
-          handler: () => {
-            updateSW(true);
+          handler: async () => {
+            const setBtnState = (text, disabled = true) => {
+              const item = notifs.find(x => x.id === 'app-update');
+              if (item?.actions?.[0]) item.actions[0].label = text;
+              const liveBtn = document.getElementById('notif-act-app-update-0');
+              if (liveBtn) {
+                liveBtn.disabled = disabled;
+                liveBtn.style.opacity = disabled ? '0.85' : '1';
+                liveBtn.style.cursor = disabled ? 'wait' : 'pointer';
+                liveBtn.textContent = text;
+              }
+            };
+
+            let pct = 10;
+            setBtnState(`Actualizando... ${pct}%`, true);
+            const timer = setInterval(() => {
+              if (pct < 90) {
+                pct = Math.min(90, pct + (pct < 50 ? 20 : 10));
+                setBtnState(`Actualizando... ${pct}%`, true);
+              }
+            }, 250);
+
+            try {
+              await updateSW(true);
+              clearInterval(timer);
+              setBtnState('Actualizando... 100%', true);
+              setTimeout(() => {
+                if (!refreshing) {
+                  refreshing = true;
+                  window.location.reload();
+                }
+              }, 1200);
+            } catch {
+              clearInterval(timer);
+              setBtnState('Actualizar', false);
+              window.Snackbar?.show('No se pudo instalar la actualización', { type: 'warning' });
+            }
           },
         },
       ]

@@ -232,6 +232,9 @@ export async function renderConfiguracion() {
           <button id="btn-config-push" type="button" class="btn-m3-primary" style="width:100%;padding:12px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:13.5px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
             <span class="material-icons" style="font-size:18px;">notifications</span> Activar notificaciones push
           </button>
+          <button id="btn-config-push-test" type="button" style="display:none;margin-top:8px;width:100%;padding:10px;border-radius:12px;background:#ffffff;color:#2d3e2c;border:1px solid #cbd8c9;font-weight:700;font-size:13px;cursor:pointer;font-family:'Work Sans',sans-serif;align-items:center;justify-content:center;gap:6px;">
+            <span class="material-icons" style="font-size:17px;">send</span> Enviar notificación de prueba
+          </button>
         </div>
         <button id="btn-config-clear-cache" class="btn-m3-tonal" style="width:100%;padding:14px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
           <span class="material-icons">cleaning_services</span> Limpiar caché
@@ -664,8 +667,10 @@ export function initConfiguracion() {
   const refreshPushUI = async () => {
     const badge = document.getElementById('config-push-badge');
     const btn = document.getElementById('btn-config-push');
+    const testBtn = document.getElementById('btn-config-push-test');
     if (!badge || !btn) return;
     const status = await getPushStatus();
+    if (testBtn) testBtn.style.display = status === 'enabled' ? 'flex' : 'none';
     if (status === 'enabled') {
       badge.textContent = '✓ Activas';
       badge.style.background = '#dcfce7';
@@ -708,6 +713,24 @@ export function initConfiguracion() {
     }
     btn.disabled = false;
     refreshPushUI();
+  });
+
+  document.getElementById('btn-config-push-test')?.addEventListener('click', async () => {
+    const testBtn = document.getElementById('btn-config-push-test');
+    if (!testBtn) return;
+    testBtn.disabled = true;
+    try {
+      const { sendTestPush } = await import('../push/push.js');
+      const r = await sendTestPush();
+      if (r.ok) {
+        window.Snackbar?.show('Notificación de prueba enviada ✓');
+      } else {
+        window.Snackbar?.show('Inicia sesión primero para probar', { type: 'warning' });
+      }
+    } catch (err) {
+      window.Snackbar?.show('Error enviando prueba: ' + (err.message || err), { type: 'error' });
+    }
+    testBtn.disabled = false;
   });
 
   document.getElementById('btn-config-download')?.addEventListener('click', async () => {

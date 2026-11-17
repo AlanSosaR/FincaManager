@@ -11,6 +11,7 @@ const DEFAULT_FIREBASE_CONFIG = {
   messagingSenderId: '1096670243449',
   appId: '1:1096670243449:web:a0a7c5c7b84f18dcde02a8',
   measurementId: 'G-Q9BC6RMWJC',
+  vapidKey: 'BFxdWd3AwT0KdcWKstBN7YdCepa4hCGnwSfChePmAeqlLPKzNZGPRy6mlsjRzFRMeVFYyx3pdEMV7-T8AWhKmAs',
 };
 
 let _cachedConfig = null;
@@ -20,7 +21,7 @@ let _fgInitialized = false;
 async function loadFirebaseConfig() {
   if (_cachedConfig) return _cachedConfig;
 
-  // 1. Intentar leer variables VITE_FIREBASE_* (local .env)
+  // 1. Intentar leer variables VITE_FIREBASE_* (local .env) o usar configuración pública por defecto
   const envCfg = {
     apiKey: import.meta.env?.VITE_FIREBASE_API_KEY || DEFAULT_FIREBASE_CONFIG.apiKey,
     authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN || DEFAULT_FIREBASE_CONFIG.authDomain,
@@ -29,7 +30,7 @@ async function loadFirebaseConfig() {
     messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID || DEFAULT_FIREBASE_CONFIG.messagingSenderId,
     appId: import.meta.env?.VITE_FIREBASE_APP_ID || DEFAULT_FIREBASE_CONFIG.appId,
     measurementId: import.meta.env?.VITE_FIREBASE_MEASUREMENT_ID || DEFAULT_FIREBASE_CONFIG.measurementId,
-    vapidKey: import.meta.env?.VITE_FIREBASE_VAPID_KEY || '',
+    vapidKey: import.meta.env?.VITE_FIREBASE_VAPID_KEY || DEFAULT_FIREBASE_CONFIG.vapidKey,
   };
   if (envCfg.apiKey && envCfg.projectId && envCfg.vapidKey) {
     _cachedConfig = envCfg;
@@ -246,6 +247,27 @@ export async function getPushStatus() {
   return 'prompt';
 }
 
+export async function sendTestPush() {
+  const userId = getSessionUserId() || (await getUser())?.id;
+  const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+  if (!userId) return { ok: false, reason: 'no_user' };
+
+  await restFetch('/rest/v1/notifications', {
+    method: 'POST',
+    body: JSON.stringify({
+      user_id: userId,
+      empresa_id: empresaId || null,
+      type: 'motor_aceite',
+      title: '🔔 Prueba de Finca Manager',
+      body: 'Las notificaciones push están funcionando correctamente en este dispositivo.',
+      url: '/#configuracion',
+      ref_id: `test-${Date.now()}`,
+    }),
+  });
+  return { ok: true };
+}
+
 window.registerPushToken = registerPushToken;
 window.initForegroundPush = initForegroundPush;
 window.checkPushAlerts = checkPushAlerts;
+window.sendTestPush = sendTestPush;
