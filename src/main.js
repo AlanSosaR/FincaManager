@@ -64,27 +64,20 @@ const updateSW = registerSW({
               }
             };
 
-            let pct = 10;
-            setBtnState(`Actualizando... ${pct}%`, true);
-            const timer = setInterval(() => {
-              if (pct < 90) {
-                pct = Math.min(90, pct + (pct < 50 ? 20 : 10));
-                setBtnState(`Actualizando... ${pct}%`, true);
-              }
-            }, 250);
-
+            const steps = [0, 15, 30, 50, 70, 85, 100];
             try {
+              for (const pct of steps) {
+                setBtnState(`Actualizando... ${pct}%`, true);
+                if (pct < 100) await new Promise(r => setTimeout(r, 200));
+              }
               await updateSW(true);
-              clearInterval(timer);
-              setBtnState('Actualizando... 100%', true);
               setTimeout(() => {
                 if (!refreshing) {
                   refreshing = true;
                   window.location.reload();
                 }
-              }, 1200);
+              }, 600);
             } catch {
-              clearInterval(timer);
               setBtnState('Actualizar', false);
               window.Snackbar?.show('No se pudo instalar la actualización', { type: 'warning' });
             }
