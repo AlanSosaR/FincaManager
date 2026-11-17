@@ -15,6 +15,13 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
 });
 navigator.serviceWorker?.addEventListener('message', (event) => {
   if (event.data?.type === 'PUSH_NAVIGATE' && event.data?.url) {
+    if (event.data?.notifId) {
+      removeNotif(`db-${event.data.notifId}`);
+      restFetch(`/rest/v1/notifications?id=eq.${encodeURIComponent(event.data.notifId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ read: true }),
+      }).catch(() => {});
+    }
     const parts = String(event.data.url).replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
     if (parts[0] && typeof window.navigateTo === 'function') {
       window.navigateTo(parts[0], ...parts.slice(1));
@@ -321,15 +328,22 @@ async function initApp() {
     initOnlineSync();
     initRealtime();
     maybePromptOfflineDownload();
-    initForegroundPush(({ title, body, url }) => {
-      const notifId = `push-${Date.now()}`;
-      addNotif(notifId, 'notifications_active', title, body, [
+
+    const addPushBellNotif = ({ notifId, title, body, url }) => {
+      const uiId = notifId ? `db-${notifId}` : `push-${Date.now()}`;
+      addNotif(uiId, 'notifications_active', title, body, [
         {
           label: 'Ver',
           handler: () => {
             notifOpen = false;
             if (notifDropdown) notifDropdown.style.display = 'none';
-            removeNotif(notifId);
+            removeNotif(uiId);
+            if (notifId) {
+              restFetch(`/rest/v1/notifications?id=eq.${encodeURIComponent(notifId)}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ read: true }),
+              }).catch(() => {});
+            }
             if (url) {
               const parts = url.replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
               if (parts[0] && typeof window.navigateTo === 'function') {
@@ -341,6 +355,24 @@ async function initApp() {
           },
         },
       ]);
+    };
+
+    // Cargar notificaciones no leídas al abrir la app
+    (async () => {
+      try {
+        const empId = window._currentEmpresaId;
+        const filter = empId ? `empresa_id=eq.${encodeURIComponent(empId)}&` : '';
+        const rows = await restFetch(`/rest/v1/notifications?${filter}read=eq.false&order=created_at.desc&limit=15`);
+        if (Array.isArray(rows)) {
+          rows.reverse().forEach((r) => {
+            addPushBellNotif({ notifId: r.id, title: r.title, body: r.body, url: r.url });
+          });
+        }
+      } catch {}
+    })();
+
+    initForegroundPush(({ notifId, title, body, url }) => {
+      addPushBellNotif({ notifId, title, body, url });
       window.Snackbar?.show(`${title}: ${body}`);
     });
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {

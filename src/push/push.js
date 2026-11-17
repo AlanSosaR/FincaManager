@@ -136,11 +136,12 @@ export async function initForegroundPush(onReceive) {
     const body = payload?.notification?.body || payload?.data?.body || '';
     const url = payload?.data?.url || '/#dashboard';
     const tag = payload?.data?.ref_id || payload?.data?.type || 'finca-notif';
+    const notifId = payload?.data?.notif_id || '';
 
-    window.dispatchEvent(new CustomEvent('push:foreground', { detail: { title, body, url, payload } }));
+    window.dispatchEvent(new CustomEvent('push:foreground', { detail: { notifId, title, body, url, payload } }));
 
     if (typeof onReceive === 'function') {
-      onReceive({ title, body, url, payload });
+      onReceive({ notifId, title, body, url, payload });
     } else {
       window.Snackbar?.show(`${title}: ${body}`);
     }
@@ -151,12 +152,10 @@ export async function initForegroundPush(onReceive) {
         if (reg?.showNotification) {
           await reg.showNotification(title, {
             body,
-            icon: '/pwa-192x192.png',
-            badge: '/pwa-192x192.png',
             vibrate: [200, 100, 200],
             requireInteraction: true,
             tag,
-            data: { url },
+            data: { url, notifId },
           });
         }
       } catch {}
