@@ -116,12 +116,6 @@ export async function renderMotores(page = 1, filter = 'all') {
     return `<div class="screen-motores"><p>Error cargando datos: ${fetchErr.message}</p></div>`;
   }
 
-  if (urgentCount > 0 && currentMotorsFilter !== 'urgent') {
-    setTimeout(() => {
-      window.Snackbar.show(`${urgentCount} equipos requieren mantenimiento urgente`, { type: 'warning' });
-    }, 1000);
-  }
-
   return `
     <div class="screen-motores" style="padding-bottom: 120px;">
       <div class="motores-top-actions-container" style="display: flex; justify-content: flex-end; margin: 16px 0 8px;">

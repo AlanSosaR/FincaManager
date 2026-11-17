@@ -312,11 +312,22 @@ async function initApp() {
     initRealtime();
     maybePromptOfflineDownload();
     initForegroundPush(({ title, body, url }) => {
-      addNotif(`push-${Date.now()}`, 'notifications_active', title, body, [
+      const notifId = `push-${Date.now()}`;
+      addNotif(notifId, 'notifications_active', title, body, [
         {
           label: 'Ver',
           handler: () => {
-            if (url) window.location.hash = url.replace(/^\/?#?/, '#');
+            notifOpen = false;
+            if (notifDropdown) notifDropdown.style.display = 'none';
+            removeNotif(notifId);
+            if (url) {
+              const parts = url.replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+              if (parts[0] && typeof window.navigateTo === 'function') {
+                window.navigateTo(parts[0], ...parts.slice(1));
+              } else {
+                window.location.hash = url.replace(/^\/?#?/, '#');
+              }
+            }
           },
         },
       ]);
