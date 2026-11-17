@@ -1785,7 +1785,6 @@ function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
   const mlError = sheet.querySelector('#catalog-new-ml-error');
   const kgInput = sheet.querySelector('#catalog-new-kg');
   const kgField = sheet.querySelector('#catalog-new-kg-field');
-  const kgGroup = kgField?.closest('.m3-field-group');
   const kgError = sheet.querySelector('#catalog-new-kg-error');
 
   const setFieldError = (fieldEl, errorEl, msg) => {
@@ -1793,24 +1792,15 @@ function openCatalogNewBottomSheet(type, onSaved, defaultKg = '') {
     if (errorEl) errorEl.textContent = msg || '';
   };
 
-  const syncKgVisibility = () => {
-    const hasMl = Boolean((mlInput?.value || '').trim());
-    if (kgGroup) kgGroup.style.display = hasMl ? 'none' : '';
-    if (hasMl) setFieldError(kgField, kgError, '');
-  };
-
   nameInput?.addEventListener('input', () => setFieldError(nameField, nameError, ''));
-  mlInput?.addEventListener('input', () => {
-    setFieldError(mlField, mlError, '');
-    syncKgVisibility();
-  });
+  mlInput?.addEventListener('input', () => setFieldError(mlField, mlError, ''));
   kgInput?.addEventListener('input', () => setFieldError(kgField, kgError, ''));
 
   sheet.querySelector('#catalog-new-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const newName = (nameInput?.value || '').trim();
     const rawMl = (mlInput?.value || '').trim();
-    const rawKgStr = rawMl !== '' ? '' : (kgInput?.value || '').trim();
+    const rawKgStr = (kgInput?.value || '').trim();
     let hasError = false;
     let firstInvalidInput = null;
 

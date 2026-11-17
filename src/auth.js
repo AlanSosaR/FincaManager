@@ -1,3 +1,5 @@
+import db from './db.js';
+
 export const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || 'https://bguzluqyxbgtsgjcncvm.supabase.co';
 export const SUPABASE_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJndXpsdXF5eGJndHNnamNuY3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgyNDk5MTUsImV4cCI6MjEwMzgyNTkxNX0.FrNo3kzUBbqOzAXpK1MmjxR9GeOfi5PkO7qWyIsOpbM';
 
@@ -14,7 +16,9 @@ async function authFetch(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.msg || body.error_description || body.error || `Auth error ${res.status}`);
+    const err = new Error(body.msg || body.error_description || body.error || `Auth error ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -32,10 +36,157 @@ function buildHeaders(headersOverrides = {}) {
   return headers;
 }
 
+function matchPostgrestCondition(rowVal, expr) {
+  if (expr.startsWith('eq.')) return String(rowVal ?? '') === expr.slice(3);
+  if (expr.startsWith('neq.')) return String(rowVal ?? '') !== expr.slice(4);
+  if (expr.startsWith('gt.')) return rowVal != null && String(rowVal) > expr.slice(3);
+  if (expr.startsWith('gte.')) return rowVal != null && String(rowVal) >= expr.slice(4);
+  if (expr.startsWith('lt.')) return rowVal != null && String(rowVal) < expr.slice(3);
+  if (expr.startsWith('lte.')) return rowVal != null && String(rowVal) <= expr.slice(4);
+  if (expr.startsWith('is.')) {
+    const target = expr.slice(3);
+    if (target === 'null') return rowVal == null;
+    if (target === 'true') return rowVal === true;
+    if (target === 'false') return rowVal === false;
+  }
+  if (expr.startsWith('in.(') && expr.endsWith(')')) {
+    const vals = expr.slice(4, -1).split(',').map(v => v.trim());
+    return vals.includes(String(rowVal ?? ''));
+  }
+  if (expr.startsWith('ilike.')) {
+    const needle = expr.slice(6).replace(/[*%]/g, '').toLowerCase();
+    return rowVal != null && String(rowVal).toLowerCase().includes(needle);
+  }
+  return true;
+}
+
+function applyPostgrestParams(rows, searchParams) {
+  let results = [...rows];
+  for (const [key, val] of searchParams.entries()) {
+    if (key === 'select' || key === 'order' || key === 'limit' || key === 'offset') continue;
+    if (key === 'or' && val.startsWith('(') && val.endsWith(')')) {
+      const parts = val.slice(1, -1).split(',');
+      results = results.filter(r => parts.some(p => {
+        const dotIdx = p.indexOf('.');
+        if (dotIdx <= 0) return false;
+        const field = p.slice(0, dotIdx);
+        return matchPostgrestCondition(r[field], p.slice(dotIdx + 1));
+      }));
+    } else {
+      results = results.filter(r => matchPostgrestCondition(r[key], val));
+    }
+  }
+  const orderParam = searchParams.get('order');
+  if (orderParam) {
+    const [field, dir] = orderParam.split('.');
+    const asc = dir !== 'desc';
+    results.sort((a, b) => {
+      const av = a[field], bv = b[field];
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const cmp = av > bv ? 1 : av < bv ? -1 : 0;
+      return asc ? cmp : -cmp;
+    });
+  }
+  const offset = parseInt(searchParams.get('offset') || '0', 10) || 0;
+  const limit = parseInt(searchParams.get('limit') || '0', 10);
+  if (offset > 0) results = results.slice(offset);
+  if (limit > 0) results = results.slice(0, limit);
+  return results;
+}
+
+async function executeOfflineRest(fullPath, options = {}, isInsertOnly = false) {
+  const [rawPath, queryStr = ''] = fullPath.split('?');
+  const tableName = decodeURIComponent(rawPath.replace(/^\/rest\/v1\//, '').split('/')[0] || '');
+  const dexieTable = db.tables.find(t => t.name === tableName);
+  if (!dexieTable) {
+    if ((options.method || 'GET').toUpperCase() === 'GET') return [];
+    throw new Error('Sin conexión a internet');
+  }
+  const method = (options.method || (isInsertOnly ? 'POST' : 'GET')).toUpperCase();
+  const params = new URLSearchParams(queryStr);
+
+  if (method === 'GET') {
+    const all = await dexieTable.toArray();
+    return applyPostgrestParams(all, params);
+  }
+
+  const enqueue = async (action, recordId, data) => {
+    await db._sync_queue.add({
+      table: tableName,
+      action,
+      record_id: recordId,
+      data: data ? JSON.parse(JSON.stringify(data)) : null,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  if (method === 'POST') {
+    const parsed = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+    const rows = Array.isArray(parsed) ? parsed : [parsed];
+    const saved = [];
+    for (const item of rows) {
+      const rec = {
+        ...item,
+        id: item.id || crypto.randomUUID(),
+        created_at: item.created_at || new Date().toISOString(),
+      };
+      if (!rec.empresa_id && window._currentEmpresaId && !['usuarios', 'empresas', 'usuario_empresas'].includes(tableName)) {
+        rec.empresa_id = window._currentEmpresaId;
+      }
+      await dexieTable.put(rec);
+      await enqueue('insert', rec.id, rec);
+      saved.push(rec);
+    }
+    if (isInsertOnly) return saved[0]?.id ? { id: saved[0].id } : {};
+    return saved;
+  }
+
+  if (method === 'PATCH') {
+    const patchData = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+    const all = await dexieTable.toArray();
+    const matched = applyPostgrestParams(all, params);
+    const updatedRows = [];
+    for (const row of matched) {
+      const updated = { ...row, ...patchData, updated_at: new Date().toISOString() };
+      await dexieTable.put(updated);
+      await enqueue('update', row.id, updated);
+      updatedRows.push(updated);
+    }
+    return updatedRows;
+  }
+
+  if (method === 'DELETE') {
+    const all = await dexieTable.toArray();
+    const matched = applyPostgrestParams(all, params);
+    const ids = matched.map(r => r.id).filter(Boolean);
+    if (ids.length) {
+      await dexieTable.bulkDelete(ids);
+      for (const id of ids) {
+        await enqueue('delete', id, null);
+      }
+    }
+    return [];
+  }
+
+  return [];
+}
+
 async function restFetch(path, options = {}) {
   const fullPath = path.startsWith('/') ? path : `/rest/v1/${path}`;
+  if (!navigator.onLine && fullPath.startsWith('/rest/v1/')) {
+    return executeOfflineRest(fullPath, options, false);
+  }
   const headers = buildHeaders({ Prefer: 'return=representation', ...options.headers });
-  const res = await fetch(`${SUPABASE_URL}${fullPath}`, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}${fullPath}`, { ...options, headers });
+  } catch (err) {
+    if (fullPath.startsWith('/rest/v1/')) {
+      return executeOfflineRest(fullPath, options, false);
+    }
+    throw err;
+  }
   const body = res.headers.get('content-type')?.includes('application/json') ? await res.json() : null;
   if (!res.ok) {
     if (res.status === 406) return [];
@@ -50,18 +201,29 @@ async function restFetch(path, options = {}) {
 
 async function restInsert(path, body) {
   const fullPath = path.startsWith('/') ? path : `/rest/v1/${path}`;
-  const headers = buildHeaders();
   let data = body;
   if (data && typeof data === 'object' && !Array.isArray(data) && !data.empresa_id && window._currentEmpresaId) {
     if (!fullPath.includes('/usuarios') && !fullPath.includes('/empresas') && !fullPath.includes('/usuario_empresas')) {
       data = { ...data, empresa_id: window._currentEmpresaId };
     }
   }
-  const res = await fetch(`${SUPABASE_URL}${fullPath}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data),
-  });
+  if (!navigator.onLine && fullPath.startsWith('/rest/v1/')) {
+    return executeOfflineRest(fullPath, { method: 'POST', body: data }, true);
+  }
+  const headers = buildHeaders();
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}${fullPath}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+  } catch (err) {
+    if (fullPath.startsWith('/rest/v1/')) {
+      return executeOfflineRest(fullPath, { method: 'POST', body: data }, true);
+    }
+    throw err;
+  }
   if (!res.ok) {
     const errBody = res.headers.get('content-type')?.includes('application/json') ? await res.json().catch(() => ({})) : {};
     const msg = errBody?.message || errBody?.error || `REST error ${res.status}`;
@@ -157,10 +319,17 @@ export async function logout() {
 }
 
 export async function getUser() {
+  const session = getSession();
+  if (!navigator.onLine) {
+    return session?.user || null;
+  }
   try {
     const data = await authFetch('/auth/v1/user');
-    return data;
-  } catch {
+    return data || session?.user || null;
+  } catch (err) {
+    if (!err?.status || err.status >= 500) {
+      return session?.user || null;
+    }
     return null;
   }
 }
@@ -185,6 +354,9 @@ export function getAccessToken() {
 export async function tryRefreshSession() {
   const session = getSession();
   if (!session?.refresh_token) return false;
+  if (!navigator.onLine) {
+    return !!session.access_token;
+  }
   try {
     const data = await authFetch('/auth/v1/token?grant_type=refresh_token', {
       method: 'POST',
@@ -194,8 +366,14 @@ export async function tryRefreshSession() {
       saveSession(data);
       return true;
     }
-  } catch {
-    saveSession(null);
+  } catch (err) {
+    // Solo cerrar sesión si el servidor rechazó explícitamente el refresh_token (400/401/403).
+    // Si es error de red o servidor (sin internet), conservar la sesión local.
+    if (err?.status && err.status >= 400 && err.status < 500) {
+      saveSession(null);
+      return false;
+    }
+    return !!session.access_token;
   }
   return false;
 }
@@ -237,10 +415,24 @@ export async function getUserEmpresas() {
   const user = await getUser();
   if (!user) return [];
   try {
-    const ue = await restFetch(`/rest/v1/usuario_empresas?usuario_id=eq.${encodeURIComponent(user.id)}&select=empresa_id,rol,empresas:empresa_id(nombre)`);
-    return (ue || []).map((r) => ({
+    if (navigator.onLine) {
+      const ue = await restFetch(`/rest/v1/usuario_empresas?usuario_id=eq.${encodeURIComponent(user.id)}&select=empresa_id,rol,empresas:empresa_id(nombre)`);
+      if (Array.isArray(ue) && ue.length > 0) {
+        return ue.map((r) => ({
+          id: r.empresa_id,
+          nombre: r.empresas?.nombre || 'Sin nombre',
+          rol: r.rol,
+        }));
+      }
+    }
+  } catch {}
+  try {
+    const localUe = await db.usuario_empresas.where('usuario_id').equals(user.id).toArray();
+    const localEmpresas = await db.empresas.toArray();
+    const empMap = new Map(localEmpresas.map(e => [e.id, e.nombre]));
+    return localUe.map((r) => ({
       id: r.empresa_id,
-      nombre: r.empresas?.nombre || 'Sin nombre',
+      nombre: empMap.get(r.empresa_id) || 'Mi Finca',
       rol: r.rol,
     }));
   } catch { return []; }
@@ -398,14 +590,26 @@ export async function loadWhatsAppConfig(empresaId) {
     window._empresaWhatsAppConfig = null;
     return null;
   }
+  const cacheKey = `empresa_config_cache_${targetId}`;
   try {
-    const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}&select=*`);
-    if (data && data.length > 0) {
-      window._empresaWhatsAppConfig = data[0];
-      if (data[0].whatsapp_group_jid) {
-        localStorage.setItem('whatsapp_group_jid', data[0].whatsapp_group_jid);
+    if (navigator.onLine) {
+      const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}&select=*`);
+      if (data && data.length > 0) {
+        window._empresaWhatsAppConfig = data[0];
+        try { localStorage.setItem(cacheKey, JSON.stringify(data[0])); } catch {}
+        if (data[0].whatsapp_group_jid) {
+          localStorage.setItem('whatsapp_group_jid', data[0].whatsapp_group_jid);
+        }
+        return data[0];
       }
-      return data[0];
+    }
+  } catch {}
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      window._empresaWhatsAppConfig = parsed;
+      return parsed;
     }
   } catch {}
   window._empresaWhatsAppConfig = null;
@@ -418,18 +622,31 @@ export async function loadPuntoReferencia(empresaId) {
     window._empresaPuntoRef = null;
     return null;
   }
+  const cacheKey = `empresa_config_cache_${targetId}`;
   try {
-    const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}&select=punto_ref_nombre,punto_ref_lat,punto_ref_lng`);
-    const row = data && data.length > 0 ? data[0] : null;
-    const punto = row && row.punto_ref_lat != null && row.punto_ref_lng != null
-      ? { nombre: row.punto_ref_nombre || '', lat: Number(row.punto_ref_lat), lng: Number(row.punto_ref_lng) }
-      : null;
-    window._empresaPuntoRef = punto;
-    return punto;
-  } catch {
-    window._empresaPuntoRef = null;
-    return null;
-  }
+    if (navigator.onLine) {
+      const data = await restFetch(`/rest/v1/empresa_config?empresa_id=eq.${encodeURIComponent(targetId)}&select=punto_ref_nombre,punto_ref_lat,punto_ref_lng`);
+      const row = data && data.length > 0 ? data[0] : null;
+      const punto = row && row.punto_ref_lat != null && row.punto_ref_lng != null
+        ? { nombre: row.punto_ref_nombre || '', lat: Number(row.punto_ref_lat), lng: Number(row.punto_ref_lng) }
+        : null;
+      window._empresaPuntoRef = punto;
+      return punto;
+    }
+  } catch {}
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const row = JSON.parse(cached);
+      const punto = row && row.punto_ref_lat != null && row.punto_ref_lng != null
+        ? { nombre: row.punto_ref_nombre || '', lat: Number(row.punto_ref_lat), lng: Number(row.punto_ref_lng) }
+        : null;
+      window._empresaPuntoRef = punto;
+      return punto;
+    }
+  } catch {}
+  window._empresaPuntoRef = null;
+  return null;
 }
 
 export async function savePuntoReferencia(empresaId, punto) {

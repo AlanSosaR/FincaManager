@@ -127,7 +127,15 @@ export async function fullDownload(onProgress) {
         onProgress?.(Math.round((done / total) * 100));
       }
     }
-    await updateSyncMeta('last_full_sync', new Date().toISOString());
+    const nowIso = new Date().toISOString();
+    await updateSyncMeta('last_full_sync', nowIso);
+    try {
+      localStorage.setItem('offline_data_downloaded_at', nowIso);
+      localStorage.removeItem('offline_download_dismissed');
+    } catch {}
+    if (typeof window !== 'undefined' && typeof window.__onOfflineDownloadComplete === 'function') {
+      window.__onOfflineDownloadComplete(nowIso);
+    }
     onProgress?.(100);
     return true;
   } catch (err) {

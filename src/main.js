@@ -16,7 +16,7 @@ navigator.serviceWorker?.addEventListener('controllerchange', () => {
 
 registerSW({ immediate: true, onNeedRefresh() { window.location.reload(); } });
 
-import { isOnline, processSyncQueue, incrementalSync } from './sync.js';
+import { isOnline, processSyncQueue, incrementalSync, fullDownload } from './sync.js';
 import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan, checkPartosProximos } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
@@ -30,9 +30,12 @@ const notifDropdown = document.getElementById('notif-dropdown');
 let notifs = [];
 let notifOpen = false;
 
-function addNotif(id, icon, title, desc, action) {
+function addNotif(id, icon, title, desc, actionOrActions) {
   notifs = notifs.filter(n => n.id !== id);
-  notifs.unshift({ id, icon, title, desc, action, read: false });
+  const actions = Array.isArray(actionOrActions)
+    ? actionOrActions
+    : (actionOrActions ? [actionOrActions] : []);
+  notifs.unshift({ id, icon, title, desc, actions, read: false });
   updateNotifUI();
 }
 
@@ -43,30 +46,42 @@ function removeNotif(id) {
 
 function updateNotifUI() {
   const unread = notifs.filter(n => !n.read).length;
-  syncBadge.style.display = unread ? 'flex' : 'none';
-  syncBadge.textContent = unread > 9 ? '9+' : unread;
-  if (!notifOpen) return;
+  if (syncBadge) {
+    syncBadge.style.display = unread ? 'flex' : 'none';
+    syncBadge.textContent = unread > 9 ? '9+' : unread;
+  }
+  if (!notifOpen || !notifDropdown) return;
   if (!notifs.length) {
     notifDropdown.innerHTML = '<div style="padding:32px;text-align:center;color:#999;font-size:13px;">Sin notificaciones</div>';
     return;
   }
   notifDropdown.innerHTML = notifs.map(n => `
-    <div style="display:flex;gap:12px;padding:12px 16px;cursor:pointer;transition:background .15s;align-items:flex-start;${n.read ? 'opacity:.6;' : ''}"
-         onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background='transparent'"
-         onclick="(${n.action ? 'window.__notifAction(\'' + n.id + '\')' : ''})">
+    <div style="display:flex;gap:12px;padding:12px 16px;transition:background .15s;align-items:flex-start;${n.read ? 'opacity:.85;' : ''}">
       <span class="material-icons" style="font-size:22px;color:var(--m3-primary,#2d3e2c);margin-top:2px;">${n.icon}</span>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:14px;color:#2d3e2c;">${n.title}</div>
-        <div style="font-size:13px;color:#2d3e2c;margin-top:2px;">${n.desc}</div>
-        ${n.action ? `<button style="margin-top:8px;background:var(--m3-primary,#2d3e2c);color:#ffffff;border:none;padding:6px 16px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;">${n.action.label}</button>` : ''}
+        <div style="font-size:13px;color:#4a5a48;margin-top:2px;line-height:1.35;">${n.desc}</div>
+        ${n.actions?.length ? `
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+            ${n.actions.map((act, idx) => `
+              <button type="button"
+                id="notif-act-${n.id}-${idx}"
+                onclick="event.stopPropagation(); window.__notifAction('${n.id}', ${idx});"
+                style="background:${act.variant === 'secondary' ? '#eef3ed' : 'var(--m3-primary,#2d3e2c)'};color:${act.variant === 'secondary' ? '#2d3e2c' : '#ffffff'};border:${act.variant === 'secondary' ? '1px solid #d5e0d4' : 'none'};padding:7px 14px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">
+                ${act.label}
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
       </div>
     </div>
   `).join('');
 }
 
-window.__notifAction = (id) => {
+window.__notifAction = (id, idx = 0) => {
   const n = notifs.find(x => x.id === id);
-  if (n && n.action) n.action.handler();
+  const act = n?.actions?.[idx];
+  if (act && typeof act.handler === 'function') act.handler();
 };
 
 function toggleNotif() {
@@ -116,11 +131,75 @@ async function initApp() {
   await updateSidebarEmpresaName();
   await initEmpresaSelector();
 
+  const syncArea = document.getElementById('sync-status-area');
+  if (syncArea) syncArea.style.display = 'inline-flex';
+
+  window.__onOfflineDownloadComplete = () => {
+    removeNotif('offline-download');
+  };
+
+  const maybePromptOfflineDownload = () => {
+    const alreadyDownloaded = !!localStorage.getItem('offline_data_downloaded_at');
+    const dismissed = localStorage.getItem('offline_download_dismissed') === '1';
+    if (!alreadyDownloaded && !dismissed && isOnline()) {
+      addNotif(
+        'offline-download',
+        'cloud_download',
+        'Descargar datos sin internet',
+        'Descarga todos los datos para usar todos los módulos cuando no tengas conexión.',
+        [
+          {
+            label: 'Descargar',
+            handler: async () => {
+              const btnEl = document.getElementById('notif-act-offline-download-0');
+              if (btnEl) {
+                btnEl.disabled = true;
+                btnEl.textContent = 'Descargando... 0%';
+              }
+              const ok = await fullDownload((pct) => {
+                const liveBtn = document.getElementById('notif-act-offline-download-0');
+                if (liveBtn) liveBtn.textContent = `Descargando... ${pct}%`;
+              });
+              if (ok) {
+                removeNotif('offline-download');
+                window.Snackbar?.show('Datos descargados para usar sin internet ✓');
+              } else {
+                if (btnEl) {
+                  btnEl.disabled = false;
+                  btnEl.textContent = 'Descargar';
+                }
+                window.Snackbar?.show('No se pudo completar la descarga', { type: 'warning' });
+              }
+            },
+          },
+          {
+            label: 'Omitir',
+            variant: 'secondary',
+            handler: () => {
+              localStorage.setItem('offline_download_dismissed', '1');
+              removeNotif('offline-download');
+              window.Snackbar?.show('Omitido. Puedes descargarlo desde Configuración');
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  window.addEventListener('offline', () => {
+    addNotif('offline', 'cloud_off', 'Sin conexión', 'Usando datos locales. Los cambios se sincronizarán al volver la conexión.');
+  });
+  window.addEventListener('online', () => {
+    removeNotif('offline');
+    maybePromptOfflineDownload();
+  });
+
   if (isOnline()) {
     initOnlineSync();
     initRealtime();
+    maybePromptOfflineDownload();
   } else {
-    addNotif('offline', 'cloud_off', 'Sin conexion', 'Usando datos locales. Los cambios se sincronizaran cuando recuperes la conexion.');
+    addNotif('offline', 'cloud_off', 'Sin conexión', 'Usando datos locales. Los cambios se sincronizarán al volver la conexión.');
   }
 }
 initApp();

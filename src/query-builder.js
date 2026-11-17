@@ -244,7 +244,8 @@ export default class QueryBuilder {
       }
     }
 
-    // Offline or online failure: keep local, enqueue for later sync
+    // Offline or online failure: delete locally and enqueue for later sync
+    await table.where(eqFilter.field).equals(eqFilter.value).delete();
     for (const item of items) {
       await this._enqueueSync('delete', item.id, null);
     }

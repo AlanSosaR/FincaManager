@@ -787,6 +787,7 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
   const pesajeData = pesajesMap.get(a.id);
   let trendHtml = '';
   let diffDays = null;
+  let weightTrendClass = '';
 
   if (pesajeData && pesajeData.latest) {
     const latestPeso = parseFloat(pesajeData.latest.peso);
@@ -800,15 +801,18 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
       let arrow = '→';
       let arrowClass = 'same';
       let changeText = '±0';
+      weightTrendClass = 'is-same';
       if (prevPeso !== null && !isNaN(prevPeso)) {
         const change = latestPeso - prevPeso;
         if (change > 0) {
           arrow = '↑';
           arrowClass = 'up';
+          weightTrendClass = 'is-up';
           changeText = `+${change.toFixed(1)}`;
         } else if (change < 0) {
           arrow = '↓';
           arrowClass = 'down';
+          weightTrendClass = 'is-down';
           changeText = `${change.toFixed(1)}`;
         }
       }
@@ -824,6 +828,7 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
   const showVacunas = currentFilter === 'vacunas' || showAllPending;
   const showFumigaciones = currentFilter === 'fumigaciones' || showAllPending;
   const showPesajes = currentFilter === 'pesajes' || showAllPending;
+  const isPesajeAlert = !isSold && showPesajes && (!pesajeData?.latest || (diffDays !== null && diffDays > 30));
 
   let pendingTagsHtml = '';
   if (!isSold && isPendingFilter) {
@@ -917,10 +922,14 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
         else timeDesc = `Último pesaje hace ${diffDays} días`;
 
         const pesoDesc = pesajeData.latest.peso ? ` · ${pesajeData.latest.peso} ${a.peso_unidad || 'kg'}` : '';
+        const changeBadgeHtml = currentFilter === 'pesajes' && trendHtml
+          ? `<span style="display:inline-flex; align-items:center; gap:3px; font-weight:800;">${trendHtml}</span>`
+          : '';
 
         tags.push(`
           <span class="ganado-pending-tag tag-pesaje" style="background:${tagBg}; color:${tagColor}; border:1px solid ${tagBorder};" title="${timeDesc}${pesoDesc}">
-            <span class="material-icons" style="font-size:13px; margin-right:4px; vertical-align:middle;">${icon}</span>${timeDesc}${pesoDesc}${isAtrasado ? ' · Requiere nuevo pesaje' : ''}
+            <span style="display:inline-flex; align-items:center; gap:5px;"><span class="material-icons" style="font-size:14px;">${icon}</span><span>${timeDesc}${pesoDesc}${isAtrasado ? ' · Requiere nuevo pesaje' : ''}</span></span>
+            ${changeBadgeHtml}
           </span>
         `);
       } else {
@@ -955,7 +964,7 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
           </div>
           <div class="ganado-row-actions-box">
             <div class="ganado-row-weight-block">
-              <div class="ganado-col-weight">
+              <div class="ganado-col-weight ${isPesajeAlert ? 'is-alert' : (showPesajes ? weightTrendClass : '')}">
                 <span class="ganado-col-weight-value">${pesoActual}</span>
                 <span class="ganado-col-weight-unit">${a.peso_unidad || 'kg'}</span>
               </div>
@@ -978,8 +987,8 @@ function renderAnimalRow(a, vacunasMap, vacunasAppliedMap, fumigacionesMap, fumi
             <span class="ganado-sold-label">Vendido</span>`}
           </div>
         </div>
-        ${pendingTagsHtml}
       </div>
+      ${pendingTagsHtml}
     </div>
   `;
 }

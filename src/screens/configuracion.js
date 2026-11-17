@@ -192,9 +192,25 @@ export async function renderConfiguracion() {
       <div style="height:1px;background:var(--m3-outline-variant,#e0e0e0);margin:24px 0;"></div>
 
       <div style="display:grid;gap:12px;">
-        <button id="btn-config-download" class="btn-m3-primary" style="width:100%;padding:14px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
-          <span class="material-icons">cloud_download</span> Descargar datos
-        </button>
+        <div style="padding:14px 16px;border-radius:14px;background:#f4f7f3;border:1px solid #dce5db;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="material-icons" style="color:#2d3e2c;font-size:20px;">offline_pin</span>
+              <span style="font-weight:700;font-size:14px;color:#2d3e2c;">Modo sin internet</span>
+            </div>
+            <span id="config-offline-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:${localStorage.getItem('offline_data_downloaded_at') ? '#dcfce7' : '#fef3c7'};color:${localStorage.getItem('offline_data_downloaded_at') ? '#166534' : '#92400e'};">
+              ${localStorage.getItem('offline_data_downloaded_at') ? '✓ Descargado' : (localStorage.getItem('offline_download_dismissed') === '1' ? 'Omitido' : 'Pendiente')}
+            </span>
+          </div>
+          <p id="config-offline-desc" style="font-size:12.5px;color:#556b53;margin:0 0 12px;line-height:1.4;">
+            ${localStorage.getItem('offline_data_downloaded_at')
+              ? `Última descarga: ${new Date(localStorage.getItem('offline_data_downloaded_at')).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}. Puedes actualizar todos los datos cuando quieras.`
+              : 'Descarga todos los datos de la finca para que todos los módulos funcionen sin conexión a internet.'}
+          </p>
+          <button id="btn-config-download" class="btn-m3-primary" style="width:100%;padding:13px;border-radius:12px;background:#2d3e2c;color:white;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span class="material-icons">cloud_download</span> ${localStorage.getItem('offline_data_downloaded_at') ? 'Actualizar datos sin internet' : 'Descargar todos los datos'}
+          </button>
+        </div>
         <button id="btn-config-clear-cache" class="btn-m3-tonal" style="width:100%;padding:14px;border-radius:12px;background:var(--m3-surface-container-highest);color:#2d3e2c;border:none;font-weight:600;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
           <span class="material-icons">cleaning_services</span> Limpiar caché
         </button>
@@ -565,6 +581,10 @@ export function initConfiguracion() {
 
   document.getElementById('btn-config-download')?.addEventListener('click', async () => {
     const btn = document.getElementById('btn-config-download');
+    if (!navigator.onLine) {
+      window.Snackbar?.show('Necesitas conexión a internet para descargar los datos', { type: 'warning' });
+      return;
+    }
     btn.disabled = true;
     btn.innerHTML = '<span class="material-symbols-outlined animate-spin">sync</span> <span id="config-dl-progress">Descargando... 0%</span>';
     const started = await fullDownload((pct) => {
@@ -573,11 +593,23 @@ export function initConfiguracion() {
     });
     if (!started) {
       window.Snackbar?.show('Ya hay una sincronización en curso', { type: 'warning' });
+    } else {
+      const badge = document.getElementById('config-offline-badge');
+      const desc = document.getElementById('config-offline-desc');
+      if (badge) {
+        badge.textContent = '✓ Descargado';
+        badge.style.background = '#dcfce7';
+        badge.style.color = '#166534';
+      }
+      if (desc) {
+        desc.textContent = `Última descarga: ${new Date().toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}. Puedes actualizar todos los datos cuando quieras.`;
+      }
+      window.Snackbar?.show('Todos los datos descargados para uso sin internet ✓');
     }
     btn.disabled = false;
     btn.innerHTML = started
-      ? '<span class="material-icons">check_circle</span> Descarga completada'
-      : '<span class="material-icons">cloud_download</span> Descargar datos';
+      ? '<span class="material-icons">check_circle</span> Datos actualizados'
+      : '<span class="material-icons">cloud_download</span> Descargar todos los datos';
   });
 
   document.getElementById('btn-config-clear-cache')?.addEventListener('click', () => {
