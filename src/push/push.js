@@ -131,14 +131,35 @@ export async function initForegroundPush(onReceive) {
   if (!inst) return;
   _fgInitialized = true;
 
-  onMessage(inst.messaging, (payload) => {
+  onMessage(inst.messaging, async (payload) => {
     const title = payload?.notification?.title || payload?.data?.title || 'Finca Manager';
     const body = payload?.notification?.body || payload?.data?.body || '';
     const url = payload?.data?.url || '/#dashboard';
+    const tag = payload?.data?.ref_id || payload?.data?.type || 'finca-notif';
+
+    window.dispatchEvent(new CustomEvent('push:foreground', { detail: { title, body, url, payload } }));
+
     if (typeof onReceive === 'function') {
       onReceive({ title, body, url, payload });
     } else {
       window.Snackbar?.show(`${title}: ${body}`);
+    }
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try {
+        const reg = await navigator.serviceWorker?.getRegistration('/firebase-cloud-messaging-push-scope');
+        if (reg?.showNotification) {
+          await reg.showNotification(title, {
+            body,
+            icon: '/pwa-512x512.svg',
+            badge: '/pwa-512x512.svg',
+            vibrate: [200, 100, 200],
+            requireInteraction: true,
+            tag,
+            data: { url },
+          });
+        }
+      } catch {}
     }
   });
 }

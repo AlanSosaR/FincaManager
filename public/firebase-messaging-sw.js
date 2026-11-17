@@ -27,10 +27,15 @@ if (self.__FIREBASE_CONFIG__ && self.__FIREBASE_CONFIG__.apiKey) {
     const title = payload?.notification?.title || payload?.data?.title || 'Finca Manager';
     const body = payload?.notification?.body || payload?.data?.body || '';
     const url = payload?.data?.url || '/#dashboard';
+    const tag = payload?.data?.ref_id || payload?.data?.type || 'finca-notif';
     return self.registration.showNotification(title, {
       body,
       icon: '/pwa-512x512.svg',
       badge: '/pwa-512x512.svg',
+      vibrate: [200, 100, 200],
+      requireInteraction: true,
+      renotify: true,
+      tag,
       data: { url },
     });
   });

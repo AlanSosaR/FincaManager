@@ -166,11 +166,17 @@ Deno.serve(async (req) => {
                 body: record.body,
               },
               webpush: {
+                headers: {
+                  Urgency: "high",
+                },
                 notification: {
                   title: record.title,
                   body: record.body,
                   icon: iconUrl,
                   badge: badgeUrl,
+                  vibrate: [200, 100, 200],
+                  requireInteraction: true,
+                  tag: String(record.ref_id || record.type || "finca-notif"),
                 },
                 fcm_options: {
                   link: `${siteUrl}${targetUrl.startsWith("/") ? targetUrl : `/${targetUrl}`}`,
