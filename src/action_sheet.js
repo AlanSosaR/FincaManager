@@ -643,7 +643,7 @@ async function loadAnimalDetails(animalId, sheet, itemsHtml, originalButtons, at
       pesoCollapsedSubHtml = `
         <div class="sheet-peso-collapsed-status">
           <span class="sheet-peso-status-pill is-${latestPesoStat.trend}">${escapeHtml(pillText)}</span>
-          <span class="sheet-peso-collapsed-vs">en ${escapeHtml(daysLabel)} (vs. ${escapeHtml(formatFecha(prevStat?.fecha))})</span>
+          <span class="sheet-peso-collapsed-vs">en ${escapeHtml(daysLabel)}</span>
         </div>
       `;
     }

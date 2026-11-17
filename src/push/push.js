@@ -233,23 +233,38 @@ export async function checkPushAlerts() {
     console.warn('checkPushAlerts motores error:', err);
   }
 
-  // 2. Ganado: Partos próximos de ternero (<= 7 días)
+  // 2. Ganado: Mes 9 (16-30 días: aviso inicial) y mitad del mes 9 (<= 15 días: cada 2 días)
   try {
-    const partoKey = `push_parto_sent_${empresaId}_${today}`;
-    const partoSent = new Set(JSON.parse(localStorage.getItem(partoKey) || '[]'));
+    const TWO_DAYS_MS = 48 * 60 * 60 * 1000;
+    const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
 
     const preneces = await restFetch(
-      `/rest/v1/animal_preñez?empresa_id=eq.${encodeURIComponent(empresaId)}&estado=eq.Preñada&select=id,animal_id,fecha_probable_parto`
+      `/rest/v1/animal_preñez?empresa_id=eq.${encodeURIComponent(empresaId)}&estado=eq.Preñada&select=id,animal_id,fecha_probable_parto,fecha_parto`
     ).catch(() => []);
 
     const hoy = new Date(`${today}T12:00:00`);
-    const en7dias = new Date(hoy);
-    en7dias.setDate(en7dias.getDate() + 7);
 
     for (const preg of (preneces || [])) {
-      if (!preg.fecha_probable_parto || partoSent.has(preg.animal_id)) continue;
+      if (!preg.fecha_probable_parto || preg.fecha_parto) continue;
       const parto = new Date(`${preg.fecha_probable_parto}T12:00:00`);
-      if (parto < hoy || parto > en7dias) continue;
+      const dias = Math.round((parto - hoy) / 86400000);
+      if (dias > 30) continue;
+
+      const tsKey = `push_parto_ts_${preg.animal_id}`;
+      const intervalMs = dias <= 15 ? TWO_DAYS_MS : FIFTEEN_DAYS_MS;
+      const lastSent = Number(localStorage.getItem(tsKey) || 0);
+      if (now - lastSent < intervalMs) continue;
+
+      const cutoff = new Date(now - intervalMs).toISOString();
+      const recent = await restFetch(
+        `/rest/v1/notifications?empresa_id=eq.${encodeURIComponent(empresaId)}&type=eq.ganado_parto&ref_id=eq.${encodeURIComponent(preg.animal_id)}&created_at=gte.${encodeURIComponent(cutoff)}&select=id&limit=1`
+      ).catch(() => []);
+
+      if (Array.isArray(recent) && recent.length > 0) {
+        localStorage.setItem(tsKey, String(now));
+        continue;
+      }
 
       let animalName = 'Vaca preñada';
       try {
@@ -257,23 +272,32 @@ export async function checkPushAlerts() {
         if (localAnimal?.nombre) animalName = localAnimal.nombre;
       } catch {}
 
-      const dias = Math.round((parto - hoy) / 86400000);
-      const cuando = dias === 0 ? '¡HOY!' : dias === 1 ? 'mañana' : `en ${dias} días`;
+      let title;
+      let body;
+      if (dias <= 15) {
+        const cuando = dias < 0
+          ? `fecha probable pasó hace ${Math.abs(dias)} día(s)`
+          : dias === 0 ? '¡HOY!' : dias === 1 ? 'mañana' : `en ${dias} días`;
+        title = dias <= 2 ? '🐄 ¡Parto inminente!' : '🐄 Parto próximo · Revisar vaca';
+        body = `${animalName} está en la recta final (${cuando} · ${preg.fecha_probable_parto}). Mantener vigilancia.`;
+      } else {
+        title = '🐄 Vaca en mes 9 de gestación';
+        body = `${animalName} entró al mes 9 (faltan ${dias} días · ${preg.fecha_probable_parto}). Ir preparando cuidados de parto.`;
+      }
 
       await restFetch('/rest/v1/notifications', {
         method: 'POST',
         body: JSON.stringify({
           empresa_id: empresaId,
           type: 'ganado_parto',
-          title: '🐄 Parto próximo de ternero',
-          body: `${animalName} está próxima a dar a luz (${cuando} · ${preg.fecha_probable_parto}).`,
-          url: '/#ganado',
+          title,
+          body,
+          url: `/#detalle_animal/${preg.animal_id}`,
           ref_id: String(preg.animal_id),
         }),
       }).catch(() => {});
-      partoSent.add(preg.animal_id);
+      localStorage.setItem(tsKey, String(now));
     }
-    localStorage.setItem(partoKey, JSON.stringify([...partoSent]));
   } catch (err) {
     console.warn('checkPushAlerts ganado error:', err);
   }
