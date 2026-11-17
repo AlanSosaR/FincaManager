@@ -31,7 +31,18 @@
 }
 .cal-day:hover { background: var(--m3-surface-container-highest); }
 .cal-day-empty { background: transparent; cursor: default; }
-.cal-day-today { border: 2px solid var(--m3-primary); }
+.cal-day-today {
+  background: #2d3e2c !important;
+  border: 2px solid #2d3e2c !important;
+  color: #ffffff !important;
+}
+.cal-day-today .cal-day-num {
+  color: #ff7a2f !important;
+  font-weight: 800;
+}
+.cal-day-today .cal-day-label {
+  color: #ffffff !important;
+}
 .cal-day-work { background: rgba(69,87,67,0.15); }
 .cal-day-rest { background: rgba(198,40,40,0.1); }
 .cal-day-sun .cal-day-num { color: var(--m3-error); }

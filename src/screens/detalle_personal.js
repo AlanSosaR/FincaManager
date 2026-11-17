@@ -153,7 +153,8 @@ async function fetchGastosPersonal() {
   }
 }
 
-export async function renderDetallePersonal(personalId, returnScreen, returnId) {
+export async function renderDetallePersonal(personalId, returnScreen, returnId, { initialView = 'month' } = {}) {
+  const initView = initialView === 'day' || initialView === 'week' ? initialView : 'month';
   const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
   const [personaArr, asistencia, gastosPersonal] = await Promise.all([
     restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(personalId)}&select=*`).catch(() => []),
@@ -177,6 +178,15 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId) 
   const today = new Date();
   const month = today.getMonth();
   const year = today.getFullYear();
+  const initialSummaryHtml = renderSummary(asisList, persona.pago_diario, month, year, today, actividadesMap, initView, persona, gastosPersonal);
+  const initialTitle = initView === 'day'
+    ? `${DAYS_FULL[today.getDay()]}, ${today.getDate()} de ${MONTHS[month]} ${year}`
+    : `${MONTHS[month]} ${year}`;
+  const initialCalHtml = initView === 'day'
+    ? renderDayView(today, asisMap, actividadesMap)
+    : renderMonthView(month, year, asisMap, actividadesMap);
+  const initialFooterHtml = renderDayActionsBar(asisMap[fmtDate(today)], false);
+  window._dpPreloaded = { personalId, persona, asisData: asisList, gastosPersonal, actividadesMap };
 
   return `
     <style>
@@ -191,34 +201,35 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId) 
 
       <div class="m3-card m3-p-8" style="border-radius: 20px; border: 1.5px solid var(--m3-outline-variant, #c7cec3); background: var(--m3-surface-container-lowest, #ffffff); box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); margin-bottom: 24px; width: 100%; box-sizing: border-box;">
         <div style="display: flex; align-items: center; gap: 16px;">
-          <div style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 28px; background: ${getColor(persona.nombre)}; color: white; flex-shrink: 0;">${persona.iniciales || '?'}</div>
+          <div style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 28px; background: ${getColor(persona.nombre)}; color: white; flex-shrink: 0;">${persona.iniciales || ((persona.nombre || '').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?')}</div>
           <div style="flex: 1;">
             <h1 class="m3-display-small m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope" style="font-size: 28px;">${persona.nombre || 'Sin nombre'}</h1>
-            <p class="m3-label-large m3-text-on-surface-variant m3-font-medium">${persona.rol || 'Sin rol'}</p>
+            <p id="dp-header-subtitle" class="m3-label-large m3-text-on-surface-variant m3-font-medium">${(() => { const s = window._currentDpSummary; return s ? `${s.periodDaysText} · Pago por día: L${Number(s.diario || 0).toLocaleString('es-HN')}` : `Pago por día: L${Number(persona.pago_diario || 0).toLocaleString('es-HN')}`; })()}</p>
           </div>
         </div>
         <div id="cal-summary" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--m3-outline-variant);">
-          ${renderSummary(asisList, persona.pago_diario, month, year, today, actividadesMap, 'month', persona, gastosPersonal)}
+          ${initialSummaryHtml}
         </div>
       </div>
 
       <div class="m3-card m3-p-8" style="border-radius: 20px; border: 1.5px solid var(--m3-outline-variant, #c7cec3); background: var(--m3-surface-container-lowest, #ffffff); box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); width: 100%; box-sizing: border-box;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <button class="cal-nav-btn" onclick="window.__calNavigate(-1)">‹</button>
-            <h2 class="m3-title-large m3-font-bold" id="cal-title">${MONTHS[month]} ${year}</h2>
-            <button class="cal-nav-btn" onclick="window.__calNavigate(1)">›</button>
+        <div class="dp-cal-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div class="dp-cal-nav-row" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+            <button type="button" class="cal-nav-btn dp-cal-arrow" onclick="window.__calNavigate(-1)" aria-label="Anterior"><span class="material-icons" style="font-size:20px;">chevron_left</span></button>
+            <h2 class="m3-title-large m3-font-bold dp-cal-title" id="cal-title">${initialTitle}</h2>
+            <button type="button" class="cal-nav-btn dp-cal-arrow" onclick="window.__calNavigate(1)" aria-label="Siguiente"><span class="material-icons" style="font-size:20px;">chevron_right</span></button>
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="cal-view-btn active" data-view="month" onclick="window.__calSetView('month')">Mes</button>
-            <button class="cal-view-btn" data-view="week" onclick="window.__calSetView('week')">Semana</button>
-            <button class="cal-view-btn" data-view="day" onclick="window.__calSetView('day')">Día</button>
+          <div class="dp-cal-views" style="display: flex; gap: 8px;">
+            <button class="cal-view-btn ${initView === 'day' ? 'active' : ''}" data-view="day" onclick="window.__calSetView('day')">Día</button>
+            <button class="cal-view-btn ${initView === 'week' ? 'active' : ''}" data-view="week" onclick="window.__calSetView('week')">Semana</button>
+            <button class="cal-view-btn ${initView === 'month' ? 'active' : ''}" data-view="month" onclick="window.__calSetView('month')">Mes</button>
           </div>
         </div>
 
         <div id="cal-container">
-          ${renderMonthView(month, year, asisMap, actividadesMap)}
+          ${initialCalHtml}
         </div>
+        <div id="dp-mobile-footer-bar" style="display:none;">${initialFooterHtml}</div>
         <!-- Floating snackbar-style tooltip for calendar days -->
         <div id="cal-tip" style="display:none;position:fixed;z-index:9999;background:#ffffff;color:#1a2e1a;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.12);padding:10px 14px;max-width:280px;pointer-events:none;border:1px solid rgba(45,62,44,0.12);transition:opacity 0.15s;">
           <div id="cal-tip-content" style="font-size:13px;font-weight:500;line-height:1.5;"></div>
@@ -330,6 +341,34 @@ function renderWeekView(weekStart, asisMap, actividadesMap = {}) {
   return html;
 }
 
+function renderDayActionsBar(estado, isFuture = false) {
+  if (isFuture) {
+    return `
+      <div class="dp-day-actions-bar" style="display:flex;justify-content:center;gap:12px;">
+        <button class="cal-view-btn" disabled style="padding:10px 24px;opacity:0.45;cursor:not-allowed;pointer-events:none;">✘ Descanso</button>
+        <button class="cal-view-btn" disabled style="padding:10px 24px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;opacity:0.45;cursor:not-allowed;pointer-events:none;">✔ Trabajó</button>
+      </div>
+    `;
+  }
+  const isWork = isTrabajo(estado);
+  const isRest = isDescanso(estado);
+  const restStyle = isRest
+    ? 'padding:10px 24px;background:#dc2626;color:#ffffff;border-color:#dc2626;box-shadow:0 3px 10px rgba(220,38,38,0.25);'
+    : 'padding:10px 24px;';
+  const workStyle = isWork
+    ? 'padding:10px 24px;background:#16a34a;color:#ffffff;border-color:#16a34a;box-shadow:0 3px 10px rgba(22,163,74,0.28);'
+    : isRest
+      ? 'padding:10px 24px;background:#ffffff;color:#2d3e2c;border-color:#d5e0d4;'
+      : 'padding:10px 24px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;';
+
+  return `
+    <div class="dp-day-actions-bar" style="display:flex;justify-content:center;gap:12px;">
+      <button class="cal-view-btn ${isRest ? 'active' : ''}" onclick="window.__calSetDayEstado('descanso')" style="${restStyle}">${isRest ? '✘ Descansó' : '✘ Descanso'}</button>
+      <button class="cal-view-btn ${isWork ? 'active' : ''}" onclick="window.__calSetDayEstado('trabajo')" style="${workStyle}">${isWork ? '✔ Trabajado' : '✔ Trabajó'}</button>
+    </div>
+  `;
+}
+
 function renderDayView(date, asisMap, actividadesMap = {}) {
   const dateStr = fmtDate(date);
   const estado = asisMap[dateStr];
@@ -379,23 +418,13 @@ function renderDayView(date, asisMap, actividadesMap = {}) {
       </div>
     `;
   } else {
-    controlsHtml = `
-      <div style="display:flex;justify-content:center;gap:16px;">
-        <button class="cal-view-btn ${isTrabajo(estado) ? 'active' : ''}" onclick="window.__calSetDayEstado('trabajo')" style="padding:8px 24px;">✔ Trabajó</button>
-        <button class="cal-view-btn ${isDescanso(estado) ? 'active' : ''}" onclick="window.__calSetDayEstado('descanso')" style="padding:8px 24px;">✘ Descanso</button>
-      </div>
-      <div style="margin-top:16px;">
-        <span class="m3-label-medium m3-font-bold" style="color:${isTrabajo(estado) ? 'var(--m3-primary)' : isDescanso(estado) ? 'var(--m3-error)' : 'var(--m3-on-surface-variant)'}">
-          ${isTrabajo(estado) ? '✔ Trabajó este día' : isDescanso(estado) ? '✘ Descansó este día' : 'Sin registrar'}
-        </span>
-      </div>
-    `;
+    controlsHtml = renderDayActionsBar(estado);
   }
 
   return `
     <div style="text-align:center;padding:24px 0;">
       <div style="font-size:14px;font-weight:600;color:var(--m3-on-surface-variant);margin-bottom:8px;">${DAYS_FULL[date.getDay()]}</div>
-      <div style="font-size:48px;font-weight:800;color:var(--m3-on-surface);margin-bottom:4px;">${date.getDate()}</div>
+      <div style="font-size:50px;font-weight:800;line-height:1;color:${isToday ? '#ff7a2f' : 'var(--m3-on-surface)'};margin:6px 0 8px;">${date.getDate()}</div>
       <div style="font-size:16px;font-weight:600;color:var(--m3-on-surface-variant);margin-bottom:20px;">${MONTHS[date.getMonth()]} ${date.getFullYear()}</div>
       ${controlsHtml}
       ${actividadesHtml}
@@ -606,7 +635,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
     }
   } else {
     // Day view
-    const targetDateStr = fmtDate(calDate || new Date());
+    const targetDateStr = fmtDate(weekDate || new Date());
     matchedGasto = candidateGastos.find(g =>
       (refTag && g.descripcion.includes(refTag)) ||
       (personalId && g.descripcion.includes(`[ref:${personalId}_dia_${targetDateStr}]`)) ||
@@ -625,7 +654,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
             <span class="material-symbols-outlined" style="font-size: 16px; color: #2d3e2c;">check_circle</span>
             En Gastos: L${monthGastosTotal.toLocaleString('es-HN')} (${monthWeeklyCount} ${monthWeeklyCount === 1 ? 'semana' : 'semanas'}) · Mes: L${periodTotal.toLocaleString('es-HN')}
           </span>
-          <button type="button" onclick="window.navigateTo('gastos')" style="background: none; border: none; font-size: 12px; font-weight: 800; color: #2d3e2c; cursor: pointer; text-decoration: underline; padding: 0;">
+          <button type="button" onclick="window.closeSubBottomSheet?.(); window.navigateTo('gastos')" style="background: none; border: none; font-size: 12px; font-weight: 800; color: #2d3e2c; cursor: pointer; text-decoration: underline; padding: 0; white-space: nowrap;">
             Ver en Gastos →
           </button>
         </div>
@@ -659,7 +688,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
             <span class="material-symbols-outlined" style="font-size: 16px; color: #2d3e2c;">check_circle</span>
             Registrado en Gastos (L${registradoMonto.toLocaleString('es-HN')} al día)
           </span>
-          <button type="button" onclick="window.navigateTo('gastos')" style="background: none; border: none; font-size: 12px; font-weight: 800; color: #2d3e2c; cursor: pointer; text-decoration: underline; padding: 0;">
+          <button type="button" onclick="window.closeSubBottomSheet?.(); window.navigateTo('gastos')" style="background: none; border: none; font-size: 12px; font-weight: 800; color: #2d3e2c; cursor: pointer; text-decoration: underline; padding: 0; white-space: nowrap;">
             Ver en Gastos →
           </button>
         </div>
@@ -678,7 +707,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
                 Días modificados: nuevo monto <b>L${periodTotal.toLocaleString('es-HN')}</b> <span style="color:#1b5e20; font-weight:800;">(+L${aumento.toLocaleString('es-HN')} aumento)</span>
               </p>
             </div>
-            <button type="button" onclick="window.navigateTo('gastos')" style="background: none; border: none; font-size: 11px; color: #2d3e2c; text-decoration: underline; cursor: pointer; font-weight: 700; white-space: nowrap; padding: 0;">Ver actual</button>
+            <button type="button" onclick="window.closeSubBottomSheet?.(); window.navigateTo('gastos')" style="background: none; border: none; font-size: 11px; color: #2d3e2c; text-decoration: underline; cursor: pointer; font-weight: 700; white-space: nowrap; padding: 0;">Ver actual</button>
           </div>
           <button type="button" onclick="window.__enviarPeriodoAGastos(true, '${matchedGasto.id}', ${periodTotal}, ${dupAttr})" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: #2d3e2c; color: #ffffff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(45,62,44,0.25); transition: transform 0.1s;">
             <span class="material-symbols-outlined" style="font-size: 16px;">update</span>
@@ -700,7 +729,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
                 Días reducidos: nuevo total <b>L${periodTotal.toLocaleString('es-HN')}</b> <span style="color:#b3261e; font-weight:800;">(-L${reduccion.toLocaleString('es-HN')})</span>
               </p>
             </div>
-            <button type="button" onclick="window.navigateTo('gastos')" style="background: none; border: none; font-size: 11px; color: #2d3e2c; text-decoration: underline; cursor: pointer; font-weight: 700; white-space: nowrap; padding: 0;">Ver actual</button>
+            <button type="button" onclick="window.closeSubBottomSheet?.(); window.navigateTo('gastos')" style="background: none; border: none; font-size: 11px; color: #2d3e2c; text-decoration: underline; cursor: pointer; font-weight: 700; white-space: nowrap; padding: 0;">Ver actual</button>
           </div>
           <button type="button" onclick="window.__enviarPeriodoAGastos(true, '${matchedGasto.id}', ${periodTotal}, ${dupAttr})" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: #2d3e2c; color: #ffffff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(45,62,44,0.25); transition: transform 0.1s;">
             <span class="material-symbols-outlined" style="font-size: 16px;">update</span>
@@ -713,7 +742,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
         <div style="margin-top: 10px; background: rgba(186, 26, 26, 0.06); border: 1.5px solid rgba(186, 26, 26, 0.2); padding: 10px 12px; border-radius: 14px; display: flex; flex-direction: column; gap: 8px;">
           <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 800; color: #8c1d18;">
             <span>En Gastos: L${registradoMonto.toLocaleString('es-HN')} (0 días laborados)</span>
-            <button type="button" onclick="window.navigateTo('gastos')" style="background: none; border: none; font-size: 11px; color: #2d3e2c; text-decoration: underline; cursor: pointer; font-weight: 700;">Ver</button>
+            <button type="button" onclick="window.closeSubBottomSheet?.(); window.navigateTo('gastos')" style="background: none; border: none; font-size: 11px; color: #2d3e2c; text-decoration: underline; cursor: pointer; font-weight: 700;">Ver</button>
           </div>
           <button type="button" onclick="window.__enviarPeriodoAGastos(true, '${matchedGasto.id}', 0, ${dupAttr})" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: #ba1a1a; color: #ffffff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 800; cursor: pointer;">
             <span class="material-symbols-outlined" style="font-size: 16px;">delete</span>
@@ -736,7 +765,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
 
   return `
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
-      <div class="m3-p-4 m3-bg-surface-container m3-rounded-2xl" style="display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="m3-p-4 m3-bg-surface-container m3-rounded-2xl dp-summary-days-card" style="display: flex; flex-direction: column; justify-content: space-between;">
         <div>
           <p class="m3-label-small m3-text-on-surface-variant">${periodTitle}</p>
           <p class="m3-title-large m3-font-bold m3-text-primary" style="margin: 4px 0 0 0;">${periodDaysText}</p>
@@ -754,7 +783,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
           <p class="m3-title-large m3-font-bold m3-text-tertiary" style="margin: 4px 0 0 0;">L${periodTotal.toLocaleString('es-HN')}</p>
         </div>
         <div style="margin-top: 12px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.07);">
-          <p class="m3-label-small m3-text-on-surface-variant" style="margin: 0; font-size: 12px;">
+          <p class="m3-label-small m3-text-on-surface-variant dp-summary-subtext" style="margin: 0; font-size: 12px;">
             ${periodSubtext}
           </p>
           ${gastosActionHtml}
@@ -764,14 +793,19 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
   `;
 }
 
-export function initDetallePersonal(personalId, returnScreen, returnId) {
+export function initDetallePersonal(personalId, returnScreen, returnId, { initialView = 'month' } = {}) {
   const _personalId = personalId;
-  let _currentActividadesMap = window._currentActividadesMap || {};
-  let _persona = null;
-  let _gastosPersonal = [];
-  let _asisData = [];
+  const pre = window._dpPreloaded && String(window._dpPreloaded.personalId) === String(personalId)
+    ? window._dpPreloaded
+    : null;
+  window._dpPreloaded = null;
 
-  let currentView = 'month';
+  let _currentActividadesMap = pre?.actividadesMap || window._currentActividadesMap || {};
+  let _persona = pre?.persona || null;
+  let _gastosPersonal = pre?.gastosPersonal || [];
+  let _asisData = pre?.asisData || [];
+
+  let currentView = initialView === 'day' || initialView === 'week' ? initialView : 'month';
   let calDate = new Date();
   calDate.setHours(0, 0, 0, 0);
 
@@ -798,26 +832,35 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
     return ws;
   }
 
-  async function refreshCalendar() {
-    const [personaArr, asistencia, gastosPersonal] = await Promise.all([
-      restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(_personalId)}&select=*`).catch(() => []),
-      restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(_personalId)}&order=fecha.desc&select=*`).catch(() => []),
-      fetchGastosPersonal()
-    ]);
-    const persona = (Array.isArray(personaArr) ? personaArr[0] : personaArr) || {};
-    _persona = persona;
-    _gastosPersonal = gastosPersonal || [];
+  async function refreshCalendar(fromMemory = false) {
+    let persona = _persona || {};
+    let asisData = Array.isArray(_asisData) ? _asisData : [];
+    let gastosPersonal = _gastosPersonal || [];
+    let actividadesMap = _currentActividadesMap || {};
 
-    const actividadesMap = await fetchActividadesMap(
-      _personalId,
-      window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '',
-      persona.nombre
-    );
-    _currentActividadesMap = actividadesMap || {};
-    window._currentActividadesMap = _currentActividadesMap;
+    if (!fromMemory || !_persona) {
+      const [personaArr, asistencia, fetchedGastos] = await Promise.all([
+        restFetch(`/rest/v1/personal?id=eq.${encodeURIComponent(_personalId)}&select=*`).catch(() => []),
+        restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(_personalId)}&order=fecha.desc&select=*`).catch(() => []),
+        fetchGastosPersonal()
+      ]);
+      persona = (Array.isArray(personaArr) ? personaArr[0] : personaArr) || {};
+      _persona = persona;
+      gastosPersonal = fetchedGastos || [];
+      _gastosPersonal = gastosPersonal;
 
-    const asisData = Array.isArray(asistencia) ? asistencia : [];
-    _asisData = asisData;
+      actividadesMap = await fetchActividadesMap(
+        _personalId,
+        window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '',
+        persona.nombre
+      );
+      _currentActividadesMap = actividadesMap || {};
+      window._currentActividadesMap = _currentActividadesMap;
+
+      asisData = Array.isArray(asistencia) ? asistencia : [];
+      _asisData = asisData;
+    }
+
     const asisMap = {};
     asisData.forEach(a => {
       const f = (a.fecha || '').slice(0, 10);
@@ -835,12 +878,23 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
       }
     }
 
+    const mobileFooter = document.getElementById('dp-mobile-footer-bar');
+    if (mobileFooter) {
+      const selStr = fmtDate(calDate);
+      const isSelFuture = selStr > fmtDate(new Date());
+      mobileFooter.innerHTML = renderDayActionsBar(asisMap[selStr], isSelFuture);
+    }
+
     const title = document.getElementById('cal-title');
     if (title) title.textContent = getViewTitle();
 
     const summary = document.getElementById('cal-summary');
     if (summary) {
       summary.innerHTML = renderSummary(asisData, persona?.pago_diario, calDate.getMonth(), calDate.getFullYear(), calDate, actividadesMap, currentView, persona, _gastosPersonal);
+      const subEl = document.getElementById('dp-header-subtitle');
+      if (subEl && window._currentDpSummary) {
+        subEl.textContent = `${window._currentDpSummary.periodDaysText} · Pago por día: L${Number(window._currentDpSummary.diario || 0).toLocaleString('es-HN')}`;
+      }
     }
   }
 
@@ -852,7 +906,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
     } else {
       calDate.setDate(calDate.getDate() + dir);
     }
-    refreshCalendar();
+    refreshCalendar(true);
   };
 
   window.__calSetView = (view) => {
@@ -860,12 +914,87 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
     document.querySelectorAll('.cal-view-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.view === view);
     });
-    refreshCalendar();
+    refreshCalendar(true);
   };
+
+  const swipeEl = document.getElementById('cal-container');
+  if (swipeEl && !swipeEl.dataset.swipeBound) {
+    swipeEl.dataset.swipeBound = '1';
+    swipeEl.style.touchAction = 'pan-y';
+    if (swipeEl.parentElement) swipeEl.parentElement.style.overflowX = 'hidden';
+    let sx = 0;
+    let sy = 0;
+    let tracking = false;
+    let isHoriz = false;
+    swipeEl.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      tracking = true;
+      isHoriz = false;
+      swipeEl.style.transition = 'none';
+    }, { passive: true });
+    swipeEl.addEventListener('touchmove', (e) => {
+      if (!tracking || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - sx;
+      const dy = e.touches[0].clientY - sy;
+      if (!isHoriz && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+        isHoriz = true;
+      }
+      if (isHoriz) {
+        const clamped = Math.max(-90, Math.min(90, dx * 0.55));
+        swipeEl.style.transform = `translateX(${clamped}px)`;
+        swipeEl.style.opacity = String(Math.max(0.45, 1 - Math.abs(clamped) / 160));
+      }
+    }, { passive: true });
+    const endSwipe = (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const touch = e.changedTouches?.[0];
+      const dx = touch ? touch.clientX - sx : 0;
+      const dy = touch ? touch.clientY - sy : 0;
+      if (isHoriz && Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+        const dir = dx < 0 ? 1 : -1;
+        swipeEl.style.transition = 'transform 110ms ease-in, opacity 110ms ease-in';
+        swipeEl.style.transform = `translateX(${dir > 0 ? '-42px' : '42px'})`;
+        swipeEl.style.opacity = '0';
+        setTimeout(() => {
+          window.__calNavigate?.(dir);
+          swipeEl.style.transition = 'none';
+          swipeEl.style.transform = `translateX(${dir > 0 ? '42px' : '-42px'})`;
+          swipeEl.style.opacity = '0';
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              swipeEl.style.transition = 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease-out';
+              swipeEl.style.transform = 'translateX(0)';
+              swipeEl.style.opacity = '1';
+            });
+          });
+        }, 110);
+      } else {
+        swipeEl.style.transition = 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease-out';
+        swipeEl.style.transform = 'translateX(0)';
+        swipeEl.style.opacity = '1';
+      }
+    };
+    swipeEl.addEventListener('touchend', endSwipe, { passive: true });
+    swipeEl.addEventListener('touchcancel', endSwipe, { passive: true });
+  }
 
   window.__calToggleDay = async (dateStr) => {
     try {
       const todayStr = fmtDate(new Date());
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      calDate = dateObj;
+
+      if (document.getElementById('lp-sheet-dp-body')) {
+        await render();
+        const selectedEl = document.querySelector(`#lp-sheet-dp-body [onclick*="'${dateStr}'"]`);
+        if (selectedEl) selectedEl.style.outline = '2px solid #2d3e2c';
+        return;
+      }
+
       if (dateStr > todayStr) {
         window.Snackbar?.show('No se puede registrar asistencia en fechas futuras', { type: 'warning' });
         return;
@@ -878,10 +1007,6 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
       const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
       const existentes = await restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(_personalId)}&fecha=eq.${dateStr}&select=*`).catch(() => []);
       const existente = (Array.isArray(existentes) ? existentes[0] : existentes) || null;
-
-      const [y, m, d] = dateStr.split('-').map(Number);
-      const dateObj = new Date(y, m - 1, d);
-      calDate = dateObj;
 
       const diaNombre = DAYS_FULL[dateObj.getDay()];
       const fechaBonita = `${diaNombre} ${d} de ${MONTHS[m - 1]}`;
@@ -969,7 +1094,9 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
       const dateStr = fmtDate(calDate);
       const todayStr = fmtDate(new Date());
       if (dateStr > todayStr) {
-        window.Snackbar?.show('No se puede registrar asistencia en fechas futuras', { type: 'warning' });
+        if (!document.getElementById('lp-sheet-dp-body')) {
+          window.Snackbar?.show('No se puede registrar asistencia en fechas futuras', { type: 'warning' });
+        }
         return;
       }
       if (_currentActividadesMap[dateStr]?.length > 0) {
@@ -1206,7 +1333,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId) {
                 {
                   text: 'Ver en Gastos →',
                   style: 'background: #2d3e2c; color: #ffffff; border-radius: 9999px; padding: 7px 16px; font-weight: 700; border: none; cursor: pointer;',
-                  onClick: () => window.navigateTo('gastos')
+                  onClick: () => { window.closeSubBottomSheet?.(); window.navigateTo('gastos'); }
                 },
                 {
                   text: 'Cerrar',

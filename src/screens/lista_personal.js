@@ -24,13 +24,14 @@ function personalRowsHtml(list) {
             </div>`;
   }
   return list.map(p => `
-      <div class="lp-card" onclick="window.navigateTo('detalle_personal', '${p.id}', 'personal')">
+      <div class="lp-card" onclick="window.openPersonalCard('${p.id}')">
         <div class="m3-flex m3-items-center" style="gap: 16px;">
           <div class="lp-avatar" style="background: ${getColor(p.nombre)}; color: white;">${p.iniciales || getInitiales(p.nombre)}</div>
           <div>
             <p class="m3-label-large m3-font-bold m3-text-on-surface">${p.nombre}</p>
-            <div class="m3-flex m3-items-center m3-gap-3 m3-mt-1">
+            <div class="m3-flex m3-items-center m3-mt-1" style="gap: 6px; flex-wrap: wrap;">
               ${p.rol ? `<span class="m3-label-small m3-text-on-surface-variant">${p.rol}</span>` : ''}
+              ${p.rol && p.pago_diario ? `<span class="m3-label-small m3-text-on-surface-variant">·</span>` : ''}
               ${p.pago_diario ? `<span class="m3-label-small m3-font-bold m3-text-primary">L${Number(p.pago_diario).toLocaleString('es-HN')}/día</span>` : ''}
             </div>
           </div>
@@ -194,8 +195,7 @@ export async function renderListaPersonal() {
         <section class="m3-mb-6">
           <div class="m3-flex m3-items-center m3-justify-between m3-gap-4 m3-flex-wrap">
             <div>
-              <h1 class="m3-display-medium m3-font-extrabold m3-text-on-surface m3-tracking-tight m3-font-manrope">Personal</h1>
-              <p class="m3-label-medium m3-text-on-surface-variant" id="personal-count-label">${personal.length} trabajadores registrados</p>
+              <p class="m3-label-medium m3-text-on-surface-variant" id="personal-count-label">${personal.length} colaborador${personal.length === 1 ? '' : 'es'} registrado${personal.length === 1 ? '' : 's'}</p>
             </div>
             <div style="width: 48px;"></div>
           </div>
@@ -213,9 +213,113 @@ export async function renderListaPersonal() {
 }
 
 export function initListaPersonal() {
+  const dpModPromise = import('./detalle_personal.js');
+
+  window.openPersonalCard = async (id) => {
+    const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+    if (!isMobile || typeof window.openSubBottomSheet !== 'function') {
+      window.navigateTo('detalle_personal', id, 'personal');
+      return;
+    }
+
+    const p = (allPersonalData || []).find(x => String(x.id) === String(id));
+    if (!p) {
+      window.navigateTo('detalle_personal', id, 'personal');
+      return;
+    }
+
+    try {
+      const { renderDetallePersonal, initDetallePersonal } = await dpModPromise;
+      const dpHtml = await renderDetallePersonal(id, 'personal', null, { initialView: 'day' });
+
+      const html = `
+        <style>
+          #m3-sub-action-sheet.open:has(#lp-sheet-dp-body) {
+            transform: none !important;
+            will-change: auto !important;
+            padding-bottom: 88px !important;
+          }
+          #lp-sheet-dp-body .dp-screen-pad { padding: 0 0 24px 0 !important; }
+          #lp-sheet-dp-body .m3-card {
+            padding: 0 !important;
+            margin-bottom: 18px !important;
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+          }
+          #lp-sheet-dp-body .m3-card:last-child { margin-bottom: 0 !important; }
+          #lp-sheet-dp-body .dp-summary-days-card { display: none !important; }
+          #lp-sheet-dp-body .dp-summary-subtext { display: none !important; }
+          #lp-sheet-dp-body h1 { font-size: clamp(18px, 5vw, 22px) !important; }
+          #lp-sheet-dp-body .dp-cal-header { flex-direction: column; align-items: stretch !important; gap: 10px !important; }
+          #lp-sheet-dp-body .dp-cal-nav-row { display: none !important; }
+          #lp-sheet-dp-body .dp-cal-title {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+            font-size: clamp(13.5px, 3.8vw, 17px) !important;
+            line-height: 1.25 !important;
+            margin: 0 !important;
+          }
+          #lp-sheet-dp-body .dp-cal-arrow {
+            width: 36px !important;
+            height: 36px !important;
+            min-width: 36px !important;
+            border-radius: 50% !important;
+            background: #f4f7f3 !important;
+            border: 1px solid #d5e0d4 !important;
+            color: #2d3e2c !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            flex-shrink: 0;
+          }
+          #lp-sheet-dp-body .dp-cal-views { width: 100%; justify-content: flex-start; }
+          #lp-sheet-dp-body #dp-mobile-footer-bar { display: block !important; }
+          #lp-sheet-dp-body #cal-container .dp-day-actions-bar { display: none !important; }
+          #lp-sheet-dp-body #dp-mobile-footer-bar .dp-day-actions-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #ffffff;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            margin: 0 !important;
+            border-top: 1px solid #e5ebe4;
+            box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+            z-index: 10005;
+          }
+          #lp-sheet-dp-body .dp-day-actions-bar .cal-view-btn {
+            flex: 1;
+            justify-content: center;
+            padding: 12px 16px !important;
+            font-size: 14px !important;
+          }
+        </style>
+        <div id="lp-sheet-dp-body" style="padding-top: 4px;">
+          ${dpHtml}
+        </div>
+      `;
+
+      window.openSubBottomSheet(html, async () => {
+        await initDetallePersonal(id, 'personal', null, { initialView: 'day' });
+      }, { expanded: true });
+    } catch (err) {
+      window.Snackbar?.show('Error cargando asistencia: ' + (err.message || err), { type: 'error' });
+    }
+  };
+
   window.toggleActionMenu = (btn) => {
     const menu = btn.nextElementSibling;
     if (!menu) return;
+    const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+    if (isMobile && window.openMobileMenuBottomSheet) {
+      document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+      window.openMobileMenuBottomSheet(menu);
+      return;
+    }
     const isActive = menu.classList.contains('active');
     document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
     if (!isActive) menu.classList.add('active');
@@ -238,7 +342,7 @@ export function initListaPersonal() {
     const listContainer = document.querySelector('.lp-list');
     const countLabel = document.getElementById('personal-count-label');
     if (listContainer) listContainer.innerHTML = personalRowsHtml(list);
-    if (countLabel) countLabel.textContent = `${list.length} trabajadores registrados`;
+    if (countLabel) countLabel.textContent = `${list.length} colaborador${list.length === 1 ? '' : 'es'} registrado${list.length === 1 ? '' : 's'}`;
   };
 
   // Material 3 Full-Screen Search

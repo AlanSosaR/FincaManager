@@ -13,6 +13,41 @@ let refreshing = false;
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
   if (!refreshing) { refreshing = true; window.location.reload(); }
 });
+window.__openNotifTarget = async (url) => {
+  if (!url) return;
+  const parts = String(url).replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+  if (!parts[0]) return;
+
+  const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+  if (isMobile && parts[0] === 'detalle_animal' && parts[1] && typeof window.openActionBottomSheet === 'function') {
+    const animalId = parts[1];
+    if (!window.location.hash.startsWith('#ganado') && typeof window.navigateTo === 'function') {
+      window.navigateTo('ganado');
+    }
+    let row = null;
+    for (let i = 0; i < 15; i++) {
+      row = document.querySelector(`.ganado-row[data-animal-id="${CSS.escape(animalId)}"]`);
+      if (row) break;
+      await new Promise(r => setTimeout(r, 120));
+    }
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'ganado-row';
+      row.dataset.animalId = animalId;
+    }
+    const btn = row.querySelector?.('.ganado-btn-more') || row;
+    const menu = row.querySelector?.('.action-menu') || document.createElement('div');
+    window.openActionBottomSheet(btn, menu);
+    return;
+  }
+
+  if (typeof window.navigateTo === 'function') {
+    window.navigateTo(parts[0], ...parts.slice(1));
+  } else {
+    window.location.hash = String(url).replace(/^\/?#?/, '#');
+  }
+};
+
 navigator.serviceWorker?.addEventListener('message', (event) => {
   if (event.data?.type === 'PUSH_NAVIGATE' && event.data?.url) {
     if (event.data?.notifId) {
@@ -22,12 +57,7 @@ navigator.serviceWorker?.addEventListener('message', (event) => {
         body: JSON.stringify({ read: true }),
       }).catch(() => {});
     }
-    const parts = String(event.data.url).replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-    if (parts[0] && typeof window.navigateTo === 'function') {
-      window.navigateTo(parts[0], ...parts.slice(1));
-    } else {
-      window.location.hash = String(event.data.url).replace(/^\/?#?/, '#');
-    }
+    window.__openNotifTarget(event.data.url);
   }
 });
 
@@ -338,12 +368,7 @@ async function initApp() {
               }).catch(() => {});
             }
             if (url) {
-              const parts = url.replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
-              if (parts[0] && typeof window.navigateTo === 'function') {
-                window.navigateTo(parts[0], ...parts.slice(1));
-              } else {
-                window.location.hash = url.replace(/^\/?#?/, '#');
-              }
+              window.__openNotifTarget?.(url);
             }
           },
         },
@@ -1283,7 +1308,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const hashParams = getHashParts();
         const initialScreen = hashParams[0] || 'dashboard';
         const initArgs = hashParams.slice(1).filter(s => s !== '');
-        navigate(initialScreen, ...initArgs);
+        const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+        if (isMobile && initialScreen === 'detalle_animal' && initArgs[0]) {
+            navigate('ganado');
+            setTimeout(() => window.__openNotifTarget?.(`#detalle_animal/${initArgs[0]}`), 250);
+        } else {
+            navigate(initialScreen, ...initArgs);
+        }
     }
 
     const menuToggle = document.getElementById('menu-toggle');
