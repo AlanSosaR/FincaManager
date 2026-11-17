@@ -45,20 +45,19 @@ self.addEventListener('notificationclick', (event) => {
   const targetUrl = event.notification?.data?.url || '/#dashboard';
   const notifId = event.notification?.data?.notifId || '';
   const fullUrl = new URL(targetUrl, self.location.origin).href;
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ('focus' in client) {
+  event.waitUntil((async () => {
+    const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of clientList) {
+      if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+        try {
+          await client.focus();
           client.postMessage({ type: 'PUSH_NAVIGATE', url: targetUrl, notifId });
-          if ('navigate' in client) {
-            client.navigate(fullUrl).catch(() => {});
-          }
-          return client.focus();
-        }
+          return;
+        } catch {}
       }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(fullUrl);
-      }
-    }),
-  );
+    }
+    if (self.clients.openWindow) {
+      return self.clients.openWindow(fullUrl);
+    }
+  })());
 });
