@@ -1832,6 +1832,8 @@ function registerOilChange(motorId) {
 
       await supabase.from('motores').update({ horas: 0 }).eq('id', motorId);
       await supabase.from('motor_sesiones').delete().eq('motor_id', motorId);
+      localStorage.removeItem(`push_motor_ts_${motorId}`);
+      window.clearPushBellByRef?.(motorId);
 
       closeOilSheet();
       window.Snackbar.show('Cambio de aceite registrado');

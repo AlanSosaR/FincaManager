@@ -38,6 +38,7 @@ if (self.__FIREBASE_CONFIG__ && self.__FIREBASE_CONFIG__.apiKey) {
     const notifId = payload?.data?.notif_id || '';
     return self.registration.showNotification(title, {
       body,
+      icon: '/notif-blank.png',
       vibrate: [200, 100, 200],
       requireInteraction: true,
       renotify: true,

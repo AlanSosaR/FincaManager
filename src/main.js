@@ -322,7 +322,7 @@ async function initApp() {
     initRealtime();
     maybePromptOfflineDownload();
 
-    const addPushBellNotif = ({ notifId, title, body, url }) => {
+    const addPushBellNotif = ({ notifId, title, body, url, refId }) => {
       const uiId = notifId ? `db-${notifId}` : `push-${Date.now()}`;
       addNotif(uiId, 'notifications_active', title, body, [
         {
@@ -348,6 +348,19 @@ async function initApp() {
           },
         },
       ]);
+      const entry = notifs.find(n => n.id === uiId);
+      if (entry && refId) entry.refId = String(refId);
+    };
+
+    window.clearPushBellByRef = (refId) => {
+      if (!refId) return;
+      const target = String(refId);
+      notifs = notifs.filter(n => n.refId !== target);
+      updateNotifUI();
+      restFetch(`/rest/v1/notifications?ref_id=eq.${encodeURIComponent(target)}&read=eq.false`, {
+        method: 'PATCH',
+        body: JSON.stringify({ read: true }),
+      }).catch(() => {});
     };
 
     // Cargar notificaciones no leídas al abrir la app
@@ -358,7 +371,7 @@ async function initApp() {
         const rows = await restFetch(`/rest/v1/notifications?${filter}read=eq.false&order=created_at.desc&limit=15`);
         if (Array.isArray(rows)) {
           rows.reverse().forEach((r) => {
-            addPushBellNotif({ notifId: r.id, title: r.title, body: r.body, url: r.url });
+            addPushBellNotif({ notifId: r.id, title: r.title, body: r.body, url: r.url, refId: r.ref_id });
           });
         }
       } catch {}

@@ -154,6 +154,7 @@ export async function initForegroundPush(onReceive) {
         if (reg?.showNotification) {
           await reg.showNotification(title, {
             body,
+            icon: '/notif-blank.png',
             vibrate: [200, 100, 200],
             requireInteraction: true,
             renotify: true,
@@ -180,10 +181,10 @@ export async function checkPushAlerts() {
   const empresaId = window._currentEmpresaId;
   const today = getLocalToday();
 
-  // 1. Motores: Cambio de aceite requerido (horas >= max_horas o >= 80)
+  // 1. Motores: Cambio de aceite requerido cada 5 horas hasta registrar cambio
   try {
-    const oilKey = `push_motor_oil_sent_${empresaId}_${today}`;
-    const oilSent = new Set(JSON.parse(localStorage.getItem(oilKey) || '[]'));
+    const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
+    const now = Date.now();
 
     const [motores, mants] = await Promise.all([
       restFetch(`/rest/v1/motores?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre,horas,max_horas`).catch(() => []),
@@ -194,22 +195,40 @@ export async function checkPushAlerts() {
     for (const m of (motores || [])) {
       const limit = mantSet.has(m.id) ? (Number(m.max_horas) || 100) : 80;
       const horas = Number(m.horas) || 0;
-      if (horas >= limit && !oilSent.has(m.id)) {
+      const tsKey = `push_motor_ts_${m.id}`;
+
+      if (horas < limit) {
+        localStorage.removeItem(tsKey);
+        continue;
+      }
+
+      const lastSent = Number(localStorage.getItem(tsKey) || 0);
+      if (now - lastSent >= FIVE_HOURS_MS) {
+        // Verificar en Supabase si ya se envió en las últimas 5h (por cron o por otro dispositivo)
+        const cutoff = new Date(now - FIVE_HOURS_MS).toISOString();
+        const recent = await restFetch(
+          `/rest/v1/notifications?empresa_id=eq.${encodeURIComponent(empresaId)}&type=eq.motor_aceite&ref_id=eq.${encodeURIComponent(m.id)}&created_at=gte.${encodeURIComponent(cutoff)}&select=id&limit=1`
+        ).catch(() => []);
+
+        if (Array.isArray(recent) && recent.length > 0) {
+          localStorage.setItem(tsKey, String(now));
+          continue;
+        }
+
         await restFetch('/rest/v1/notifications', {
           method: 'POST',
           body: JSON.stringify({
             empresa_id: empresaId,
             type: 'motor_aceite',
             title: '🛢️ Cambio de aceite requerido',
-            body: `${m.nombre || 'Equipo'} alcanzó ${horas} h (límite ${limit} h). Toca cambio de aceite.`,
+            body: `${m.nombre || 'Equipo'} alcanzó ${horas} h (límite ${limit} h). Toca Ver para registrar el cambio.`,
             url: `/#detalle_motor/${m.id}`,
             ref_id: String(m.id),
           }),
         }).catch(() => {});
-        oilSent.add(m.id);
+        localStorage.setItem(tsKey, String(now));
       }
     }
-    localStorage.setItem(oilKey, JSON.stringify([...oilSent]));
   } catch (err) {
     console.warn('checkPushAlerts motores error:', err);
   }
