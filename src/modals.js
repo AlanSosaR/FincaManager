@@ -2,7 +2,10 @@ import { supabase } from './supabase.js';
 
 export function closeModal() {
   const mc = document.getElementById('modal-container');
-  if (mc) mc.classList.remove('active');
+  if (mc) {
+    mc.classList.remove('active');
+    mc.classList.remove('modal-sheet-expanded');
+  }
 }
 
 export function showNamePrompt(title, defaultValue, onSave) {
@@ -76,6 +79,9 @@ export function showModal(titleOrType, contentHTMLOrOnSave) {
     const title = titleOrType;
     const html = contentHTMLOrOnSave;
     content = `
+      <div class="modal-sheet-handle-wrap" id="modal-sheet-handle-wrap" title="Toca o desliza para expandir">
+        <div class="modal-sheet-handle"></div>
+      </div>
       <div class="modal-header">
         <h3>${title}</h3>
         <button class="btn-close" id="close-modal"><span class="material-icons">close</span></button>
@@ -87,7 +93,31 @@ export function showModal(titleOrType, contentHTMLOrOnSave) {
     modalBody.innerHTML = content;
   }
 
+  modalContainer.classList.remove('modal-sheet-expanded');
   modalContainer.classList.add('active');
+
+  const handleWrap = document.getElementById('modal-sheet-handle-wrap');
+  if (handleWrap) {
+    let touchStartY = 0;
+    handleWrap.addEventListener('click', () => {
+      modalContainer.classList.toggle('modal-sheet-expanded');
+    });
+    handleWrap.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    handleWrap.addEventListener('touchend', (e) => {
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (dy < -30) {
+        modalContainer.classList.add('modal-sheet-expanded');
+      } else if (dy > 30) {
+        if (modalContainer.classList.contains('modal-sheet-expanded')) {
+          modalContainer.classList.remove('modal-sheet-expanded');
+        } else {
+          closeModal();
+        }
+      }
+    }, { passive: true });
+  }
 
   // Close logic
   const closeBtn = document.getElementById('close-modal');

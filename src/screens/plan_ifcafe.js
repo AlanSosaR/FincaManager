@@ -182,21 +182,25 @@ function eventCardHtml(ev) {
     .trim();
 
   return `
-    <div class="plan-ev" style="border:1.5px solid ${isRealizada ? '#c8e6c9' : isAtrasada ? '#ffcdd2' : '#ffe9a8'};">
-      <div class="plan-ev-head">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span style="font-size:18px;">${icon}</span>
-          <div>
-            <p class="plan-ev-producto">${ev.producto || 'Actividad del cafetal'}</p>
+    <div class="plan-ev" onclick="if (event.target.closest('button, a, img')) return; const d = this.querySelector('.plan-ev-details'); const c = this.querySelector('.plan-ev-chevron'); if (!d) return; const open = d.style.display === 'block'; d.style.display = open ? 'none' : 'block'; if (c) c.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';" style="cursor:pointer; border:1.5px solid ${isRealizada ? '#c8e6c9' : isAtrasada ? '#ffcdd2' : '#ffe9a8'};">
+      <div class="plan-ev-head" style="align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+          <span style="font-size:18px; flex-shrink:0;">${icon}</span>
+          <div style="min-width:0;">
+            <p class="plan-ev-producto" style="margin:0;">${ev.producto || 'Actividad del cafetal'}</p>
+            ${showDosis ? `<div style="font-size:12px; color:#4a5d48; font-weight:700; margin-top:2px;">Dosis: ${ev.dosis}</div>` : ''}
             ${ev.showLote ? `<div class="plan-ev-lote"><span class="material-symbols-outlined" style="font-size:13px;">eco</span> ${ev.loteNombre}</div>` : ''}
           </div>
         </div>
-        <span class="plan-ev-badge" style="${badgeStyle[badgeLabel]}">${badgeLabel}</span>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          ${isRealizada ? '' : `<span class="plan-ev-badge" style="${badgeStyle[badgeLabel]}">${badgeLabel}</span>`}
+          <span class="material-symbols-outlined plan-ev-chevron" style="font-size:20px; color:#4a5d48; transition:transform 0.2s;">expand_more</span>
+        </div>
       </div>
 
-      <div class="plan-ev-meta">
-        <div><strong>Tipo:</strong> ${ev.tipo || 'General'}${ev.metodo ? ` · ${ev.metodo}` : ''}</div>
-        ${showDosis ? `<div><strong>Dosis:</strong> ${ev.dosis}</div>` : ''}
+      <div class="plan-ev-details" style="display:none; margin-top:10px;">
+        <div class="plan-ev-meta">
+          <div><strong>Tipo:</strong> ${ev.tipo || 'General'}${ev.metodo ? ` · ${ev.metodo}` : ''}</div>
 
         ${listaOperadores.length > 0 ? `
           <div style="grid-column: 1 / -1; margin-top: 6px;">
@@ -235,7 +239,8 @@ function eventCardHtml(ev) {
         </div>
       ` : ''}
 
-      <div class="plan-ev-actions">${acciones.join('')}</div>
+        <div class="plan-ev-actions">${acciones.join('')}</div>
+      </div>
     </div>`;
 }
 
@@ -434,10 +439,13 @@ function renderPlanWeekStrip() {
       dotHtml = `<div class="da-cal-strip-dot" style="background:${dotColor};"></div>`;
     }
 
+    const dStr = `${dYear}-${String(dMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+    const isToday = dStr === todayStr;
+
     html += `
-      <div class="da-cal-strip-day ${isSel ? 'selected' : ''}" onclick="window.selectPlanCalendarDay(${dYear}, ${dMonth}, ${dayNum})">
+      <div class="da-cal-strip-day ${isSel ? 'selected' : ''} ${isToday ? 'today' : ''}" onclick="window.selectPlanCalendarDay(${dYear}, ${dMonth}, ${dayNum})">
         <div class="da-cal-strip-name">${dayLetters[i]}</div>
-        <div class="da-cal-strip-num">${dayNum}</div>
+        <div class="da-cal-strip-num" ${isToday ? 'style="color:#ff6b00 !important;font-weight:800;"' : ''}>${dayNum}</div>
         ${dotHtml}
       </div>
     `;
@@ -529,6 +537,8 @@ function showPlanDayDetails(day, dayEvents) {
   if (!panel) return;
 
   const dateStr = `${_calYear}-${String(_calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  window._planSelectedDateStr = dateStr;
+  window._onPlanDateChangeForFooter?.(dateStr);
   const dateFormatted = new Date(_calYear, _calMonth, day).toLocaleDateString('es-ES', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   });
@@ -573,10 +583,9 @@ function showPlanDayDetails(day, dayEvents) {
 
   panel.innerHTML = `
     <div class="cafetal-day-details-inner">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; border-bottom:1.5px solid #eef2ee; padding-bottom:10px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px; border-bottom:1.5px solid #eef2ee; padding-bottom:8px;">
         <div>
-          <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">Actividades del día</span>
-          <h4 style="margin:2px 0 0; font-size:16px; font-weight:800; color:#1a1a1a; text-transform:capitalize;">${dateFormatted}</h4>
+          <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">${(isPast || isToday) ? 'Actividades del día realizadas' : 'Actividades del día programadas'}</span>
         </div>
       </div>
 
@@ -635,8 +644,9 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
     formTitle = 'Programar Labor Futura';
   }
 
+  const useSheetModal = Boolean(document.getElementById('lote-bottom-sheet')?.classList.contains('open'));
   const panel = document.getElementById('plan-day-details');
-  if (!panel) return;
+  if (!panel && !useSheetModal) return;
 
   const dateFormatted = new Date(actDate + 'T12:00:00').toLocaleDateString('es-ES', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
@@ -658,17 +668,21 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   }
   const currentFoto = editApp ? (editApp.foto_url || editApp.notas || '') : '';
 
-  panel.innerHTML = `
+  const formBodyHtml = `
     <div class="cafetal-day-details-inner" style="animation: slideUp 0.2s ease-out;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1.5px solid #eef2ee; padding-bottom:8px;">
-        <div>
-          <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;" id="inline-plan-form-title">${formTitle}</span>
-          <h4 style="margin:2px 0 0; font-size:15px; font-weight:800; color:#1a1a1a; text-transform:capitalize;" id="inline-plan-date-heading">${dateFormatted}</h4>
+      ${useSheetModal ? `
+        <div style="font-size:13px; font-weight:700; color:#4a5d48; margin:-10px 0 14px; text-transform:capitalize;" id="inline-plan-date-heading">${dateFormatted}</div>
+      ` : `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; border-bottom:1.5px solid #eef2ee; padding-bottom:8px;">
+          <div>
+            <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;" id="inline-plan-form-title">${formTitle}</span>
+            <h4 style="margin:2px 0 0; font-size:15px; font-weight:800; color:#1a1a1a; text-transform:capitalize;" id="inline-plan-date-heading">${dateFormatted}</h4>
+          </div>
+          <button type="button" onclick="window.cancelInlineActividad('${actDate}')" style="background:none; border:none; color:#777; cursor:pointer; padding:4px;">
+            <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+          </button>
         </div>
-        <button type="button" onclick="window.cancelInlineActividad('${actDate}')" style="background:none; border:none; color:#777; cursor:pointer; padding:4px;">
-          <span class="material-symbols-outlined" style="font-size:20px;">close</span>
-        </button>
-      </div>
+      `}
 
       <form id="form-plan-inline-actividad" style="display:flex; flex-direction:column; gap:12px;">
         ${editAppId ? `<input type="hidden" name="id" value="${editAppId}">` : ''}
@@ -679,27 +693,53 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           <label>Fecha de la Actividad</label>
         </div>
 
-        <!-- 2. Lote -->
-        <div class="m3-field">
-          <select name="lote_id" id="inline-plan-lote" required style="font-size:13px; font-weight:600;">
-            ${_allLotes.map(l => `<option value="${l.id}" ${l.id === targetLoteId ? 'selected' : ''}>${l.nombre} (${l.variedad || 'Café'} - ${l.num_plantas || 0} plantas)</option>`).join('')}
-          </select>
-          <label>Lote de Café</label>
-        </div>
+        <!-- 2. Lote (oculto si ya estamos dentro de un lote específico) -->
+        ${_ifcafeLoteId ? `
+          <input type="hidden" name="lote_id" id="inline-plan-lote" value="${targetLoteId}">
+        ` : `
+          <div class="m3-field">
+            <select name="lote_id" id="inline-plan-lote" required style="font-size:13px; font-weight:600;">
+              ${_allLotes.map(l => `<option value="${l.id}" ${l.id === targetLoteId ? 'selected' : ''}>${l.nombre} (${l.variedad || 'Café'} - ${l.num_plantas || 0} plantas)</option>`).join('')}
+            </select>
+            <label>Lote de Café</label>
+          </div>
+        `}
 
-        <!-- 3. Tipo de Labor -->
-        <div class="m3-field">
-          <select name="tipo" id="inline-plan-tipo" required style="font-size:13px; font-weight:600;">
-            <option value="Aplicación Foliar" ${currentTipo === 'Aplicación Foliar' ? 'selected' : ''}>🍃 Aplicación Foliar (Nutrición / Estimulante)</option>
-            <option value="Fertilización al Suelo" ${currentTipo === 'Fertilización al Suelo' ? 'selected' : ''}>🌿 Fertilización al Suelo (NPK / Abono)</option>
-            <option value="Control Fitosanitario" ${currentTipo === 'Control Fitosanitario' ? 'selected' : ''}>🛡️ Control Fitosanitario (Fungicida / Insecticida)</option>
-            <option value="Manejo de Tejido" ${currentTipo === 'Manejo de Tejido' ? 'selected' : ''}>✂️ Manejo de Tejido (Poda / Descope)</option>
-            <option value="Limpieza" ${currentTipo === 'Limpieza' ? 'selected' : ''}>🧹 Limpieza / Chapea</option>
-            <option value="Análisis de Suelo" ${currentTipo === 'Análisis de Suelo' ? 'selected' : ''}>🧪 Análisis de Suelo</option>
-            <option value="Otro" ${currentTipo === 'Otro' ? 'selected' : ''}>📌 Otra labor</option>
-          </select>
-          <label>Tipo de Actividad</label>
-        </div>
+        <!-- 3. Tipo de Labor (Custom M3 Dropdown estilo Vacuna/Tratamiento) -->
+        ${(() => {
+          const tipoItems = [
+            { value: 'Aplicación Foliar', icon: '🍃', title: 'Aplicación Foliar', sub: 'Nutrición / Estimulante' },
+            { value: 'Fertilización al Suelo', icon: '🌿', title: 'Fertilización al Suelo', sub: 'NPK / Abono' },
+            { value: 'Control Fitosanitario', icon: '🛡️', title: 'Control Fitosanitario', sub: 'Fungicida / Insecticida' },
+            { value: 'Manejo de Tejido', icon: '✂️', title: 'Manejo de Tejido', sub: 'Poda / Descope' },
+            { value: 'Limpieza', icon: '🧹', title: 'Limpieza', sub: 'Chapea / Desyerbe' },
+            { value: 'Análisis de Suelo', icon: '🧪', title: 'Análisis de Suelo', sub: 'Muestreo / pH' },
+            { value: 'Otro', icon: '📌', title: 'Otra labor', sub: 'Labor personalizada' }
+          ];
+          const activeTipo = tipoItems.find(x => x.value === currentTipo) || tipoItems[0];
+          return `
+            <div style="position:relative;" id="inline-plan-tipo-wrap">
+              <input type="hidden" name="tipo" id="inline-plan-tipo" value="${esc(activeTipo.value)}">
+              <button type="button" id="inline-plan-tipo-trigger" style="width:100%; min-height:54px; padding:12px 16px; border-radius:14px; border:1px solid #757c73; background:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; position:relative; box-sizing:border-box;">
+                <span style="position:absolute; top:-9px; left:12px; background:#ffffff; padding:0 5px; font-size:11.5px; font-weight:700; color:#4a5d48; letter-spacing:0.3px; text-transform:uppercase;">Tipo de Actividad</span>
+                <span id="inline-plan-tipo-display" style="font-size:14px; font-weight:600; color:#192b1b; display:flex; align-items:center; gap:8px;">
+                  <span>${activeTipo.icon}</span><span>${esc(activeTipo.title)}</span>
+                </span>
+                <span class="material-icons" id="inline-plan-tipo-arrow" style="font-size:20px; color:#2d3e2c; transition:transform 0.15s;">arrow_drop_down</span>
+              </button>
+              <div id="inline-plan-tipo-menu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:#f5f9f3; border:1px solid #d5e2d2; border-radius:20px; box-shadow:0 12px 32px rgba(0,0,0,0.14); z-index:100025; padding:8px 0; max-height:290px; overflow-y:auto;">
+                ${tipoItems.map(item => `
+                  <div class="inline-plan-tipo-opt" data-value="${esc(item.value)}" data-icon="${item.icon}" data-title="${esc(item.title)}" style="padding:10px 18px; cursor:pointer; background:${item.value === activeTipo.value ? '#e6efe3' : 'transparent'}; transition:background 0.12s;">
+                    <div style="font-size:15px; font-weight:600; color:#192b1b; display:flex; align-items:center; gap:8px;">
+                      <span>${item.icon}</span><span>${esc(item.title)}</span>
+                    </div>
+                    <div style="font-size:12.5px; color:#4a5d48; margin-top:2px; padding-left:26px;">${esc(item.sub)}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        })()}
 
         <!-- 4. Producto / Tratamiento -->
         <div class="m3-field" id="field-plan-producto">
@@ -722,15 +762,14 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
             <span style="font-size: 11px; color: #666;">Buscar en personal</span>
           </div>
 
-          <!-- Buscador con dropdown interactivo -->
+          <!-- Trigger para abrir Bottom Sheet de Responsables -->
           <div style="position: relative;">
-            <div style="position: relative; display: flex; align-items: center;">
+            <button type="button" id="inline-plan-operador-custom-input" style="width: 100%; box-sizing: border-box; border: 1.5px solid #c2d8c0; border-radius: 12px; padding: 11px 14px 11px 38px; font-size: 13.5px; outline: none; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03); text-align: left; color: #6b7280; cursor: pointer; position: relative; display: flex; align-items: center; justify-content: space-between;">
               <span class="material-symbols-outlined" style="position: absolute; left: 12px; font-size: 20px; color: #5a7357; pointer-events: none;">search</span>
-              <input type="text" id="inline-plan-operador-custom-input" placeholder="Buscar responsable (ej: David, Erick)..." autocomplete="off" style="width: 100%; box-sizing: border-box; border: 1.5px solid #c2d8c0; border-radius: 12px; padding: 11px 14px 11px 38px; font-size: 13.5px; outline: none; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-            </div>
-
-            <!-- Lista desplegable flotante de resultados -->
-            <div id="inline-plan-operador-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #ffffff; border: 1.5px solid #2d3e2c; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.16); z-index: 1050; max-height: 220px; overflow-y: auto;"></div>
+              <span>Buscar responsable (ej: David, Erick)...</span>
+              <span class="material-symbols-outlined" style="font-size: 19px; color: #5a7357;">expand_more</span>
+            </button>
+            <div id="inline-plan-operador-dropdown" style="display: none;"></div>
           </div>
 
           <!-- Contenedor de responsables seleccionados (uno sobre otro) -->
@@ -794,21 +833,15 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           </div>
         </div>
 
-        <!-- 9. Estado de la labor -->
-        <div class="m3-field" style="margin-bottom: 8px;">
-          <select name="estado" id="inline-plan-estado" style="font-size:13px; font-weight:700;">
-            <option value="Aplicada" ${estadoValor === 'Aplicada' ? 'selected' : ''}>✅ Aplicada / Realizada (Histórico o realizada)</option>
-            <option value="Programada" ${estadoValor === 'Programada' ? 'selected' : ''}>📅 Programada / Pendiente</option>
-          </select>
-          <label>Estado de la labor</label>
-        </div>
+        <!-- 9. Estado de la labor (automático según fecha: <= hoy Aplicada, futura Programada) -->
+        <input type="hidden" name="estado" id="inline-plan-estado" value="${estadoValor}">
 
         <!-- Botones de Acción M3 Expressive -->
-        <div style="display:flex; gap:14px; justify-content:flex-end; align-items:center; margin-top:16px; padding-top:16px; border-top:1px solid #eef2ee;">
-          <button type="button" class="plan-btn-ghost" onclick="window.cancelInlineActividad('${actDate}')">
+        <div id="inline-plan-footer-actions" style="${useSheetModal ? 'position:sticky; bottom:-20px; z-index:20; background:rgba(255,255,255,0.97); backdrop-filter:blur(8px); display:flex; gap:10px; justify-content:space-between; align-items:center; margin:14px -18px -20px; padding:12px 18px calc(14px + env(safe-area-inset-bottom, 0px)); border-top:1px solid #eef2ee; box-shadow:0 -4px 16px rgba(0,0,0,0.06);' : 'display:flex; gap:14px; justify-content:flex-end; align-items:center; margin-top:16px; padding-top:16px; border-top:1px solid #eef2ee;'}">
+          <button type="button" class="plan-btn-ghost" onclick="window.cancelInlineActividad('${actDate}')" style="${useSheetModal ? 'flex:0 0 auto; height:44px; padding:0 18px;' : ''}">
             <span>Cancelar</span>
           </button>
-          <button type="submit" id="inline-plan-btn-submit" class="plan-btn-primary">
+          <button type="submit" id="inline-plan-btn-submit" class="plan-btn-primary" style="${useSheetModal ? 'flex:1; height:44px;' : ''}">
             <span class="material-symbols-outlined" id="inline-plan-submit-icon" style="font-size:18px;">${editApp ? 'save' : (isToday || isPast) ? 'check_circle' : 'save'}</span>
             <span id="inline-plan-submit-text">${editApp ? 'Guardar Cambios' : isPast ? 'Registrar Actividad Realizada' : isToday ? 'Registrar Actividad' : 'Programar Actividad'}</span>
           </button>
@@ -817,7 +850,43 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
     </div>
   `;
 
+  if (useSheetModal) {
+    showModal(formTitle, formBodyHtml);
+  } else {
+    panel.innerHTML = formBodyHtml;
+  }
+
   const selectTipo = document.getElementById('inline-plan-tipo');
+  const tipoTrigger = document.getElementById('inline-plan-tipo-trigger');
+  const tipoMenu = document.getElementById('inline-plan-tipo-menu');
+  const tipoArrow = document.getElementById('inline-plan-tipo-arrow');
+  const tipoDisplay = document.getElementById('inline-plan-tipo-display');
+  if (tipoTrigger && tipoMenu) {
+    tipoTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = tipoMenu.style.display === 'block';
+      tipoMenu.style.display = isOpen ? 'none' : 'block';
+      if (tipoArrow) tipoArrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    });
+    tipoMenu.querySelectorAll('.inline-plan-tipo-opt').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const val = opt.dataset.value;
+        if (selectTipo) selectTipo.value = val;
+        if (tipoDisplay) tipoDisplay.innerHTML = `<span>${opt.dataset.icon}</span><span>${opt.dataset.title}</span>`;
+        tipoMenu.querySelectorAll('.inline-plan-tipo-opt').forEach(o => { o.style.background = o === opt ? '#e6efe3' : 'transparent'; });
+        tipoMenu.style.display = 'none';
+        if (tipoArrow) tipoArrow.style.transform = 'rotate(0deg)';
+        selectTipo?.dispatchEvent(new Event('change'));
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#inline-plan-tipo-wrap')) {
+        tipoMenu.style.display = 'none';
+        if (tipoArrow) tipoArrow.style.transform = 'rotate(0deg)';
+      }
+    });
+  }
   const inputProducto = document.getElementById('inline-plan-producto');
   const inputDosis = document.getElementById('inline-plan-dosis');
   const fieldDosis = document.getElementById('field-plan-dosis');
@@ -978,35 +1047,137 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
     dropdownMenu.style.display = 'block';
   };
 
+  const openResponsablesBottomSheet = () => {
+    document.getElementById('plan-responsables-sheet-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'plan-responsables-sheet-overlay';
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(3px); z-index:100030; display:flex; align-items:flex-end; justify-content:center;';
+    overlay.innerHTML = `
+      <div id="plan-responsables-sheet" style="width:100%; max-width:520px; max-height:86dvh; background:#ffffff; border-radius:26px 26px 0 0; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 -10px 36px rgba(0,0,0,0.28); animation:slideUp 0.22s ease-out;">
+        <div style="padding:10px 18px 12px; border-bottom:1px solid #eef2ee; flex-shrink:0;">
+          <div style="width:38px; height:4px; border-radius:999px; background:#d0dad0; margin:0 auto 10px;"></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+            <h3 style="margin:0; font-size:17px; font-weight:800; color:#1e3e2b; font-family:'Work Sans',sans-serif;">Seleccionar Responsables</h3>
+            <button type="button" id="plan-resp-sheet-close" style="width:34px; height:34px; border-radius:50%; background:#eff4ed; border:none; color:#1e3e2b; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+              <span class="material-symbols-outlined" style="font-size:19px;">close</span>
+            </button>
+          </div>
+          <div style="position:relative; display:flex; align-items:center;">
+            <span class="material-symbols-outlined" style="position:absolute; left:12px; font-size:20px; color:#5a7357; pointer-events:none;">search</span>
+            <input type="text" id="plan-resp-sheet-search" placeholder="Buscar en personal o escribir nombre..." autocomplete="off" style="width:100%; box-sizing:border-box; border:1.5px solid #c2d8c0; border-radius:12px; padding:11px 14px 11px 38px; font-size:14px; outline:none; background:#f8faf8; color:#1a1a1a;">
+          </div>
+        </div>
+        <div id="plan-resp-sheet-list" style="flex:1 1 0%; min-height:180px; overflow-y:auto; padding:6px 0;"></div>
+        <div style="padding:12px 18px calc(14px + env(safe-area-inset-bottom, 0px)); border-top:1px solid #eef2ee; background:#ffffff; flex-shrink:0;">
+          <button type="button" id="plan-resp-sheet-done" style="width:100%; height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-symbols-outlined" style="font-size:18px;">check</span>
+            <span id="plan-resp-sheet-done-label">Listo</span>
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const searchInput = document.getElementById('plan-resp-sheet-search');
+    const listEl = document.getElementById('plan-resp-sheet-list');
+    const doneLabel = document.getElementById('plan-resp-sheet-done-label');
+
+    const closeSheet = () => overlay.remove();
+    document.getElementById('plan-resp-sheet-close')?.addEventListener('click', closeSheet);
+    document.getElementById('plan-resp-sheet-done')?.addEventListener('click', closeSheet);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeSheet();
+    });
+
+    const renderList = (queryText = '') => {
+      const term = queryText.trim().toLowerCase();
+      if (doneLabel) {
+        doneLabel.textContent = selectedOperadores.length > 0 ? `Listo (${selectedOperadores.length})` : 'Listo';
+      }
+
+      const matches = _personalList.filter(p => {
+        if (!term) return true;
+        return (p.nombre || '').toLowerCase().includes(term) || (p.rol || '').toLowerCase().includes(term);
+      });
+
+      const exactExists = term && _personalList.some(p => (p.nombre || '').toLowerCase() === term);
+      const alreadyCustom = term && selectedOperadores.some(s => s.toLowerCase() === term);
+
+      let html = '';
+      if (term && !exactExists && !alreadyCustom) {
+        html += `
+          <div id="plan-resp-add-custom" style="padding:12px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #eef2ee; background:#f4f9f3; cursor:pointer;">
+            <span style="font-size:13.5px; font-weight:700; color:#2d3e2c;">Agregar "${esc(queryText.trim())}"</span>
+            <span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c;">add_circle</span>
+          </div>
+        `;
+      }
+
+      if (matches.length === 0 && !term) {
+        html += `<div style="padding:28px 18px; text-align:center; color:#777; font-size:13px;">No hay personal registrado. Escribe un nombre arriba para agregarlo.</div>`;
+      } else if (matches.length === 0 && exactExists) {
+        html += `<div style="padding:20px 18px; text-align:center; color:#777; font-size:13px;">Sin resultados adicionales</div>`;
+      } else {
+        html += matches.map(p => {
+          const isSelected = selectedOperadores.some(s => s.toLowerCase() === (p.nombre || '').toLowerCase());
+          return `
+            <div class="plan-resp-sheet-row" data-fullname="${esc(p.nombre)}" style="padding:12px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; border-bottom:1px solid #f2f5f2; background:${isSelected ? '#eef6ec' : '#ffffff'};">
+              <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                <div style="width:36px; height:36px; border-radius:50%; background:${isSelected ? '#2d3e2c' : '#e4ece2'}; color:${isSelected ? '#ffffff' : '#2d3e2c'}; font-size:13px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  ${esc((p.nombre || 'U').charAt(0).toUpperCase())}
+                </div>
+                <div style="min-width:0;">
+                  <div style="font-size:14px; font-weight:700; color:#1a1a1a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${highlightMatch(p.nombre, term)}</div>
+                  ${p.rol ? `<div style="font-size:12px; color:#5a6b58;">${esc(p.rol)}</div>` : ''}
+                </div>
+              </div>
+              <span class="material-symbols-outlined" style="font-size:22px; color:${isSelected ? '#2d3e2c' : '#9aa598'}; flex-shrink:0;">
+                ${isSelected ? 'check_circle' : 'radio_button_unchecked'}
+              </span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      listEl.innerHTML = html;
+
+      document.getElementById('plan-resp-add-custom')?.addEventListener('click', () => {
+        const val = searchInput.value.trim();
+        if (!val) return;
+        selectedOperadores.push(val);
+        updateOperadoresUI();
+        searchInput.value = '';
+        renderList('');
+      });
+
+      listEl.querySelectorAll('.plan-resp-sheet-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const name = row.dataset.fullname;
+          const idx = selectedOperadores.findIndex(s => s.toLowerCase() === name.toLowerCase());
+          if (idx >= 0) {
+            selectedOperadores.splice(idx, 1);
+          } else {
+            selectedOperadores.push(name);
+          }
+          updateOperadoresUI();
+          renderList(searchInput.value);
+        });
+      });
+    };
+
+    renderList('');
+    searchInput?.addEventListener('input', () => renderList(searchInput.value));
+    setTimeout(() => searchInput?.focus(), 120);
+  };
+
   if (customOperadorInput) {
-    // Al escribir, mostrar inmediatamente las sugerencias en tiempo real
-    customOperadorInput.addEventListener('input', () => {
-      renderDropdown(customOperadorInput.value);
-    });
-
-    customOperadorInput.addEventListener('focus', () => {
-      if (customOperadorInput.value.trim()) {
-        renderDropdown(customOperadorInput.value);
-      }
-    });
-
-    customOperadorInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        addOperatorToSelection(customOperadorInput.value);
-      } else if (e.key === 'Escape') {
-        if (dropdownMenu) dropdownMenu.style.display = 'none';
-      }
+    customOperadorInput.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openResponsablesBottomSheet();
     });
   }
-
-  // Cerrar el dropdown al hacer clic fuera
-  const closeDropdownHandler = (e) => {
-    if (dropdownMenu && !dropdownMenu.contains(e.target) && e.target !== customOperadorInput) {
-      dropdownMenu.style.display = 'none';
-    }
-  };
-  document.addEventListener('click', closeDropdownHandler);
 
   updateOperadoresUI();
 
@@ -1651,6 +1822,11 @@ export function initPlanIfcafe() {
   const reloadCurrentView = (loteIdTarget) => {
     window.clearScreenCache?.('plan_ifcafe');
     window.clearScreenCache?.('detalle_lote');
+    window.clearScreenCache?.('dashboard');
+    if (document.getElementById('lote-bottom-sheet')?.classList.contains('open') && typeof window._reloadLoteSheetDetail === 'function') {
+      window._reloadLoteSheetDetail(loteIdTarget || _ifcafeLoteId);
+      return;
+    }
     if (window.location.hash.startsWith('#detalle_lote')) {
       const lid = loteIdTarget || _ifcafeLoteId;
       window.navigateTo('detalle_lote', lid);
@@ -1778,6 +1954,10 @@ export function initPlanIfcafe() {
   };
 
   window.cancelInlineActividad = function(defaultDate) {
+    if (document.getElementById('modal-container')?.classList.contains('active')) {
+      closeModal();
+      return;
+    }
     const day = parseInt(defaultDate.split('-')[2]);
     const monthEvents = _ifcafeEvents.filter(ev => {
       if (!ev.matchFecha) return false;
@@ -1824,6 +2004,7 @@ export function initPlanIfcafe() {
       }
 
       invalidateCache('lote_aplicaciones');
+      closeModal();
       reloadCurrentView(data.lote_id);
     } catch (err) {
       console.error(err);

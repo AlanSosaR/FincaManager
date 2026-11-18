@@ -31,7 +31,7 @@ function isPhotoValid(src) {
   return Boolean(src && (src.startsWith('data:image') || src.startsWith('http')));
 }
 
-export async function renderDetalleLote(id) {
+export async function renderDetalleLote(id, { embeddedInSheet = false } = {}) {
   try {
     const [
       { data: lote, error: loteErr },
@@ -309,8 +309,9 @@ export async function renderDetalleLote(id) {
           touch-action: pan-y !important;
         }
       </style>
-      <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dl-screen-pad">
-        <!-- Header -->
+      <div class="${embeddedInSheet ? 'm3-font-work-sans' : 'm3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dl-screen-pad'}" style="${embeddedInSheet ? 'padding: 6px 0 24px;' : ''}">
+        <!-- Header (oculto cuando está embebido en el bottom sheet, ya que el engranaje va en el header del sheet) -->
+        ${embeddedInSheet ? '' : `
         <section class="m3-mb-4" style="padding: 0 4px;">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0;">
@@ -345,11 +346,20 @@ export async function renderDetalleLote(id) {
             </div>
           </div>
         </section>
+        `}
 
-        <!-- Tarjeta Unificada Completa del Lote (Hero/Mapa + Manejo del Cafetal en UNA SOLA TARJETA) -->
-        <div class="dl-unified-main-card" style="border-radius: 20px; border: 1.5px solid var(--m3-outline-variant, #c7cec3); background: var(--m3-surface-container-lowest, #ffffff); box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); overflow: hidden; width: 100%; box-sizing: border-box; margin-bottom: 24px;">
+        <!-- Tarjeta Unificada Completa del Lote (sin borde de tarjeta cuando está embebida en el bottom sheet) -->
+        <div class="dl-unified-main-card" style="${embeddedInSheet ? 'border-radius: 0; border: none; background: transparent; box-shadow: none; overflow: visible; width: 100%; box-sizing: border-box; margin-bottom: 0;' : 'border-radius: 20px; border: 1.5px solid var(--m3-outline-variant, #c7cec3); background: var(--m3-surface-container-lowest, #ffffff); box-shadow: 0 4px 16px rgba(45, 62, 44, 0.06); overflow: hidden; width: 100%; box-sizing: border-box; margin-bottom: 24px;'}">
 
-          <!-- Top: Info del Lote, Variedad, Plantas, Árboles y Mapa Satelital -->
+          <!-- Top: Info del Lote, Variedad, Plantas, Árboles y Mapa Satelital (solo en vista principal, en sheet muestra solo el mapa del lote) -->
+          ${embeddedInSheet ? (hasMap ? `
+            <div id="dl-embedded-sheet-map-wrap" style="position: relative; width: 100%; height: 175px; border-radius: 16px; overflow: hidden; border: 1.5px solid #dce5da; margin-bottom: 14px; box-shadow: 0 3px 12px rgba(0,0,0,0.06);">
+              <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' style="width: 100%; height: 100%; min-height: 175px;"></div>
+              <div style="position: absolute; bottom: 8px; right: 10px; background: rgba(0,0,0,0.68); backdrop-filter: blur(4px); color: #fff; padding: 3px 9px; border-radius: 8px; font-size: 11px; font-weight: 700; z-index: 400; pointer-events: none; display: flex; align-items: center; gap: 4px;">
+                <span class="material-symbols-outlined" style="font-size: 13px;">location_on</span> ${lote.area_ha || 0} Ha
+              </div>
+            </div>
+          ` : '') : `
           <div class="dl-fused-card" style="border-radius: 0; border: none; box-shadow: none;">
             <!-- Left Stats Column -->
             <div style="padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 16px; min-width: 0; overflow: hidden;">
@@ -417,7 +427,7 @@ export async function renderDetalleLote(id) {
               </div>
             </div>
 
-            <!-- Right Fused Map Column -->
+            ${embeddedInSheet ? '' : `<div id="dl-map-placeholder"></div>`}
             ${hasMap ? `
               <div class="dl-fused-map-col">
                 <div id="dl-map-container" data-coords='${lote.coordenadas_json || ''}' style="width: 100%; height: 100%; min-height: 180px; border-radius: 0;"></div>
@@ -427,16 +437,27 @@ export async function renderDetalleLote(id) {
               </div>
             ` : ''}
           </div>
+          `}
 
           <!-- Bottom: Manejo del Cafetal / Galería de Evolución (Dentro de la Misma Tarjeta) -->
-          <div id="lote-calendario-section" style="border-radius: 0; border: none; box-shadow: none; padding: 20px 18px; width: 100%; box-sizing: border-box; background: #ffffff;">
+          <div id="lote-calendario-section" style="border-radius: 0; border: none; box-shadow: none; padding: ${embeddedInSheet ? '4px 0 8px' : '20px 18px'}; width: 100%; box-sizing: border-box; background: ${embeddedInSheet ? 'transparent' : '#ffffff'};">
+          ${embeddedInSheet ? `
+            <div id="dl-sheet-pills-carousel" style="display:flex; align-items:center; gap:8px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; padding:2px 0 12px; margin-bottom:10px; border-bottom:1px solid #eef2ee;">
+              <button type="button" class="dl-sheet-pill active" data-tab="manejo" onclick="window._switchSheetTab?.('manejo')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #2d3e2c; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Manejo</button>
+              <button type="button" class="dl-sheet-pill" data-tab="balance" onclick="window._switchSheetTab?.('balance')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #d5e2d2; background:#ffffff; color:#1e3e2b; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Balance de cuentas</button>
+              <button type="button" class="dl-sheet-pill" data-tab="timeline" onclick="window._switchSheetTab?.('timeline')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #d5e2d2; background:#ffffff; color:#1e3e2b; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Línea de tiempo</button>
+            </div>
+          ` : ''}
           
           <!-- Vista 1: Calendario Interactivo -->
           <div id="dl-calendar-wrap">
+            ${embeddedInSheet ? '' : `
             <div class="m3-flex m3-items-center m3-justify-between m3-mb-4 dl-header-cafetal" style="border-bottom: 1.5px solid #eef2ee; padding-bottom: 12px; flex-wrap: wrap; gap: 12px;">
               <div class="m3-flex m3-items-center m3-gap-3 dl-header-title-box">
-                <span style="font-size: 24px;">🌿</span>
-                <div>
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #2d3e2c; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <img src="/planta-de-cafe.png" alt="Cafetal" style="width: 26px; height: 26px; object-fit: contain; filter: brightness(0) invert(1);">
+                </div>
+                <div style="min-width: 0;">
                   <h2 class="m3-title-large m3-font-bold m3-text-on-surface" style="margin: 0; font-size: 18px;">Manejo del Cafetal</h2>
                   <p style="margin: 2px 0 0; font-size: 12px; color: var(--m3-on-surface-variant);">Calendario de labores, abonadas, foliares y podas de este lote</p>
                 </div>
@@ -486,11 +507,15 @@ export async function renderDetalleLote(id) {
                 </div>
               </div>
             </div>
+            `}
             ${planCalendarHtml}
           </div>
 
           <!-- Vista 2: Visor de Fotos y Evolución de Aplicaciones -->
           <div id="dl-evolucion-wrap" style="display: none;"></div>
+
+          <!-- Vista 3: Balance de Cuentas del Lote -->
+          <div id="dl-balance-wrap" style="display: none;"></div>
 
         </div>
         </div>
@@ -1136,22 +1161,15 @@ export function initDetalleLote(id) {
             doubleClickZoom: false,
             touchZoom: false,
             keyboard: false,
+            zoomSnap: 0.1,
             maxZoom: 21
           });
-          const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             maxZoom: 21,
-            maxNativeZoom: 17,
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri'
+            maxNativeZoom: 20,
+            attribution: 'Imagery &copy; Google'
           }).addTo(map);
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 21,
-            maxNativeZoom: 17,
-            opacity: 0.85
-          }).addTo(map);
-          esriSatLayer.on('tileerror', (e) => {
-            console.warn('[detalle_lote] ESRI tile failed:', e.tile.src);
-          });
           const polygon = L.polygon(latlngs, {
             color: '#ffffff',
             fillColor: color || '#2d3e2c',
@@ -1160,8 +1178,15 @@ export function initDetalleLote(id) {
           }).addTo(map);
 
           const fitMapToPolygon = () => {
-            map.invalidateSize();
-            map.fitBounds(polygon.getBounds().pad(0.12));
+            map.invalidateSize({ animate: false, pan: false });
+            const bounds = polygon.getBounds();
+            map.fitBounds(bounds.pad(0.55), {
+              paddingTopLeft: [20, 20],
+              paddingBottomRight: [20, 26],
+              maxZoom: 17.8,
+              animate: false
+            });
+            map.setView(bounds.getCenter(), map.getZoom(), { animate: false });
           };
 
           fitMapToPolygon();

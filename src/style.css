@@ -637,16 +637,69 @@ body.screen-auth #app .main-content {
 /* Modal Styling */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.6);
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 100010;
   backdrop-filter: blur(8px);
+}
+@media (max-width: 768px) {
+  .modal-overlay.active {
+    align-items: flex-end !important;
+  }
+  .modal-overlay .modal-content {
+    max-width: 100% !important;
+    border-radius: 26px 26px 0 0 !important;
+    max-height: 92% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    padding: 4px 18px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    transition: height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), max-height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.25s ease;
+  }
+  .modal-overlay.modal-sheet-expanded .modal-content {
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+  .modal-sheet-handle-wrap {
+    display: flex !important;
+    flex-shrink: 0;
+  }
+  .modal-content-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-top: 4px;
+  }
+}
+
+.modal-sheet-handle-wrap {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0 10px;
+  cursor: pointer;
+  touch-action: none;
+  flex-shrink: 0;
+  background: var(--surface, #ffffff);
+}
+.modal-sheet-handle {
+  width: 48px;
+  height: 5px;
+  border-radius: 4px;
+  background: rgba(30, 62, 43, 0.28);
+  transition: width 0.2s, background 0.2s;
+}
+.modal-overlay.modal-sheet-expanded .modal-sheet-handle {
+  width: 56px;
+  background: rgba(30, 62, 43, 0.45);
 }
 
 .modal-overlay.active {
@@ -659,6 +712,8 @@ body.screen-auth #app .main-content {
   padding: 32px;
   width: 100%;
   max-width: 500px;
+  max-height: 92dvh;
+  overflow-y: auto;
   position: relative;
   box-shadow: 0 20px 40px rgba(0,0,0,0.2);
   animation: modalIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -673,7 +728,11 @@ body.screen-auth #app .main-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  background: var(--surface, #ffffff);
+  padding: 2px 0 6px;
 }
 
 .modal-header h3 {

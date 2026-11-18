@@ -160,7 +160,16 @@ export default class QueryBuilder {
     const now = new Date().toISOString();
     const results = [];
     for (const record of records) {
-      if (!record.id) record.id = crypto.randomUUID();
+      if (!record.id) {
+        record.id = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+          ? crypto.randomUUID()
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+              const r = (typeof crypto !== 'undefined' && crypto.getRandomValues)
+                ? (crypto.getRandomValues(new Uint8Array(1))[0] & 15)
+                : (Math.random() * 16) | 0;
+              return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+            });
+      }
       if (!record.created_at) record.created_at = now;
       if (typeof window !== 'undefined' && window._currentEmpresaId && this.tableName !== 'usuarios' && this.tableName !== 'empresas' && this.tableName !== 'usuario_empresas' && this.tableName !== 'invitaciones') {
         if (!record.empresa_id) record.empresa_id = window._currentEmpresaId;
