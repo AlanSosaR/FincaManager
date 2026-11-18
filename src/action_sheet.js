@@ -3433,14 +3433,16 @@ export function openMobileMenuBottomSheet(menuEl) {
   sheet.setAttribute('aria-modal', 'true');
 
   const itemsHtml = buttons.map((origBtn, idx) => {
-    const iconText = origBtn.querySelector('.material-icons')?.textContent?.trim() || 'chevron_right';
+    const iconEl = origBtn.querySelector('.material-icons, .material-symbols-outlined');
+    const iconText = iconEl?.textContent?.trim() || 'chevron_right';
+    const iconCls = iconEl?.classList.contains('material-symbols-outlined') ? 'material-symbols-outlined' : 'material-icons';
     const clone = origBtn.cloneNode(true);
-    clone.querySelectorAll('.material-icons').forEach(el => el.remove());
+    clone.querySelectorAll('.material-icons, .material-symbols-outlined').forEach(el => el.remove());
     const label = clone.textContent.trim();
     const isDelete = origBtn.classList.contains('delete') || iconText.includes('delete');
     return `
       <button type="button" class="m3-menu-sheet-item ${isDelete ? 'is-delete' : ''}" data-menu-idx="${idx}">
-        <span class="material-icons m3-menu-sheet-icon">${escapeHtml(iconText)}</span>
+        <span class="${iconCls} m3-menu-sheet-icon">${escapeHtml(iconText)}</span>
         <span class="m3-menu-sheet-label">${escapeHtml(label)}</span>
       </button>
     `;

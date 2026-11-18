@@ -404,23 +404,23 @@ function renderGastoRow(g, refs) {
             <p class="ganado-col-value" style="font-weight:800;color:#2d3e2c;white-space:nowrap;font-size:15px;margin:0;">${formatMoney(g.monto)}</p>
             ${aprobarButton}
 
-            <button class="ganado-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)" style="margin:0;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;border-radius:50%;">
+            <button class="ganado-btn-more" onclick="event.stopPropagation(); if (window.openMobileMenuBottomSheet) { window.openMobileMenuBottomSheet(this.nextElementSibling); } else { window.toggleActionMenu(this); }" style="margin:0;display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;border-radius:50%;">
               <span class="material-symbols-outlined" style="font-size:20px;color:var(--m3-on-surface-variant,#555);">more_vert</span>
             </button>
 
             <div class="action-menu" style="background:#2d3e2c !important; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.15); border-radius:12px; right:0; top:100%;">
-              <div class="action-item" onclick="event.stopPropagation(); window.handleEditGasto('${g.id}')">
+              <button type="button" class="action-item" onclick="event.stopPropagation(); window.handleEditGasto('${g.id}')">
                 <span class="material-symbols-outlined">edit</span>
                 <span>Editar</span>
-              </div>
-              <div class="action-item" onclick="event.stopPropagation(); window.shareGastoDirect('${g.id}')">
+              </button>
+              <button type="button" class="action-item" onclick="event.stopPropagation(); window.shareGastoDirect('${g.id}')">
                 <span class="material-symbols-outlined">share</span>
                 <span>WhatsApp</span>
-              </div>
-              <div class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteGasto('${g.id}', '${String(g.descripcion || '').replace(/'/g, "\\'").substring(0, 30)}')">
+              </button>
+              <button type="button" class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteGasto('${g.id}', '${String(g.descripcion || '').replace(/'/g, "\\'").substring(0, 30)}')">
                 <span class="material-symbols-outlined">delete</span>
                 <span>Eliminar</span>
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -513,7 +513,8 @@ function renderDonutAndUI() {
   // Actualizar Centro de la Dona
   const centerAmtEl = document.getElementById('center-total-amount');
   const centerMonthEl = document.getElementById('center-month-name');
-  if (centerAmtEl) centerAmtEl.textContent = formatNumber(grandTotal);
+  const centerTotal = activeCategory !== 'all' ? (totals[activeCategory] || 0) : grandTotal;
+  if (centerAmtEl) centerAmtEl.textContent = formatNumber(centerTotal);
   if (centerMonthEl) centerMonthEl.textContent = monthName;
 
   // Actualizar Banner Superior
@@ -527,6 +528,10 @@ function renderDonutAndUI() {
 
   // Lista de Movimientos (Siempre muestra los registros correspondientes)
   const displayRecords = getFilteredRecords();
+  const centerCountEl = document.getElementById('center-records-count');
+  if (centerCountEl) {
+    centerCountEl.textContent = `${displayRecords.length} ${displayRecords.length === 1 ? 'registro' : 'registros'}`;
+  }
   const listContainer = document.getElementById('gastos-list-container');
   const countLabel = document.getElementById('gastos-count-label');
 
@@ -1235,11 +1240,11 @@ export async function renderGastos() {
 
       /* Tarjeta Principal de la Dona Analítica */
       .gastos-dona-card {
-        background: #ffffff !important;
-        border-radius: 28px;
-        padding: 18px 16px;
-        border: 1.5px solid rgba(45, 62, 44, 0.12) !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+        background: transparent !important;
+        border-radius: 0;
+        padding: 18px 0 12px;
+        border: none !important;
+        box-shadow: none !important;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1278,8 +1283,8 @@ export async function renderGastos() {
       /* Contenedor SVG de la Dona */
       .gastos-donut-box {
         position: relative;
-        width: 276px;
-        height: 276px;
+        width: min(340px, 90vw);
+        height: min(340px, 90vw);
         margin: 4px auto;
         display: flex;
         align-items: center;
@@ -1385,18 +1390,14 @@ export async function renderGastos() {
       </div>
 
       <!-- Título de la Página -->
-      <div class="herramientas-page-title">
-        <h2>Gastos</h2>
-      </div>
-
-      <div class="da-tabs-section" style="margin-top: 10px;">
+      <div class="da-tabs-section" style="margin-top: 10px; background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;">
         <!-- 1. TARJETA PRINCIPAL: DONA ANALÍTICA -->
         <section class="gastos-dona-card" style="padding-top: 24px;">
           <!-- Dona SVG con Cápsulas Gruesas y Recorte Entrelazado -->
           <div class="gastos-donut-box">
             <svg id="donut-svg" class="overflow-visible" viewBox="0 0 280 280" style="width: 100%; height: 100%;">
               <defs>
-                <filter id="glow-active" x="-25%" y="-25%" width="150%" height="150%">
+                <filter id="glow-active" filterUnits="userSpaceOnUse" x="-40" y="-40" width="360" height="360">
                   <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#000000" flood-opacity="0.15"/>
                 </filter>
               </defs>
@@ -1413,17 +1414,20 @@ export async function renderGastos() {
               <span id="center-total-amount" style="font-size: 26px; font-weight: 800; color: #2d3e2c; letter-spacing: -0.6px; line-height: 1; margin: 2px 0;">
                 0.00
               </span>
-              <div style="pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 4px 10px; border-radius: 9999px; background: #f2f6f1; border: 1px solid #dce5da;">
+              <div style="pointer-events: auto; display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; padding: 3px 8px; border-radius: 9999px; background: #f2f6f1; border: 1px solid #dce5da;">
                 <button onclick="window.changeGastosMonth(-1)" class="gastos-month-btn press-effect" title="Período anterior">
-                  <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+                  <span class="material-icons" style="font-size: 15px;">chevron_left</span>
                 </button>
-                <span id="center-month-name" style="font-size: 11px; font-weight: 700; color: #2d3e2c; min-width: 96px; text-align: center; cursor: pointer;" onclick="window.changeGastosMonth(1)">
+                <span id="center-month-name" style="font-size: 10.5px; font-weight: 700; color: #2d3e2c; min-width: 84px; text-align: center; cursor: pointer;" onclick="window.changeGastosMonth(1)">
                   Historial Completo
                 </span>
                 <button onclick="window.changeGastosMonth(1)" class="gastos-month-btn press-effect" title="Período siguiente">
-                  <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+                  <span class="material-icons" style="font-size: 15px;">chevron_right</span>
                 </button>
               </div>
+              <span id="center-records-count" style="font-size: 11px; font-weight: 600; color: #5a6b58; margin-top: 6px;">
+                0 registros
+              </span>
             </div>
           </div>
 

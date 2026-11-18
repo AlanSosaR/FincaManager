@@ -206,12 +206,12 @@ function eventCardHtml(ev) {
           <div style="grid-column: 1 / -1; margin-top: 6px;">
             <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #526350; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
               <span class="material-symbols-outlined" style="font-size: 14px; color: #2d3e2c;">badge</span>
-              <span>Responsable${listaOperadores.length > 1 ? 's' : ''}:</span>
+              <span>Colaborador${listaOperadores.length > 1 ? 'es' : ''}:</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 5px;">
+            <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 2px;">
               ${listaOperadores.map(op => `
-                <div style="display: flex; align-items: center; gap: 8px; background: #f2f7f1; border: 1px solid #d4dfd2; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 700; color: #1b5e20;">
-                  <span class="material-symbols-outlined" style="font-size: 15px; color: #2d3e2c;">person</span>
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #1b6e1b; padding: 1px 0;">
+                  <span class="material-symbols-outlined" style="font-size: 15px; color: #1b6e1b;">person</span>
                   <span>${esc(op)}</span>
                 </div>
               `).join('')}

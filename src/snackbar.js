@@ -9,11 +9,15 @@ class SnackbarSystem {
   }
 
   show(message, options = {}) {
+    if (this.active && !this._isConfirmActive) {
+      this.dismissAll();
+    }
     this.queue.push({ message, ...options });
     this.processQueue();
   }
 
   confirm(message, onConfirm, onCancel, options = {}) {
+    this.dismissAll();
     this.queue.push({
       message,
       confirm: true,
@@ -25,11 +29,16 @@ class SnackbarSystem {
   }
 
   dismissAll() {
+    if (this._autoTimer) {
+      clearTimeout(this._autoTimer);
+      this._autoTimer = null;
+    }
     this.container.querySelectorAll('.m3-snackbar').forEach(el => {
       el.classList.remove('visible');
       el.remove();
     });
     this.active = false;
+    this._isConfirmActive = false;
     this.queue = [];
   }
 
@@ -38,6 +47,7 @@ class SnackbarSystem {
     this.active = true;
 
     const current = this.queue.shift();
+    this._isConfirmActive = Boolean(current.confirm);
     const snackbar = document.createElement('div');
     snackbar.className = `m3-snackbar ${current.type || 'info'} ${current.confirm || current.actions ? 'expressive' : ''}`;
     
@@ -51,18 +61,20 @@ class SnackbarSystem {
     snackbar.innerHTML = `
       <div class="m3-snackbar-content">
         <span class="m3-snackbar-text">${current.message}</span>
-        <div class="m3-snackbar-actions" style="flex-wrap:wrap; gap:8px;">
-          ${current.actions ? `
-            ${current.actions.map((act, i) => `
-              <button class="m3-snackbar-btn ${act.type || ''}" data-action-idx="${i}" style="${act.style || ''}">${act.text}</button>
-            `).join('')}
-          ` : current.confirm ? `
-            ${current.cancelText !== false ? `<button class="m3-snackbar-btn cancel">${current.cancelText || 'Cancelar'}</button>` : ''}
-            <button class="m3-snackbar-btn confirm">${current.confirmText || 'Confirmar'}</button>
-          ` : `
-            <button class="m3-snackbar-btn close">${current.actionText || 'Cerrar'}</button>
-          `}
-        </div>
+        ${(current.actions || current.confirm || current.actionText) ? `
+          <div class="m3-snackbar-actions" style="flex-wrap:wrap; gap:8px;">
+            ${current.actions ? `
+              ${current.actions.map((act, i) => `
+                <button class="m3-snackbar-btn ${act.type || ''}" data-action-idx="${i}" style="${act.style || ''}">${act.text}</button>
+              `).join('')}
+            ` : current.confirm ? `
+              ${current.cancelText !== false ? `<button class="m3-snackbar-btn cancel">${current.cancelText || 'Cancelar'}</button>` : ''}
+              <button class="m3-snackbar-btn confirm">${current.confirmText || 'Confirmar'}</button>
+            ` : `
+              <button class="m3-snackbar-btn close">${current.actionText}</button>
+            `}
+          </div>
+        ` : ''}
       </div>
     `;
 
@@ -73,10 +85,15 @@ class SnackbarSystem {
 
     return new Promise((resolve) => {
       const close = () => {
+        if (this._autoTimer) {
+          clearTimeout(this._autoTimer);
+          this._autoTimer = null;
+        }
         snackbar.classList.remove('visible');
         setTimeout(() => {
           snackbar.remove();
           this.active = false;
+          this._isConfirmActive = false;
           this.processQueue();
           resolve();
         }, 300);
@@ -114,9 +131,10 @@ class SnackbarSystem {
           };
         }
         
-        // Auto close after 5s if not confirm
+        // Auto close after 2.6s for plain info toasts, 5s otherwise
         if (!current.persist) {
-          setTimeout(close, current.duration || 5000);
+          const ms = current.duration || ((!current.actions && !current.actionText) ? 2600 : 5000);
+          this._autoTimer = setTimeout(close, ms);
         }
       }
     });

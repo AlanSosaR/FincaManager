@@ -667,6 +667,32 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
         </button>
       </div>
     `;
+  }
+  const weekRefTag = personalId ? `[ref:${personalId}_sem_${fmtDate(weekStart)}]` : '';
+  const weekPaidGasto = (currentView === 'day' && weekRefTag)
+    ? (gastosPersonal || []).find(g => g.categoria === 'Personal' && (g.descripcion || '').includes(weekRefTag) && !(g.descripcion || '').includes('[Por Aprobar]'))
+    : null;
+  const dayCoveredByWeek = Boolean(weekPaidGasto && (Number(weekPaidGasto.monto) || 0) >= weekTotal && weekTotal > 0);
+
+  const isMatchedNonDraft = Boolean(matchedGasto && !(matchedGasto.descripcion || '').includes('[Por Aprobar]'));
+  const pendienteMostrar = dayCoveredByWeek
+    ? 0
+    : isMatchedNonDraft
+      ? Math.max(0, periodTotal - (Number(matchedGasto.monto) || 0))
+      : periodTotal;
+
+  if (dayCoveredByWeek) {
+    gastosActionHtml = `
+      <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(45, 62, 44, 0.08); padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(45, 62, 44, 0.18);">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: #2d3e2c;">
+          <span class="material-symbols-outlined" style="font-size: 16px; color: #2d3e2c;">check_circle</span>
+          Semana ya pagada en Gastos (L${(Number(weekPaidGasto.monto) || 0).toLocaleString('es-HN')})
+        </span>
+        <button type="button" onclick="window.closeSubBottomSheet?.(); window.navigateTo('gastos')" style="background: none; border: none; font-size: 12px; font-weight: 800; color: #2d3e2c; cursor: pointer; text-decoration: underline; padding: 0; white-space: nowrap;">
+          Ver en Gastos →
+        </button>
+      </div>
+    `;
   } else if (matchedGasto) {
     const isDraftPorAprobar = (matchedGasto.descripcion || '').includes('[Por Aprobar]');
     const registradoMonto = Number(matchedGasto.monto) || 0;
@@ -780,7 +806,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
       <div class="m3-p-4 m3-bg-surface-container m3-rounded-2xl" style="display: flex; flex-direction: column; justify-content: space-between;">
         <div>
           <p class="m3-label-small m3-text-on-surface-variant">Total a pagar</p>
-          <p class="m3-title-large m3-font-bold m3-text-tertiary" style="margin: 4px 0 0 0;">L${periodTotal.toLocaleString('es-HN')}</p>
+          <p class="m3-title-large m3-font-bold" style="margin: 4px 0 0 0; color: ${pendienteMostrar === 0 ? '#1b6e1b' : 'var(--m3-tertiary)'};">L${pendienteMostrar.toLocaleString('es-HN')}</p>
         </div>
         <div style="margin-top: 12px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.07);">
           <p class="m3-label-small m3-text-on-surface-variant dp-summary-subtext" style="margin: 0; font-size: 12px;">
@@ -989,7 +1015,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
       calDate = dateObj;
 
       if (document.getElementById('lp-sheet-dp-body')) {
-        await render();
+        await refreshCalendar();
         const selectedEl = document.querySelector(`#lp-sheet-dp-body [onclick*="'${dateStr}'"]`);
         if (selectedEl) selectedEl.style.outline = '2px solid #2d3e2c';
         return;

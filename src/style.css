@@ -1637,8 +1637,9 @@ body.screen-auth #app .main-content {
     bottom: 20px;
     right: 20px;
     z-index: 1200;
-    background-color: #2d3e2c;
-    color: #ffffff;
+    background-color: #ffffff;
+    color: #b34200;
+    border: 2px solid #2d3e2c;
     box-shadow: 0 4px 14px rgba(45, 62, 44, 0.3);
     transform: scale(0);
     opacity: 0;
