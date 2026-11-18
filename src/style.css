@@ -568,8 +568,9 @@ body.screen-auth #app .main-content {
     height: 580px !important;
   }
   #lote-map-container {
-    height: 580px !important;
-    min-height: 580px !important;
+    flex: 1 1 0% !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
   #dl-map-container {
     height: 320px !important;

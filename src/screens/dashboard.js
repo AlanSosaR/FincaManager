@@ -514,7 +514,29 @@ export async function renderDashboard() {
         }
         @media (max-width: 600px) {
           .screen-cafetal .da-tabs-section {
-            padding: 12px 6px;
+            padding: 0 !important;
+          }
+        }
+        @media (max-width: 768px) {
+          .preview-container:has(.screen-cafetal) {
+            padding: 0 !important;
+            overflow: hidden !important;
+          }
+          .screen-cafetal {
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .screen-cafetal .ganado-top-actions-container,
+          .screen-cafetal .ganado-page-title {
+            display: none !important;
+          }
+          .screen-cafetal .da-tabs-section {
+            margin-top: 0 !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+            background: transparent !important;
           }
         }
       </style>
@@ -542,6 +564,16 @@ export async function renderDashboard() {
         </div>
 
         <div class="da-tabs-section" style="margin-top: 10px;">
+          ${(() => { window._cafetalTotalPlantas = totalPlantas; return ''; })()}
+          <style>
+            .cafetal-mobile-pills { display: none; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+            @media (max-width: 768px) {
+              .cafetal-hero { display: none !important; }
+              .cafetal-mobile-pills { display: flex !important; }
+            }
+          </style>
+          <!-- Mobile Pills removed -->
+          ${''}
           <!-- 1. Hero Summary Card (Dark Green Banner) -->
           ${allLotes.length > 0 ? `
           <div class="cafetal-hero" style="margin-bottom: 14px;">
@@ -560,10 +592,10 @@ export async function renderDashboard() {
                   </span>
                   <div style="display: flex; flex-direction: column; line-height: 1.15;">
                     <span style="font-size: 13px; font-weight: 800; color: #2d3e2c; white-space: nowrap;">Lotes</span>
-                    <span style="font-size: 10.5px; font-weight: 700; color: #666; white-space: nowrap;">de Café</span>
+                    <span style="font-size: 10.5px; font-weight: 700; color: #556b53; white-space: nowrap;">${totalHa.toFixed(2)} ha</span>
                   </div>
                 </div>
-                <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat" style="background: rgba(255,255,255,0.95); border-radius: 12px; padding: 10px 14px; flex: 1; min-width: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: inherit; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;" title="Abrir Manejo y Calendario del Cafetal">
+                <a href="#" onclick="event.preventDefault(); window.navigateTo('plan_ifcafe')" class="ganado-tag-stat cafetal-hero-manejo-link" style="background: rgba(255,255,255,0.95); border-radius: 12px; padding: 10px 14px; flex: 1; min-width: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; text-decoration: none; color: inherit; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;" title="Abrir Manejo y Calendario del Cafetal">
                   <div style="display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden;">
                     <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;">🌿</span>
                     <span class="ganado-tag-info" style="display: flex; flex-direction: column; min-width: 0;">
@@ -584,21 +616,6 @@ export async function renderDashboard() {
 
         <!-- 2. Interactive ESRI Satellite Map of Lotes (Directly Below Banner) -->
           <div style="position: relative;">
-            <div class="ganado-tag-stat" style="background: #fdfdfd; border-radius: 16px; padding: 13px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; cursor: default;">
-              <div style="display: flex; align-items: center; gap: 14px;">
-                <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;"><img src="mapa.png" alt="" style="width: 24px; height: 24px; object-fit: contain;"></span>
-                <div style="display: flex; flex-direction: column;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 16px; font-weight: 800; color: #2d3e2c;">Lotes & Microlotes</span>
-                    <span style="font-size: 12px; font-weight: 700; color: #2d3e2c; background: #eef4ec; border: 1px solid #d4dfd2; padding: 2px 10px; border-radius: 99px;">${totalHa.toFixed(2)} Hectáreas</span>
-                  </div>
-                  <span style="font-size: 11.5px; color: #666; font-weight: 600; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
-                    <span class="material-icons" style="font-size: 14px; color: #2d3e2c;">touch_app</span> Toca una parcela en el mapa para ver su detalle
-                  </span>
-                </div>
-              </div>
-            </div>
-
             <div id="mapa-container">
               <div class="mapa-empty" id="mapa-loading">
                 <div class="spinner"></div>
@@ -616,6 +633,13 @@ export async function renderDashboard() {
 }
 
 export async function initDashboard() {
+  const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+  if (isMobile && window._cafetalTotalPlantas != null) {
+    const titleEl = document.querySelector('#current-screen-title .topbar-title-text');
+    if (titleEl) {
+      titleEl.textContent = `Total Plantas · ${Number(window._cafetalTotalPlantas).toLocaleString()}`;
+    }
+  }
   // Split control (search + arrow) menu
   window.toggleLotesSplitMenu = (e) => {
     if (e) e.stopPropagation();
@@ -659,11 +683,66 @@ export async function initDashboard() {
 
   const withCoords = lotes.filter(l => l.coordenadas_json || l.coordenadas);
 
+  // En móvil: el mapa principal ocupa TODA la pantalla (pegado desde el header hasta abajo, de borde a borde)
+  const fitMapToScreen = () => {
+    const el = document.getElementById('mapa-container');
+    if (!el || !el.isConnected) return;
+    const props = ['height', 'min-height', 'width', 'margin-left', 'margin-top', 'border-radius', 'border', 'box-shadow'];
+    props.forEach(p => el.style.removeProperty(p));
+    if (window.innerWidth > 768) {
+      window._dbMapInstance?.invalidateSize();
+      return;
+    }
+    const topbar = document.querySelector('.top-bar');
+    const topbarBottom = topbar ? Math.round(topbar.getBoundingClientRect().bottom) : 0;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0) return; // pantalla oculta
+    const gapTop = Math.round(rect.top - topbarBottom);
+    const set = (k, v) => el.style.setProperty(k, v, 'important');
+    if (gapTop !== 0) {
+      set('margin-top', (-gapTop) + 'px');
+    }
+    const leftAfter = Math.round(el.getBoundingClientRect().left);
+    if (leftAfter !== 0) {
+      set('margin-left', (-leftAfter) + 'px');
+    }
+    const mainContent = document.querySelector('.main-content');
+    const mainBottom = mainContent ? Math.ceil(mainContent.getBoundingClientRect().bottom) : 0;
+    const vh = Math.ceil(Math.max(
+      window.innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+      window.visualViewport?.height || 0,
+      mainBottom
+    ));
+    const vw = Math.ceil(Math.max(
+      window.innerWidth || 0,
+      document.documentElement.clientWidth || 0,
+      window.visualViewport?.width || 0
+    ));
+    const actualTop = Math.floor(el.getBoundingClientRect().top);
+    const h = Math.max(320, vh - actualTop + 2);
+    set('width', vw + 'px');
+    set('height', h + 'px');
+    set('min-height', h + 'px');
+    set('border-radius', '0');
+    set('border', 'none');
+    set('box-shadow', 'none');
+    window._dbMapInstance?.invalidateSize({ animate: false, pan: false });
+  };
+  fitMapToScreen();
+  if (window._dbFitMapHandler) {
+    window.removeEventListener('resize', window._dbFitMapHandler);
+    window.visualViewport?.removeEventListener('resize', window._dbFitMapHandler);
+  }
+  window._dbFitMapHandler = fitMapToScreen;
+  window.addEventListener('resize', fitMapToScreen);
+  window.visualViewport?.addEventListener('resize', fitMapToScreen);
+
   container.innerHTML = `
     <div id="mapa-leaflet" style="width:100%;height:100%;"></div>
     <button class="mapa-layers-btn" id="mapa-layers-btn" title="Cambiar tipo de satélite">
       <span class="material-symbols-outlined" style="font-size:18px;">layers</span>
-      <span id="mapa-layers-label">Esri Sat.</span>
+      <span id="mapa-layers-label">Google Earth</span>
     </button>
   `;
 
@@ -682,21 +761,21 @@ export async function initDashboard() {
     attribution: 'Tiles &copy; Esri',
     maxZoom: 21,
     maxNativeZoom: 17
-  }).addTo(map);
+  });
 
   const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     maxZoom: 21,
-    maxNativeZoom: 18
-  });
-
-  const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 21,
-    maxNativeZoom: 17,
-    opacity: 0.85
+    maxNativeZoom: 20
   }).addTo(map);
+
+  const googleHybridLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+    attribution: 'Imagery &copy; Google',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    maxZoom: 21,
+    maxNativeZoom: 20
+  });
 
   // Zoom control
   L.control.zoom({ position: 'topright' }).addTo(map);
@@ -710,21 +789,19 @@ export async function initDashboard() {
       layerMode = (layerMode + 1) % 3;
       map.removeLayer(esriSatLayer);
       map.removeLayer(googleSatLayer);
-      map.removeLayer(labelsLayer);
+      map.removeLayer(googleHybridLayer);
       if (layerMode === 0) {
-        map.addLayer(esriSatLayer);
-        map.addLayer(labelsLayer);
-        if (layersLabel) layersLabel.textContent = 'Esri Sat.';
-        window.Snackbar?.show('Capa: Esri Satélite', { duration: 1200 });
-      } else if (layerMode === 1) {
         map.addLayer(googleSatLayer);
-        map.addLayer(labelsLayer);
-        if (layersLabel) layersLabel.textContent = 'Google Sat.';
-        window.Snackbar?.show('Capa: Google Satélite', { duration: 1200 });
+        if (layersLabel) layersLabel.textContent = 'Google Earth';
+        window.Snackbar?.show('Capa: Google Earth / Satélite', { duration: 1200 });
+      } else if (layerMode === 1) {
+        map.addLayer(googleHybridLayer);
+        if (layersLabel) layersLabel.textContent = 'Google Híbrido';
+        window.Snackbar?.show('Capa: Google Híbrido', { duration: 1200 });
       } else {
         map.addLayer(esriSatLayer);
-        if (layersLabel) layersLabel.textContent = 'Sat. Limpio';
-        window.Snackbar?.show('Capa: Satélite Limpio', { duration: 1200 });
+        if (layersLabel) layersLabel.textContent = 'Esri Sat.';
+        window.Snackbar?.show('Capa: Esri Satélite', { duration: 1200 });
       }
     });
   }
@@ -1436,11 +1513,18 @@ export async function initDashboard() {
     }
   };
 
+  fitMapToScreen();
+  map.invalidateSize({ animate: false, pan: false });
   adjustMapView();
   setTimeout(() => {
-    map.invalidateSize();
+    fitMapToScreen();
+    map.invalidateSize({ animate: false, pan: false });
     adjustMapView();
   }, 120);
+  setTimeout(() => {
+    fitMapToScreen();
+    map.invalidateSize({ animate: false, pan: false });
+  }, 450);
 
   // Material 3 Full-Screen Search on Cafetal / Lotes
   initM3FullScreenSearch({
