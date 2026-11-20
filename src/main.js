@@ -6,6 +6,7 @@ import './detalle_motor.css';
 import './asistente.css';
 import './snackbar.js';
 import './action_sheet.js';
+import { initGlobalM3DatePickers } from './utils/m3_date_picker.js';
 
 import { registerSW } from 'virtual:pwa-register';
 
@@ -641,7 +642,7 @@ const screens = {
     dashboard: { title: 'Dashboard Cafetal', render: renderDashboard },
     motores: { title: 'Lista de Motores', render: renderMotores },
     herramientas: { title: 'Inventario de Herramientas', render: renderHerramientas },
-    gastos: { title: 'Gastos', render: renderGastos },
+    gastos: { title: 'Cuentas', render: renderGastos },
     nuevo_gasto: { title: 'Nuevo Gasto', backTo: 'gastos', render: renderNuevoGasto },
     cultivos: { title: 'Cultivos', render: renderCultivos },
     nuevo_cultivo: { title: 'Nuevo Cultivo', backTo: 'cultivos', render: renderNuevoCultivo },
@@ -740,6 +741,7 @@ function handleAuthCallback() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    initGlobalM3DatePickers();
     const isAuthCallback = handleAuthCallback();
     const titleElement = document.getElementById('current-screen-title');
 
@@ -756,6 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // potreros: render() solo devuelve el shell del mapa; initPotreros() dibuja
         'potreros',
         'ganado',
+        'gastos',
         'asistente'
     ]);
 
@@ -984,7 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             const ctrl = inPageCtrl || topbarActions.querySelector('.ganado-split-ctrl');
-            if (ctrl) {
+            if (ctrl && currentScreenId !== 'gastos') {
                 const primaryAction = ctrl.querySelector('.ganado-split-menu .ganado-split-item') || ctrl.querySelector('.ganado-split-ctrl-reg[onclick]');
                 if (primaryAction) {
                     const fab = document.createElement('button');

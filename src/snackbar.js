@@ -6,9 +6,21 @@ class SnackbarSystem {
     this.container = document.getElementById('snackbar-container');
     this.queue = [];
     this.active = false;
+    this._lastMsg = '';
+    this._lastMsgAt = 0;
   }
 
   show(message, options = {}) {
+    const now = Date.now();
+    const msgStr = String(message || '');
+    if (msgStr && msgStr === this._lastMsg && (now - this._lastMsgAt) < 1800) {
+      return;
+    }
+    if (this.queue.some(q => !q.confirm && String(q.message || '') === msgStr)) {
+      return;
+    }
+    this._lastMsg = msgStr;
+    this._lastMsgAt = now;
     if (this.active && !this._isConfirmActive) {
       this.dismissAll();
     }
@@ -78,6 +90,8 @@ class SnackbarSystem {
       </div>
     `;
 
+    // Garantizar que nunca se apilen 2 snackbars visibles a la vez
+    this.container.querySelectorAll('.m3-snackbar').forEach(el => el.remove());
     this.container.appendChild(snackbar);
 
     // Trigger entrance animation
@@ -111,17 +125,26 @@ class SnackbarSystem {
           };
         });
       } else if (current.confirm) {
+        let handled = false;
         const cancelBtn = snackbar.querySelector('.cancel');
+        const confirmBtn = snackbar.querySelector('.confirm');
         if (cancelBtn) {
           cancelBtn.onclick = () => {
+            if (handled) return;
+            handled = true;
             if (current.onCancel) current.onCancel();
             close();
           };
         }
-        snackbar.querySelector('.confirm').onclick = () => {
-          if (current.onConfirm) current.onConfirm();
-          close();
-        };
+        if (confirmBtn) {
+          confirmBtn.onclick = () => {
+            if (handled) return;
+            handled = true;
+            confirmBtn.disabled = true;
+            if (current.onConfirm) current.onConfirm();
+            close();
+          };
+        }
       } else {
         const closeBtn = snackbar.querySelector('.close');
         if (closeBtn) {

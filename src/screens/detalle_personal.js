@@ -698,7 +698,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
     const registradoMonto = Number(matchedGasto.monto) || 0;
 
     if (isDraftPorAprobar) {
-      const btnLabel = currentView === 'week' ? 'Enviar semana a Gastos' : currentView === 'month' ? 'Enviar mes a Gastos' : 'Enviar día a Gastos';
+      const btnLabel = currentView === 'week' ? 'Enviar semana a Cuentas' : currentView === 'month' ? 'Enviar mes a Cuentas' : 'Enviar día a Cuentas';
       gastosActionHtml = `
         <div style="margin-top: 10px;">
           <button type="button" onclick="window.__enviarPeriodoAGastos(true, '${matchedGasto.id}', ${periodTotal}, ${dupAttr})" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: #2d3e2c; color: #ffffff; border: none; border-radius: 12px; padding: 9px 14px; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(45,62,44,0.22); transition: transform 0.1s, background 0.2s;">
@@ -778,7 +778,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
       `;
     }
   } else if (periodTotal > 0) {
-    const btnLabel = currentView === 'week' ? 'Enviar semana a Gastos' : currentView === 'month' ? 'Enviar mes a Gastos' : 'Enviar día a Gastos';
+    const btnLabel = currentView === 'week' ? 'Enviar semana a Cuentas' : currentView === 'month' ? 'Enviar mes a Cuentas' : 'Enviar día a Cuentas';
     gastosActionHtml = `
       <div style="margin-top: 10px;">
         <button type="button" onclick="window.__enviarPeriodoAGastos(false, null, ${periodTotal}, ${dupAttr})" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: #2d3e2c; color: #ffffff; border: none; border-radius: 12px; padding: 9px 14px; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(45,62,44,0.22); transition: transform 0.1s, background 0.2s;">
@@ -1352,7 +1352,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
           window.Snackbar?.show(
             periodTotal <= 0
               ? '✔ Registro de gasto eliminado en Gastos'
-              : `✔ ${isUpdate ? 'Actualizado' : 'Enviado'} a Gastos: L${periodTotal.toLocaleString('es-HN')}`,
+              : `✔ ${isUpdate ? 'Actualizado' : 'Enviado'} a Cuentas: L${periodTotal.toLocaleString('es-HN')}`,
             {
               theme: 'white',
               actions: [

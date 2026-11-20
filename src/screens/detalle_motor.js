@@ -1831,6 +1831,14 @@ function registerOilChange(motorId) {
       });
 
       await supabase.from('motores').update({ horas: 0 }).eq('id', motorId);
+      await restFetch(`/rest/v1/motores?id=eq.${encodeURIComponent(motorId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ horas: 0 })
+      }).catch(() => {});
+      await restFetch(`/rest/v1/notifications?type=eq.motor_aceite&ref_id=eq.${encodeURIComponent(motorId)}&read=eq.false`, {
+        method: 'PATCH',
+        body: JSON.stringify({ read: true })
+      }).catch(() => {});
       await supabase.from('motor_sesiones').delete().eq('motor_id', motorId);
       localStorage.removeItem(`push_motor_ts_${motorId}`);
       window.clearPushBellByRef?.(motorId);

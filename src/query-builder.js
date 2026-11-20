@@ -206,29 +206,29 @@ export default class QueryBuilder {
     const eqFilter = this._filters.find(f => f.type === 'eq');
     if (!eqFilter) return { data: null, error: 'update requires eq filter' };
     const existing = await table.where(eqFilter.field).equals(eqFilter.value).first();
-    if (!existing) return { data: null, error: null };
-
-    const updated = { ...existing, ...updateData, updated_at: new Date().toISOString() };
+    const updated = { ...(existing || { [eqFilter.field]: eqFilter.value }), ...updateData, updated_at: new Date().toISOString() };
 
     if (isOnline()) {
       try {
-        const body = { ...updated };
+        const body = { ...updateData };
         delete body.id;
         delete body.created_at;
         delete body.updated_at;
         const res = await supabaseFetch(
-          `/rest/v1/${this.tableName}?id=eq.${encodeURIComponent(eqFilter.value)}`,
+          `/rest/v1/${this.tableName}?${encodeURIComponent(eqFilter.field)}=eq.${encodeURIComponent(eqFilter.value)}`,
           { method: 'PATCH', body: JSON.stringify(body) }
         );
         const serverRecords = await res.json();
         const serverRecord = Array.isArray(serverRecords) ? serverRecords[0] : serverRecords;
-        await table.put({ ...updated, ...serverRecord });
-        return { data: { ...updated, ...serverRecord }, error: null };
+        const merged = { ...updated, ...(serverRecord || {}) };
+        if (merged.id) await table.put(merged);
+        return { data: merged, error: null };
       } catch (e) {
         console.warn(`online update failed for ${this.tableName}, fallback to local:`, e);
       }
     }
 
+    if (!existing) return { data: null, error: null };
     await table.put(updated);
     await this._enqueueSync('update', eqFilter.value, updated);
     return { data: updated, error: null };

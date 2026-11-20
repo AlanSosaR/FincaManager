@@ -43,6 +43,8 @@ Debes tocar toditos estos sitios, o la app fallará/morirá RLS:
 - Confirmaciones destructivas con `Snackbar.confirm`; avisos con `Snackbar.show`.
 - Estados de agenda (vacunas/fumigaciones/aplicaciones): `Aplicada` | `Programada` | `Cancelada`. Regla: `fecha <= hoy` → `Aplicada`, futura → `Programada`. El número principal cuenta solo las `Aplicada`; `Programada` son "pendientes".
 - Plantillas de UI devuelven strings HTML.
+- **Carruseles horizontales de píldoras/tabs**: al tocar cualquier píldora que re-renderiza el carrusel (`innerHTML`), siempre preservar `scrollLeft` previo antes de re-renderizar y luego centrar suavemente el nuevo botón activo dentro de `requestAnimationFrame` con `newActive.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })` para que siempre se vea completa la opción seleccionada.
+- **FAB estándar**: cuadrado redondeado `56×56`, `border-radius: 16px`, fondo blanco `#ffffff`, borde `2px solid #2d3e2c`, ícono `+` naranja `#b34200`.
 
 ## WhatsApp (Evolution API)
 

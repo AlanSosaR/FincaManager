@@ -409,7 +409,7 @@ export async function renderListaPersonal() {
             ${totalPorPagar > 0 ? `
               <button type="button" id="lp-send-week-gastos-btn" onclick="window.enviarSemanaPersonalAGastos()" style="margin-top:8px; width:100%; height:32px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:11.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
                 <span class="material-symbols-outlined" style="font-size:15px;">payments</span>
-                <span>Enviar a Gastos</span>
+                <span>Enviar a Cuentas</span>
               </button>
             ` : (totalPagadoSemana > 0 ? `
               <button type="button" onclick="window.navigateTo('gastos')" style="margin-top:8px; width:100%; height:30px; border-radius:999px; border:1px solid #d5e2d2; background:#eff4ed; color:#1b6e1b; font-family:'Work Sans',sans-serif; font-size:11.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
@@ -445,7 +445,7 @@ export function initListaPersonal() {
     }
     const totalSum = pendientes.reduce((s, p) => s + (_lpSummaryMap.get(String(p.id))?.pending || 0), 0);
     window.Snackbar?.confirm(
-      `¿Enviar a Gastos <b>${pendientes.length}</b> ${pendientes.length === 1 ? 'pago individual' : 'pagos individuales'} de esta semana (<b>L ${totalSum.toLocaleString('es-HN')}</b>)?`,
+      `¿Enviar a Cuentas <b>${pendientes.length}</b> ${pendientes.length === 1 ? 'pago individual' : 'pagos individuales'} de esta semana (<b>L ${totalSum.toLocaleString('es-HN')}</b>)?`,
       async () => {
         const btn = document.getElementById('lp-send-week-gastos-btn');
         if (btn) {
@@ -486,15 +486,15 @@ export function initListaPersonal() {
             initListaPersonal();
           }
         } catch (err) {
-          window.Snackbar?.show('Error enviando a Gastos: ' + (err.message || err), { type: 'error' });
+          window.Snackbar?.show('Error enviando a Cuentas: ' + (err.message || err), { type: 'error' });
           if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">payments</span><span>Enviar a Gastos</span>';
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">payments</span><span>Enviar a Cuentas</span>';
           }
         }
       },
       () => {},
-      { confirmText: 'Enviar a Gastos', cancelText: 'Cancelar' }
+      { confirmText: 'Enviar a Cuentas', cancelText: 'Cancelar' }
     );
   };
 

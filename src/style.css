@@ -742,15 +742,27 @@ body.screen-auth #app .main-content {
 }
 
 .btn-close {
-  background: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #eff4ed;
   border: none;
   cursor: pointer;
-  color: #999;
+  color: #1e3e2b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   transition: var(--transition);
+}
+.btn-close .material-icons,
+.btn-close .material-symbols-outlined {
+  font-size: 19px;
 }
 
 .btn-close:hover {
-  color: #333;
+  background: #e2ece0;
+  color: #1e3e2b;
 }
 
 .form-group {

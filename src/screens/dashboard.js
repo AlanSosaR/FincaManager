@@ -3,11 +3,17 @@ import { getPaginationFooterHtml } from '../pagination.js';
 import { loadPuntoReferencia } from '../auth.js';
 import { renderM3SearchBar, initM3FullScreenSearch, escapeSearchHtml } from '../components/m3_search.js';
 import { renderDetalleLote, initDetalleLote } from './detalle_lote.js';
+import { createCosechaController } from './cosecha_lote.js';
 import { showModal, closeModal } from '../modals.js';
+import { mergeCategories, openNewCategoryBottomSheet } from '../utils/custom_categories.js';
 
 let allLotes = [];
 let currentLotesSearchQuery = '';
 let refMarker = null;
+
+function formatLoteNombre(name) {
+  return String(name || '').replace(/\bcafe\b/gi, 'Café');
+}
 
 function parseCoordenadasJson(json) {
   try {
@@ -694,7 +700,7 @@ export async function renderDashboard() {
           <div class="cafetal-hero" style="margin-bottom: 14px;">
             <div class="ganado-card ganado-card-primary ganado-tally" style="background: var(--m3-primary, #2d3e2c); border-radius: 20px; padding: 24px 22px 20px; box-shadow: 0 6px 24px rgba(45,62,44,0.22); width: 100%; box-sizing: border-box;">
               <div class="ganado-tally-top" style="margin-bottom: 16px;">
-                <span class="ganado-tally-label" style="color: rgba(255,255,255,0.92); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13.5px;">Total Plantas</span>
+                <span class="ganado-tally-label" style="color: rgba(255,255,255,0.92); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 13.5px;">Total Plantas de Café</span>
                 <span class="ganado-tally-count">
                   <span class="ganado-card-value" style="color: #ffffff !important; font-size: 38px; font-weight: 800;">${totalPlantas.toLocaleString()}</span>
                 </span>
@@ -753,7 +759,7 @@ export async function initDashboard() {
   if (isMobile && window._cafetalTotalPlantas != null) {
     const titleEl = document.querySelector('#current-screen-title .topbar-title-text');
     if (titleEl) {
-      titleEl.textContent = `Total Plantas · ${Number(window._cafetalTotalPlantas).toLocaleString()}`;
+      titleEl.textContent = `Total Plantas de Café · ${Number(window._cafetalTotalPlantas).toLocaleString()}`;
     }
   }
   // Split control (search + arrow) menu
@@ -1008,7 +1014,7 @@ export async function initDashboard() {
     const extraCount = Math.max(0, sortedApps.length - 3);
 
     const plantasCount = Number(lote.num_plantas || 0).toLocaleString();
-    const haStr = lote.area_ha ? `${parseFloat(lote.area_ha).toFixed(2)} ha` : '';
+    const haStr = lote.area_ha ? `${parseFloat(lote.area_ha).toFixed(2)} hectáreas` : '';
 
     return `
       <!-- Header fijo (no se mueve ni lo tapa el contenido al hacer scroll) -->
@@ -1023,13 +1029,13 @@ export async function initDashboard() {
           </button>
         </div>
 
-        <!-- Header compacto: Nombre del lote + Píldora de plantas + 3 puntos (Bottom Sheet) -->
+        <!-- Header compacto: Nombre del lote + plantas y hectáreas debajo + 3 puntos (Bottom Sheet) -->
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 4px 0 14px; border-bottom: 1px solid rgba(45, 62, 44, 0.12);">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1; min-width:0;">
-            <h3 class="lote-sheet-title" style="margin:0; font-size:19px; font-weight:800; color:#1e3e2b; line-height:1.2;">${escapeHtml(lote.nombre)}</h3>
-            <span style="display:inline-flex; align-items:center; gap:5px; background:#eff4ed; color:#1e3e2b; border:1px solid #d5e2d2; font-weight:700; font-size:12px; padding:4px 10px; border-radius:999px; white-space:nowrap;">
+          <div style="display:flex; flex-direction:column; gap:3px; flex:1; min-width:0;">
+            <h3 class="lote-sheet-title" style="margin:0; font-size:19px; font-weight:800; color:#1e3e2b; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(formatLoteNombre(lote.nombre))}</h3>
+            <div style="display:inline-flex; align-items:center; gap:5px; color:#5a6b58; font-weight:600; font-size:12.5px; line-height:1.2;">
               <span>${plantasCount} plantas</span>${haStr ? `<span style="color:#8a4b19;">• ${haStr}</span>` : ''}
-            </span>
+            </div>
           </div>
           <button type="button" id="lote-sheet-more-btn" style="width:36px; height:36px; border-radius:50%; background:transparent; border:none; color:#1e3e2b; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;" title="Opciones del Lote" aria-label="Opciones del Lote">
             <span class="material-symbols-outlined" style="font-size:22px;">more_vert</span>
@@ -1113,7 +1119,7 @@ export async function initDashboard() {
         </button>
       </div>
 
-      <h3 class="mapa-pop-title">${escapeHtml(lote.nombre)}</h3>
+      <h3 class="mapa-pop-title">${escapeHtml(formatLoteNombre(lote.nombre))}</h3>
 
       <div class="mapa-pop-stats" style="margin-top:6px; flex-wrap:wrap; gap:8px;">
         <span><img src="sprouts.png" alt="" style="width:16px;height:16px;object-fit:contain;"> <b>${(lote.num_plantas || 0).toLocaleString()}</b> plantas de café</span>
@@ -1658,6 +1664,14 @@ export async function initDashboard() {
           return isoStr === todayStr ? `Hoy, ${d} ${m}` : `${d} ${m} ${p[0]}`;
         };
 
+        const rawEditDescLote = isEdit ? String(editMov.descripcion || '') : '';
+        const preservedTagsLote = (rawEditDescLote.match(/\[(?:ref:[^\]]+|Por Aprobar)\]/g) || []).join(' ');
+        const visibleEditDescLote = rawEditDescLote
+          .replace(/\[ref:[^\]]+\]/g, '')
+          .replace(/\[Por Aprobar\]/g, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+
         showModal(isEdit ? 'Editar movimiento' : 'Nuevo movimiento', `
           <form id="form-lote-gasto-sheet" novalidate style="display:flex; flex-direction:column; gap:13px;">
             <!-- Toggle Egreso / Ingreso -->
@@ -1679,7 +1693,7 @@ export async function initDashboard() {
             <!-- Nombre del movimiento (Material 3 Outlined Text Field) -->
             <div>
               <div id="mov-nombre-field" class="m3-field" style="margin-bottom:0;">
-                <input type="text" id="mov-nombre-input" name="nombre_movimiento" placeholder=" " value="${isEdit ? escapeHtml(String(editMov.descripcion || '')) : ''}" style="font-size:14px; font-weight:600; background:#ffffff;">
+                <input type="text" id="mov-nombre-input" name="nombre_movimiento" placeholder=" " value="${isEdit ? escapeHtml(visibleEditDescLote) : ''}" style="font-size:14px; font-weight:600; background:#ffffff;">
                 <label for="mov-nombre-input" style="background:#ffffff;">Nombre del movimiento</label>
               </div>
               <div id="mov-nombre-err" style="display:none; font-size:11.5px; font-weight:600; color:#ba1a1a; margin-top:4px; padding-left:14px;"></div>
@@ -1737,17 +1751,45 @@ export async function initDashboard() {
           if (lbl) lbl.textContent = movTipo === 'ingreso' ? '¿De qué producto viene?' : 'Categoría';
           wrap.style.flexWrap = 'nowrap';
           wrap.style.overflowX = 'auto';
-          const list = movTipo === 'egreso' ? egresoCats : ingresoCats;
+          const baseList = movTipo === 'egreso' ? egresoCats : ingresoCats;
+          const list = mergeCategories(baseList, movTipo);
           if (!list.includes(selectedCat)) selectedCat = list[0];
+          const prevCatScroll = wrap.scrollLeft;
           wrap.innerHTML = list.map(cat => {
             const active = cat === selectedCat;
             const displayLabel = cat.replace(/^Ingreso · /i, '');
-            return `<button type="button" data-cat="${escapeHtml(cat)}" style="flex:0 0 auto; height:34px; padding:0 14px; border-radius:999px; border:1px solid ${active ? accent : '#d5e2d2'}; background:${active ? accent : '#ffffff'}; color:${active ? '#ffffff' : '#1f2937'}; font-size:12.5px; font-weight:${active ? '700' : '600'}; cursor:pointer; white-space:nowrap;">${escapeHtml(displayLabel)}</button>`;
+            return `<button type="button" data-cat="${escapeHtml(cat)}" class="${active ? 'is-active-cat' : ''}" style="flex:0 0 auto; height:34px; padding:0 14px; border-radius:999px; border:1px solid ${active ? accent : '#d5e2d2'}; background:${active ? accent : '#ffffff'}; color:${active ? '#ffffff' : '#1f2937'}; font-size:12.5px; font-weight:${active ? '700' : '600'}; cursor:pointer; white-space:nowrap;">${escapeHtml(displayLabel)}</button>`;
           }).join('');
+          wrap.scrollLeft = prevCatScroll;
           wrap.querySelectorAll('button[data-cat]').forEach(btn => {
             btn.addEventListener('click', () => {
-              selectedCat = btn.dataset.cat;
+              const clicked = btn.dataset.cat;
+              const isOtros = clicked === 'Otros' || clicked === 'Ingreso · Otros';
+              if (isOtros) {
+                openNewCategoryBottomSheet({
+                  tipo: movTipo,
+                  onCreated: (newCat) => {
+                    selectedCat = newCat;
+                    renderCatPills();
+                    requestAnimationFrame(() => {
+                      document.querySelector('#mov-cat-pills button.is-active-cat')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    });
+                  },
+                  onUseOtros: () => {
+                    selectedCat = clicked;
+                    renderCatPills();
+                    requestAnimationFrame(() => {
+                      document.querySelector('#mov-cat-pills button.is-active-cat')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                    });
+                  }
+                });
+                return;
+              }
+              selectedCat = clicked;
               renderCatPills();
+              requestAnimationFrame(() => {
+                document.querySelector('#mov-cat-pills button.is-active-cat')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+              });
             });
           });
         };
@@ -1794,6 +1836,9 @@ export async function initDashboard() {
           if (etapaSec) etapaSec.style.display = movTipo === 'egreso' ? 'block' : 'none';
           renderCatPills();
           renderEtapaPills();
+          requestAnimationFrame(() => {
+            document.querySelector('#mov-cat-pills button.is-active-cat')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+          });
         };
 
         document.getElementById('mov-btn-egreso')?.addEventListener('click', () => {
@@ -1978,12 +2023,13 @@ export async function initDashboard() {
           }
           try {
             const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || lote.empresa_id;
+            const finalDescLote = (isEdit && preservedTagsLote) ? `${desc} ${preservedTagsLote}`.trim() : desc;
             const payload = {
               lote_id: lote.id,
               ...(empresaId ? { empresa_id: empresaId } : {}),
               fecha,
               categoria: selectedCat,
-              descripcion: desc,
+              descripcion: finalDescLote,
               monto
             };
             const { error } = isEdit
@@ -2021,20 +2067,32 @@ export async function initDashboard() {
         });
       };
 
+      const cosechaCtrl = createCosechaController(lote, 'dl-cosecha-wrap');
+
       const syncFooterButtons = () => {
+        const singleBtn = document.getElementById('lote-footer-register-btn');
+        const cosechaRow = document.getElementById('lote-footer-cosecha-row');
         const rIcon = document.getElementById('lote-footer-register-icon');
         const rLbl = document.getElementById('lote-footer-register-label');
         const selDate = window._planSelectedDateStr || getTodayLocalStr();
         const isFutureDate = selDate > getTodayLocalStr();
-        if (activeSheetTab === 'timeline') {
-          if (rIcon) rIcon.textContent = 'add_a_photo';
-          if (rLbl) rLbl.textContent = 'Subir Fotografía';
-        } else if (activeSheetTab === 'balance') {
-          if (rIcon) rIcon.textContent = 'receipt_long';
-          if (rLbl) rLbl.textContent = 'Registrar Gasto';
+
+        if (activeSheetTab === 'cosecha') {
+          if (singleBtn) singleBtn.style.display = 'none';
+          if (cosechaRow) cosechaRow.style.display = 'grid';
         } else {
-          if (rIcon) rIcon.textContent = isFutureDate ? 'calendar_add_on' : 'add_circle';
-          if (rLbl) rLbl.textContent = isFutureDate ? 'Programar Actividad' : 'Registrar Actividad';
+          if (cosechaRow) cosechaRow.style.display = 'none';
+          if (singleBtn) singleBtn.style.display = 'flex';
+          if (activeSheetTab === 'timeline') {
+            if (rIcon) rIcon.textContent = 'add_a_photo';
+            if (rLbl) rLbl.textContent = 'Subir Fotografía';
+          } else if (activeSheetTab === 'balance') {
+            if (rIcon) rIcon.textContent = 'receipt_long';
+            if (rLbl) rLbl.textContent = 'Registrar Movimiento';
+          } else {
+            if (rIcon) rIcon.textContent = isFutureDate ? 'calendar_add_on' : 'add_circle';
+            if (rLbl) rLbl.textContent = isFutureDate ? 'Programar Actividad' : 'Registrar Actividad';
+          }
         }
         const mapWrap = document.getElementById('dl-embedded-sheet-map-wrap');
         if (mapWrap) mapWrap.style.display = activeSheetTab === 'manejo' ? 'block' : 'none';
@@ -2047,19 +2105,32 @@ export async function initDashboard() {
           pill.style.background = active ? '#2d3e2c' : '#ffffff';
           pill.style.borderColor = active ? '#2d3e2c' : '#d5e2d2';
           pill.style.color = active ? '#ffffff' : '#1e3e2b';
+          if (active) {
+            try { pill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } catch (_) {}
+          }
         });
         const calWrap = document.getElementById('dl-calendar-wrap');
         const evoWrap = document.getElementById('dl-evolucion-wrap');
+        const cosWrap = document.getElementById('dl-cosecha-wrap');
         const balWrap = document.getElementById('dl-balance-wrap');
         if (tab === 'timeline') {
+          if (cosWrap) cosWrap.style.display = 'none';
           if (balWrap) balWrap.style.display = 'none';
           window.onSelectActividadEvolucion?.('gallery:all');
+        } else if (tab === 'cosecha') {
+          if (calWrap) calWrap.style.display = 'none';
+          if (evoWrap) evoWrap.style.display = 'none';
+          if (balWrap) balWrap.style.display = 'none';
+          if (cosWrap) cosWrap.style.display = 'block';
+          cosechaCtrl.loadAndRender();
         } else if (tab === 'balance') {
           if (calWrap) calWrap.style.display = 'none';
           if (evoWrap) evoWrap.style.display = 'none';
+          if (cosWrap) cosWrap.style.display = 'none';
           if (balWrap) balWrap.style.display = 'block';
           loadLoteBalance();
         } else {
+          if (cosWrap) cosWrap.style.display = 'none';
           if (balWrap) balWrap.style.display = 'none';
           window.onSelectActividadEvolucion?.('cal');
         }
@@ -2071,8 +2142,26 @@ export async function initDashboard() {
           <span class="material-symbols-outlined" id="lote-footer-register-icon" style="font-size:19px;">add_circle</span>
           <span id="lote-footer-register-label">Registrar Actividad</span>
         </button>
+        <div id="lote-footer-cosecha-row" style="display:none; width:100%; grid-template-columns:1fr 1.25fr; gap:10px;">
+          <button type="button" id="lote-footer-cos-gastos" style="height:44px; border-radius:999px; border:1.5px solid #2d3e2c; background:#ffffff; color:#2d3e2c; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">
+            Enviar a Cuentas
+          </button>
+          <button type="button" id="lote-footer-cos-register" style="height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; box-shadow:0 3px 10px rgba(45,62,44,0.22);">
+            + Registrar hoy
+          </button>
+        </div>
       `;
       fixedFooter.classList.add('open');
+
+      document.getElementById('lote-footer-cos-gastos')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cosechaCtrl.sendWeekToGastos();
+      });
+      document.getElementById('lote-footer-cos-register')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setSheetExpanded(true);
+        cosechaCtrl.openRegisterToday();
+      });
 
       document.getElementById('lote-footer-register-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -2250,7 +2339,7 @@ export async function initDashboard() {
       icon: L.divIcon({
         className: 'lote-label-wrap',
         html: `<div class="lote-label" style="background:${escapeHtml(loteColor)};">
-          <span>${escapeHtml(lote.nombre || 'Lote')}</span>
+          <span>${escapeHtml(formatLoteNombre(lote.nombre || 'Lote'))}</span>
         </div>`,
         iconSize: [0, 0],
         iconAnchor: [0, 0]
@@ -2360,7 +2449,7 @@ export async function initDashboard() {
         <div class="ganado-row-content">
           <div class="ganado-col-group" style="flex:1;min-width:0;">
             <p class="ganado-col-label">${escapeSearchHtml((l.variedad || 'CAFÉ').toUpperCase())}</p>
-            <p class="ganado-col-value">${escapeSearchHtml(l.nombre || 'Sin nombre')}</p>
+            <p class="ganado-col-value">${escapeSearchHtml(formatLoteNombre(l.nombre || 'Sin nombre'))}</p>
             <p class="ganado-col-label" style="margin-top:4px;">${Number(l.numero_plantas || 0).toLocaleString('es-HN')} plantas</p>
           </div>
           <div class="ganado-col-group" style="text-align:right;margin-left:auto;align-items:flex-end;">

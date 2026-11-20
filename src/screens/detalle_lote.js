@@ -443,7 +443,8 @@ export async function renderDetalleLote(id, { embeddedInSheet = false } = {}) {
           <div id="lote-calendario-section" style="border-radius: 0; border: none; box-shadow: none; padding: ${embeddedInSheet ? '4px 0 8px' : '20px 18px'}; width: 100%; box-sizing: border-box; background: ${embeddedInSheet ? 'transparent' : '#ffffff'};">
           ${embeddedInSheet ? `
             <div id="dl-sheet-pills-carousel" style="display:flex; align-items:center; gap:8px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; padding:2px 0 12px; margin-bottom:10px; border-bottom:1px solid #eef2ee;">
-              <button type="button" class="dl-sheet-pill active" data-tab="manejo" onclick="window._switchSheetTab?.('manejo')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #2d3e2c; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Manejo</button>
+              <button type="button" class="dl-sheet-pill active" data-tab="manejo" onclick="window._switchSheetTab?.('manejo')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #2d3e2c; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Manejo de lote</button>
+              <button type="button" class="dl-sheet-pill" data-tab="cosecha" onclick="window._switchSheetTab?.('cosecha')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #d5e2d2; background:#ffffff; color:#1e3e2b; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Cosecha</button>
               <button type="button" class="dl-sheet-pill" data-tab="balance" onclick="window._switchSheetTab?.('balance')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #d5e2d2; background:#ffffff; color:#1e3e2b; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Balance de cuentas</button>
               <button type="button" class="dl-sheet-pill" data-tab="timeline" onclick="window._switchSheetTab?.('timeline')" style="flex-shrink:0; padding:8px 18px; border-radius:999px; border:1.5px solid #d5e2d2; background:#ffffff; color:#1e3e2b; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">Línea de tiempo</button>
             </div>
@@ -514,7 +515,10 @@ export async function renderDetalleLote(id, { embeddedInSheet = false } = {}) {
           <!-- Vista 2: Visor de Fotos y Evolución de Aplicaciones -->
           <div id="dl-evolucion-wrap" style="display: none;"></div>
 
-          <!-- Vista 3: Balance de Cuentas del Lote -->
+          <!-- Vista 3: Cosecha del Lote -->
+          <div id="dl-cosecha-wrap" style="display: none;"></div>
+
+          <!-- Vista 4: Balance de Cuentas del Lote -->
           <div id="dl-balance-wrap" style="display: none;"></div>
 
         </div>

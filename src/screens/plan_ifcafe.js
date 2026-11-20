@@ -1630,7 +1630,7 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
     _personalList = Array.isArray(personalData) ? personalData : [];
     _currentUser = userData;
 
-    let aplicaciones = Array.isArray(appsData) ? appsData : [];
+    let aplicaciones = (Array.isArray(appsData) ? appsData : []).filter(a => !String(a.observaciones || '').startsWith('[COSECHA_JSON]'));
 
     if (_allLotes.length === 0) {
       return emptyStateHtml('No hay lotes registrados', 'Crea tu primer lote de café para planificar y registrar labores');
