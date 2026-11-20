@@ -1059,8 +1059,12 @@ function createCosechaInlineController(editMov, refMatch, containerId, onTotalCh
 
   const load = async () => {
     try {
-      const rows = await restFetch(`/rest/v1/lote_aplicaciones?lote_id=eq.${encodeURIComponent(loteId)}&fecha=gte.${wsIso}&fecha=lte.${weIso}&select=id,fecha,tipo,observaciones`);
-      (Array.isArray(rows) ? rows : []).forEach(r => {
+      const { data: allRows } = await supabase.from('lote_aplicaciones').select('*').eq('lote_id', loteId);
+      const rows = (Array.isArray(allRows) ? allRows : []).filter(r => {
+        const f = String(r.fecha || '').slice(0, 10);
+        return f && f >= wsIso && f <= weIso;
+      });
+      rows.forEach(r => {
         const obs = String(r.observaciones || '');
         if (!obs.startsWith('[COSECHA_JSON]')) return;
         try {
@@ -1126,12 +1130,11 @@ function createCosechaInlineController(editMov, refMatch, containerId, onTotalCh
         observaciones: '[COSECHA_JSON]' + JSON.stringify({ precio_lata: dayPrice, registros: prevRegs })
       };
       if (existing?.rowId) {
-        await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${encodeURIComponent(existing.rowId)}`, {
-          method: 'PATCH',
-          body: JSON.stringify(aplPayload)
-        });
+        const { error: uErr } = await supabase.from('lote_aplicaciones').update(aplPayload).eq('id', existing.rowId);
+        if (uErr) throw uErr;
       } else if (prevRegs.length > 0) {
-        await restInsert('/rest/v1/lote_aplicaciones', aplPayload);
+        const { error: iErr } = await supabase.from('lote_aplicaciones').insert([aplPayload]);
+        if (iErr) throw iErr;
       }
     }
     const newTotalLatas = Array.from(workerDayLatas.values()).reduce((s, v) => s + (Number(v) || 0), 0);

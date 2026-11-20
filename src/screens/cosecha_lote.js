@@ -1,4 +1,5 @@
-import { restFetch, restInsert } from '../auth.js';
+import { restFetch } from '../auth.js';
+import { supabase } from '../supabase.js';
 import { showModal, closeModal } from '../modals.js';
 
 const DAYS_SHORT = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
@@ -126,15 +127,21 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       const weIso = fmtIso(days[6]);
       const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || lote?.empresa_id || '';
 
-      const [personalRes, appsRes, gastosRes] = await Promise.all([
-        restFetch('/rest/v1/personal?order=nombre.asc&select=*').catch(() => []),
-        restFetch(`/rest/v1/lote_aplicaciones?lote_id=eq.${encodeURIComponent(lote.id)}&fecha=gte.${wsIso}&fecha=lte.${weIso}&select=*`).catch(() => []),
-        restFetch(`/rest/v1/gastos?lote_id=eq.${encodeURIComponent(lote.id)}&categoria=eq.Cosecha&select=id,descripcion,monto`).catch(() => [])
+      const [personalRes, appsQuery, gastosQuery] = await Promise.all([
+        restFetch('/rest/v1/personal?order=nombre.asc&select=*').catch(async () => {
+          const loc = await supabase.from('personal').select('*').catch(() => ({ data: [] }));
+          return (loc?.data || []).sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
+        }),
+        supabase.from('lote_aplicaciones').select('*').eq('lote_id', lote.id).catch(() => ({ data: [] })),
+        supabase.from('gastos').select('*').eq('lote_id', lote.id).catch(() => ({ data: [] }))
       ]);
 
       allPersonal = Array.isArray(personalRes) ? personalRes : [];
-      const apps = Array.isArray(appsRes) ? appsRes : [];
-      const gastos = Array.isArray(gastosRes) ? gastosRes : [];
+      const apps = (appsQuery?.data || []).filter(app => {
+        const f = String(app.fecha || '').slice(0, 10);
+        return f && f >= wsIso && f <= weIso;
+      });
+      const gastos = (gastosQuery?.data || []).filter(g => g.categoria === 'Cosecha');
 
       weekPaidMap = new Map();
       gastos.forEach(g => {
@@ -654,14 +661,13 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
         saveBtn.textContent = 'Guardando...';
       }
       try {
-        const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || lote?.empresa_id || '';
-        await restInsert('/rest/v1/personal', {
-          empresa_id: eid,
+        const { error: pErr } = await supabase.from('personal').insert([{
           nombre,
           iniciales: getInitials(nombre),
           rol: 'Recolector',
           pago_diario: 0
-        });
+        }]);
+        if (pErr) throw pErr;
         window.clearScreenCache?.('personal');
         closeModal();
         window.Snackbar?.show(`✔ ${nombre} agregado al equipo`);
@@ -735,12 +741,11 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
           observaciones: '[COSECHA_JSON]' + JSON.stringify({ precio_lata: dayPrice, registros: prevRegs })
         };
         if (existing?.rowId) {
-          await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${encodeURIComponent(existing.rowId)}`, {
-            method: 'PATCH',
-            body: JSON.stringify(aplPayload)
-          });
+          const { error: uErr } = await supabase.from('lote_aplicaciones').update(aplPayload).eq('id', existing.rowId);
+          if (uErr) throw uErr;
         } else if (prevRegs.length > 0) {
-          await restInsert('/rest/v1/lote_aplicaciones', aplPayload);
+          const { error: iErr } = await supabase.from('lote_aplicaciones').insert([aplPayload]);
+          if (iErr) throw iErr;
         }
       }
     };
@@ -1007,15 +1012,12 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
           const weekTitle = getWeekTitleFull();
           const newDesc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(totalLatas)} ${totalLatas === 1 ? 'lata' : 'latas'}) ${refTag}`;
           if (totalPay > 0) {
-            await restFetch(`/rest/v1/gastos?id=eq.${encodeURIComponent(paidInfo.id)}`, {
-              method: 'PATCH',
-              body: JSON.stringify({ monto: totalPay, descripcion: newDesc })
-            });
+            const { error: uErr } = await supabase.from('gastos').update({ monto: totalPay, descripcion: newDesc }).eq('id', paidInfo.id);
+            if (uErr) throw uErr;
             weekPaidMap.set(refTag, { id: paidInfo.id, monto: totalPay, descripcion: newDesc });
           } else {
-            await restFetch(`/rest/v1/gastos?id=eq.${encodeURIComponent(paidInfo.id)}`, {
-              method: 'DELETE'
-            });
+            const { error: dErr } = await supabase.from('gastos').delete().eq('id', paidInfo.id);
+            if (dErr) throw dErr;
             weekPaidMap.delete(refTag);
           }
           window.clearScreenCache?.('gastos');
@@ -1038,15 +1040,16 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
           const weekTitle = getWeekTitleFull();
           const todayIso = fmtIso(new Date());
           const desc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(totalLatas)} ${totalLatas === 1 ? 'lata' : 'latas'}) ${refTag}`;
-          const res = await restInsert('/rest/v1/gastos', {
-            empresa_id: eid,
+          const { data: insData, error: iErr } = await supabase.from('gastos').insert([{
             lote_id: lote.id,
             fecha: todayIso,
             categoria: 'Cosecha',
             descripcion: desc,
             monto: totalPay
-          });
-          weekPaidMap.set(refTag, { id: res?.id || '', monto: totalPay, descripcion: desc });
+          }]);
+          if (iErr) throw iErr;
+          const created = Array.isArray(insData) ? insData[0] : insData;
+          weekPaidMap.set(refTag, { id: created?.id || '', monto: totalPay, descripcion: desc });
           window.clearScreenCache?.('gastos');
           closeModal();
           window.Snackbar?.show(`✔ Enviado a Cuentas: ${col.nombre} (L ${totalPay.toLocaleString('es-HN')})`);
@@ -1330,12 +1333,12 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
         const totalLatas = registros.reduce((s, r) => s + r.latas, 0);
         if (registros.length === 0) {
           if (existing?.rowId) {
-            await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${encodeURIComponent(existing.rowId)}`, { method: 'DELETE' });
+            const { error: dErr } = await supabase.from('lote_aplicaciones').delete().eq('id', existing.rowId);
+            if (dErr) throw dErr;
           }
         } else {
           const payload = {
             lote_id: lote.id,
-            empresa_id: eid,
             fecha: activeIso,
             tipo: 'Cosecha',
             metodo: 'Corte manual',
@@ -1347,12 +1350,11 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
             observaciones: '[COSECHA_JSON]' + JSON.stringify({ precio_lata: dayPrice, registros })
           };
           if (existing?.rowId) {
-            await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${encodeURIComponent(existing.rowId)}`, {
-              method: 'PATCH',
-              body: JSON.stringify(payload)
-            });
+            const { error: uErr } = await supabase.from('lote_aplicaciones').update(payload).eq('id', existing.rowId);
+            if (uErr) throw uErr;
           } else {
-            await restInsert('/rest/v1/lote_aplicaciones', payload);
+            const { error: iErr } = await supabase.from('lote_aplicaciones').insert([payload]);
+            if (iErr) throw iErr;
           }
         }
         closeModal();
@@ -1410,29 +1412,27 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
           for (const { col, refTag } of newCols) {
             const desc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(col.latas)} ${col.latas === 1 ? 'lata' : 'latas'}) ${refTag}`;
-            const res = await restInsert('/rest/v1/gastos', {
-              empresa_id: eid,
+            const { data: insData, error: iErr } = await supabase.from('gastos').insert([{
               lote_id: lote.id,
               fecha: todayIso,
               categoria: 'Cosecha',
               descripcion: desc,
               monto: col.pay
-            });
-            weekPaidMap.set(refTag, { id: res?.id || '', monto: col.pay, descripcion: desc });
+            }]);
+            if (iErr) throw iErr;
+            const created = Array.isArray(insData) ? insData[0] : insData;
+            weekPaidMap.set(refTag, { id: created?.id || '', monto: col.pay, descripcion: desc });
           }
 
           for (const { col, refTag, paid } of changedCols) {
             const desc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(col.latas)} ${col.latas === 1 ? 'lata' : 'latas'}) ${refTag}`;
             if (col.pay > 0) {
-              await restFetch(`/rest/v1/gastos?id=eq.${encodeURIComponent(paid.id)}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ monto: col.pay, descripcion: desc })
-              });
+              const { error: uErr } = await supabase.from('gastos').update({ monto: col.pay, descripcion: desc }).eq('id', paid.id);
+              if (uErr) throw uErr;
               weekPaidMap.set(refTag, { id: paid.id, monto: col.pay, descripcion: desc });
             } else {
-              await restFetch(`/rest/v1/gastos?id=eq.${encodeURIComponent(paid.id)}`, {
-                method: 'DELETE'
-              });
+              const { error: dErr } = await supabase.from('gastos').delete().eq('id', paid.id);
+              if (dErr) throw dErr;
               weekPaidMap.delete(refTag);
             }
           }
