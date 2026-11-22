@@ -567,7 +567,8 @@ body.screen-auth #app .main-content {
     min-height: 580px !important;
     height: 580px !important;
   }
-  #lote-map-container {
+  #lote-map-container,
+  #ref-map-container {
     flex: 1 1 0% !important;
     height: auto !important;
     min-height: 0 !important;
@@ -577,8 +578,9 @@ body.screen-auth #app .main-content {
     min-height: 320px !important;
   }
   #ref-map {
-    height: 380px !important;
-    min-height: 380px !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
   }
 
   .sidebar-overlay {

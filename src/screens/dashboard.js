@@ -2406,6 +2406,17 @@ export async function initDashboard() {
   setTimeout(() => {
     fitMapToScreen();
     map.invalidateSize({ animate: false, pan: false });
+    if (window._pendingOpenLote?.loteId) {
+      const target = window._pendingOpenLote;
+      window._pendingOpenLote = null;
+      selectLote(target.loteId);
+      if (target.tab) {
+        setTimeout(() => {
+          const tabBtn = document.querySelector(`[data-tab="${target.tab}"], [data-dl-tab="${target.tab}"]`);
+          if (tabBtn) tabBtn.click();
+        }, 420);
+      }
+    }
   }, 450);
 
   // Material 3 Full-Screen Search on Cafetal / Lotes

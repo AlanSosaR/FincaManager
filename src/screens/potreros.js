@@ -106,7 +106,7 @@ export async function renderPotreros() {
         align-items: center;
         gap: 6px;
         padding: 8px 14px;
-        border-radius: 12px;
+        border-radius: 999px;
         border: 1px solid rgba(0,0,0,0.08);
         background: #ffffff;
         color: #2d3e2c;
@@ -114,7 +114,7 @@ export async function renderPotreros() {
         font-size: 12px;
         font-weight: 700;
         cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.18);
       }
       .mapa-empty {
         display: flex;
@@ -321,27 +321,43 @@ export async function renderPotreros() {
       .leaflet-top.leaflet-right {
         top: 64px;
       }
+      .screen-potreros .leaflet-control-geocoder {
+        display: none !important;
+      }
       .potrero-label {
         position: absolute;
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
         color: #ffffff;
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 800;
         letter-spacing: 0.3px;
-        padding: 5px 12px 5px 8px;
+        padding: 5px 12px;
         border-radius: 999px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.35);
         white-space: nowrap;
         border: 2px solid #ffffff;
-        pointer-events: none;
+        pointer-events: auto !important;
+        cursor: pointer !important;
         z-index: 500;
         font-family: 'Work Sans', sans-serif;
         display: flex;
         align-items: center;
-        gap: 4px;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        gap: 5px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+      }
+      .potrero-label-wrap {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+      }
+      @media (max-width: 600px) {
+        .potrero-label {
+          font-size: 10.5px;
+          padding: 3px 8px;
+          border-width: 1.5px;
+          gap: 3px;
+        }
       }
       #mapa-container path.leaflet-interactive {
         filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
@@ -351,28 +367,17 @@ export async function renderPotreros() {
       .potrero-float-card {
         position: absolute;
         z-index: 1400;
-        max-width: 320px;
+        max-width: calc(100vw - 32px);
         width: 320px;
         background: #ffffff;
         border-radius: 16px;
         box-shadow: 0 12px 40px rgba(0,0,0,0.35);
         border: 1px solid #e0e8e0;
         padding: 14px 16px;
+        top: 50%;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translate(-50%, -50%);
         font-family: 'Work Sans', sans-serif;
-      }
-      .potrero-float-tip {
-        position: absolute;
-        bottom: -10px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 0;
-        height: 0;
-        border-left: 10px solid transparent;
-        border-right: 10px solid transparent;
-        border-top: 10px solid #ffffff;
-        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15));
       }
       .potrero-float-close {
         display: inline-flex;
@@ -389,6 +394,29 @@ export async function renderPotreros() {
       }
       .potrero-float-close:hover {
         background: #f2f4f0;
+      }
+      @media (max-width: 768px) {
+        .preview-container:has(.screen-potreros) {
+          padding: 0 !important;
+          overflow: hidden !important;
+        }
+        .screen-potreros {
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        .screen-potreros .ganado-top-actions-container,
+        .screen-potreros .ganado-page-title,
+        .screen-potreros .potreros-hero-banner {
+          display: none !important;
+        }
+        .screen-potreros .da-tabs-section {
+          margin-top: 0 !important;
+          padding: 0 !important;
+          border-radius: 0 !important;
+          border: none !important;
+          box-shadow: none !important;
+          background: transparent !important;
+        }
       }
     </style>
     <div class="screen-potreros" style="padding-bottom: 80px;">
@@ -418,7 +446,7 @@ export async function renderPotreros() {
 
       <div class="da-tabs-section" style="margin-top: 10px;">
         <div style="position: relative;">
-          <div class="ganado-tag-stat" style="background: #fdfdfd; border-radius: 16px; padding: 13px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; cursor: default;">
+          <div class="ganado-tag-stat potreros-hero-banner" style="background: #fdfdfd; border-radius: 16px; padding: 13px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1.5px solid rgba(45,62,44,0.12); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; width: 100%; box-sizing: border-box; cursor: default;">
             <div style="display: flex; align-items: center; gap: 14px;">
               <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;"><img src="mapa.png" alt="" style="width: 24px; height: 24px; object-fit: contain;"></span>
               <div style="display: flex; flex-direction: column;">
@@ -439,7 +467,6 @@ export async function renderPotreros() {
               <p>Cargando mapa de potreros...</p>
             </div>
           </div>
-          <div id="potrero-float-card" class="potrero-float-card" style="display:none;"></div>
         </div>
       </div>
     </div>
@@ -476,89 +503,138 @@ export async function initPotreros() {
 
   const withCoords = potreros.filter(p => p.coordenadas_json || p.coordenadas);
   const totalHa = potreros.reduce((s, p) => s + (parseFloat(p.area) || 0), 0);
-  document.getElementById('mapa-title-count').textContent = `(${potreros.length})`;
-  document.getElementById('mapa-ha-text').textContent = `${totalHa.toFixed(2)} Hectáreas`;
+  const countEl = document.getElementById('mapa-title-count');
+  if (countEl) countEl.textContent = `(${potreros.length})`;
+  const haTextEl = document.getElementById('mapa-ha-text');
+  if (haTextEl) haTextEl.textContent = `${totalHa.toFixed(2)} Hectáreas`;
 
-  container.innerHTML = '';
+  const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+  if (isMobile) {
+    const titleEl = document.querySelector('#current-screen-title .topbar-title-text');
+    if (titleEl) {
+      titleEl.textContent = `Control de Potreros · ${totalHa.toFixed(2)} ha`;
+    }
+  }
 
-  const map = L.map(container, {
-    center: [14.08572, -86.17865],
-    zoom: 15,
-    maxZoom: 22,
-    zoomControl: false,
-    attributionControl: false
-  });
+  // En móvil: el mapa principal ocupa TODA la pantalla (pegado desde el header hasta abajo, de borde a borde)
+  const fitMapToScreen = () => {
+    const el = document.getElementById('mapa-container');
+    if (!el || !el.isConnected) return;
+    const props = ['height', 'min-height', 'width', 'margin-left', 'margin-top', 'border-radius', 'border', 'box-shadow'];
+    props.forEach(p => el.style.removeProperty(p));
+    if (window.innerWidth > 768) {
+      window._potrerosMapInstance?.invalidateSize();
+      return;
+    }
+    const topbar = document.querySelector('.top-bar');
+    const topbarBottom = topbar ? Math.round(topbar.getBoundingClientRect().bottom) : 0;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const gapTop = Math.round(rect.top - topbarBottom);
+    const set = (k, v) => el.style.setProperty(k, v, 'important');
+    if (gapTop !== 0) {
+      set('margin-top', (-gapTop) + 'px');
+    }
+    const leftAfter = Math.round(el.getBoundingClientRect().left);
+    if (leftAfter !== 0) {
+      set('margin-left', (-leftAfter) + 'px');
+    }
+    const mainContent = document.querySelector('.main-content');
+    const mainBottom = mainContent ? Math.ceil(mainContent.getBoundingClientRect().bottom) : 0;
+    const vh = Math.ceil(Math.max(
+      window.innerHeight || 0,
+      document.documentElement.clientHeight || 0,
+      window.visualViewport?.height || 0,
+      mainBottom
+    ));
+    const vw = Math.ceil(Math.max(
+      window.innerWidth || 0,
+      document.documentElement.clientWidth || 0,
+      window.visualViewport?.width || 0
+    ));
+    const actualTop = Math.floor(el.getBoundingClientRect().top);
+    const h = Math.max(320, vh - actualTop + 2);
+    set('width', vw + 'px');
+    set('height', h + 'px');
+    set('min-height', h + 'px');
+    set('border-radius', '0');
+    set('border', 'none');
+    set('box-shadow', 'none');
+    window._potrerosMapInstance?.invalidateSize({ animate: false, pan: false });
+  };
+  fitMapToScreen();
+  if (window._potrerosFitMapHandler) {
+    window.removeEventListener('resize', window._potrerosFitMapHandler);
+    window.visualViewport?.removeEventListener('resize', window._potrerosFitMapHandler);
+  }
+  window._potrerosFitMapHandler = fitMapToScreen;
+  window.addEventListener('resize', fitMapToScreen);
+  window.visualViewport?.addEventListener('resize', fitMapToScreen);
 
-  const btnLayers = document.createElement('button');
-  btnLayers.id = 'mapa-layers-btn';
-  btnLayers.className = 'mapa-layers-btn';
-  btnLayers.title = 'Cambiar mapa base';
-  btnLayers.style.background = '#1b5e20';
-  btnLayers.style.color = '#ffffff';
-  btnLayers.innerHTML = `
-    <span class="material-icons" style="font-size:16px;">layers</span>
-    <span id="mapa-layers-label">Esri Sat.</span>
+  container.innerHTML = `
+    <div id="mapa-leaflet" style="width:100%;height:100%;"></div>
+    <button class="mapa-layers-btn" id="mapa-layers-btn" title="Cambiar tipo de satélite">
+      <span class="material-symbols-outlined" style="font-size:18px;">layers</span>
+      <span id="mapa-layers-label">Google Earth</span>
+    </button>
+    <div id="potrero-float-card" class="potrero-float-card" style="display:none;"></div>
   `;
-  container.appendChild(btnLayers);
 
-  // Si hay potreros con polígono, se ajusta la vista a ellos; si no, centra en el punto de referencia de la finca
-  setTimeout(async () => {
-    const ref = await loadPuntoReferencia(window._currentEmpresaId).catch(() => null);
-    if (ref) {
-      if (refMarker) map.removeLayer(refMarker);
-      refMarker = L.marker([ref.lat, ref.lng], {
-        icon: L.divIcon({
-          className: 'ref-label-icon',
-          html: '<span class="material-icons" style="font-size:38px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
-          iconSize: null,
-          iconAnchor: [19, 38]
-        }),
-        interactive: false
-      }).addTo(map);
-    }
-    if (allBounds.length > 0) {
-      const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
-      map.fitBounds(group.getBounds().pad(0.1));
-    } else if (ref) {
-      map.setView([ref.lat, ref.lng], 15);
-    }
-    setTimeout(() => map.invalidateSize(), 200);
-  }, 50);
+  document.getElementById('potrero-float-card')?.addEventListener('click', (e) => e.stopPropagation());
 
-  // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
+  const map = L.map('mapa-leaflet', {
+    zoomControl: false,
+    attributionControl: false,
+    maxZoom: 21,
+    minZoom: 3,
+    zoomSnap: 0.1
+  }).setView([14.08572, -86.17865], 15);
+
+  window._potrerosMapInstance = map;
+
   const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
-    maxZoom: 22,
-    maxNativeZoom: 18
-  }).addTo(map);
+    maxZoom: 21,
+    maxNativeZoom: 17
+  });
 
   const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-    maxZoom: 22,
+    maxZoom: 21,
+    maxNativeZoom: 20
+  }).addTo(map);
+
+  const googleHybridLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+    attribution: 'Imagery &copy; Google',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    maxZoom: 21,
     maxNativeZoom: 20
   });
 
-  const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 22,
-    maxNativeZoom: 19,
-    opacity: 0.8
-  }).addTo(map);
-
-  // Fallback si Esri satélite falla
-  let esriFailed = false;
-  esriSatLayer.on('tileerror', function() {
-    if (esriFailed) return;
-    esriFailed = true;
-    if (map.hasLayer(esriSatLayer)) {
-      map.removeLayer(esriSatLayer);
-      map.addLayer(googleSatLayer);
-      window.Snackbar?.show('Cambiado a Google Satélite automáticamente', 'info');
+  // Load Punto de Referencia (exacto a Cafetal)
+  loadPuntoReferencia(window._currentEmpresaId).then(pt => {
+    if (!pt) return;
+    if (refMarker) map.removeLayer(refMarker);
+    const redPin = L.divIcon({
+      className: 'ref-pin-icon',
+      html: `<div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;transform:translate(-50%,-100%);">
+        <div style="width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#d93025;border:2.5px solid #ffffff;box-shadow:0 4px 10px rgba(0,0,0,0.38);display:flex;align-items:center;justify-content:center;">
+          <span class="material-symbols-outlined" style="transform:rotate(45deg);color:#ffffff;font-size:17px;">home</span>
+        </div>
+        <div style="width:8px;height:4px;border-radius:50%;background:rgba(0,0,0,0.35);margin-top:2px;"></div>
+        <span style="margin-top:3px;background:rgba(255,255,255,0.96);color:#1e3e2b;border:1.5px solid #2d3e2c;font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap;box-shadow:0 3px 8px rgba(0,0,0,0.28);letter-spacing:0.1px;">${escapeHtml(pt.nombre || 'Finca')}</span>
+      </div>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0]
+    });
+    refMarker = L.marker([pt.lat, pt.lng], { icon: redPin, interactive: false }).addTo(map);
+    if (!withCoords.length) {
+      map.setView([pt.lat, pt.lng], 16);
     }
-  });
+  }).catch(() => {});
 
-  // Zoom controls
+  // Zoom controls (visibles en escritorio, ocultos en móvil por CSS)
   L.Control.CustomZoom = L.Control.extend({
     onAdd: function() {
       const div = L.DomUtil.create('div', 'm3-map-zoom');
@@ -581,36 +657,31 @@ export async function initPotreros() {
     document.getElementById('mapa-zoom-out')?.addEventListener('click', () => map.zoomOut());
   }, 200);
 
-  // Layer toggle: 0 = Esri Satélite (Claridad), 1 = Google Satélite (Híbrido), 2 = Satélite Limpio
+  // Layer switcher: 0 = Google Earth, 1 = Google Híbrido, 2 = Esri Sat.
   let layerMode = 0;
+  const btnLayers = document.getElementById('mapa-layers-btn');
   const layersLabel = document.getElementById('mapa-layers-label');
-  btnLayers.addEventListener('click', () => {
-    layerMode = (layerMode + 1) % 3;
-    map.removeLayer(esriSatLayer);
-    map.removeLayer(googleSatLayer);
-    map.removeLayer(labelsLayer);
-    if (layerMode === 0) {
-      map.addLayer(esriSatLayer);
-      map.addLayer(labelsLayer);
-      btnLayers.style.background = '#1b5e20';
-      btnLayers.style.color = '#ffffff';
-      if (layersLabel) layersLabel.textContent = 'Esri Sat.';
-      window.Snackbar?.show('Capa: Esri Satélite (Claridad agrícola)', { duration: 1500 });
-    } else if (layerMode === 1) {
-      map.addLayer(googleSatLayer);
-      map.addLayer(labelsLayer);
-      btnLayers.style.background = '#2d3e2c';
-      btnLayers.style.color = '#ffffff';
-      if (layersLabel) layersLabel.textContent = 'Google Sat.';
-      window.Snackbar?.show('Capa: Google Satélite', { duration: 1500 });
-    } else {
-      map.addLayer(esriSatLayer);
-      btnLayers.style.background = '#37474f';
-      btnLayers.style.color = '#ffffff';
-      if (layersLabel) layersLabel.textContent = 'Sat. Limpio';
-      window.Snackbar?.show('Capa: Satélite Limpio (Sin textos)', { duration: 1500 });
-    }
-  });
+  if (btnLayers) {
+    btnLayers.addEventListener('click', () => {
+      layerMode = (layerMode + 1) % 3;
+      map.removeLayer(esriSatLayer);
+      map.removeLayer(googleSatLayer);
+      map.removeLayer(googleHybridLayer);
+      if (layerMode === 0) {
+        map.addLayer(googleSatLayer);
+        if (layersLabel) layersLabel.textContent = 'Google Earth';
+        window.Snackbar?.show('Capa: Google Earth / Satélite', { duration: 1200 });
+      } else if (layerMode === 1) {
+        map.addLayer(googleHybridLayer);
+        if (layersLabel) layersLabel.textContent = 'Google Híbrido';
+        window.Snackbar?.show('Capa: Google Híbrido', { duration: 1200 });
+      } else {
+        map.addLayer(esriSatLayer);
+        if (layersLabel) layersLabel.textContent = 'Esri Sat.';
+        window.Snackbar?.show('Capa: Esri Satélite', { duration: 1200 });
+      }
+    });
+  }
 
   // Search control - Material 3 Expressive (places + coordinates + plus codes)
   function extractPlusCode(query) {
@@ -846,16 +917,24 @@ export async function initPotreros() {
   const allBounds = [];
   const polyByPotrero = {};
   let selectedPotreroId = null;
+  let lastPotreroSelectTime = 0;
 
   function selectPotrero(id) {
+    lastPotreroSelectTime = Date.now();
     selectedPotreroId = id;
-    Object.values(polyByPotrero).forEach(({ poly, potrero }) => {
+    Object.values(polyByPotrero).forEach(({ poly, labelMarker, potrero }) => {
+      const { color } = parseCoordenadasJson(potrero.coordenadas_json || potrero.coordenadas);
+      const potreroColor = color || '#2d3e2c';
       const selected = potrero.id === id;
+      if (!map.hasLayer(poly)) map.addLayer(poly);
+      if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
       if (selected) {
-        if (!map.hasLayer(poly)) map.addLayer(poly);
-        poly.setStyle({ fillOpacity: 0.48, weight: 5, opacity: 1 });
-      } else if (map.hasLayer(poly)) {
-        map.removeLayer(poly);
+        poly.setStyle({ fillOpacity: 0.65, weight: 4.5, opacity: 1, color: '#ffffff', fillColor: potreroColor });
+        poly.bringToFront();
+        if (labelMarker) labelMarker.setZIndexOffset(1000);
+      } else {
+        poly.setStyle({ fillOpacity: 0.35, weight: 2.5, opacity: 1, color: '#ffffff', fillColor: potreroColor });
+        if (labelMarker) labelMarker.setZIndexOffset(100);
       }
     });
     const sel = polyByPotrero[id];
@@ -869,29 +948,27 @@ export async function initPotreros() {
     selectedPotreroId = null;
     hidePotreroFloatCard();
     map.closePopup();
-    Object.values(polyByPotrero).forEach(({ poly, potrero }) => {
-      const { color } = parseCoordenadasJson(potrero.coordenadas_json);
-      const potreroColor = color || '#2e7d32';
+    Object.values(polyByPotrero).forEach(({ poly, labelMarker, potrero }) => {
+      const { color } = parseCoordenadasJson(potrero.coordenadas_json || potrero.coordenadas);
+      const potreroColor = color || '#2d3e2c';
       if (!map.hasLayer(poly)) map.addLayer(poly);
-      poly.setStyle({ fillOpacity: 0.30, weight: 3.5, opacity: 1, color: potreroColor, fillColor: potreroColor });
+      if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
+      poly.setStyle({ fillOpacity: 0.35, weight: 3, opacity: 1, color: '#ffffff', fillColor: potreroColor });
+      if (labelMarker) labelMarker.setZIndexOffset(100);
     });
-    fitToParcels();
+    adjustMapView();
   }
 
   function showPotreroFloatCard(potrero, eventos) {
     const card = document.getElementById('potrero-float-card');
     const containerEl = document.getElementById('mapa-container');
     if (!card || !containerEl) return;
-    card.innerHTML = `
-      <div class="potrero-float-tip"></div>
-      ${buildPopupHtml(potrero, eventos)}
-    `;
+    card.innerHTML = buildPopupHtml(potrero, eventos);
     card.style.display = 'block';
-    const pageEl = card.closest('.mapa-page') || document.body;
-    const pageRect = pageEl.getBoundingClientRect();
-    const cardHeight = card.offsetHeight;
-    card.style.top = Math.max(0, (pageRect.height - cardHeight) / 2) + 'px';
-    document.getElementById('potrero-float-close')?.addEventListener('click', clearPotreroSelection);
+    document.getElementById('potrero-float-close')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearPotreroSelection();
+    });
   }
 
   function hidePotreroFloatCard() {
@@ -903,62 +980,83 @@ export async function initPotreros() {
     const { coordinates, color } = parseCoordenadasJson(potrero.coordenadas_json || potrero.coordenadas);
     if (!coordinates || coordinates.length < 3) return;
     const latlngs = coordinates.map(c => [c.lat, c.lng]);
-    const potreroColor = color || '#2e7d32';
+    const potreroColor = color || '#2d3e2c';
 
     const poly = L.polygon(latlngs, {
-      color: potreroColor,
+      color: '#ffffff',
       fillColor: potreroColor,
-      fillOpacity: 0.30,
-      weight: 3.5,
+      fillOpacity: 0.35,
+      weight: 3,
       opacity: 1,
       lineJoin: 'round',
-      lineCap: 'round'
+      lineCap: 'round',
+      bubblingMouseEvents: false
     }).addTo(map);
     allBounds.push(poly.getBounds());
-    polyByPotrero[potrero.id] = { poly, potrero };
-
-    poly.on('mouseover', () => {
-      if (selectedPotreroId !== potrero.id) {
-        poly.setStyle({ weight: 5, fillOpacity: 0.45 });
-      }
-    });
-
-    poly.on('mouseout', () => {
-      if (selectedPotreroId !== potrero.id) {
-        poly.setStyle({ weight: 3.5, fillOpacity: 0.30 });
-      }
-    });
-
-    poly.on('click', (e) => {
-      selectPotrero(potrero.id);
-      L.DomEvent.stopPropagation(e);
-    });
 
     const c = poly.getBounds().getCenter();
-    L.marker([c.lat, c.lng], {
+    const labelMarker = L.marker([c.lat, c.lng], {
       icon: L.divIcon({
         className: 'potrero-label-wrap',
         html: `<div class="potrero-label" style="background:${escapeHtml(potreroColor)};">
-          <span class="material-icons" style="font-size:13px;color:#ffffff;">grass</span>
           <span>${escapeHtml(potrero.nombre || 'Potrero')}</span>
         </div>`,
         iconSize: [0, 0],
         iconAnchor: [0, 0]
       }),
-      interactive: false
+      interactive: true,
+      bubblingMouseEvents: false
     }).addTo(map);
+
+    polyByPotrero[potrero.id] = { poly, labelMarker, potrero };
+
+    poly.on('mouseover', () => {
+      if (selectedPotreroId !== potrero.id) {
+        poly.setStyle({ weight: 4.5, fillOpacity: 0.48 });
+      }
+    });
+
+    poly.on('mouseout', () => {
+      if (selectedPotreroId !== potrero.id) {
+        poly.setStyle({ weight: 3, fillOpacity: 0.35 });
+      }
+    });
+
+    const onPotreroClick = (e) => {
+      if (e && e.originalEvent) {
+        L.DomEvent.stopPropagation(e.originalEvent);
+      }
+      if (e) L.DomEvent.stopPropagation(e);
+      selectPotrero(potrero.id);
+    };
+
+    poly.on('click', onPotreroClick);
+    labelMarker.on('click', onPotreroClick);
   });
 
-  const fitToParcels = () => {
+  const adjustMapView = () => {
     if (allBounds.length > 0) {
       const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
-      map.fitBounds(group.getBounds().pad(0.1));
+      const mobile = window.innerWidth <= 768;
+      if (mobile) {
+        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+        const currentZoom = map.getZoom();
+        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19));
+      } else {
+        map.fitBounds(group.getBounds().pad(0.12));
+      }
     }
   };
+  const fitToParcels = adjustMapView;
 
-  fitToParcels();
+  fitMapToScreen();
+  map.invalidateSize({ animate: false, pan: false });
+  adjustMapView();
 
-  map.on('click', () => clearPotreroSelection());
+  map.on('click', () => {
+    if (Date.now() - lastPotreroSelectTime < 450) return;
+    clearPotreroSelection();
+  });
 
   // ── Split control: búsqueda por nombre + registro ──
   window.togglePotrerosSplitMenu = (e) => {
@@ -1028,13 +1126,15 @@ export async function initPotreros() {
   function applyPotreroSearch(q) {
     const ql = q.toLowerCase();
     let bounds = [];
-    Object.values(polyByPotrero).forEach(({ poly, potrero }) => {
+    Object.values(polyByPotrero).forEach(({ poly, labelMarker, potrero }) => {
       const hit = !ql || (potrero.nombre || '').toLowerCase().includes(ql);
       if (hit) {
         if (!map.hasLayer(poly)) map.addLayer(poly);
+        if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
         bounds.push(poly.getBounds());
-      } else if (map.hasLayer(poly)) {
-        map.removeLayer(poly);
+      } else {
+        if (map.hasLayer(poly)) map.removeLayer(poly);
+        if (labelMarker && map.hasLayer(labelMarker)) map.removeLayer(labelMarker);
       }
     });
     if (bounds.length > 0) {
@@ -1108,8 +1208,15 @@ export async function initPotreros() {
 
   loadSavedPoints().forEach(p => addSavedMarker(p));
 
-  setTimeout(() => { map.invalidateSize(); fitToParcels(); }, 250);
-  setTimeout(() => { map.invalidateSize(); fitToParcels(); }, 600);
+  setTimeout(() => {
+    fitMapToScreen();
+    map.invalidateSize({ animate: false, pan: false });
+    adjustMapView();
+  }, 120);
+  setTimeout(() => {
+    fitMapToScreen();
+    map.invalidateSize({ animate: false, pan: false });
+  }, 450);
 }
 
 function fmtFecha(fecha) {

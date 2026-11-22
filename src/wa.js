@@ -43,9 +43,9 @@ async function waFetch(path, options = {}) {
   return res;
 }
 
-export async function createInstance(number) {
-  const name = getInstanceName();
-  const body = { instanceName: name, integration: 'WHATSAPP-BAILEYS', qrcode: true };
+export async function createInstance(number, instanceNameOverride) {
+  const name = instanceNameOverride || getInstanceName();
+  const body = { instanceName: name, integration: 'WHATSAPP-BAILEYS', qrcode: !number };
   if (number) body.number = number;
   const res = await waFetch(`instance/create`, {
     method: 'POST',
@@ -54,8 +54,16 @@ export async function createInstance(number) {
   return res.json();
 }
 
+export async function logoutInstance() {
+  const name = getInstanceName();
+  try {
+    await waFetch(`instance/logout/${name}`, { method: 'DELETE' });
+  } catch {}
+}
+
 export async function deleteInstance() {
   const name = getInstanceName();
+  await logoutInstance();
   localStorage.removeItem('wa_instance_name');
   window._activeWaInstance = null;
   try {
@@ -69,20 +77,53 @@ export async function deleteInstance() {
   }
 }
 
-export async function getQR() {
+export async function getQR(phoneNumber) {
   const name = getInstanceName();
-  const res = await waFetch(`instance/connect/${name}`);
+  const query = phoneNumber ? `?number=${encodeURIComponent(phoneNumber)}` : '';
+  const res = await waFetch(`instance/connect/${name}${query}`);
   return res.json();
 }
 
+function extractPairingCode(payload) {
+  const raw = payload?.qrcode?.pairingCode || payload?.pairingCode;
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  const code = payload?.code;
+  if (typeof code === 'string' && code.trim() && code.trim().length <= 16) return code.trim();
+  return null;
+}
+
 export async function connectPairing(phoneNumber) {
+  const empresaId = window._currentEmpresaId || 'default';
   await deleteInstance().catch(() => {});
-  const data = await createInstance(phoneNumber);
-  const pairingCode = data?.qrcode?.pairingCode || data?.pairingCode;
+  await new Promise(r => setTimeout(r, 700));
+
+  let activeName = getInstanceName();
+  let created = null;
+  try {
+    created = await createInstance(phoneNumber, activeName);
+  } catch (err) {
+    if (err.message?.includes('403') || err.message?.toLowerCase().includes('already in use')) {
+      activeName = `finca_mgr_${empresaId.substring(0, 8)}_${Date.now().toString(36).slice(-4)}`;
+      window._activeWaInstance = activeName;
+      localStorage.setItem('wa_instance_name', activeName);
+      created = await createInstance(phoneNumber, activeName);
+    } else {
+      throw err;
+    }
+  }
+
+  let pairingCode = extractPairingCode(created);
   if (pairingCode) return { pairingCode };
-  const connectData = await getQR();
+
+  let connectData = await getQR(phoneNumber).catch(() => null);
+  pairingCode = extractPairingCode(connectData);
+  if (!pairingCode) {
+    await new Promise(r => setTimeout(r, 1500));
+    connectData = await getQR(phoneNumber);
+    pairingCode = extractPairingCode(connectData);
+  }
   return {
-    pairingCode: connectData?.pairingCode || connectData?.code || null,
+    pairingCode,
     code: connectData?.code || null,
   };
 }
@@ -158,15 +199,17 @@ export async function joinGroup(inviteCode) {
 
 export async function sendWhatsApp(mensaje) {
   const groupJid = localStorage.getItem('whatsapp_group_jid') || window._empresaWhatsAppConfig?.whatsapp_group_jid;
-  if (!groupJid) return;
+  if (!groupJid) return false;
   const name = getInstanceName();
   try {
     await waFetch(`message/sendText/${name}`, {
       method: 'POST',
       body: JSON.stringify({ number: groupJid, text: mensaje }),
     });
+    return true;
   } catch (e) {
     console.warn('WhatsApp send failed:', e);
+    return false;
   }
 }
 
@@ -555,42 +598,111 @@ export async function actualizarSaludPorPlan() {
   }
 }
 
-export async function checkPartosProximos() {
-  const today = getLocalToday();
-  const sentKey = 'wa_partos_sent_' + today;
-  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
-  try {
-    const preñeces = await restFetch(`/rest/v1/animal_preñez?estado=eq.Preñada&select=animal_id,fecha_monta,fecha_probable_parto`);
-    if (!preñeces || preñeces.length === 0) return;
+function getActiveEmpresaId() {
+  return window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
+}
 
-    const hoy = new Date(today + 'T12:00:00');
-    const en7dias = new Date(hoy);
-    en7dias.setDate(en7dias.getDate() + 7);
+export async function checkMotoresAceite() {
+  const empresaId = getActiveEmpresaId();
+  if (!empresaId || !navigator.onLine) return;
+  try {
+    const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
+    const now = Date.now();
+    const [motores, mants] = await Promise.all([
+      restFetch(`/rest/v1/motores?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre,horas,max_horas`).catch(() => []),
+      restFetch(`/rest/v1/motor_mantenimientos?empresa_id=eq.${encodeURIComponent(empresaId)}&select=motor_id`).catch(() => []),
+    ]);
+    const mantSet = new Set((Array.isArray(mants) ? mants : []).map(x => x.motor_id));
+
+    for (const m of (Array.isArray(motores) ? motores : [])) {
+      const hasPrevMant = mantSet.has(m.id);
+      const limit = hasPrevMant ? (Number(m.max_horas) || 100) : 80;
+      const horas = Number(m.horas) || 0;
+      const tsKey = `wa_motor_aceite_ts_${m.id}`;
+
+      if (horas < limit) {
+        localStorage.removeItem(tsKey);
+        continue;
+      }
+
+      const lastSent = Number(localStorage.getItem(tsKey) || 0);
+      if (lastSent && (now - lastSent) < FIVE_HOURS_MS) continue;
+
+      const sent = await sendWhatsApp(
+        `🛢️ *ALERTA DE MOTOR - Cambio de aceite requerido*\n` +
+        `Equipo: ${m.nombre || 'Motor'}\n` +
+        `Horas acumuladas: ${horas} h (límite ${limit} h${hasPrevMant ? '' : ' · 1er cambio'})\n` +
+        `Finca: ${window._empresaNombre || ''}`
+      );
+      if (sent) {
+        localStorage.setItem(tsKey, String(now));
+      }
+    }
+  } catch (e) {
+    console.warn('checkMotoresAceite error:', e);
+  }
+}
+
+export async function checkPartosProximos() {
+  const empresaId = getActiveEmpresaId();
+  if (!empresaId || !navigator.onLine) return;
+  const today = getLocalToday();
+  const TWO_DAYS_MS = 48 * 60 * 60 * 1000;
+  const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  try {
+    const [preñeces, animales] = await Promise.all([
+      restFetch(`/rest/v1/animal_preñez?empresa_id=eq.${encodeURIComponent(empresaId)}&estado=eq.Preñada&select=id,animal_id,fecha_monta,fecha_probable_parto,fecha_parto`).catch(() => []),
+      restFetch(`/rest/v1/ganado?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre`).catch(() => []),
+    ]);
+    if (!Array.isArray(preñeces) || preñeces.length === 0) return;
+
+    const ganadoMap = new Map((Array.isArray(animales) ? animales : []).map(a => [a.id, a.nombre]));
+    const hoy = new Date(`${today}T12:00:00`);
 
     for (const preg of preñeces) {
-      if (!preg.fecha_probable_parto) continue;
-      if (alreadySent.has(preg.animal_id)) continue;
+      const tsKey = `wa_parto_ts_${preg.animal_id}`;
+      if (!preg.fecha_probable_parto || preg.fecha_parto) {
+        localStorage.removeItem(tsKey);
+        continue;
+      }
 
-      const parto = new Date(preg.fecha_probable_parto + 'T12:00:00');
-      if (parto < hoy || parto > en7dias) continue;
+      const parto = new Date(`${preg.fecha_probable_parto}T12:00:00`);
+      const dias = Math.round((parto - hoy) / 86400000);
+      if (dias > 30 || dias < -30) continue;
 
-      let animalName = `Animal #${preg.animal_id?.substring(0, 6) || '?'}`;
-      try {
-        const animal = await db.ganado.get(preg.animal_id);
-        if (animal?.nombre) animalName = animal.nombre;
-      } catch {}
+      const minInterval = dias <= 15 ? TWO_DAYS_MS : FIFTEEN_DAYS_MS;
+      const lastSent = Number(localStorage.getItem(tsKey) || 0);
+      if (lastSent && (now - lastSent) < minInterval) continue;
 
-      const dias = Math.round((parto - hoy) / (1000 * 60 * 60 * 24));
-      const diasText = dias === 0 ? '¡HOY!' : dias === 1 ? 'mañana' : `en ${dias} días`;
+      let animalName = ganadoMap.get(preg.animal_id) || '';
+      if (!animalName) {
+        try {
+          const animal = await db.ganado.get(preg.animal_id);
+          if (animal?.nombre) animalName = animal.nombre;
+        } catch {}
+      }
+      if (!animalName) {
+        animalName = `Animal #${String(preg.animal_id || '').substring(0, 6) || '?'}`;
+      }
 
-      await sendWhatsApp(
-        `🔔 PARTOS PRÓXIMOS\nMadre: ${animalName}\nFecha estimada de parto: ${preg.fecha_probable_parto}\n${diasText}\nFinca: ${window._empresaNombre || ''}`
-      );
+      let msg;
+      if (dias <= 0) {
+        const estadoTxt = dias < 0 ? `hace ${Math.abs(dias)} ${Math.abs(dias) === 1 ? 'día' : 'días'}` : '¡HOY!';
+        msg = `🐄 *ALERTA DE PARTO - Parto inminente o vencido*\nVaca: ${animalName}\nFecha probable: ${preg.fecha_probable_parto} (${estadoTxt})\nMantener vigilancia continua.\nFinca: ${window._empresaNombre || ''}`;
+      } else if (dias <= 15) {
+        const cuando = dias === 1 ? 'mañana' : `en ${dias} días`;
+        msg = `🐄 *ALERTA DE PARTO - Recta final (${cuando})*\nVaca: ${animalName}\nFecha probable: ${preg.fecha_probable_parto}\nRevisar ubre y signos de parto.\nFinca: ${window._empresaNombre || ''}`;
+      } else {
+        msg = `🐄 *AVISO DE GESTACIÓN - Mes 9 de gestación*\nVaca: ${animalName}\nFaltan aprox. ${dias} días para el parto (${preg.fecha_probable_parto}).\nIr preparando cuidados de parto.\nFinca: ${window._empresaNombre || ''}`;
+      }
 
-      alreadySent.add(preg.animal_id);
+      const sent = await sendWhatsApp(msg);
+      if (sent) {
+        localStorage.setItem(tsKey, String(now));
+      }
     }
-
-    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
   } catch (e) {
     console.warn('checkPartosProximos error:', e);
   }

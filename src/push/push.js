@@ -2,6 +2,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import { restFetch, getUser, getSessionUserId } from '../auth.js';
 import db from '../db.js';
+import { checkMotoresAceite, checkPartosProximos } from '../wa.js';
 
 const DEFAULT_FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA0u2DcfghFR1-gEzJcRpSb778jBFHjcEE',
@@ -301,6 +302,10 @@ export async function checkPushAlerts() {
   } catch (err) {
     console.warn('checkPushAlerts ganado error:', err);
   }
+
+  // 3. Replicar alertas activas de motores (cambio de aceite) y ganado (vacas por dar a luz) por WhatsApp
+  await checkMotoresAceite().catch(() => {});
+  await checkPartosProximos().catch(() => {});
 }
 
 export async function getPushStatus() {

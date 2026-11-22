@@ -5,8 +5,10 @@ import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_sear
 import { mergeCategories, openNewCategoryBottomSheet } from '../utils/custom_categories.js';
 
 let _allGastos = [];
-let _refs = { lotes: new Map(), ganado: new Map(), herramientas: new Map(), personal: new Map() };
-let activePeriod = 'todo'; // 'dia' | 'semana' | 'mes' | 'todo'
+let _refs = { lotes: new Map(), lotesMeta: new Map(), ganado: new Map(), herramientas: new Map(), personal: new Map(), personalMeta: new Map() };
+let _pendingSummary = { totalAmount: 0, items: [] };
+let activePeriod = 'todo'; // 'todo' | 'dia' | 'semana' | 'mes'
+let activeGroupMode = 'categoria'; // 'categoria' | 'lote'
 let selectedDateIso = ''; // YYYY-MM-DD
 let showMonthCalendar = false;
 let activeLoteId = 'all'; // 'all' | lote_id
@@ -195,29 +197,236 @@ export function parsePersonalGasto(desc, fechaStr) {
 }
 
 // ─── Fetch de referencias ─────────────────────────────────────────────────────
+function extractLoteColor(coordJson) {
+  try {
+    if (!coordJson) return '#2d3e2c';
+    const parsed = typeof coordJson === 'string' ? JSON.parse(coordJson) : coordJson;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.color) {
+      return parsed.color;
+    }
+  } catch {}
+  return '#2d3e2c';
+}
+
 async function fetchRefs() {
   const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
   const empFilter = empId ? `empresa_id=eq.${encodeURIComponent(empId)}&` : '';
   const [lotesData, ganadoRes, herramientasRes, personalData] = await Promise.all([
-    restFetch(`/rest/v1/lotes?${empFilter}select=id,nombre`).catch(async () => {
-      const local = await supabase.from('lotes').select('id,nombre').catch(() => ({ data: [] }));
+    restFetch(`/rest/v1/lotes?${empFilter}select=id,nombre,num_plantas,coordenadas_json`).catch(async () => {
+      const local = await supabase.from('lotes').select('id,nombre,num_plantas,coordenadas_json').catch(() => ({ data: [] }));
       return local.data || [];
     }),
     supabase.from('ganado').select('id,nombre'),
     supabase.from('herramientas').select('id,nombre'),
-    restFetch(`/rest/v1/personal?${empFilter}select=id,nombre`).catch(async () => {
-      const local = await supabase.from('personal').select('id,nombre').catch(() => ({ data: [] }));
+    restFetch(`/rest/v1/personal?${empFilter}select=id,nombre,pago_diario`).catch(async () => {
+      const local = await supabase.from('personal').select('id,nombre,pago_diario').catch(() => ({ data: [] }));
       return local.data || [];
     })
   ]);
   const toMap = (arr) => new Map((Array.isArray(arr) ? arr : []).map(x => [String(x.id), x.nombre]));
-  const lotesMap = new Map((Array.isArray(lotesData) ? lotesData : []).map(x => [String(x.id), String(x.nombre || '').replace(/\bcafe\b/gi, 'Café')]));
+  const lotesArr = Array.isArray(lotesData) ? lotesData : [];
+  const lotesMap = new Map();
+  const lotesMeta = new Map();
+  lotesArr.forEach(x => {
+    const id = String(x.id);
+    const nombre = String(x.nombre || '').replace(/\bcafe\b/gi, 'Café');
+    lotesMap.set(id, nombre);
+    lotesMeta.set(id, {
+      id,
+      nombre,
+      num_plantas: Number(x.num_plantas) || 0,
+      color: extractLoteColor(x.coordenadas_json)
+    });
+  });
+  const personalArr = Array.isArray(personalData) ? personalData : [];
+  const personalMeta = new Map(personalArr.map(p => [String(p.id), { id: String(p.id), nombre: p.nombre || '', pago_diario: Number(p.pago_diario) || 0 }]));
   return {
     lotes: lotesMap,
+    lotesMeta,
     ganado: toMap(ganadoRes.data),
     herramientas: toMap(herramientasRes.data),
-    personal: toMap(personalData)
+    personal: toMap(personalArr),
+    personalMeta
   };
+}
+
+// ─── Detectar pendientes por enviar a Cuentas (Cosecha y Personal) ───────────
+async function computePendingForCuentas(allGastos, refs) {
+  const items = [];
+  const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
+  const empFilter = empId ? `empresa_id=eq.${encodeURIComponent(empId)}&` : '';
+  const weekInfo = getWeekBoundsFromIso(getTodayLocalStr());
+  const wsIsoCur = weekInfo.start;
+  const weIsoCur = weekInfo.end;
+
+  // Mapa de pagos de cosecha ya enviados: refTag -> monto
+  const paidCosechaMap = new Map();
+  (allGastos || []).forEach(g => {
+    const matches = String(g.descripcion || '').match(/\[ref:cosecha_[^\]]+\]/g);
+    if (matches) {
+      matches.forEach(tag => paidCosechaMap.set(tag, (paidCosechaMap.get(tag) || 0) + (Number(g.monto) || 0)));
+    }
+  });
+
+  const [appsRes, asisRes] = await Promise.all([
+    supabase.from('lote_aplicaciones').select('*').catch(() => ({ data: [] })),
+    restFetch(`/rest/v1/personal_asistencia?${empFilter}fecha=gte.${wsIsoCur}&fecha=lte.${weIsoCur}&select=personal_id,fecha,estado`).catch(() => [])
+  ]);
+
+  const appsList = Array.isArray(appsRes?.data) ? appsRes.data : [];
+
+  // 1. Pendientes de Cosecha agrupados por (lote_id, semana)
+  const cosechaGroups = new Map(); // `${loteId}__${wsIso}` -> Map(workerKey -> pay)
+  appsList.forEach(app => {
+    const obs = String(app.observaciones || '');
+    if (!obs.startsWith('[COSECHA_JSON]')) return;
+    const f = String(app.fecha || '').slice(0, 10);
+    if (!f || !app.lote_id) return;
+    try {
+      const parsed = JSON.parse(obs.slice('[COSECHA_JSON]'.length));
+      const price = Number(parsed.precio_lata) || 40;
+      const regs = Array.isArray(parsed.registros) ? parsed.registros : [];
+      const wBounds = getWeekBoundsFromIso(f);
+      const gk = `${String(app.lote_id)}__${wBounds.start}`;
+      if (!cosechaGroups.has(gk)) {
+        cosechaGroups.set(gk, { loteId: String(app.lote_id), wsIso: wBounds.start, weIso: wBounds.end, workers: new Map() });
+      }
+      const grp = cosechaGroups.get(gk);
+      regs.forEach(r => {
+        const l = Number(r.latas) || 0;
+        if (l <= 0) return;
+        const wk = String(r.personal_id || r.nombre);
+        grp.workers.set(wk, (grp.workers.get(wk) || 0) + Math.round(l * price));
+      });
+    } catch {}
+  });
+
+  cosechaGroups.forEach(grp => {
+    let pendingAmount = 0;
+    let isUpdate = false;
+    grp.workers.forEach((pay, wk) => {
+      const refTag = `[ref:cosecha_${grp.loteId}_${wk}_${grp.wsIso}]`;
+      if (!paidCosechaMap.has(refTag)) {
+        pendingAmount += pay;
+      } else {
+        const paid = Math.round(paidCosechaMap.get(refTag) || 0);
+        if (paid !== Math.round(pay)) {
+          pendingAmount += Math.abs(Math.round(pay) - paid);
+          isUpdate = true;
+        }
+      }
+    });
+    if (pendingAmount > 0) {
+      const meta = refs.lotesMeta?.get(grp.loteId);
+      const sDt = isoToDate(grp.wsIso);
+      const eDt = isoToDate(grp.weIso);
+      const semLbl = `${sDt.getDate()}–${eDt.getDate()} ${SHORT_MONTHS[eDt.getMonth()]}`;
+      items.push({
+        module: 'cosecha',
+        loteId: grp.loteId,
+        title: meta?.nombre || refs.lotes?.get(grp.loteId) || 'Lote de café',
+        subtitle: `Cosecha · Semana ${semLbl}${isUpdate ? ' · Por actualizar' : ''}`,
+        amount: pendingAmount,
+        color: meta?.color || '#2d3e2c',
+        actionLabel: 'Ir a Cosecha'
+      });
+    }
+  });
+
+  // 2. Pendientes de Personal de la semana actual
+  const asisList = Array.isArray(asisRes) ? asisRes : [];
+  const personalGastos = (allGastos || []).filter(g => String(g.categoria || '').toLowerCase() === 'personal');
+  const isTrabajoState = (est) => {
+    const s = String(est || '').toLowerCase();
+    return s.includes('asist') || s.includes('trabaj') || s === 'presente' || s === 'si' || s === 'sí';
+  };
+  let personalPendingTotal = 0;
+  let personalPendingCount = 0;
+  (refs.personalMeta || new Map()).forEach((pMeta, pId) => {
+    if (!pMeta.pago_diario || pMeta.pago_diario <= 0) return;
+    const workedDates = new Set(
+      asisList
+        .filter(a => String(a.personal_id) === pId && isTrabajoState(a.estado))
+        .map(a => String(a.fecha || '').slice(0, 10))
+        .filter(Boolean)
+    );
+    const pNomLow = String(pMeta.nombre || '').toLowerCase().trim();
+    appsList.forEach(app => {
+      const f = String(app.fecha || '').slice(0, 10);
+      if (!f || f < wsIsoCur || f > weIsoCur) return;
+      if (String(app.observaciones || '').startsWith('[COSECHA_JSON]')) return;
+      const pids = Array.isArray(app.personal_ids) ? app.personal_ids.map(String) : [];
+      const opMatch = pNomLow && String(app.operador || '').toLowerCase().includes(pNomLow);
+      if (pids.includes(pId) || opMatch) workedDates.add(f);
+    });
+    const weekGross = workedDates.size * pMeta.pago_diario;
+    if (weekGross <= 0) return;
+    const refPrefix = `[ref:${pId}_sem_${wsIsoCur}]`;
+    const paid = personalGastos
+      .filter(g => String(g.descripcion || '').includes(refPrefix))
+      .reduce((s, g) => s + (Number(g.monto) || 0), 0);
+    const pending = Math.max(0, weekGross - paid);
+    if (pending > 0) {
+      personalPendingTotal += pending;
+      personalPendingCount++;
+    }
+  });
+  if (personalPendingTotal > 0) {
+    items.push({
+      module: 'personal',
+      title: 'Personal · Jornales de la semana',
+      subtitle: `${personalPendingCount} ${personalPendingCount === 1 ? 'colaborador pendiente' : 'colaboradores pendientes'}`,
+      amount: personalPendingTotal,
+      color: '#2d3e2c',
+      actionLabel: 'Ir a Personal'
+    });
+  }
+
+  const totalAmount = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  return { totalAmount, items };
+}
+
+function openPendingReviewSheet() {
+  const items = _pendingSummary?.items || [];
+  if (!items.length) return;
+  showModal('Pendiente de enviar a Cuentas', `
+    <div style="display:flex; flex-direction:column; gap:10px; padding-bottom:10px;">
+      <div style="font-size:13px; color:#5a6b58; line-height:1.4;">
+        Tienes registros en otros módulos que todavía no se han enviado o actualizado en Cuentas. Toca uno para ir a revisarlo:
+      </div>
+      ${items.map((it, idx) => `
+        <button type="button" class="cuentas-pending-item-btn" data-idx="${idx}" style="width:100%; text-align:left; background:#fafcf9; border:1px solid #dfe8dd; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; font-family:inherit;">
+          <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+            ${it.module === 'personal'
+              ? `<span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; flex-shrink:0;">groups</span>`
+              : `<span style="width:12px; height:12px; border-radius:50%; background:${escapeHtml(it.color)}; flex-shrink:0;"></span>`}
+            <div style="min-width:0; flex:1;">
+              <div style="font-size:14px; font-weight:800; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(it.title)}</div>
+              <div style="font-size:12px; color:#5a6b58; margin-top:2px;">${escapeHtml(it.subtitle)}</div>
+            </div>
+          </div>
+          <div style="text-align:right; flex-shrink:0;">
+            <div style="font-size:14.5px; font-weight:800; color:#b34200;">${formatShortL(it.amount)}</div>
+            <div style="font-size:11.5px; font-weight:700; color:#2d3e2c; margin-top:2px;">${escapeHtml(it.actionLabel)} ›</div>
+          </div>
+        </button>
+      `).join('')}
+    </div>
+  `);
+
+  document.querySelectorAll('.cuentas-pending-item-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const it = items[Number(btn.dataset.idx)];
+      if (!it) return;
+      closeModal();
+      if (it.module === 'cosecha' && it.loteId) {
+        window._pendingOpenLote = { loteId: it.loteId, tab: 'cosecha' };
+        window.navigateTo('dashboard');
+      } else if (it.module === 'personal') {
+        window.navigateTo('personal');
+      }
+    });
+  });
 }
 
 // ─── Helpers de presentación de cada movimiento ───────────────────────────────
@@ -399,14 +608,14 @@ function renderCuentasUI() {
   const sectionsWrap = document.getElementById('cuentas-sections-wrap');
   if (!kpiWrap || !sectionsWrap) return;
 
-  // 1. Pills de período: Día | Semana | Mes | Todo
+  // 1. Pills de período: Todo | Día | Semana | Mes
   if (periodRow) {
     const prevPeriodScroll = periodRow.scrollLeft;
     const periods = [
+      { key: 'todo', label: 'Todo' },
       { key: 'dia', label: 'Día' },
       { key: 'semana', label: 'Semana' },
-      { key: 'mes', label: 'Mes' },
-      { key: 'todo', label: 'Todo' }
+      { key: 'mes', label: 'Mes' }
     ];
     periodRow.innerHTML = periods.map(p => `
       <button type="button" class="cuentas-pill ${activePeriod === p.key ? 'active' : ''}" data-period="${p.key}">
@@ -620,37 +829,135 @@ function renderCuentasUI() {
     : (balance > 0 ? `+ ${formatShortL(balance)}` : formatShortL(0));
   const balanceColor = balance > 0 ? '#1b6e1b' : '#111827';
 
+  // Calcular total de plantas en el alcance actual (todos los lotes o lote seleccionado)
+  let scopePlantas = 0;
+  if (activeLoteId === 'all') {
+    const seenLoteNames = new Set();
+    (_refs.lotesMeta || new Map()).forEach(m => {
+      const k = String(m.nombre || '').trim().toLowerCase();
+      if (k && !seenLoteNames.has(k)) {
+        seenLoteNames.add(k);
+        scopePlantas += (Number(m.num_plantas) || 0);
+      }
+    });
+  } else {
+    const m = _refs.lotesMeta?.get(String(activeLoteId));
+    scopePlantas = Number(m?.num_plantas) || 0;
+  }
+  const costoPorPlanta = scopePlantas > 0 && totalEgresos > 0 ? (totalEgresos / scopePlantas) : 0;
+  const egrSub = scopePlantas > 0 ? `L ${costoPorPlanta.toFixed(2)} por planta` : `${egresosList.length} ${egresosList.length === 1 ? 'egreso' : 'egresos'}`;
+  const ingSub = totalIngresos <= 0 ? 'Aún sin ventas' : `${ingresosList.length} ${ingresosList.length === 1 ? 'ingreso' : 'ingresos'}`;
+  const balSub = balance < 0 ? 'Inversión por recuperar' : (balance > 0 ? 'Ganancia neta' : 'En equilibrio');
+
   kpiWrap.innerHTML = `
     <div class="cuentas-kpi-card">
       <div class="cuentas-kpi-label">Egresos</div>
       <div class="cuentas-kpi-val" style="color:#b34200;">${formatShortL(totalEgresos)}</div>
+      <div class="cuentas-kpi-sub">${escapeHtml(egrSub)}</div>
     </div>
     <div class="cuentas-kpi-card">
       <div class="cuentas-kpi-label">Ingresos</div>
       <div class="cuentas-kpi-val" style="color:#1b6e1b;">${formatShortL(totalIngresos)}</div>
+      <div class="cuentas-kpi-sub">${escapeHtml(ingSub)}</div>
     </div>
     <div class="cuentas-kpi-card">
       <div class="cuentas-kpi-label">Balance</div>
       <div class="cuentas-kpi-val" style="color:${balanceColor};">${balanceStr}</div>
+      <div class="cuentas-kpi-sub">${escapeHtml(balSub)}</div>
     </div>
   `;
 
-  // 4. Agrupar Egresos
-  const egrMap = new Map();
-  egresosList.forEach(g => {
-    const grpName = getDisplayGroupName(g.categoria);
-    if (!egrMap.has(grpName)) {
-      egrMap.set(grpName, { name: grpName, total: 0, items: [], subCats: new Set() });
+  // 3b. Banner de Pendiente de enviar a Cuentas
+  const pendingWrap = document.getElementById('cuentas-pending-banner');
+  if (pendingWrap) {
+    const pItems = _pendingSummary?.items || [];
+    if (pItems.length > 0 && _pendingSummary.totalAmount > 0) {
+      const cosAmt = pItems.filter(x => x.module === 'cosecha').reduce((s, x) => s + x.amount, 0);
+      const perAmt = pItems.filter(x => x.module === 'personal').reduce((s, x) => s + x.amount, 0);
+      const subParts = [];
+      if (cosAmt > 0) subParts.push(`${formatShortL(cosAmt)} de cosecha de la semana`);
+      if (perAmt > 0) subParts.push(`${formatShortL(perAmt)} de personal`);
+      pendingWrap.innerHTML = `
+        <button type="button" id="cuentas-pending-review-btn" style="width:100%; text-align:left; background:#fff3e8; border:1px solid #f5d6bc; border-radius:16px; padding:12px 15px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; font-family:inherit;">
+          <div style="min-width:0; flex:1;">
+            <div style="font-size:14px; font-weight:800; color:#7a3405; line-height:1.25;">Pendiente de enviar a Cuentas</div>
+            <div style="font-size:12.5px; font-weight:500; color:#8c4717; margin-top:2px; line-height:1.3;">${escapeHtml(subParts.join(' · '))}</div>
+          </div>
+          <span style="font-size:14px; font-weight:800; color:#7a3405; white-space:nowrap; flex-shrink:0;">Revisar ›</span>
+        </button>
+      `;
+      document.getElementById('cuentas-pending-review-btn')?.addEventListener('click', openPendingReviewSheet);
+    } else {
+      pendingWrap.innerHTML = '';
     }
-    const bucket = egrMap.get(grpName);
-    bucket.total += (Number(g.monto) || 0);
-    bucket.items.push(g);
-    const rawCat = String(g.categoria || '').trim();
-    if (rawCat && rawCat.toLowerCase() !== grpName.toLowerCase()) {
-      bucket.subCats.add(rawCat);
-    }
-  });
-  const egrEntries = Array.from(egrMap.values()).sort((a, b) => b.total - a.total);
+  }
+
+  // 3c. Encabezado + Segmentado Por categoría | Por lote
+  const groupToggleWrap = document.getElementById('cuentas-group-toggle');
+  if (groupToggleWrap) {
+    groupToggleWrap.innerHTML = egresosList.length > 0 ? `
+      <div class="cuentas-section-title" style="color:#4a5d48;">EN QUÉ SE VA EL DINERO · TOCA PARA VER</div>
+      <div style="background:#eff4ed; border-radius:16px; padding:4px; display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:14px;">
+        <button type="button" data-gmode="categoria" style="height:38px; border-radius:12px; border:none; background:${activeGroupMode === 'categoria' ? '#2d3e2c' : 'transparent'}; color:${activeGroupMode === 'categoria' ? '#ffffff' : '#1e2a1e'}; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.16s ease;">
+          Por categoría
+        </button>
+        <button type="button" data-gmode="lote" style="height:38px; border-radius:12px; border:none; background:${activeGroupMode === 'lote' ? '#2d3e2c' : 'transparent'}; color:${activeGroupMode === 'lote' ? '#ffffff' : '#1e2a1e'}; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.16s ease;">
+          Por lote
+        </button>
+      </div>
+    ` : '';
+    groupToggleWrap.querySelectorAll('button[data-gmode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeGroupMode = btn.dataset.gmode;
+        renderCuentasUI();
+      });
+    });
+  }
+
+  // 4. Agrupar Egresos (Por categoría o Por lote)
+  let egrEntries = [];
+  if (activeGroupMode === 'lote') {
+    const loteGroupMap = new Map();
+    egresosList.forEach(g => {
+      const lid = String(g.lote_id || '').trim();
+      const meta = lid ? _refs.lotesMeta?.get(lid) : null;
+      const key = meta ? `lote:${meta.nombre.toLowerCase()}` : 'sin_lote';
+      if (!loteGroupMap.has(key)) {
+        loteGroupMap.set(key, {
+          name: meta ? meta.nombre : 'Finca general',
+          total: 0,
+          items: [],
+          subCats: new Set(),
+          dotColor: meta ? (meta.color || '#2d3e2c') : '#8f9890',
+          numPlantas: meta ? (Number(meta.num_plantas) || 0) : 0,
+          isGeneral: !meta
+        });
+      }
+      const bucket = loteGroupMap.get(key);
+      bucket.total += (Number(g.monto) || 0);
+      bucket.items.push(g);
+    });
+    egrEntries = Array.from(loteGroupMap.values()).sort((a, b) => {
+      if (a.isGeneral !== b.isGeneral) return a.isGeneral ? 1 : -1;
+      return b.total - a.total;
+    });
+  } else {
+    const egrMap = new Map();
+    egresosList.forEach(g => {
+      const grpName = getDisplayGroupName(g.categoria);
+      if (!egrMap.has(grpName)) {
+        egrMap.set(grpName, { name: grpName, total: 0, items: [], subCats: new Set() });
+      }
+      const bucket = egrMap.get(grpName);
+      bucket.total += (Number(g.monto) || 0);
+      bucket.items.push(g);
+      const rawCat = String(g.categoria || '').trim();
+      if (rawCat && rawCat.toLowerCase() !== grpName.toLowerCase()) {
+        bucket.subCats.add(rawCat);
+      }
+    });
+    egrEntries = Array.from(egrMap.values()).sort((a, b) => b.total - a.total);
+  }
   const maxEgr = egrEntries.length ? Math.max(...egrEntries.map(x => x.total), 1) : 1;
 
   // 5. Agrupar Ingresos
@@ -681,11 +988,22 @@ function renderCuentasUI() {
       const pctOfTotal = sectionTotal > 0 ? Math.round((cat.total / sectionTotal) * 100) : 0;
       const barPct = Math.max(5, Math.round((cat.total / maxVal) * 100));
 
-      let subtitlePrefix = `${cat.items.length} ${cat.items.length === 1 ? 'movimiento' : 'movimientos'}`;
-      if (!isIngreso && cat.name === 'Cafetal' && cat.subCats.size > 0) {
-        const subArr = Array.from(cat.subCats).slice(0, 2);
-        const formattedSubs = subArr.map((s, i) => i === 0 ? s : s.toLowerCase()).join(', ');
-        subtitlePrefix = `${formattedSubs}${cat.subCats.size > 2 ? '...' : ''}`;
+      let subtitleText = '';
+      if (!isIngreso && activeGroupMode === 'lote') {
+        if (cat.isGeneral) {
+          subtitleText = `Sin lote · ${pctOfTotal}%`;
+        } else {
+          const perPlant = cat.numPlantas > 0 ? ` · L ${(cat.total / cat.numPlantas).toFixed(2)} por planta` : '';
+          subtitleText = `${pctOfTotal}%${perPlant}`;
+        }
+      } else {
+        let subtitlePrefix = `${cat.items.length} ${cat.items.length === 1 ? 'movimiento' : 'movimientos'}`;
+        if (!isIngreso && cat.name === 'Cafetal' && cat.subCats.size > 0) {
+          const subArr = Array.from(cat.subCats).slice(0, 2);
+          const formattedSubs = subArr.map((s, i) => i === 0 ? s : s.toLowerCase()).join(', ');
+          subtitlePrefix = `${formattedSubs}${cat.subCats.size > 2 ? '...' : ''}`;
+        }
+        subtitleText = `${subtitlePrefix} · ${pctOfTotal}%`;
       }
 
       const visibleItems = isShowAll ? cat.items : cat.items.slice(0, 3);
@@ -735,9 +1053,12 @@ function renderCuentasUI() {
       return `
         <div class="cuentas-cat-card ${isOpen ? 'is-open' : ''}" data-cat-key="${escapeHtml(catKey)}">
           <div class="cuentas-cat-header">
-            <div style="min-width:0; flex:1;">
-              <div class="cuentas-cat-name">${escapeHtml(cat.name)}</div>
-              <div class="cuentas-cat-sub">${escapeHtml(subtitlePrefix)} · ${pctOfTotal}%</div>
+            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+              ${cat.dotColor ? `<span style="width:12px; height:12px; border-radius:50%; background:${escapeHtml(cat.dotColor)}; flex-shrink:0;"></span>` : ''}
+              <div style="min-width:0; flex:1;">
+                <div class="cuentas-cat-name">${escapeHtml(cat.name)}</div>
+                <div class="cuentas-cat-sub">${escapeHtml(subtitleText)}</div>
+              </div>
             </div>
             <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
               <span class="cuentas-cat-amt" style="color:${accentColor};">${formatShortL(cat.total)}</span>
@@ -757,7 +1078,7 @@ function renderCuentasUI() {
 
     return `
       <div class="cuentas-section">
-        <div class="cuentas-section-title" style="color:${isIngreso ? '#1b6e1b' : '#4a5d48'};">${title}</div>
+        ${title ? `<div class="cuentas-section-title" style="color:${isIngreso ? '#1b6e1b' : '#4a5d48'};">${title}</div>` : ''}
         ${cardsHtml}
       </div>
     `;
@@ -777,7 +1098,7 @@ function renderCuentasUI() {
     `;
   } else {
     sectionsWrap.innerHTML =
-      renderSection('EN QUÉ SE VA EL DINERO · TOCA PARA VER', egrEntries, totalEgresos, maxEgr, false) +
+      renderSection('', egrEntries, totalEgresos, maxEgr, false) +
       renderSection('DE DÓNDE VIENE EL DINERO · TOCA PARA VER', ingEntries, totalIngresos, maxIng, true);
   }
 
@@ -1600,6 +1921,7 @@ export async function renderGastos() {
 
   _allGastos = all || [];
   _refs = refs;
+  _pendingSummary = await computePendingForCuentas(_allGastos, _refs).catch(() => ({ totalAmount: 0, items: [] }));
 
   return `
     <style>
@@ -1683,6 +2005,13 @@ export async function renderGastos() {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+      .cuentas-kpi-sub {
+        font-size: 11px;
+        font-weight: 500;
+        color: #5a6b58;
+        margin-top: 3px;
+        line-height: 1.25;
       }
 
       .cuentas-section {
@@ -1918,7 +2247,13 @@ export async function renderGastos() {
       <!-- 3 Tarjetas KPI: Egresos | Ingresos | Balance -->
       <div id="cuentas-kpi-row" class="cuentas-kpi-grid"></div>
 
-      <!-- Secciones de Categorías (Acordeón) -->
+      <!-- Banner Pendiente de enviar a Cuentas -->
+      <div id="cuentas-pending-banner"></div>
+
+      <!-- Segmentado: Por categoría | Por lote -->
+      <div id="cuentas-group-toggle"></div>
+
+      <!-- Secciones de Categorías / Lotes (Acordeón) -->
       <div id="cuentas-sections-wrap"></div>
 
       <!-- FAB blanco con borde verde e ícono + naranja -->

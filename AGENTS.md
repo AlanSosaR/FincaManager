@@ -45,6 +45,9 @@ Debes tocar toditos estos sitios, o la app fallará/morirá RLS:
 - Plantillas de UI devuelven strings HTML.
 - **Carruseles horizontales de píldoras/tabs**: al tocar cualquier píldora que re-renderiza el carrusel (`innerHTML`), siempre preservar `scrollLeft` previo antes de re-renderizar y luego centrar suavemente el nuevo botón activo dentro de `requestAnimationFrame` con `newActive.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })` para que siempre se vea completa la opción seleccionada.
 - **FAB estándar**: cuadrado redondeado `56×56`, `border-radius: 16px`, fondo blanco `#ffffff`, borde `2px solid #2d3e2c`, ícono `+` naranja `#b34200`.
+- **Text fields (Material 3 Outlined Text Fields)**: Todos los campos de entrada de texto (`input`, `textarea`, `select`) de la aplicación deben usar siempre el patrón Material 3 Outlined Text Field (`.m3-field` con `<input placeholder=" ">` seguido de `<label>` flotante que corta el borde superior), nunca un `<label>` suelto arriba con un `<input>` simple debajo.
+- **Switches (Material 3 Switch)**: Para activar o desactivar opciones binarias (como Notificaciones Push), usar siempre un componente Material 3 Switch (`52×32px` con ícono `check` en el círculo activo) en lugar de botones largos de activar/desactivar.
+- **Bottom sheets para flujos de configuración/mapas**: Acciones como conectar WhatsApp o abrir el mapa satelital de punto de referencia / delimitación deben mostrar un botón o tarjeta disparadora limpia en la vista principal y abrir sus controles dentro de un Bottom Sheet.
 
 ## WhatsApp (Evolution API)
 

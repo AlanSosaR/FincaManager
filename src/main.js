@@ -121,7 +121,7 @@ const updateSW = registerSW({
 
 import { isOnline, processSyncQueue, incrementalSync, fullDownload } from './sync.js';
 import { registerPushToken, initForegroundPush, checkPushAlerts } from './push/push.js';
-import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan, checkPartosProximos } from './wa.js';
+import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan, checkPartosProximos, checkMotoresAceite } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 import { initRealtime, disconnectRealtime } from './realtime.js';
@@ -423,20 +423,27 @@ let _empresaList = [];
 
 async function updateSidebarEmpresaName() {
   const el = document.getElementById('sidebar-empresa-name');
-  if (!el) return;
   const empresaId = window._currentEmpresaId;
-  if (!empresaId) { el.textContent = ''; return; }
+  if (!empresaId) {
+    window._empresaNombre = '';
+    if (el) el.textContent = '';
+    return;
+  }
+  const setNombre = (nombre) => {
+    window._empresaNombre = nombre;
+    if (el) el.textContent = nombre;
+  };
   try {
     const emp = await db.empresas?.get(empresaId);
-    if (emp?.nombre) { el.textContent = emp.nombre; return; }
+    if (emp?.nombre) { setNombre(emp.nombre); return; }
   } catch {}
   const found = _empresaList.find(e => e.id === empresaId);
-  if (found) { el.textContent = found.nombre; return; }
+  if (found) { setNombre(found.nombre); return; }
   try {
     const data = await restFetch(`/rest/v1/empresas?id=eq.${encodeURIComponent(empresaId)}&select=nombre`);
-    if (data?.[0]?.nombre) { el.textContent = data[0].nombre; return; }
+    if (data?.[0]?.nombre) { setNombre(data[0].nombre); return; }
   } catch {}
-  el.textContent = '';
+  setNombre('');
 }
 
 window.__empresaNombreChanged = function() {
@@ -570,6 +577,7 @@ function initOnlineSync() {
       await checkEnmiendaCal();
       await actualizarSaludPorPlan();
       await checkPartosProximos();
+      await checkMotoresAceite();
     } catch (e) { /* silent */ }
   }
 
@@ -759,6 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'potreros',
         'ganado',
         'gastos',
+        'configuracion',
         'asistente'
     ]);
 
@@ -1257,6 +1266,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     window.addEventListener('hashchange', () => {
+        if (typeof window.__closeConfigOverlayIfOpen === 'function' && window.__closeConfigOverlayIfOpen()) {
+            if (window.location.hash !== '#configuracion') {
+                window.history.pushState(null, '', '#configuracion');
+            }
+            return;
+        }
         const hashParams = getHashParts();
         const screenId = hashParams[0];
         const args = hashParams.slice(1);
