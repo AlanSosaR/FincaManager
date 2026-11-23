@@ -2,6 +2,7 @@ import { RealtimeClient } from '@supabase/realtime-js'
 import { SUPABASE_URL, SUPABASE_KEY, getAccessToken } from './auth.js'
 import { syncTable } from './sync.js'
 import { checkPendingVaccines, checkPendingFumigaciones, checkAplicacionesDelMes, checkPartosProximos, checkMotoresAceite } from './wa.js'
+import { checkPushAlerts } from './push/push.js'
 
 const REALTIME_URL = SUPABASE_URL.replace('https://', 'wss://') + '/realtime/v1'
 
@@ -26,6 +27,9 @@ function scheduleWaCheck() {
   waCheckTimeout = setTimeout(async () => {
     waCheckTimeout = null
     try {
+      await checkPushAlerts()
+    } catch (e) { /* silent */ }
+    try {
       await checkPendingVaccines()
     } catch (e) { /* silent */ }
     try {
@@ -40,7 +44,7 @@ function scheduleWaCheck() {
     try {
       await checkMotoresAceite()
     } catch (e) { /* silent */ }
-  }, 1000)
+  }, 250)
 }
 
 export function initRealtime() {

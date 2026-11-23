@@ -7,6 +7,7 @@ import './asistente.css';
 import './snackbar.js';
 import './action_sheet.js';
 import { initGlobalM3DatePickers } from './utils/m3_date_picker.js';
+import { initGlobalM3Selects } from './utils/m3_select_picker.js';
 
 import { registerSW } from 'virtual:pwa-register';
 
@@ -14,32 +15,109 @@ let refreshing = false;
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
   if (!refreshing) { refreshing = true; window.location.reload(); }
 });
-window.__openNotifTarget = async (url) => {
+window.__openNotifTarget = async (url, meta = {}) => {
   if (!url) return;
   const parts = String(url).replace(/^\/?#?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   if (!parts[0]) return;
 
-  const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
-  if (isMobile && parts[0] === 'detalle_animal' && parts[1] && typeof window.openActionBottomSheet === 'function') {
-    const animalId = parts[1];
-    if (!window.location.hash.startsWith('#ganado') && typeof window.navigateTo === 'function') {
-      window.navigateTo('ganado');
+  const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
+  if (isMobile) {
+    if (parts[0] === 'detalle_lote' && parts[1]) {
+      const loteId = parts[1];
+      const hint = `${parts[2] || ''} ${meta?.title || ''} ${meta?.type || ''} ${meta?.refId || ''}`;
+      let tab = 'manejo';
+      if (/cosecha|latas|cos_pend_/i.test(hint)) tab = 'cosecha';
+      else if (/balance|aprobar|apr_/i.test(hint)) tab = 'balance';
+      else if (/timeline|foto|tiempo|caf_foto_/i.test(hint)) tab = 'timeline';
+      else if (parts[2]) tab = parts[2];
+
+      if (typeof window.__openLoteInDashboard === 'function' && window.__openLoteInDashboard(loteId, tab)) {
+        return;
+      }
+      window._pendingOpenLote = { loteId, tab };
+      if (typeof window.navigateTo === 'function') {
+        window.navigateTo('dashboard');
+      } else {
+        window.location.hash = '#dashboard';
+      }
+      return;
     }
-    let row = null;
-    for (let i = 0; i < 15; i++) {
-      row = document.querySelector(`.ganado-row[data-animal-id="${CSS.escape(animalId)}"]`);
-      if (row) break;
-      await new Promise(r => setTimeout(r, 120));
+
+    if (parts[0] === 'detalle_motor' && parts[1]) {
+      const motorId = parts[1];
+      if (!window.location.hash.startsWith('#motores') && typeof window.navigateTo === 'function') {
+        window.navigateTo('motores');
+      }
+      for (let i = 0; i < 20; i++) {
+        if (document.getElementById('motor-list-sheet') && typeof window.handleMotorCardClick === 'function') break;
+        await new Promise(r => setTimeout(r, 120));
+      }
+      let cardEl = null;
+      for (let i = 0; i < 10; i++) {
+        cardEl = document.querySelector(`.motor-card-compact[data-id="${CSS.escape(motorId)}"]`);
+        if (cardEl) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
+      if (!cardEl) {
+        cardEl = { dataset: { id: motorId, nombre: 'Detalle de Equipo' } };
+      }
+      if (typeof window.handleMotorCardClick === 'function') {
+        await window.handleMotorCardClick(null, cardEl);
+        return;
+      }
     }
-    if (!row) {
-      row = document.createElement('div');
-      row.className = 'ganado-row';
-      row.dataset.animalId = animalId;
+
+    if (parts[0] === 'detalle_animal' && parts[1] && typeof window.openActionBottomSheet === 'function') {
+      const animalId = parts[1];
+      if (!window.location.hash.startsWith('#ganado') && typeof window.navigateTo === 'function') {
+        window.navigateTo('ganado');
+      }
+      let row = null;
+      for (let i = 0; i < 20; i++) {
+        row = document.querySelector(`.ganado-row[data-animal-id="${CSS.escape(animalId)}"]`);
+        if (row) break;
+        await new Promise(r => setTimeout(r, 120));
+      }
+      if (!row) {
+        row = document.createElement('div');
+        row.className = 'ganado-row';
+        row.dataset.animalId = animalId;
+      }
+      const btn = row.querySelector?.('.ganado-btn-more') || row;
+      const menu = row.querySelector?.('.action-menu') || document.createElement('div');
+      window.openActionBottomSheet(btn, menu);
+      return;
     }
-    const btn = row.querySelector?.('.ganado-btn-more') || row;
-    const menu = row.querySelector?.('.action-menu') || document.createElement('div');
-    window.openActionBottomSheet(btn, menu);
-    return;
+
+    if (parts[0] === 'detalle_potrero' && parts[1]) {
+      const potreroId = parts[1];
+      if (window.location.hash.startsWith('#potreros') && typeof window.__selectPotreroInMap === 'function') {
+        const opened = window.__selectPotreroInMap(potreroId);
+        if (opened) return;
+      }
+      window._pendingOpenPotreroId = potreroId;
+      if (typeof window.navigateTo === 'function') {
+        window.navigateTo('potreros');
+      } else {
+        window.location.hash = '#potreros';
+      }
+      return;
+    }
+
+    if (parts[0] === 'detalle_personal' && parts[1]) {
+      const personalId = parts[1];
+      if (!window.location.hash.startsWith('#personal') && typeof window.navigateTo === 'function') {
+        window.navigateTo('personal');
+      }
+      for (let i = 0; i < 20; i++) {
+        if (document.querySelector('.lp-list') && typeof window.openPersonalCard === 'function') break;
+        await new Promise(r => setTimeout(r, 120));
+      }
+      if (typeof window.openPersonalCard === 'function') {
+        await window.openPersonalCard(personalId);
+        return;
+      }
+    }
   }
 
   if (typeof window.navigateTo === 'function') {
@@ -58,7 +136,7 @@ navigator.serviceWorker?.addEventListener('message', (event) => {
         body: JSON.stringify({ read: true }),
       }).catch(() => {});
     }
-    window.__openNotifTarget(event.data.url);
+    window.__openNotifTarget(event.data.url, event.data);
   }
 });
 
@@ -121,7 +199,7 @@ const updateSW = registerSW({
 
 import { isOnline, processSyncQueue, incrementalSync, fullDownload } from './sync.js';
 import { registerPushToken, initForegroundPush, checkPushAlerts } from './push/push.js';
-import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, actualizarSaludPorPlan, checkPartosProximos, checkMotoresAceite } from './wa.js';
+import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, checkPartosProximos, checkMotoresAceite } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 import { initRealtime, disconnectRealtime } from './realtime.js';
@@ -353,7 +431,10 @@ async function initApp() {
     initRealtime();
     maybePromptOfflineDownload();
 
-    const addPushBellNotif = ({ notifId, title, body, url, refId }) => {
+    const addPushBellNotif = ({ notifId, title, body, url, refId, type }) => {
+      if (refId) {
+        notifs = notifs.filter(n => n.refId !== String(refId));
+      }
       const uiId = notifId ? `db-${notifId}` : `push-${Date.now()}`;
       addNotif(uiId, 'notifications_active', title, body, [
         {
@@ -369,7 +450,7 @@ async function initApp() {
               }).catch(() => {});
             }
             if (url) {
-              window.__openNotifTarget?.(url);
+              window.__openNotifTarget?.(url, { title, type, refId });
             }
           },
         },
@@ -377,6 +458,7 @@ async function initApp() {
       const entry = notifs.find(n => n.id === uiId);
       if (entry && refId) entry.refId = String(refId);
     };
+    window.__addPushBellNotif = addPushBellNotif;
 
     window.clearPushBellByRef = (refId) => {
       if (!refId) return;
@@ -397,14 +479,14 @@ async function initApp() {
         const rows = await restFetch(`/rest/v1/notifications?${filter}read=eq.false&order=created_at.desc&limit=15`);
         if (Array.isArray(rows)) {
           rows.reverse().forEach((r) => {
-            addPushBellNotif({ notifId: r.id, title: r.title, body: r.body, url: r.url, refId: r.ref_id });
+            addPushBellNotif({ notifId: r.id, title: r.title, body: r.body, url: r.url, refId: r.ref_id, type: r.type });
           });
         }
       } catch {}
     })();
 
-    initForegroundPush(({ notifId, title, body, url }) => {
-      addPushBellNotif({ notifId, title, body, url });
+    initForegroundPush(({ notifId, title, body, url, refId, payload }) => {
+      addPushBellNotif({ notifId, title, body, url, refId, type: payload?.data?.type });
       window.Snackbar?.show(`${title}: ${body}`);
     });
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -575,7 +657,6 @@ function initOnlineSync() {
       await checkAplicacionesDelMes();
       await checkAnalisisSueloPendiente();
       await checkEnmiendaCal();
-      await actualizarSaludPorPlan();
       await checkPartosProximos();
       await checkMotoresAceite();
     } catch (e) { /* silent */ }
@@ -750,6 +831,7 @@ function handleAuthCallback() {
 
 document.addEventListener('DOMContentLoaded', () => {
     initGlobalM3DatePickers();
+    initGlobalM3Selects();
     const isAuthCallback = handleAuthCallback();
     const titleElement = document.getElementById('current-screen-title');
 

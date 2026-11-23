@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { restFetch, restInsert, loadPuntoReferencia } from '../auth.js';
 import { invalidateCache } from '../sync.js';
+import { initM3FullScreenSearch, escapeSearchHtml } from '../components/m3_search.js';
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, m => ({
@@ -40,6 +41,9 @@ let drawControl = null;
 let existingPotrerosLayer = null;
 let selectedColor = '#2d3e2c';
 let refMarker = null;
+let miniPreviewMap = null;
+let miniPreviewPoly = null;
+let coordinatesCleared = false;
 
 // Walking / GPS recording state
 let walkState = 'idle';        // 'idle' | 'searching' | 'recording' | 'paused'
@@ -97,24 +101,26 @@ export async function renderNuevoPotrero(id) {
 
             <div class="m3-field ${val('pasto') ? 'has-value' : ''}" id="pasto-field">
               <select name="pasto" id="pasto-select" required onchange="window._togglePastoCustom()">
-                <option value="Estrella" ${selected('pasto', 'Estrella')}>Estrella</option>
-                <option value="Brachiaria" ${selected('pasto', 'Brachiaria')}>Brachiaria</option>
-                <option value="Pangola" ${selected('pasto', 'Pangola')}>Pangola</option>
-                <option value="Guinea" ${selected('pasto', 'Guinea')}>Guinea</option>
-                <option value="Cratylia" ${selected('pasto', 'Cratylia')}>Cratylia</option>
-                <option value="Natural" ${selected('pasto', 'Natural')}>Natural / Sabana</option>
-                <option value="Otro" ${selected('pasto', 'Otro')}>Otro (escribir)</option>
+                <option value="Estrella" data-icon="⭐" data-sub="Pasto rastrero de alta cobertura" ${selected('pasto', 'Estrella')}>Estrella</option>
+                <option value="Brachiaria" data-icon="🌿" data-sub="Forraje resistente de alto rendimiento" ${selected('pasto', 'Brachiaria')}>Brachiaria</option>
+                <option value="Pangola" data-icon="🌾" data-sub="Pasto suave para corte o pastoreo" ${selected('pasto', 'Pangola')}>Pangola</option>
+                <option value="Guinea" data-icon="🌱" data-sub="Macolla alta ideal para engorde" ${selected('pasto', 'Guinea')}>Guinea</option>
+                <option value="Cratylia" data-icon="🍃" data-sub="Leguminosa forrajera rica en proteína" ${selected('pasto', 'Cratylia')}>Cratylia</option>
+                <option value="Natural" data-icon="🏞️" data-sub="Pasto nativo / grama de potrero" ${selected('pasto', 'Natural')}>Natural / Sabana</option>
+                ${(potrero?.pasto && !['Estrella', 'Brachiaria', 'Pangola', 'Guinea', 'Cratylia', 'Natural', 'Otro'].includes(potrero.pasto))
+                  ? `<option data-custom-pasto="1" value="${escapeHtml(potrero.pasto)}" data-icon="🌱" data-sub="Variedad personalizada" selected>${escapeHtml(potrero.pasto)}</option>`
+                  : ''}
+                <option value="Otro" data-icon="✏️" data-sub="Escribir otra variedad de pasto" ${selected('pasto', 'Otro')}>Otro (escribir)</option>
               </select>
-              <input type="text" name="pasto_custom" id="pasto-input" placeholder=" " value="${val('pasto_custom') || ''}" style="display:none;" oninput="this.closest('.m3-field').classList.toggle('has-value', !!this.value)">
+              <input type="hidden" name="pasto_custom" id="pasto-input" value="">
               <label>Tipo de Semilla (Pasto)</label>
-              <button type="button" id="pasto-back" style="display:none; margin-top:6px; background:none; border:none; color:#2d3e2c; font-size:12px; font-weight:700; cursor:pointer; font-family:'Work Sans', sans-serif; padding:0;" onclick="window._showPastoList()">← Volver a la lista</button>
             </div>
 
             <div class="m3-field">
               <select name="status">
-                <option value="libre" ${selected('status', 'libre')}>Libre</option>
-                <option value="ocupado" ${selected('status', 'ocupado')}>Ocupado</option>
-                <option value="recuperando" ${selected('status', 'recuperando')}>Recuperando / Descanso</option>
+                <option value="libre" data-icon="✅" data-sub="Listo para ingresar ganado" ${selected('status', 'libre')}>Libre</option>
+                <option value="ocupado" data-icon="🐄" data-sub="Con hato en pastoreo actual" ${selected('status', 'ocupado')}>Ocupado</option>
+                <option value="recuperando" data-icon="🌱" data-sub="En ciclo de rebrote y descanso" ${selected('status', 'recuperando')}>Recuperando / Descanso</option>
               </select>
               <label>Estado</label>
             </div>
@@ -130,44 +136,135 @@ export async function renderNuevoPotrero(id) {
             <label>Notas Adicionales</label>
           </div>
 
-          <!-- Map Section - Google Earth Style -->
-          <div style="margin-top: 32px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+          <!-- Map Section - Opens Full Bottom Sheet (Google Earth style, igual a Cafetal) -->
+          <div style="margin-top: 28px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
               <span class="material-icons" style="color: var(--m3-primary); font-size: 24px;">public</span>
               <h3 style="font-family: 'Work Sans', sans-serif; font-size: 18px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Delimitar Área del Potrero</h3>
             </div>
 
-            <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-bottom: 16px; line-height: 1.5;">
-              Dibuja el perímetro de tu potrero en el mapa. Usa la barra de búsqueda <span class="material-icons" style="font-size: 14px; vertical-align: middle;">search</span> para encontrar tu finca.
-            </p>
-
-            <div id="lote-map-container" style="width: 100%; height: 550px; border-radius: 12px; overflow: hidden; border: 2px solid var(--m3-outline-variant); position: relative; box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
-              <div id="lote-map" style="width: 100%; height: 100%;"></div>
-
-              <!-- Scale bar -->
-              <div id="map-scale-bar" style="position: absolute; bottom: 24px; left: 24px; z-index: 1000; background: rgba(0,0,0,0.6); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; font-family: 'Work Sans', sans-serif;">
-                <span id="scale-text">400 m</span>
+            <button type="button" id="btn-open-map-sheet" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-radius: 16px; border: 1.5px solid var(--m3-outline-variant); background: #f6f8f5; cursor: pointer; text-align: left; transition: all 0.2s;">
+              <div style="display: flex; align-items: center; gap: 14px; min-width: 0;">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: #2d3e2c; color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <span class="material-icons" style="font-size: 22px;">add_location_alt</span>
+                </div>
+                <div style="min-width: 0;">
+                  <div style="font-family: 'Work Sans', sans-serif; font-size: 15px; font-weight: 700; color: var(--m3-on-surface);">Abrir mapa satelital</div>
+                  <div id="map-open-status" style="font-size: 12.5px; color: var(--m3-on-surface-variant); margin-top: 2px;">Toca para marcar los puntos del potrero</div>
+                </div>
               </div>
+              <span class="material-icons" style="color: var(--m3-primary); font-size: 24px; flex-shrink: 0;">open_in_full</span>
+            </button>
 
-              <!-- Coordinates display -->
-              <div id="map-coords" style="position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(0,0,0,0.7); color: white; padding: 6px 16px; border-radius: 12px; font-size: 11px; font-weight: 500; font-family: 'Work Sans', monospace; backdrop-filter: blur(8px);">
-                <span id="coords-text">14°04'57.77"N 86°10'36.26"W</span>
-              </div>
-
-              <!-- Map overlay buttons - M3 Floating -->
-              <div style="position: absolute; top: 128px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px;">
-                <button type="button" id="btn-toggle-layers" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Cambiar capa">
-                  <span class="material-icons" style="font-size: 22px; color: #444;">layers</span>
-                </button>
-                <button type="button" id="btn-locate" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Mi ubicación">
-                  <span class="material-icons" style="font-size: 22px; color: #444;">my_location</span>
-                </button>
+            <!-- Live Satellite Mini Preview of Delimited Polygon -->
+            <div id="lote-map-preview-wrap" style="display: none; margin-top: 12px; height: 185px; width: 100%; border-radius: 16px; overflow: hidden; border: 1.5px solid var(--m3-outline-variant); position: relative; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
+              <div id="lote-mini-preview-map" style="width: 100%; height: 100%; pointer-events: none;"></div>
+              <div style="position: absolute; bottom: 10px; right: 10px; z-index: 500; background: rgba(20,22,20,0.82); color: #ffffff; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; font-family: 'Work Sans', sans-serif; display: flex; align-items: center; gap: 5px; backdrop-filter: blur(6px);">
+                <span class="material-icons" style="font-size: 15px;">edit</span>
+                Editar mapa
               </div>
             </div>
 
-            <p style="font-size: 13px; color: var(--m3-on-surface-variant); margin-bottom: 16px; line-height: 1.5;">
-              Usa las herramientas del mapa para dibujar el polígono que representa tu potrero. El área se calculará automáticamente en hectáreas.
-            </p>
+            <!-- Fullscreen Google Earth Style Map + Medir Potrero Bottom Sheet -->
+            <div id="lote-map-sheet" style="position: fixed; inset: 0; z-index: 10050; background: #141614; display: flex; flex-direction: column; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity 0.22s ease;">
+              <div style="height: 100dvh; width: 100%; background: #141614; overflow: hidden; display: flex; flex-direction: column;">
+
+                <div id="lote-map-container" style="flex: 1 1 0%; min-height: 0; width: 100%; position: relative; overflow: hidden;">
+                  <div id="lote-map" style="width: 100%; height: 100%;"></div>
+                  <input type="hidden" id="potrero-map-search-input" value="">
+                  <button type="button" id="potrero-map-search-clear" style="display: none;"></button>
+
+                  <!-- Google Earth Center Crosshair + Distance Pill -->
+                  <div id="earth-crosshair" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1002; pointer-events: none; display: flex; flex-direction: column; align-items: center;">
+                    <div id="earth-measure-pill" style="margin-bottom: 10px; background: #f3d26b; color: #1f1b10; padding: 4px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 800; font-family: 'Work Sans', sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,0.45); white-space: nowrap;">
+                      Ubica el 1er punto
+                    </div>
+                    <div style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.65), inset 0 0 0 1.5px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center;">
+                      <div style="width: 4px; height: 4px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 2px rgba(0,0,0,0.8);"></div>
+                    </div>
+                  </div>
+
+                  <!-- Scale bar -->
+                  <div id="map-scale-bar" style="position: absolute; bottom: 14px; left: 14px; z-index: 1000; background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; font-family: 'Work Sans', sans-serif;">
+                    <span id="scale-text">400 m</span>
+                  </div>
+
+                  <!-- Live Drawing HUD -->
+                  <div id="draw-live-hud" style="display: none; position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); z-index: 1001; background: rgba(110, 68, 0, 0.94); color: #fff8e1; border: 1px solid rgba(251, 188, 4, 0.55); padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; font-family: 'Work Sans', sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.35); white-space: nowrap; pointer-events: none;">
+                    Agregar primer punto
+                  </div>
+
+                  <!-- Coordinates display -->
+                  <div id="map-coords" style="position: absolute; bottom: 14px; right: 14px; z-index: 1000; background: rgba(0,0,0,0.65); color: white; padding: 4px 10px; border-radius: 10px; font-size: 10.5px; font-weight: 500; font-family: 'Work Sans', monospace; backdrop-filter: blur(8px);">
+                    <span id="coords-text">14°04'57.77"N 86°10'36.26"W</span>
+                  </div>
+
+                  <!-- Map overlay search button - Top Right -->
+                  <div style="position: absolute; top: 16px; right: 16px; z-index: 1000;">
+                    <button type="button" id="potrero-map-search-toggle" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: #141614; color: #ffffff; border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 4px 14px rgba(0,0,0,0.45); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Buscar lugar, potrero o coordenadas">
+                      <span class="material-icons" style="font-size: 22px; color: #ffffff;">search</span>
+                    </button>
+                  </div>
+
+                  <!-- Map overlay action buttons - Bottom Right Stack -->
+                  <div id="map-bottom-actions" style="position: absolute; bottom: 50px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" id="btn-walk-toggle" class="m3-map-overlay-btn m3-walk-btn" style="width: 44px; height: 44px; border-radius: 12px; background: #141614; color: #ffffff; border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 4px 14px rgba(0,0,0,0.45); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Registrar caminando">
+                      <span class="material-icons" style="font-size: 22px; color: #ffffff;">directions_walk</span>
+                    </button>
+                    <button type="button" id="btn-toggle-layers" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: #141614; color: #ffffff; border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 4px 14px rgba(0,0,0,0.45); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Cambiar capa">
+                      <span class="material-icons" style="font-size: 22px; color: #ffffff;">layers</span>
+                    </button>
+                    <button type="button" id="btn-locate" class="m3-map-overlay-btn" style="width: 44px; height: 44px; border-radius: 12px; background: #141614; color: #ffffff; border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 4px 14px rgba(0,0,0,0.45); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Mi ubicación">
+                      <span class="material-icons" style="font-size: 22px; color: #ffffff;">my_location</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Google Earth Style Bottom Sheet: Medir Potrero -->
+                <div id="earth-measure-bar" style="flex-shrink: 0; background: #141614; color: #f1f3f4; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; margin-top: -18px; position: relative; z-index: 1005; box-shadow: 0 -8px 28px rgba(0,0,0,0.45); display: flex; flex-direction: column; gap: 12px; transition: all 0.22s ease;">
+                  <div id="earth-sheet-handle" style="width: 40px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.35); margin: 2px auto 0; cursor: pointer;"></div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <button type="button" id="btn-close-map-sheet" style="width: 36px; height: 36px; border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: #f1f3f4; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Cerrar mapa">
+                        <span class="material-icons" style="font-size: 20px;">arrow_back</span>
+                      </button>
+                      <div>
+                        <div style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 700; color: #ffffff;">Medir Potrero</div>
+                        <div id="earth-bar-stats" style="font-size: 12px; color: #c4c7c5;">0 puntos</div>
+                      </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <button type="button" id="btn-earth-undo" disabled style="width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: #f1f3f4; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.4;" title="Deshacer último punto">
+                        <span class="material-icons" style="font-size: 20px;">undo</span>
+                      </button>
+                      <button type="button" id="btn-earth-clear" style="width: 38px; height: 38px; border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: #f1f3f4; display: flex; align-items: center; justify-content: center; cursor: pointer;" title="Limpiar puntos">
+                        <span class="material-icons" style="font-size: 20px;">delete_outline</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div id="earth-closed-metrics" style="display: none; flex-direction: column; gap: 10px; padding: 10px 4px 4px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div>
+                      <div style="font-size: 13px; color: #c4c7c5; font-weight: 500;">Área</div>
+                      <div id="earth-metric-area" style="font-size: 16px; font-weight: 700; color: #ffffff; margin-top: 2px;">0.00 ha</div>
+                    </div>
+                    <div>
+                      <div style="font-size: 13px; color: #c4c7c5; font-weight: 500;">Perímetro</div>
+                      <div id="earth-metric-perim" style="font-size: 16px; font-weight: 700; color: #ffffff; margin-top: 2px;">0.00 m</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" id="btn-earth-add-point" style="flex: 1; height: 44px; border-radius: 999px; border: none; background: #c2e7ff; color: #001d35; font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+                      <span class="material-icons" style="font-size: 20px;">add</span>
+                      Agregar punto
+                    </button>
+                    <button type="button" id="btn-earth-done" style="height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.28); background: transparent; color: #e3e3e3; font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+                      <span class="material-icons" style="font-size: 18px;">check</span>
+                      Listo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <!-- Color Picker and Area Badge -->
             <div id="color-picker-row" style="display: none; margin-top: 16px; padding: 12px 20px; background: white; border-radius: 12px; border: 1px solid var(--m3-outline-variant); align-items: center; gap: 16px; flex-wrap: wrap;">
@@ -365,88 +462,81 @@ function initMap() {
   mapInstance = L.map('lote-map', {
     center: [14.5, -88.5],
     zoom: 9,
-    maxZoom: 20,
+    maxZoom: 22,
     zoomControl: false,
     attributionControl: false
   });
 
-  // Centro inicial en el punto de referencia de la finca (si existe) y lo muestra marcado
+  // Centro inicial y marcador del punto de referencia de la finca (si existe)
   loadPuntoReferencia(window._currentEmpresaId).then(ref => {
     if (ref && mapInstance) {
-      if (refMarker) mapInstance.removeLayer(refMarker);
-      mapInstance.setView([ref.lat, ref.lng], 17);
+      const nombre = escapeHtml(ref.nombre || 'Finca');
+      if (refMarker && mapInstance.hasLayer(refMarker)) {
+        mapInstance.removeLayer(refMarker);
+      }
       refMarker = L.marker([ref.lat, ref.lng], {
         icon: L.divIcon({
           className: 'ref-label-icon',
-          html: '<span class="material-icons" style="font-size:38px;color:#e53935;text-shadow:0 0 3px #fff,0 0 6px #fff;">place</span><span class="ref-label-text">' + escapeHtml(ref.nombre || '') + '</span>',
-          iconSize: null,
-          iconAnchor: [19, 38]
+          html: `<div style="display:flex; flex-direction:column; align-items:center; cursor:pointer;">
+                   <span class="material-icons" style="font-size:36px; color:#e53935; text-shadow:0 0 3px #fff, 0 0 6px #fff; line-height:1;">place</span>
+                   <span style="font-family:'Work Sans',sans-serif; font-size:11px; font-weight:800; color:#ffffff; background:#e53935; padding:2px 8px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.3); white-space:nowrap; margin-top:-4px;">📍 ${nombre}</span>
+                 </div>`,
+          iconSize: [120, 52],
+          iconAnchor: [60, 36]
         }),
-        interactive: false
+        interactive: true,
+        zIndexOffset: 1000
       }).addTo(mapInstance);
+
+      refMarker.bindPopup(`
+        <div style="font-family:'Work Sans',sans-serif; padding:4px;">
+          <div style="font-weight:800; font-size:13px; color:#e53935;">📍 Punto de Referencia de la Finca</div>
+          <div style="font-size:12px; color:#333; margin-top:2px;"><b>${nombre}</b></div>
+          <div style="font-size:11px; color:#777; margin-top:2px;">${ref.lat.toFixed(6)}, ${ref.lng.toFixed(6)}</div>
+        </div>
+      `);
+
+      if (!window.__currentPotreroData?.coordenadas_json) {
+        mapInstance.setView([ref.lat, ref.lng], 15);
+      }
     }
   }).catch(() => {});
 
-  // ── Capas satelitales especializadas para fincas (Default: Esri Satélite) ──
+  // ── Capas satelitales especializadas para fincas (Default: Google Earth) ──
   const esriSatLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles &copy; Esri',
     maxZoom: 22,
-    maxNativeZoom: 19
-  }).addTo(mapInstance);
+    maxNativeZoom: 17
+  });
 
   const googleSatLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
     attribution: 'Imagery &copy; Google',
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     maxZoom: 22,
     maxNativeZoom: 20
-  });
-
-  // Labels overlay for satellite
-  const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
-    maxZoom: 22,
-    opacity: 0.8
   }).addTo(mapInstance);
+
+  const googleHybridLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+    attribution: 'Imagery &copy; Google',
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    maxZoom: 22,
+    maxNativeZoom: 20
+  });
 
   // Store layers for toggling
   mapInstance._layersConfig = {
     esriSat: esriSatLayer,
     googleSat: googleSatLayer,
-    labels: labelsLayer
+    googleHybrid: googleHybridLayer
   };
 
-  // Track which base layer is active (0=Esri Sat, 1=Google Sat, 2=Clean Sat)
+  // Track which base layer is active (0=Google Earth, 1=Google Híbrido, 2=Esri Sat.)
   let layerMode = 0;
 
   // ── Tile error handler: show warning when tiles fail ──
   mapInstance.on('tileerror', function(e) {
     console.warn('Tile failed to load:', e.tile.src);
   });
-
-  // ── Custom M3 Zoom Controls (top-right, Google Maps style) ──
-  L.Control.CustomZoom = L.Control.extend({
-    onAdd: function() {
-      const div = L.DomUtil.create('div', 'm3-map-zoom');
-      div.innerHTML = `
-        <button class="m3-zoom-btn" id="m3-zoom-in" title="Acercar">
-          <span class="material-icons">add</span>
-        </button>
-        <div class="m3-zoom-divider"></div>
-        <button class="m3-zoom-btn" id="m3-zoom-out" title="Alejar">
-          <span class="material-icons">remove</span>
-        </button>
-      `;
-      L.DomEvent.disableClickPropagation(div);
-      return div;
-    }
-  });
-  new L.Control.CustomZoom({ position: 'topright' }).addTo(mapInstance);
-
-  // Wire zoom buttons
-  setTimeout(() => {
-    document.getElementById('m3-zoom-in')?.addEventListener('click', () => mapInstance.zoomIn());
-    document.getElementById('m3-zoom-out')?.addEventListener('click', () => mapInstance.zoomOut());
-  }, 200);
 
   // Search control - Material 3 Expressive (places + coordinates + plus codes)
   function extractPlusCode(query) {
@@ -595,39 +685,23 @@ function initMap() {
   searchGeocoder.geocode = function(query, cb, ctx) { searchFor(query, cb, ctx, true); };
   searchGeocoder.suggest = function(query, cb, ctx) { searchFor(query, cb, ctx, false); };
 
-  const geocoder = L.Control.geocoder({
-    defaultMarkGeocode: false,
-    collapsed: false,
-    position: 'topleft',
-    placeholder: 'Buscar lugar, ciudad, coordenadas o plus code...',
-    errorMessage: 'No se encontró el lugar. Intenta con un plus code de Google Maps (ej. 3RPC+5C)',
-    suggestTimeout: 250,
-    queryMinLength: 2,
-    geocoder: searchGeocoder
-  }).addTo(mapInstance);
-
-  // Customize the geocoder icon to use Material Icons and Spanish
-  setTimeout(() => {
-    const iconEl = document.querySelector('.leaflet-control-geocoder-icon');
-    if (iconEl) {
-      iconEl.innerHTML = '<span class="material-icons" style="font-size:22px;color:#444;line-height:48px;">search</span>';
-      iconEl.title = 'Buscar lugar';
-    }
-  }, 500);
-
   let tempMarker = null;
-  geocoder.on('markgeocode', function(e) {
-    const gc = e.geocode;
-    const bbox = gc.bbox;
-    if (bbox) {
+  let currentMapSearchQuery = '';
+
+  function focusSearchResult(gc) {
+    if (!gc) return;
+    if (gc.bbox) {
       const poly = L.polygon([
-        bbox.getSouthEast(), bbox.getNorthEast(),
-        bbox.getNorthWest(), bbox.getSouthWest()
+        gc.bbox.getSouthEast(), gc.bbox.getNorthEast(),
+        gc.bbox.getNorthWest(), gc.bbox.getSouthWest()
       ]).addTo(mapInstance);
       mapInstance.fitBounds(poly.getBounds());
       setTimeout(() => mapInstance.removeLayer(poly), 3000);
+    } else if (gc.center) {
+      mapInstance.setView(gc.center, Math.max(mapInstance.getZoom(), 17));
     }
 
+    if (!gc.center) return;
     if (tempMarker) mapInstance.removeLayer(tempMarker);
     const icon = L.divIcon({
       className: 'mapa-saved-icon',
@@ -637,9 +711,7 @@ function initMap() {
     });
     tempMarker = L.marker(gc.center, { icon }).addTo(mapInstance);
 
-    if (gc._savedPoint) {
-      return;
-    }
+    if (gc._savedPoint) return;
 
     const defaultName = gc.name || ('Punto ' + (gc.center ? gc.center.lat.toFixed(5) + ', ' + gc.center.lng.toFixed(5) : ''));
     tempMarker.on('click', () => {
@@ -651,7 +723,83 @@ function initMap() {
         if (tempMarker) { mapInstance.removeLayer(tempMarker); tempMarker = null; }
       });
     });
+  }
+
+  initM3FullScreenSearch({
+    moduleKey: 'potrero_map',
+    toggleId: 'potrero-map-search-toggle',
+    inputId: 'potrero-map-search-input',
+    clearId: 'potrero-map-search-clear',
+    placeholder: 'Buscar lugar, potrero o coordenadas...',
+    ariaLabel: 'Búsqueda de lugar o potrero en mapa',
+    suggestedTitle: 'Lugares y potreros sugeridos',
+    emptyLabel: 'lugares',
+    getQuery: () => currentMapSearchQuery,
+    setQuery: (v) => { currentMapSearchQuery = (v || '').trim(); },
+    onApplySearch: (v) => {
+      const q = (v || '').trim();
+      if (!q) return;
+      searchGeocoder.geocode(q, (results) => {
+        if (results && results.length > 0) {
+          focusSearchResult(results[0]);
+        } else {
+          window.Snackbar?.show('No se encontró el lugar. Intenta con coordenadas o Plus Code (ej. 3RPC+5C)', { duration: 3000 });
+        }
+      });
+    },
+    loadItems: async () => {
+      const items = [];
+      if (refMarker) {
+        const ll = refMarker.getLatLng();
+        items.push({ id: 'ref-finca', kind: 'Finca', name: 'Punto de referencia de la finca', lat: ll.lat, lng: ll.lng, icon: 'home_pin' });
+      }
+      loadSavedPoints().forEach((p, idx) => {
+        items.push({ id: `saved-${idx}`, kind: 'Guardado', name: p.name, lat: p.lat, lng: p.lng, icon: 'bookmark' });
+      });
+      if (existingPotrerosLayer) {
+        existingPotrerosLayer.eachLayer(l => {
+          if (l.getBounds) {
+            const c = l.getBounds().getCenter();
+            const tt = l.getTooltip()?.getContent?.() || '';
+            const cleanName = String(tt).replace(/<[^>]+>/g, '').replace('🌿 Potrero:', '').trim();
+            if (cleanName) {
+              items.push({ id: `pot-${items.length}`, kind: 'Potrero', name: cleanName, lat: c.lat, lng: c.lng, icon: 'landscape' });
+            }
+          }
+        });
+      }
+      return items;
+    },
+    getQuickChips: () => [
+      { label: 'Mi finca', type: 'query', value: 'finca', icon: 'home_pin' },
+      { label: 'Guardados', type: 'query', value: 'guardado', icon: 'bookmark' },
+      { label: 'Potreros', type: 'query', value: 'potrero', icon: 'landscape' }
+    ],
+    filterItems: (items, qLower) => items.filter(it =>
+      (it.name || '').toLowerCase().includes(qLower) ||
+      (it.kind || '').toLowerCase().includes(qLower)
+    ),
+    renderItem: (it) => `
+      <div class="m3-search-item m3-contained-item" data-lat="${it.lat}" data-lng="${it.lng}" role="option" tabindex="0" style="cursor: pointer;">
+        <span class="material-icons m3-search-item-leading">${it.icon || 'place'}</span>
+        <div class="m3-search-item-body">
+          <div style="font-size: 11px; font-weight: 700; color: var(--m3-primary); text-transform: uppercase;">${escapeSearchHtml(it.kind)}</div>
+          <span class="m3-search-item-title">${escapeSearchHtml(it.name)}</span>
+        </div>
+      </div>
+    `,
+    itemSelector: '.m3-search-item[data-lat]',
+    getItemTitle: (el) => el.querySelector('.m3-search-item-title')?.textContent?.trim() || '',
+    onItemClick: (el) => {
+      const lat = parseFloat(el.dataset.lat);
+      const lng = parseFloat(el.dataset.lng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        mapInstance.setView([lat, lng], 18);
+      }
+    }
   });
+  const mapFsOverlay = document.getElementById('potrero_map-fullscreen-search');
+  if (mapFsOverlay) mapFsOverlay.style.zIndex = '10100';
 
   function showSaveBar(currentName, onSave, onDelete) {
     let saveBar = document.getElementById('temp-save-bar');
@@ -815,6 +963,7 @@ function initMap() {
       glow._isGlow = true;
       layer._glowPolygon = glow;
       mapInstance.addLayer(glow);
+      updateMiniPreviewMap(latlngs[0], color);
     }
   }
 
@@ -834,55 +983,28 @@ function initMap() {
     });
   }
 
-  // Draw control - Material 3 Expressive
-  drawControl = new L.Control.Draw({
-    position: 'topleft',
-    draw: {
-      polygon: {
-        allowIntersection: false,
-        showArea: true,
-        shapeOptions: {
-          color: '#ffffff',
-          fillColor: selectedColor,
-          fillOpacity: 0.5,
-          weight: 2
-        },
-        drawError: {
-          color: '#b23d21',
-          message: '<strong>Error:</strong> No se permiten intersecciones'
-        },
-        icon: new L.DivIcon({
-          iconSize: new L.Point(8, 8),
-          className: 'leaflet-div-icon leaflet-editing-icon'
-        })
-      },
-      polyline: false,
-      rectangle: false,
-      circle: false,
-      marker: false,
-      circlemarker: false
-    },
-    edit: {
-      featureGroup: drawnItems,
-      remove: true,
-      selectedPathOptions: {
-        color: '#ffffff',
-        fillColor: selectedColor,
-        fillOpacity: 0.5,
-        weight: 2,
-        dashArray: ''
-      }
-    }
-  });
-  mapInstance.addControl(drawControl);
+  // Draw control removed in favor of Google Earth style bottom measure bar
+  drawControl = null;
 
   // ── Walking / GPS Recording Control ──
   createWalkControl();
 
-  // ── Toolbar toggle: click button again to close actions pill ──
+  // ── Toolbar toggle & Google Earth style live drawing HUD ──
   let toolActive = false;
-  mapInstance.on('draw:drawstart draw:editstart', () => { toolActive = true; });
-  mapInstance.on('draw:drawstop draw:editstop', () => { toolActive = false; });
+  mapInstance.on('draw:drawstart', () => {
+    toolActive = true;
+    const hud = document.getElementById('draw-live-hud');
+    if (hud) {
+      hud.textContent = 'Agregar primer punto';
+      hud.style.display = 'block';
+    }
+  });
+  mapInstance.on('draw:editstart', () => { toolActive = true; });
+  mapInstance.on('draw:drawstop draw:editstop', () => {
+    toolActive = false;
+    const hud = document.getElementById('draw-live-hud');
+    if (hud) hud.style.display = 'none';
+  });
 
   setTimeout(() => {
     document.querySelectorAll('.leaflet-draw-toolbar a').forEach(btn => {
@@ -977,28 +1099,43 @@ function initMap() {
     potreros.forEach(potrero => {
       if (potrero.coordenadas_json) {
         const { coordinates, color } = parseCoordenadasJson(potrero.coordenadas_json);
+        if (!coordinates || coordinates.length < 3) return;
         const latlngs = coordinates.map(c => [c.lat, c.lng]);
         const potreroColor = color || '#2d3e2c';
 
         const poly = L.polygon(latlngs, {
           color: potreroColor,
           fillColor: potreroColor,
-          fillOpacity: 0.35,
-          weight: 3.5,
-          opacity: 1,
+          fillOpacity: 0.22,
+          weight: 2.5,
+          opacity: 0.9,
+          dashArray: '6, 6',
           lineJoin: 'round',
           lineCap: 'round'
         }).addTo(existingPotrerosLayer);
 
+        poly.bindTooltip(`🌿 Potrero: <b>${escapeHtml(potrero.nombre || 'Potrero')}</b> (${parseFloat(potrero.area || 0).toFixed(2)} ha)`, {
+          permanent: false,
+          sticky: true,
+          className: 'lote-ref-tooltip'
+        });
+
         poly.bindPopup(buildExistingPotreroPopupHtml(potrero));
       }
     });
+
+    if (!window.__currentPotreroData?.coordenadas_json && existingPotrerosLayer.getLayers().length > 0 && !refMarker) {
+      try {
+        mapInstance.fitBounds(existingPotrerosLayer.getBounds().pad(0.2));
+      } catch {}
+    }
   });
 
   // Clear button
   const clearBtn = document.getElementById('btn-clear-drawing');
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
+      coordinatesCleared = true;
       if (drawnItems) {
         drawnItems.eachLayer(l => {
           if (l._glowPolygon && mapInstance.hasLayer(l._glowPolygon)) {
@@ -1011,6 +1148,16 @@ function initMap() {
       const row = document.getElementById('color-picker-row');
       if (row) row.style.display = 'none';
     });
+  }
+
+  // Prevent map drag/click through overlay buttons
+  const bottomActions = document.getElementById('map-bottom-actions');
+  if (bottomActions && window.L?.DomEvent) {
+    L.DomEvent.disableClickPropagation(bottomActions);
+  }
+  const searchToggle = document.getElementById('potrero-map-search-toggle');
+  if (searchToggle && window.L?.DomEvent) {
+    L.DomEvent.disableClickPropagation(searchToggle);
   }
 
   // Locate button
@@ -1050,40 +1197,36 @@ function initMap() {
     });
   }
 
-    // Layers toggle: 0 = Google Sat, 1 = Esri Sat, 2 = Sat Limpio
+  // Layers toggle: 0 = Google Earth, 1 = Google Híbrido, 2 = Esri Sat.
   const btnLayers = document.getElementById('btn-toggle-layers');
   if (btnLayers) {
+    btnLayers.title = 'Capa: Google Earth';
     btnLayers.addEventListener('click', () => {
       layerMode = (layerMode + 1) % 3;
       mapInstance.removeLayer(googleSatLayer);
+      mapInstance.removeLayer(googleHybridLayer);
       mapInstance.removeLayer(esriSatLayer);
-      mapInstance.removeLayer(labelsLayer);
+      btnLayers.style.background = '#141614';
+      btnLayers.style.color = '#ffffff';
       if (layerMode === 0) {
-        mapInstance.addLayer(esriSatLayer);
-        mapInstance.addLayer(labelsLayer);
-        btnLayers.style.background = '#e8f5e9';
-        btnLayers.style.color = '#1b5e20';
-        btnLayers.title = 'Capa: Esri Satélite (Claridad)';
-        window.Snackbar?.show('Capa: Esri Satélite (Claridad agrícola)', { duration: 1500 });
-      } else if (layerMode === 1) {
         mapInstance.addLayer(googleSatLayer);
-        mapInstance.addLayer(labelsLayer);
-        btnLayers.style.background = '#ffffff';
-        btnLayers.style.color = '#2d3e2c';
-        btnLayers.title = 'Capa: Google Satélite';
-        window.Snackbar?.show('Capa: Google Satélite', { duration: 1500 });
+        btnLayers.title = 'Capa: Google Earth';
+        window.Snackbar?.show('Capa: Google Earth', { duration: 1500 });
+      } else if (layerMode === 1) {
+        mapInstance.addLayer(googleHybridLayer);
+        btnLayers.title = 'Capa: Google Híbrido';
+        window.Snackbar?.show('Capa: Google Híbrido', { duration: 1500 });
       } else {
         mapInstance.addLayer(esriSatLayer);
-        btnLayers.style.background = '#eceff1';
-        btnLayers.style.color = '#37474f';
-        btnLayers.title = 'Capa: Satélite Limpio (Sin textos)';
-        window.Snackbar?.show('Capa: Satélite Limpio (Sin textos)', { duration: 1500 });
+        btnLayers.title = 'Capa: Esri Satélite';
+        window.Snackbar?.show('Capa: Esri Satélite', { duration: 1500 });
       }
       if (existingPotrerosLayer) existingPotrerosLayer.bringToFront();
       if (drawnItems) drawnItems.bringToFront();
     });
   }
 
+  initEarthMeasureMode({ applyColorToPolygon, initColorPicker });
   updateScaleBar();
 
   // Try to restore walking session from localStorage
@@ -1141,6 +1284,55 @@ function calculateArea(layer) {
 
   const hint = document.getElementById('area-hint');
   if (hint) hint.style.display = 'none';
+
+  const mapStatus = document.getElementById('map-open-status');
+  if (mapStatus) mapStatus.textContent = `${areaHectares.toFixed(2)} ha · Toca para editar en el mapa`;
+
+  coordinatesCleared = false;
+  updateMiniPreviewMap(latlngs, selectedColor);
+}
+
+function updateMiniPreviewMap(latlngs, color = selectedColor) {
+  const wrap = document.getElementById('lote-map-preview-wrap');
+  const el = document.getElementById('lote-mini-preview-map');
+  if (!wrap || !el || !latlngs || latlngs.length < 3) return;
+
+  wrap.style.display = 'block';
+  if (!miniPreviewMap) {
+    miniPreviewMap = L.map('lote-mini-preview-map', {
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false,
+      boxZoom: false,
+      keyboard: false
+    });
+    L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      maxZoom: 22,
+      maxNativeZoom: 20
+    }).addTo(miniPreviewMap);
+  }
+
+  if (miniPreviewPoly && miniPreviewMap.hasLayer(miniPreviewPoly)) {
+    miniPreviewMap.removeLayer(miniPreviewPoly);
+  }
+  miniPreviewPoly = L.polygon(latlngs, {
+    color: '#ffffff',
+    weight: 2.5,
+    fillColor: color || '#2d3e2c',
+    fillOpacity: 0.45
+  }).addTo(miniPreviewMap);
+
+  setTimeout(() => {
+    if (!miniPreviewMap || !miniPreviewPoly) return;
+    miniPreviewMap.invalidateSize();
+    try {
+      miniPreviewMap.fitBounds(miniPreviewPoly.getBounds(), { padding: [22, 22], maxZoom: 18 });
+    } catch (e) {}
+  }, 80);
 }
 
 function clearAreaDisplay() {
@@ -1155,35 +1347,394 @@ function clearAreaDisplay() {
 
   const hint = document.getElementById('area-hint');
   if (hint) hint.style.display = 'block';
+
+  const mapStatus = document.getElementById('map-open-status');
+  if (mapStatus) mapStatus.textContent = 'Toca para marcar los puntos del potrero';
+
+  const wrap = document.getElementById('lote-map-preview-wrap');
+  if (wrap) wrap.style.display = 'none';
+}
+
+function initEarthMeasureMode({ applyColorToPolygon, initColorPicker } = {}) {
+  if (!mapInstance) return;
+  let measurePoints = [];
+  const measureGroup = L.layerGroup().addTo(mapInstance);
+  const measureGuideLine = L.polyline([], {
+    color: '#ffffff',
+    weight: 1.5,
+    opacity: 0.9,
+    interactive: false
+  }).addTo(mapInstance);
+
+  const sheet = document.getElementById('lote-map-sheet');
+  const btnOpen = document.getElementById('btn-open-map-sheet');
+  const btnClose = document.getElementById('btn-close-map-sheet');
+  const btnAdd = document.getElementById('btn-earth-add-point');
+  const btnUndo = document.getElementById('btn-earth-undo');
+  const btnClear = document.getElementById('btn-earth-clear');
+  const btnDone = document.getElementById('btn-earth-done');
+  const pill = document.getElementById('earth-measure-pill');
+  const stats = document.getElementById('earth-bar-stats');
+
+  let isNearStart = false;
+  let firstPointHalo = null;
+  let isPolygonClosed = false;
+
+  function updateCrosshairPreview() {
+    if (!mapInstance || isPolygonClosed) return;
+    const center = mapInstance.getCenter();
+    if (measurePoints.length === 0) {
+      isNearStart = false;
+      if (firstPointHalo && mapInstance.hasLayer(firstPointHalo)) mapInstance.removeLayer(firstPointHalo);
+      if (pill) pill.textContent = 'Ubica el 1er punto';
+      if (btnAdd) btnAdd.innerHTML = '<span class="material-icons" style="font-size: 20px;">add</span> Agregar punto';
+      measureGuideLine.setLatLngs([]);
+      return;
+    }
+    const last = measurePoints[measurePoints.length - 1];
+    isNearStart = false;
+    if (measurePoints.length >= 3) {
+      const pCenter = mapInstance.latLngToContainerPoint(center);
+      const pFirst = mapInstance.latLngToContainerPoint(measurePoints[0]);
+      if (pCenter.distanceTo(pFirst) <= 26) {
+        isNearStart = true;
+      }
+    }
+
+    if (isNearStart) {
+      if (pill) pill.textContent = 'Cerrar la forma';
+      if (btnAdd) btnAdd.innerHTML = '<span class="material-icons" style="font-size: 20px;">polyline</span> Cerrar la forma';
+      measureGuideLine.setLatLngs([last, measurePoints[0]]);
+      if (!firstPointHalo) {
+        firstPointHalo = L.circleMarker(measurePoints[0], {
+          radius: 16,
+          color: '#fbbc04',
+          weight: 2,
+          fillColor: '#fbbc04',
+          fillOpacity: 0.35,
+          interactive: false
+        });
+      } else {
+        firstPointHalo.setLatLng(measurePoints[0]);
+      }
+      if (!mapInstance.hasLayer(firstPointHalo)) firstPointHalo.addTo(mapInstance);
+    } else {
+      if (firstPointHalo && mapInstance.hasLayer(firstPointHalo)) mapInstance.removeLayer(firstPointHalo);
+      const dist = mapInstance.distance(last, center);
+      if (pill) pill.textContent = `${dist.toFixed(2)} m`;
+      if (btnAdd) btnAdd.innerHTML = '<span class="material-icons" style="font-size: 20px;">add</span> Agregar punto';
+      measureGuideLine.setLatLngs([last, center]);
+    }
+  }
+
+  function redrawMeasurePoints() {
+    measureGroup.clearLayers();
+    if (measurePoints.length >= 2) {
+      L.polyline(measurePoints, {
+        color: '#fbbc04',
+        weight: 3.5,
+        opacity: 1,
+        interactive: false
+      }).addTo(measureGroup);
+    }
+    measurePoints.forEach(pt => {
+      L.circleMarker(pt, {
+        radius: 7,
+        color: '#fbbc04',
+        weight: 3,
+        fillColor: '#ffffff',
+        fillOpacity: 1,
+        interactive: false
+      }).addTo(measureGroup);
+    });
+    if (stats) {
+      if (measurePoints.length >= 3 && typeof turf !== 'undefined') {
+        const coords = measurePoints.map(p => [p.lng, p.lat]);
+        coords.push(coords[0]);
+        const ha = turf.area(turf.polygon([coords])) / 10000;
+        stats.textContent = `${measurePoints.length} pts · ${ha.toFixed(2)} ha`;
+      } else {
+        stats.textContent = `${measurePoints.length} ${measurePoints.length === 1 ? 'punto' : 'puntos'}`;
+      }
+    }
+    if (btnUndo) {
+      btnUndo.disabled = measurePoints.length === 0;
+      btnUndo.style.opacity = measurePoints.length === 0 ? '0.4' : '1';
+    }
+    if (isBarExpanded && !isPolygonClosed) {
+      updateMetricsDisplay(measurePoints);
+    }
+    updateCrosshairPreview();
+  }
+
+  const crosshair = document.getElementById('earth-crosshair');
+  const closedPreviewGroup = L.layerGroup().addTo(mapInstance);
+  const measureBar = document.getElementById('earth-measure-bar');
+  const sheetHandle = document.getElementById('earth-sheet-handle');
+  const metricsBox = document.getElementById('earth-closed-metrics');
+  const metricArea = document.getElementById('earth-metric-area');
+  const metricPerim = document.getElementById('earth-metric-perim');
+  let isBarExpanded = false;
+
+  function updateMetricsDisplay(latlngs) {
+    if (!latlngs || latlngs.length < 2) {
+      if (metricArea) metricArea.textContent = '0.00 ha · 0 m²';
+      if (metricPerim) metricPerim.textContent = '0.00 m';
+      return;
+    }
+    let perim = 0;
+    const count = latlngs.length;
+    for (let i = 0; i < count; i++) {
+      if (!isPolygonClosed && i === count - 1) break;
+      perim += mapInstance.distance(latlngs[i], latlngs[(i + 1) % count]);
+    }
+    if (metricPerim) metricPerim.textContent = `${perim.toFixed(2)} m`;
+    if (count >= 3 && typeof turf !== 'undefined') {
+      const coords = latlngs.map(p => [p.lng, p.lat]);
+      coords.push(coords[0]);
+      const areaM2 = turf.area(turf.polygon([coords]));
+      const areaHa = areaM2 / 10000;
+      if (metricArea) metricArea.textContent = `${areaHa.toFixed(2)} ha · ${Math.round(areaM2).toLocaleString()} m²`;
+    } else if (metricArea) {
+      metricArea.textContent = 'Marca al menos 3 puntos';
+    }
+  }
+
+  function setBarExpanded(expanded) {
+    isBarExpanded = expanded;
+    if (metricsBox) metricsBox.style.display = expanded ? 'flex' : 'none';
+    if (measureBar) {
+      measureBar.style.paddingBottom = expanded
+        ? 'calc(22px + env(safe-area-inset-bottom))'
+        : 'calc(16px + env(safe-area-inset-bottom))';
+    }
+    if (expanded) {
+      const pts = isPolygonClosed && drawnItems?.getLayers().length > 0
+        ? (drawnItems.getLayers()[0].getLatLngs?.()[0] || [])
+        : measurePoints;
+      updateMetricsDisplay(pts);
+    }
+    setTimeout(() => mapInstance?.invalidateSize(), 120);
+  }
+
+  if (sheetHandle && measureBar) {
+    let dragStartY = null;
+    sheetHandle.addEventListener('click', () => {
+      setBarExpanded(!isBarExpanded);
+    });
+    measureBar.addEventListener('touchstart', (e) => {
+      if (e.target.closest('button')) return;
+      dragStartY = e.touches[0].clientY;
+    }, { passive: true });
+    measureBar.addEventListener('touchend', (e) => {
+      if (dragStartY === null) return;
+      const dy = e.changedTouches[0].clientY - dragStartY;
+      dragStartY = null;
+      if (dy < -25) setBarExpanded(true);
+      else if (dy > 25) setBarExpanded(false);
+    }, { passive: true });
+    measureBar.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' || e.target.closest('button')) return;
+      dragStartY = e.clientY;
+    });
+    measureBar.addEventListener('pointerup', (e) => {
+      if (e.pointerType === 'touch' || dragStartY === null) return;
+      const dy = e.clientY - dragStartY;
+      dragStartY = null;
+      if (dy < -20) setBarExpanded(true);
+      else if (dy > 20) setBarExpanded(false);
+    });
+  }
+
+  function setClosedMode(closed, latlngs = null) {
+    isPolygonClosed = closed;
+    if (crosshair) crosshair.style.display = closed ? 'none' : 'flex';
+    closedPreviewGroup.clearLayers();
+    if (closed && latlngs && latlngs.length >= 3) {
+      L.polygon(latlngs, {
+        color: '#fbbc04',
+        weight: 3.5,
+        opacity: 1,
+        fillColor: '#fbbc04',
+        fillOpacity: 0.14,
+        interactive: false
+      }).addTo(closedPreviewGroup);
+      latlngs.forEach(pt => {
+        L.circleMarker(pt, {
+          radius: 7,
+          color: '#fbbc04',
+          weight: 3,
+          fillColor: '#ffffff',
+          fillOpacity: 1,
+          interactive: false
+        }).addTo(closedPreviewGroup);
+      });
+    }
+    if (closed) {
+      if (firstPointHalo && mapInstance.hasLayer(firstPointHalo)) mapInstance.removeLayer(firstPointHalo);
+      if (btnAdd) btnAdd.innerHTML = '<span class="material-icons" style="font-size: 19px;">bookmark_add</span> Guardar en el proyecto';
+      if (btnDone) btnDone.style.display = 'none';
+      if (latlngs && latlngs.length >= 3) {
+        updateMetricsDisplay(latlngs);
+      }
+      setBarExpanded(true);
+      if (stats) {
+        const areaText = document.getElementById('area-calculated-text')?.textContent || '';
+        stats.textContent = areaText ? `Polígono cerrado · ${areaText}` : 'Polígono cerrado';
+      }
+    } else {
+      setBarExpanded(false);
+      if (btnDone) btnDone.style.display = 'flex';
+      if (btnAdd) btnAdd.innerHTML = '<span class="material-icons" style="font-size: 20px;">add</span> Agregar punto';
+    }
+  }
+
+  function openMapSheet() {
+    if (!sheet) return;
+    sheet.style.visibility = 'visible';
+    sheet.style.pointerEvents = 'auto';
+    sheet.style.opacity = '1';
+    setTimeout(() => {
+      mapInstance?.invalidateSize();
+      if (drawnItems && drawnItems.getLayers().length > 0 && measurePoints.length === 0) {
+        try {
+          const layer = drawnItems.getLayers()[0];
+          const latlngs = layer.getLatLngs?.()[0] || [];
+          setClosedMode(true, latlngs);
+          mapInstance.fitBounds(drawnItems.getBounds(), { padding: [40, 40], maxZoom: 18 });
+        } catch (e) {}
+      } else {
+        setClosedMode(false);
+      }
+      updateCrosshairPreview();
+    }, 120);
+  }
+
+  function closeMapSheet() {
+    if (!sheet) return;
+    sheet.style.opacity = '0';
+    sheet.style.pointerEvents = 'none';
+    setTimeout(() => {
+      sheet.style.visibility = 'hidden';
+    }, 220);
+  }
+
+  mapInstance.on('move', updateCrosshairPreview);
+
+  btnOpen?.addEventListener('click', openMapSheet);
+  document.getElementById('lote-map-preview-wrap')?.addEventListener('click', openMapSheet);
+  btnClose?.addEventListener('click', closeMapSheet);
+  sheet?.addEventListener('click', (e) => {
+    if (e.target === sheet) closeMapSheet();
+  });
+
+  function commitMeasuredPolygon(closeAfter = false) {
+    if (measurePoints.length < 3) return false;
+    const ptsCopy = [...measurePoints];
+    const poly = L.polygon(ptsCopy, {
+      color: '#ffffff',
+      fillColor: selectedColor,
+      fillOpacity: 0.5,
+      weight: 2.5
+    });
+    drawnItems.clearLayers();
+    drawnItems.addLayer(poly);
+    applyColorToPolygon?.(poly, selectedColor);
+    calculateArea(poly);
+    coordinatesCleared = false;
+    const row = document.getElementById('color-picker-row');
+    if (row) row.style.display = 'flex';
+    initColorPicker?.();
+    measurePoints = [];
+    redrawMeasurePoints();
+    if (closeAfter) {
+      setClosedMode(false);
+      closeMapSheet();
+    } else {
+      setClosedMode(true, ptsCopy);
+    }
+    return true;
+  }
+
+  btnAdd?.addEventListener('click', () => {
+    if (!mapInstance) return;
+    if (isPolygonClosed) {
+      closeMapSheet();
+      return;
+    }
+    if (isNearStart && measurePoints.length >= 3) {
+      commitMeasuredPolygon(false);
+      return;
+    }
+    if (measurePoints.length === 0 && drawnItems && drawnItems.getLayers().length > 0) {
+      drawnItems.eachLayer(l => {
+        if (l._glowPolygon && mapInstance.hasLayer(l._glowPolygon)) {
+          mapInstance.removeLayer(l._glowPolygon);
+        }
+      });
+      drawnItems.clearLayers();
+    }
+    measurePoints.push(mapInstance.getCenter());
+    redrawMeasurePoints();
+  });
+
+  btnUndo?.addEventListener('click', () => {
+    if (isPolygonClosed) {
+      setClosedMode(false);
+    }
+    if (measurePoints.length === 0) return;
+    measurePoints.pop();
+    redrawMeasurePoints();
+  });
+
+  btnClear?.addEventListener('click', () => {
+    coordinatesCleared = true;
+    measurePoints = [];
+    setClosedMode(false);
+    if (drawnItems) {
+      drawnItems.eachLayer(l => {
+        if (l._glowPolygon && mapInstance.hasLayer(l._glowPolygon)) {
+          mapInstance.removeLayer(l._glowPolygon);
+        }
+      });
+      drawnItems.clearLayers();
+    }
+    clearAreaDisplay();
+    const row = document.getElementById('color-picker-row');
+    if (row) row.style.display = 'none';
+    redrawMeasurePoints();
+  });
+
+  btnDone?.addEventListener('click', () => {
+    if (measurePoints.length >= 3) {
+      commitMeasuredPolygon(false);
+    } else if (measurePoints.length > 0) {
+      window.Snackbar?.show('Marca al menos 3 puntos para cerrar el potrero', { duration: 2500 });
+    } else if (drawnItems && drawnItems.getLayers().length > 0) {
+      closeMapSheet();
+    } else {
+      window.Snackbar?.show('Agrega al menos 3 puntos en el mapa', { duration: 2500 });
+    }
+  });
+
+  redrawMeasurePoints();
 }
 
 // ── Walking / GPS Recording ────────────────────────────────────
 
 function createWalkControl() {
-  const WalkControl = L.Control.extend({
-    onAdd: function() {
-      const div = L.DomUtil.create('div', 'm3-walk-control');
-      div.innerHTML = `<button type="button" id="btn-walk-toggle" class="m3-walk-btn" title="Registrar caminando">
-        <span class="material-icons">directions_walk</span>
-      </button>`;
-      L.DomEvent.disableClickPropagation(div);
-      return div;
+  const btn = document.getElementById('btn-walk-toggle');
+  if (!btn) return;
+  if (window.L?.DomEvent) {
+    L.DomEvent.disableClickPropagation(btn);
+  }
+  btn.addEventListener('click', () => {
+    if (walkState === 'idle') {
+      startWalking();
+    } else if (walkState === 'searching' || walkState === 'recording' || walkState === 'paused') {
+      discardWalking();
     }
   });
-  walkControl = new WalkControl({ position: 'topleft' });
-  mapInstance.addControl(walkControl);
-
-  setTimeout(() => {
-    const btn = document.getElementById('btn-walk-toggle');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      if (walkState === 'idle') {
-        startWalking();
-      } else if (walkState === 'searching' || walkState === 'recording' || walkState === 'paused') {
-        discardWalking();
-      }
-    });
-  }, 300);
 }
 
 function createWalkPanel() {
@@ -1707,43 +2258,164 @@ export async function initNuevoPotrero(id) {
   const form = document.getElementById('form-nuevo-potrero');
   if (!form) return;
 
+  coordinatesCleared = false;
+  const mapSheet = document.getElementById('lote-map-sheet');
+  document.querySelectorAll('#lote-map-sheet').forEach(el => {
+    if (el !== mapSheet) el.remove();
+  });
+  if (mapSheet && mapSheet.parentElement !== document.body) {
+    document.body.appendChild(mapSheet);
+  }
+
   const PASTO_LIST = ['Estrella', 'Brachiaria', 'Pangola', 'Guinea', 'Cratylia', 'Natural'];
+
+  const applyCustomPastoOption = (select, customVal) => {
+    if (!select || !customVal) return;
+    let customOpt = select.querySelector('option[data-custom-pasto="1"]');
+    if (!customOpt) {
+      customOpt = document.createElement('option');
+      customOpt.dataset.customPasto = '1';
+      customOpt.dataset.icon = '🌱';
+      customOpt.dataset.sub = 'Variedad personalizada';
+      const otroOpt = select.querySelector('option[value="Otro"]');
+      if (otroOpt) select.insertBefore(customOpt, otroOpt);
+      else select.appendChild(customOpt);
+    }
+    customOpt.value = customVal;
+    customOpt.textContent = customVal;
+  };
+
+  let lastValidPasto = (() => {
+    const sel = document.getElementById('pasto-select');
+    const cur = window.__currentPotreroData?.pasto;
+    if (sel && cur && !PASTO_LIST.includes(cur) && cur !== 'Otro') {
+      applyCustomPastoOption(sel, cur);
+      sel.value = cur;
+      return cur;
+    }
+    return (sel && sel.value && sel.value !== 'Otro') ? sel.value : 'Estrella';
+  })();
+
+  const openCustomPastoBottomSheet = (initialText = '') => {
+    const select = document.getElementById('pasto-select');
+    const input = document.getElementById('pasto-input');
+    if (!select) return;
+
+    document.getElementById('pasto-custom-sheet-overlay')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pasto-custom-sheet-overlay';
+    overlay.style.cssText = 'position:fixed; inset:0; z-index:100030; background:rgba(15,25,16,0.48); backdrop-filter:blur(2px); display:flex; align-items:flex-end; justify-content:center; opacity:0; transition:opacity 0.2s ease;';
+
+    overlay.innerHTML = `
+      <div id="pasto-custom-sheet" style="width:100%; max-width:520px; background:#ffffff; border-radius:28px 28px 0 0; padding:12px 20px calc(22px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 32px rgba(0,0,0,0.18); transform:translateY(100%); transition:transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); font-family:'Work Sans', sans-serif;">
+        <div style="width:36px; height:4px; border-radius:99px; background:#c5cdc2; margin:0 auto 14px;"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px;">
+          <div style="font-size:18px; font-weight:700; color:#1b2919;">Otra variedad de pasto</div>
+          <button type="button" id="pasto-custom-sheet-close" aria-label="Cerrar" style="width:36px; height:36px; border-radius:50%; border:none; background:#f2f5f0; color:#1b2919; font-size:20px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">&times;</button>
+        </div>
+        <div style="font-size:13px; color:#5e6b5c; line-height:1.4;">Escribe el nombre de la semilla o variedad de pasto para este potrero.</div>
+        <div class="m3-field ${initialText ? 'has-value' : ''}" id="pasto-custom-sheet-field" style="margin:16px 0 6px;">
+          <input type="text" id="pasto-custom-sheet-input" placeholder=" " value="${escapeHtml(initialText)}" autocomplete="off">
+          <label for="pasto-custom-sheet-input">Nombre de la semilla / pasto</label>
+        </div>
+        <div id="pasto-custom-sheet-err" style="display:none; font-size:12px; color:#b3261e; font-weight:600; margin-top:4px;">Escribe el nombre de la variedad para continuar.</div>
+        <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:18px;">
+          <button type="button" id="pasto-custom-sheet-cancel" style="height:44px; padding:0 18px; border-radius:99px; border:none; background:transparent; color:#2d3e2c; font-weight:700; font-size:14px; font-family:'Work Sans', sans-serif; cursor:pointer;">Cancelar</button>
+          <button type="button" id="pasto-custom-sheet-save" style="height:44px; padding:0 22px; border-radius:99px; border:none; background:#2d3e2c; color:#ffffff; font-weight:700; font-size:14px; font-family:'Work Sans', sans-serif; cursor:pointer; box-shadow:0 2px 6px rgba(45,62,44,0.25);">Guardar variedad</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const sheet = overlay.querySelector('#pasto-custom-sheet');
+    const sheetField = overlay.querySelector('#pasto-custom-sheet-field');
+    const sheetInput = overlay.querySelector('#pasto-custom-sheet-input');
+    const errEl = overlay.querySelector('#pasto-custom-sheet-err');
+
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      if (sheet) sheet.style.transform = 'translateY(0)';
+    });
+
+    const closeSheet = (restorePrevious) => {
+      overlay.style.opacity = '0';
+      if (sheet) sheet.style.transform = 'translateY(100%)';
+      setTimeout(() => overlay.remove(), 220);
+      if (restorePrevious) {
+        const fallback = lastValidPasto && lastValidPasto !== 'Otro' ? lastValidPasto : 'Estrella';
+        select.value = fallback;
+        if (input) input.value = PASTO_LIST.includes(fallback) ? '' : fallback;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+
+    const handleSave = () => {
+      const customVal = (sheetInput?.value || '').trim();
+      if (!customVal) {
+        if (errEl) errEl.style.display = 'block';
+        sheetInput?.focus();
+        return;
+      }
+      applyCustomPastoOption(select, customVal);
+      lastValidPasto = customVal;
+      select.value = customVal;
+      if (input) input.value = PASTO_LIST.includes(customVal) ? '' : customVal;
+      closeSheet(false);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    sheetInput?.addEventListener('input', () => {
+      if (sheetField) sheetField.classList.toggle('has-value', !!sheetInput.value);
+      if (errEl && sheetInput.value.trim()) errEl.style.display = 'none';
+    });
+
+    sheetInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSheet(true);
+      }
+    });
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeSheet(true);
+    });
+
+    overlay.querySelector('#pasto-custom-sheet-close')?.addEventListener('click', () => closeSheet(true));
+    overlay.querySelector('#pasto-custom-sheet-cancel')?.addEventListener('click', () => closeSheet(true));
+    overlay.querySelector('#pasto-custom-sheet-save')?.addEventListener('click', handleSave);
+
+    setTimeout(() => {
+      sheetInput?.focus();
+      if (sheetInput && initialText) sheetInput.select();
+    }, 90);
+  };
 
   window._togglePastoCustom = () => {
     const select = document.getElementById('pasto-select');
     const input = document.getElementById('pasto-input');
-    const backBtn = document.getElementById('pasto-back');
-    if (!select || !input) return;
-    const cur = window.__currentPotreroData?.pasto;
-    const isEditingCustom = cur && !PASTO_LIST.includes(cur) && cur !== 'Otro';
-    const isCustom = select.value === 'Otro' || isEditingCustom;
-    if (isCustom) {
-      select.style.display = 'none';
-      input.style.display = 'block';
-      if (backBtn) backBtn.style.display = 'inline-block';
-      input.value = isEditingCustom ? cur : '';
-      const field = input.closest('.m3-field');
-      if (field) field.classList.toggle('has-value', !!input.value);
-      input.focus();
-    } else {
-      input.style.display = 'none';
-      select.style.display = 'block';
-      if (backBtn) backBtn.style.display = 'none';
+    if (!select) return;
+    if (select.value === 'Otro') {
+      const initial = (!PASTO_LIST.includes(lastValidPasto) && lastValidPasto !== 'Otro') ? lastValidPasto : '';
+      openCustomPastoBottomSheet(initial);
+    } else if (select.value) {
+      lastValidPasto = select.value;
+      if (input) input.value = PASTO_LIST.includes(select.value) ? '' : select.value;
     }
   };
 
   window._showPastoList = () => {
     const select = document.getElementById('pasto-select');
     const input = document.getElementById('pasto-input');
-    const backBtn = document.getElementById('pasto-back');
-    if (!select || !input) return;
-    input.value = '';
-    input.style.display = 'none';
-    select.style.display = 'block';
-    select.value = '';
-    if (backBtn) backBtn.style.display = 'none';
-    const field = input.closest('.m3-field');
-    if (field) field.classList.remove('has-value');
+    if (!select) return;
+    if (input) input.value = '';
+    lastValidPasto = 'Estrella';
+    select.value = 'Estrella';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
   };
   window._togglePastoCustom();
 
@@ -1784,6 +2456,10 @@ export async function initNuevoPotrero(id) {
         }
       });
     }
+    if (refMarker && mapInstance?.hasLayer(refMarker)) {
+      mapInstance.removeLayer(refMarker);
+      refMarker = null;
+    }
     if (mapInstance) {
       mapInstance.remove();
       mapInstance = null;
@@ -1791,7 +2467,16 @@ export async function initNuevoPotrero(id) {
       drawControl = null;
       existingPotrerosLayer = null;
       walkControl = null;
+      refMarker = null;
     }
+    if (miniPreviewMap) {
+      miniPreviewMap.remove();
+      miniPreviewMap = null;
+      miniPreviewPoly = null;
+    }
+    document.getElementById('lote-map-sheet')?.remove();
+    document.getElementById('potrero_map-fullscreen-search')?.remove();
+    document.getElementById('pasto-custom-sheet-overlay')?.remove();
   };
 
   if (window.refreshM3Fields) window.refreshM3Fields();
@@ -1805,40 +2490,52 @@ export async function initNuevoPotrero(id) {
           drawnItems.clearLayers();
 
           const { coordinates, color: savedColor } = parseCoordenadasJson(editingPotrero.coordenadas_json);
-          selectedColor = savedColor;
+          selectedColor = savedColor || '#2d3e2c';
 
           const latlngs = coordinates.map(c => L.latLng(c.lat, c.lng));
-          const polygon = L.polygon(latlngs, {
-            color: '#ffffff',
-            fillColor: selectedColor,
-            fillOpacity: 0.5,
-            weight: 2
-          });
-          drawnItems.addLayer(polygon);
+          if (latlngs.length >= 3) {
+            const polygon = L.polygon(latlngs, {
+              color: '#ffffff',
+              fillColor: selectedColor,
+              fillOpacity: 0.55,
+              weight: 2.5
+            });
+            drawnItems.addLayer(polygon);
 
-          const glow = L.polygon(latlngs, {
-            color: selectedColor, fillColor: selectedColor, fillOpacity: 0.5, weight: 6, opacity: 0.7
-          });
-          glow._isGlow = true;
-          polygon._glowPolygon = glow;
-          mapInstance.addLayer(glow);
+            const glow = L.polygon(latlngs, {
+              color: selectedColor, fillColor: selectedColor, fillOpacity: 0.5, weight: 6, opacity: 0.7
+            });
+            glow._isGlow = true;
+            polygon._glowPolygon = glow;
+            mapInstance.addLayer(glow);
 
-          document.querySelectorAll('.poly-color-btn').forEach(btn => {
-            btn.style.boxShadow = 'none';
-            if (btn.dataset.color === selectedColor) {
-              btn.style.boxShadow = `0 0 0 2px white, 0 0 0 4px ${selectedColor}`;
+            document.querySelectorAll('.poly-color-btn').forEach(btn => {
+              btn.style.boxShadow = 'none';
+              if (btn.dataset.color === selectedColor) {
+                btn.style.boxShadow = `0 0 0 2px white, 0 0 0 4px ${selectedColor}`;
+              }
+            });
+
+            mapInstance.fitBounds(polygon.getBounds().pad(0.25));
+
+            const badge = document.getElementById('area-info-badge');
+            if (badge) badge.style.display = 'flex';
+            const text = document.getElementById('area-calculated-text');
+            const areaVal = editingPotrero.area ? parseFloat(editingPotrero.area).toFixed(2) : null;
+            if (text && areaVal) text.textContent = areaVal + ' ha';
+
+            const mapStatus = document.getElementById('map-open-status');
+            if (mapStatus) {
+              mapStatus.textContent = areaVal
+                ? `${areaVal} ha · Toca para editar en el mapa`
+                : 'Polígono guardado · Toca para editar en el mapa';
             }
-          });
 
-          mapInstance.fitBounds(polygon.getBounds().pad(0.2));
+            const row = document.getElementById('color-picker-row');
+            if (row) row.style.display = 'flex';
 
-          const badge = document.getElementById('area-info-badge');
-          if (badge) badge.style.display = 'flex';
-          const text = document.getElementById('area-calculated-text');
-          if (text && editingPotrero.area) text.textContent = parseFloat(editingPotrero.area).toFixed(2) + ' ha';
-
-          const row = document.getElementById('color-picker-row');
-          if (row) row.style.display = 'flex';
+            updateMiniPreviewMap(latlngs, selectedColor);
+          }
         } catch (e) {
           console.warn('Error drawing existing polygon:', e);
         }
@@ -1865,6 +2562,7 @@ export async function initNuevoPotrero(id) {
             glow._isGlow = true;
             layer._glowPolygon = glow;
             mapInstance.addLayer(glow);
+            updateMiniPreviewMap(latlngs[0], color);
           }
         }
       });
@@ -1903,6 +2601,14 @@ export async function initNuevoPotrero(id) {
       data.coordenadas_json = JSON.stringify({
         color: selectedColor,
         coordinates: latlngs.map(ll => ({ lat: ll.lat, lng: ll.lng }))
+      });
+    } else if (coordinatesCleared) {
+      data.coordenadas_json = null;
+    } else if (window.__currentPotreroData?.coordenadas_json) {
+      const prev = parseCoordenadasJson(window.__currentPotreroData.coordenadas_json);
+      data.coordenadas_json = JSON.stringify({
+        color: selectedColor,
+        coordinates: prev.coordinates || []
       });
     }
 

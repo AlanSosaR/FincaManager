@@ -75,3 +75,24 @@ Debes tocar toditos estos sitios, o la app fallará/morirá RLS:
 Existentes y funcionales: Dashboard, Motores (sesiones/mantenimientos), Herramientas (CSV export), Potreros, Ganado (pesajes, vacunas, fumigación masiva con panel inline y aplicar prog/ todas, reproducción preñez-parto-crías), Cafetal (lotes, aplicaciones, plan IFCAFE, actividad), Gastos (período por mes), Cultivos, Personal (asistencia), Equipo (invites/roles), Configuración (WhatsApp, caché), Perfil, Multimercados (selector empresa).
 
 Pendientes registrados por docs previas: revisar ajuste de URLs/plantillas de email en el dashboard de Supabase.
+
+### Plan guardado para próxima sesión — Notificaciones Push granulares por módulo (`#push-prefs-sheet`)
+- **UI en `src/screens/configuracion.js`**:
+  - La tarjeta **Notificaciones Push** conserva el **Material 3 Switch** maestro a la derecha y, al tocarla, abre un Bottom Sheet expandible (`#push-prefs-sheet`) con lista de todos los módulos de la app; cada módulo puede activarse/desactivarse o desplegarse para seleccionar sub-notificaciones específicas, con footer fijo para guardar.
+- **Módulos y sub-notificaciones (alineados con los flujos nuevos)**:
+  - **Cafetal** (`dashboard.js`, `cosecha_lote.js`, `detalle_lote.js`, sin lógica vieja):
+    - *Calendario de Actividades (Manejo)*: actividades programadas para hoy y actividades atrasadas del lote.
+    - *Cosecha (Control de Latas)*: latas registradas en la semana (`[COSECHA_JSON]`) pendientes de enviar o actualizar en Cuentas.
+    - *Balance del Lote*: planillas o movimientos del lote pendientes `[Por Aprobar]`.
+    - *Línea de Tiempo (Fotografías)*: nuevas fotografías de evolución/actividad subidas en los lotes.
+  - **Cuentas** (`gastos.js` — flujo nuevo de Egresos / Ingresos y agrupación por categoría/lote):
+    - *Pendiente de enviar a Cuentas (`computePendingForCuentas`)*: cosechas semanales de lotes (`[ref:cosecha_...]`) y jornales semanales de Personal (`[ref:<id>_sem_...]`) pendientes de enviar o con cambios por actualizar.
+    - *Movimientos por aprobar (`[Por Aprobar]`)*: planillas o gastos enviados que esperan aprobación.
+    - *Nuevos movimientos (Egresos / Ingresos)*: registros nuevos de egresos (`Chapias`, `Abonadas`, `Foliares`, `Insumos`, `Cosecha`, `Personal`, `Veterinaria`, `Maquinaria`, etc.) o ingresos (`Ingreso · Café`, `Ingreso · Plátano`, etc.).
+  - **Ganado**: partos próximos (mes 9 `16–30` días y recta final `<= 15` días / vencidos), vacunas programadas/vencidas y fumigaciones programadas/pendientes.
+  - **Motores**: cambio de aceite (`80 h` primer cambio / `max_horas` siguientes cada 5 h) y mantenimientos.
+  - **Potreros**: rotación de ganado / eventos de potrero.
+  - **Personal**: asistencia semanal y jornales pendientes de liquidar.
+  - **Herramientas y Cultivos**: mantenimientos de herramientas y labores/cosechas de cultivos.
+- **Persistencia y filtrado**:
+  - Guardar preferencias (`push_alert_prefs`) en `localStorage` y en Supabase (`empresa_config` / `push_tokens`), y filtrar los checkers en `src/push/push.js` (y opcionalmente `src/wa.js`) mediante `isAlertEnabled(modulo, subtipo)`.

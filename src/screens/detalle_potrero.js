@@ -4,7 +4,8 @@ import { showSnackbar } from '../snackbar.js';
 
 let currentPotreroId = null;
 
-export async function renderDetallePotrero(potreroId) {
+export async function renderDetallePotrero(potreroId, opts = {}) {
+  const embeddedInSheet = Boolean(opts?.embeddedInSheet);
   currentPotreroId = potreroId;
   const { data: potrero, error: potreroError } = await supabase
     .from('potreros')
@@ -56,8 +57,30 @@ export async function renderDetallePotrero(potreroId) {
 
 
   return `
-    <div class="screen-detalle" id="potrero-detail-container">
+    <div class="screen-detalle ${embeddedInSheet ? 'potrero-sheet-detalle' : ''}" id="potrero-detail-container">
 
+      ${embeddedInSheet ? `
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px;">
+          <div style="background:#f6f8f5;border:1px solid #e4ece3;border-radius:14px;padding:10px 10px;">
+            <div style="font-size:10.5px;font-weight:700;color:#5a6b58;text-transform:uppercase;letter-spacing:0.3px;">Área Total</div>
+            <div style="font-size:14px;font-weight:800;color:#1e3e2b;margin-top:3px;">${potreroData.area}</div>
+          </div>
+          <div style="background:#f6f8f5;border:1px solid #e4ece3;border-radius:14px;padding:10px 10px;">
+            <div style="font-size:10.5px;font-weight:700;color:#5a6b58;text-transform:uppercase;letter-spacing:0.3px;">Pasto</div>
+            <div style="font-size:14px;font-weight:800;color:#1e3e2b;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${potreroData.pasto}</div>
+          </div>
+          <div style="background:#f6f8f5;border:1px solid #e4ece3;border-radius:14px;padding:10px 10px;">
+            <div style="font-size:10.5px;font-weight:700;color:#5a6b58;text-transform:uppercase;letter-spacing:0.3px;">Carga</div>
+            <div style="font-size:14px;font-weight:800;color:#1e3e2b;margin-top:3px;">${potreroData.carga}</div>
+          </div>
+        </div>
+        <div class="alert-banner" style="margin-top:0;margin-bottom:16px;border-radius:14px;padding:10px 12px;">
+          <span class="material-icons" style="font-size:19px;">schedule</span>
+          <div>
+            <p style="margin:0;font-size:12.5px;"><strong>Ciclo de Recuperación:</strong> ${potreroData.cycle}</p>
+          </div>
+        </div>
+      ` : `
       <!-- Hero Section -->
       <div class="detail-hero card">
         <div class="detail-hero-header" style="justify-content: space-between; width: 100%;">
@@ -95,13 +118,14 @@ export async function renderDetallePotrero(potreroId) {
           </div>
         </div>
       </div>
+      `}
 
-      <div class="grid-2">
+      <div class="${embeddedInSheet ? '' : 'grid-2'}" style="${embeddedInSheet ? 'display:flex;flex-direction:column;gap:16px;' : ''}">
         <!-- Animal Segment -->
         <div class="section">
           <div class="section-title">
             <h3>Animales en el Lote</h3>
-            <span class="tag" style="background:#2d3e2c; color:#43a047">${animales ? animales.length : 0} Activos</span>
+            <span class="tag" style="background:#2d3e2c; color:#ffffff">${animales ? animales.length : 0} Activos</span>
           </div>
           <div class="animal-list" style="margin-top: 12px; gap: 8px;">
             ${animales && animales.length > 0 ? animales.map(a => `
@@ -112,7 +136,7 @@ export async function renderDetallePotrero(potreroId) {
                 </div>
                 <span class="material-icons" style="color:#ccc">chevron_right</span>
               </div>
-            `).join('') : '<p style="text-align:center; padding: 24px; color:#999">No hay animales en este potrero.</p>'}
+            `).join('') : '<p style="text-align:center; padding: 20px; color:#999">No hay animales en este potrero.</p>'}
           </div>
         </div>
 
@@ -120,7 +144,7 @@ export async function renderDetallePotrero(potreroId) {
         <div class="section">
           <div class="section-title">
             <h3>Bitácora de Eventos</h3>
-            <button class="btn-primary" id="btn-add-potrero-note" style="padding: 6px 12px; font-size: 12px;">+ Nota</button>
+            ${embeddedInSheet ? '' : `<button class="btn-primary" id="btn-add-potrero-note" style="padding: 6px 12px; font-size: 12px;">+ Nota</button>`}
           </div>
           <div class="activity-list" style="margin-top: 12px;">
             ${bitacora && bitacora.length > 0 ? bitacora.map(b => `
@@ -142,11 +166,12 @@ export async function renderDetallePotrero(potreroId) {
                   </button>
                 </div>
               </div>
-            `).join('') : '<p style="text-align:center; padding: 24px; color:#999">No hay eventos registrados.</p>'}
+            `).join('') : '<p style="text-align:center; padding: 20px; color:#999">No hay eventos registrados.</p>'}
           </div>
         </div>
       </div>
 
+      ${embeddedInSheet ? '' : `
       <!-- Curator Suggestion -->
       <div class="tip-card" style="margin-top: 24px;">
         <span class="material-icons" style="color: #fbc02d;">lightbulb</span>
@@ -154,11 +179,14 @@ export async function renderDetallePotrero(potreroId) {
           <p><strong>Sugerencia del Curador:</strong> Basado en la humedad del suelo actual (78%) y el crecimiento del Kikuyo, se recomienda un periodo de descanso adicional de 3 días para maximizar el rebrote proteico.</p>
         </div>
       </div>
+      `}
     </div>
   `;
 }
 
 export function initDetallePotrero(potreroId) {
+  window.openAddPotreroNoteModal = (id = potreroId) => showAddPotreroNoteModal(id);
+
   const btnAddNote = document.getElementById('btn-add-potrero-note');
   if (btnAddNote) {
     btnAddNote.addEventListener('click', () => {
@@ -171,7 +199,11 @@ export function initDetallePotrero(potreroId) {
   animalCards.forEach(card => {
     card.addEventListener('click', () => {
       const animalId = card.getAttribute('data-id');
-      window.navigateTo('detalle_animal', animalId);
+      if (typeof window.__openNotifTarget === 'function') {
+        window.__openNotifTarget('/#detalle_animal/' + animalId);
+      } else {
+        window.navigateTo('detalle_animal', animalId);
+      }
     });
   });
 
@@ -215,28 +247,37 @@ async function showEditPotreroNoteModal(noteId, potreroId) {
   renderPotreroNoteFormModal('Editar Nota de Potrero', note, potreroId);
 }
 
+function reloadPotreroTarget(potreroId) {
+  const sheetOpen = document.getElementById('potrero-bottom-sheet')?.classList.contains('open');
+  if (sheetOpen && typeof window._reloadPotreroSheetDetail === 'function') {
+    window._reloadPotreroSheetDetail(potreroId);
+  } else {
+    window.navigateTo('detalle_potrero', potreroId);
+  }
+}
+
 function renderPotreroNoteFormModal(title, note = null, potreroId) {
   showModal(title, `
     <form id="form-potrero-note" style="display: flex; flex-direction: column; gap: 16px; padding: 8px;">
-      <div class="m3-field">
+      <div class="m3-field ${note?.evento ? 'has-value' : ''}">
         <input type="text" name="evento" placeholder=" " value="${note ? note.evento : ''}" required>
         <label>Título del Evento (ej. Riego, Fumigación)</label>
       </div>
-      <div class="m3-field">
+      <div class="m3-field ${note?.descripcion ? 'has-value' : ''}">
         <textarea name="descripcion" placeholder=" " style="min-height: 100px;">${note ? note.descripcion || '' : ''}</textarea>
         <label>Descripción / Observaciones</label>
       </div>
-      <div class="m3-field">
+      <div class="m3-field has-value">
         <input type="date" name="fecha" value="${note ? note.fecha : new Date().toISOString().split('T')[0]}" required>
         <label>Fecha</label>
       </div>
-      <div class="m3-field">
+      <div class="m3-field has-value">
         <select name="icon">
-          <option value="history" ${note && note.icon === 'history' ? 'selected' : ''}>General</option>
-          <option value="water_drop" ${note && note.icon === 'water_drop' ? 'selected' : ''}>Riego</option>
-          <option value="grass" ${note && note.icon === 'grass' ? 'selected' : ''}>Abono / Siembra</option>
-          <option value="bug_report" ${note && note.icon === 'bug_report' ? 'selected' : ''}>Fumigación</option>
-          <option value="fence" ${note && note.icon === 'fence' ? 'selected' : ''}>Mantenimiento Cerca</option>
+          <option value="history" data-icon="📝" data-sub="Registro general o nota de campo" ${note && note.icon === 'history' ? 'selected' : ''}>General</option>
+          <option value="water_drop" data-icon="💧" data-sub="Riego o humedad del potrero" ${note && note.icon === 'water_drop' ? 'selected' : ''}>Riego</option>
+          <option value="grass" data-icon="🌿" data-sub="Fertilización, abono o resiembra" ${note && note.icon === 'grass' ? 'selected' : ''}>Abono / Siembra</option>
+          <option value="bug_report" data-icon="🛡️" data-sub="Control de maleza o plagas" ${note && note.icon === 'bug_report' ? 'selected' : ''}>Fumigación</option>
+          <option value="fence" data-icon="🪵" data-sub="Postes, alambre y división" ${note && note.icon === 'fence' ? 'selected' : ''}>Mantenimiento Cerca</option>
         </select>
         <label>Ícono</label>
       </div>
@@ -272,7 +313,7 @@ function renderPotreroNoteFormModal(title, note = null, potreroId) {
 
       showSnackbar(note ? 'Nota actualizada' : 'Nota agregada');
       closeModal();
-      window.navigateTo('detalle_potrero', potreroId);
+      reloadPotreroTarget(potreroId);
     } catch (err) {
       console.error('Error saving note:', err);
       showSnackbar('Error al guardar la nota: ' + err.message, 'error');
@@ -281,15 +322,24 @@ function renderPotreroNoteFormModal(title, note = null, potreroId) {
 }
 
 async function confirmDeletePotreroNote(noteId, potreroId) {
-  if (confirm('¿Estás seguro de que deseas eliminar esta nota?')) {
+  const doDelete = async () => {
     try {
       const { error } = await supabase.from('potrero_eventos').delete().eq('id', noteId);
       if (error) throw error;
       showSnackbar('Nota eliminada');
-      window.navigateTo('detalle_potrero', potreroId);
+      reloadPotreroTarget(potreroId);
     } catch (err) {
       console.error('Error deleting note:', err);
       showSnackbar('Error al eliminar la nota', 'error');
     }
+  };
+
+  if (window.Snackbar?.confirm) {
+    window.Snackbar.confirm('¿Estás seguro de que deseas eliminar esta nota?', doDelete, null, {
+      confirmText: 'Eliminar',
+      cancelText: 'Cancelar'
+    });
+  } else {
+    await doDelete();
   }
 }

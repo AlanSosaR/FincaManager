@@ -1278,7 +1278,7 @@ export async function initDashboard() {
     }, 50);
   }
 
-  function showLoteBottomSheet(lote, apps) {
+  function showLoteBottomSheet(lote, apps, initialTab = null) {
     const sheet = document.getElementById('lote-bottom-sheet');
     const scrim = document.getElementById('lote-sheet-scrim');
     if (!sheet) return;
@@ -2193,6 +2193,9 @@ export async function initDashboard() {
         if (host) {
           host.innerHTML = detailHtml;
           await initDetalleLote(targetLoteId);
+          if (initialTab && typeof window._switchSheetTab === 'function') {
+            window._switchSheetTab(initialTab);
+          }
         }
       } catch (err) {
         console.warn('[dashboard] Error cargando detalle embebido en sheet:', err);
@@ -2257,7 +2260,7 @@ export async function initDashboard() {
 
   let lastLoteSelectTime = 0;
 
-  function selectLote(id) {
+  function selectLote(id, initialTab = null) {
     lastLoteSelectTime = Date.now();
     selectedLoteId = id;
     
@@ -2265,7 +2268,7 @@ export async function initDashboard() {
     Object.values(polyByLote).forEach(({ poly, labelMarker, lote }) => {
       const { color } = parseCoordenadasJson(lote.coordenadas_json || lote.coordenadas);
       const loteColor = color || '#2d3e2c';
-      const selected = lote.id === id;
+      const selected = String(lote.id) === String(id);
       if (selected) {
         poly.setStyle({ fillOpacity: 0.65, weight: 4.5, color: '#ffffff', fillColor: loteColor });
         poly.bringToFront();
@@ -2284,7 +2287,13 @@ export async function initDashboard() {
         animate: true,
         duration: 0.6
       });
-      showLoteBottomSheet(sel.lote, appsByLote[id] || []);
+      showLoteBottomSheet(sel.lote, appsByLote[id] || [], initialTab);
+      return;
+    }
+
+    const fallbackLote = (lotes || []).find(l => String(l.id) === String(id));
+    if (fallbackLote) {
+      showLoteBottomSheet(fallbackLote, appsByLote[fallbackLote.id] || [], initialTab);
     }
   }
 
@@ -2386,11 +2395,11 @@ export async function initDashboard() {
       const isMobile = window.innerWidth <= 768;
       if (isMobile) {
         // En móvil ajuste más holgado
-        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+        map.fitBounds(group.getBounds(), { padding: [30, 30], animate: false });
         const currentZoom = map.getZoom();
-        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19));
+        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19), { animate: false });
       } else {
-        map.fitBounds(group.getBounds().pad(0.12));
+        map.fitBounds(group.getBounds().pad(0.12), { animate: false });
       }
     }
   };
@@ -2403,19 +2412,19 @@ export async function initDashboard() {
     map.invalidateSize({ animate: false, pan: false });
     adjustMapView();
   }, 120);
+  window.__openLoteInDashboard = (loteId, tab = null) => {
+    if (!document.getElementById('lote-bottom-sheet')?.isConnected) return false;
+    selectLote(loteId, tab);
+    return true;
+  };
+
   setTimeout(() => {
     fitMapToScreen();
     map.invalidateSize({ animate: false, pan: false });
     if (window._pendingOpenLote?.loteId) {
       const target = window._pendingOpenLote;
       window._pendingOpenLote = null;
-      selectLote(target.loteId);
-      if (target.tab) {
-        setTimeout(() => {
-          const tabBtn = document.querySelector(`[data-tab="${target.tab}"], [data-dl-tab="${target.tab}"]`);
-          if (tabBtn) tabBtn.click();
-        }, 420);
-      }
+      selectLote(target.loteId, target.tab || null);
     }
   }, 450);
 

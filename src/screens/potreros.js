@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { loadPuntoReferencia } from '../auth.js';
 import { renderM3SearchBar, initM3FullScreenSearch, escapeSearchHtml } from '../components/m3_search.js';
+import { renderDetallePotrero, initDetallePotrero } from './detalle_potrero.js';
 
 let currentPotrerosSearchQuery = '';
 let refMarker = null;
@@ -395,6 +396,144 @@ export async function renderPotreros() {
       .potrero-float-close:hover {
         background: #f2f4f0;
       }
+      /* Bottom Sheet Material 3 Expressive (idéntico a Cafetal) */
+      .lote-sheet-scrim {
+        position: fixed !important;
+        inset: 0 !important;
+        background: rgba(0, 0, 0, 0.35) !important;
+        backdrop-filter: blur(2px);
+        z-index: 99998 !important;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s cubic-bezier(0.2, 0, 0, 1), background 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+      }
+      .lote-sheet-scrim.open {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+      .lote-sheet-scrim.expanded {
+        background: rgba(0, 0, 0, 0.6) !important;
+      }
+      .lote-m3-sheet {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        max-width: 520px !important;
+        z-index: 99999 !important;
+        background: #ffffff !important;
+        border-top-left-radius: 28px !important;
+        border-top-right-radius: 28px !important;
+        border-top: 1.5px solid rgba(45, 62, 44, 0.16) !important;
+        box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.28) !important;
+        transform: translateY(105%) !important;
+        transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.35s ease !important;
+        will-change: transform;
+        padding: 8px 18px 28px !important;
+        box-sizing: border-box !important;
+        height: calc(100vh - 20px) !important;
+        max-height: calc(100vh - 20px) !important;
+        overflow: hidden !important;
+        scrollbar-width: none !important;
+        -webkit-overflow-scrolling: touch;
+        font-family: 'Plus Jakarta Sans', 'Work Sans', sans-serif !important;
+        color: #1e3e2b !important;
+        overscroll-behavior: contain;
+      }
+      .lote-m3-sheet::-webkit-scrollbar {
+        display: none !important;
+      }
+      .lote-m3-sheet.open {
+        transform: translateY(50%) !important;
+      }
+      .lote-m3-sheet.expanded {
+        transform: translateY(0) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        border-top-left-radius: 0 !important;
+        border-top-right-radius: 0 !important;
+        padding-bottom: 0 !important;
+      }
+      .lote-m3-sheet.expanded #potrero-sheet-full-detail {
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 96px !important;
+        scrollbar-width: none !important;
+      }
+      .lote-m3-sheet.expanded #potrero-sheet-full-detail::-webkit-scrollbar {
+        display: none !important;
+      }
+      #potrero-sheet-full-detail .screen-detalle {
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      #potrero-sheet-full-detail #btn-add-potrero-note {
+        display: none !important;
+      }
+      .lote-sheet-fixed-footer {
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        max-width: 520px !important;
+        z-index: 100001 !important;
+        background: rgba(255, 255, 255, 0.96) !important;
+        backdrop-filter: blur(10px);
+        border-top: 1px solid rgba(45, 62, 44, 0.12) !important;
+        padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        box-sizing: border-box !important;
+        box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.08) !important;
+        transform: translateY(110%) !important;
+        transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      }
+      .lote-sheet-fixed-footer.open {
+        transform: translateY(0) !important;
+      }
+      .lote-sheet-handle-box {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 4px 0 8px;
+        cursor: pointer;
+        touch-action: none;
+        user-select: none;
+      }
+      .lote-sheet-handle {
+        width: 48px;
+        height: 5px;
+        border-radius: 4px;
+        background: rgba(30, 62, 43, 0.28);
+        transition: background 0.2s, width 0.2s;
+      }
+      .lote-m3-sheet.expanded .lote-sheet-handle {
+        background: rgba(30, 62, 43, 0.4);
+        width: 54px;
+      }
+      .lote-sheet-title {
+        margin: 0;
+        color: #1e3e2b;
+        font-size: 20px;
+        font-weight: 800;
+        letter-spacing: -0.3px;
+      }
+      .lote-sheet-expanded-sec {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(30, 62, 43, 0.12);
+      }
       @media (max-width: 768px) {
         .preview-container:has(.screen-potreros) {
           padding: 0 !important;
@@ -460,6 +599,11 @@ export async function renderPotreros() {
               </div>
             </div>
           </div>
+
+          <!-- Material 3 Mobile Bottom Sheet for Potreros -->
+          <div id="potrero-sheet-scrim" class="lote-sheet-scrim"></div>
+          <div id="potrero-bottom-sheet" class="lote-m3-sheet"></div>
+          <div id="potrero-sheet-fixed-footer" class="lote-sheet-fixed-footer"></div>
 
           <div id="mapa-container">
             <div class="mapa-empty" id="mapa-loading">
@@ -577,10 +721,11 @@ export async function initPotreros() {
       <span class="material-symbols-outlined" style="font-size:18px;">layers</span>
       <span id="mapa-layers-label">Google Earth</span>
     </button>
-    <div id="potrero-float-card" class="potrero-float-card" style="display:none;"></div>
   `;
 
-  document.getElementById('potrero-float-card')?.addEventListener('click', (e) => e.stopPropagation());
+  document.getElementById('potrero-sheet-scrim')?.addEventListener('click', () => {
+    clearPotreroSelection();
+  });
 
   const map = L.map('mapa-leaflet', {
     zoomControl: false,
@@ -925,7 +1070,7 @@ export async function initPotreros() {
     Object.values(polyByPotrero).forEach(({ poly, labelMarker, potrero }) => {
       const { color } = parseCoordenadasJson(potrero.coordenadas_json || potrero.coordenadas);
       const potreroColor = color || '#2d3e2c';
-      const selected = potrero.id === id;
+      const selected = String(potrero.id) === String(id);
       if (!map.hasLayer(poly)) map.addLayer(poly);
       if (labelMarker && !map.hasLayer(labelMarker)) map.addLayer(labelMarker);
       if (selected) {
@@ -939,14 +1084,29 @@ export async function initPotreros() {
     });
     const sel = polyByPotrero[id];
     if (sel) {
-      map.fitBounds(sel.poly.getBounds().pad(0.08));
-      showPotreroFloatCard(sel.potrero, eventosByPotrero[id] || []);
+      map.flyToBounds(sel.poly.getBounds(), {
+        paddingBottomRight: [0, 260],
+        maxZoom: 18,
+        animate: true,
+        duration: 0.6
+      });
+      showPotreroBottomSheet(sel.potrero, eventosByPotrero[id] || []);
+      return;
+    }
+    const fallbackPotrero = (potreros || []).find(p => String(p.id) === String(id));
+    if (fallbackPotrero) {
+      showPotreroBottomSheet(fallbackPotrero, eventosByPotrero[fallbackPotrero.id] || []);
     }
   }
 
   function clearPotreroSelection() {
     selectedPotreroId = null;
-    hidePotreroFloatCard();
+    const sheet = document.getElementById('potrero-bottom-sheet');
+    const scrim = document.getElementById('potrero-sheet-scrim');
+    const fixedFooter = document.getElementById('potrero-sheet-fixed-footer');
+    if (sheet) sheet.classList.remove('open', 'expanded');
+    if (scrim) scrim.classList.remove('open', 'expanded');
+    if (fixedFooter) fixedFooter.classList.remove('open');
     map.closePopup();
     Object.values(polyByPotrero).forEach(({ poly, labelMarker, potrero }) => {
       const { color } = parseCoordenadasJson(potrero.coordenadas_json || potrero.coordenadas);
@@ -959,21 +1119,202 @@ export async function initPotreros() {
     adjustMapView();
   }
 
-  function showPotreroFloatCard(potrero, eventos) {
-    const card = document.getElementById('potrero-float-card');
-    const containerEl = document.getElementById('mapa-container');
-    if (!card || !containerEl) return;
-    card.innerHTML = buildPopupHtml(potrero, eventos);
-    card.style.display = 'block';
-    document.getElementById('potrero-float-close')?.addEventListener('click', (e) => {
+  function showPotreroBottomSheet(potrero) {
+    const sheet = document.getElementById('potrero-bottom-sheet');
+    const scrim = document.getElementById('potrero-sheet-scrim');
+    const fixedFooter = document.getElementById('potrero-sheet-fixed-footer');
+    if (!sheet) return;
+
+    const areaStr = potrero.area ? `${parseFloat(potrero.area).toFixed(2)} ${potrero.area_unidad || 'ha'}` : '0.00 ha';
+    const pastoStr = potrero.pasto || 'Natural';
+    const estLabel = statusLabel(potrero.status);
+
+    sheet.scrollTop = 0;
+    sheet.innerHTML = `
+      <div style="flex-shrink:0; position:relative; z-index:1000; background:#ffffff; margin:-8px -18px 0; padding:8px 18px 0;">
+        <div style="position:relative; display:flex; align-items:center; justify-content:center; padding: 8px 0 18px; min-height: 36px;">
+          <div class="lote-sheet-handle-box" id="potrero-sheet-handle-box" title="Desliza o toca para expandir" style="padding: 4px 24px; width: auto;">
+            <div class="lote-sheet-handle"></div>
+          </div>
+          <button id="potrero-sheet-close" title="Cerrar" aria-label="Cerrar" style="position:absolute; right:0; top:2px; width:34px; height:34px; border-radius:50%; background:#eff4ed; border:none; color:#1e3e2b; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+            <span class="material-symbols-outlined" style="font-size:19px;">close</span>
+          </button>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 4px 0 14px; border-bottom: 1px solid rgba(45, 62, 44, 0.12);">
+          <div style="display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+              <h3 class="lote-sheet-title" style="margin:0; font-size:19px; font-weight:800; color:#1e3e2b; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(potrero.nombre || 'Potrero')}</h3>
+              <span style="padding:2px 9px; border-radius:999px; background:#2d3e2c; color:#ffffff; font-size:11px; font-weight:700; white-space:nowrap; flex-shrink:0;">${escapeHtml(estLabel)}</span>
+            </div>
+            <div style="display:inline-flex; align-items:center; gap:5px; color:#5a6b58; font-weight:600; font-size:12.5px; line-height:1.2;">
+              <span>${escapeHtml(pastoStr)}</span><span style="color:#8a4b19;">• ${escapeHtml(areaStr)}</span>
+            </div>
+          </div>
+          <button type="button" id="potrero-sheet-more-btn" style="width:36px; height:36px; border-radius:50%; background:transparent; border:none; color:#1e3e2b; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;" title="Opciones del Potrero" aria-label="Opciones del Potrero">
+            <span class="material-symbols-outlined" style="font-size:22px;">more_vert</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="lote-sheet-expanded-sec" id="potrero-sheet-full-detail" style="margin-top: 10px; padding-top: 2px; border-top: none;">
+        <div style="padding: 20px; text-align: center; color: #556b53; font-size: 13px; font-weight: 600;">
+          Cargando detalles del potrero...
+        </div>
+      </div>
+    `;
+
+    sheet.classList.add('open', 'expanded');
+    if (scrim) scrim.classList.add('open', 'expanded');
+
+    document.getElementById('potrero-sheet-close')?.addEventListener('click', (e) => {
       e.stopPropagation();
       clearPotreroSelection();
     });
-  }
 
-  function hidePotreroFloatCard() {
-    const card = document.getElementById('potrero-float-card');
-    if (card) card.style.display = 'none';
+    document.getElementById('potrero-sheet-more-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('potrero-actions-sheet-overlay')?.remove();
+      const actOverlay = document.createElement('div');
+      actOverlay.id = 'potrero-actions-sheet-overlay';
+      actOverlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.48); backdrop-filter:blur(2px); z-index:100025; display:flex; align-items:flex-end; justify-content:center;';
+      actOverlay.innerHTML = `
+        <div style="width:100%; max-width:520px; background:#ffffff; border-radius:26px 26px 0 0; padding:12px 8px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 34px rgba(0,0,0,0.26); animation:slideUp 0.2s ease-out;">
+          <div style="width:38px; height:4px; border-radius:999px; background:#d0dad0; margin:0 auto 10px;"></div>
+          <div id="potrero-action-edit" style="padding:14px 20px; display:flex; align-items:center; gap:16px; cursor:pointer; border-radius:14px; font-size:15px; font-weight:700; color:#1e3e2b;">
+            <span class="material-symbols-outlined" style="font-size:22px; color:#2d3e2c;">edit</span>
+            <span>Editar Potrero</span>
+          </div>
+          <div id="potrero-action-delete" style="padding:14px 20px; display:flex; align-items:center; gap:16px; cursor:pointer; border-radius:14px; font-size:15px; font-weight:700; color:#ba1a1a;">
+            <span class="material-symbols-outlined" style="font-size:22px; color:#ba1a1a;">delete</span>
+            <span>Eliminar Potrero</span>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(actOverlay);
+      const closeActions = () => actOverlay.remove();
+      actOverlay.addEventListener('click', (ev) => {
+        if (ev.target === actOverlay) closeActions();
+      });
+      document.getElementById('potrero-action-edit')?.addEventListener('click', () => {
+        closeActions();
+        clearPotreroSelection();
+        window.navigateTo('nuevo_potrero', potrero.id);
+      });
+      document.getElementById('potrero-action-delete')?.addEventListener('click', () => {
+        closeActions();
+        const runDelete = async () => {
+          try {
+            const { error } = await supabase.from('potreros').delete().eq('id', potrero.id);
+            if (error) throw error;
+            clearPotreroSelection();
+            window.Snackbar?.show('Potrero eliminado');
+            window.clearScreenCache?.('potreros');
+            window.navigateTo('potreros');
+          } catch (err) {
+            window.Snackbar?.show('Error eliminando potrero: ' + (err?.message || err), { type: 'error' });
+          }
+        };
+        if (window.Snackbar?.confirm) {
+          window.Snackbar.confirm(`¿Eliminar el potrero "${potrero.nombre || 'Potrero'}"?`, runDelete, null, {
+            confirmText: 'Eliminar',
+            cancelText: 'Cancelar'
+          });
+        } else {
+          runDelete();
+        }
+      });
+    });
+
+    const setSheetExpanded = (expand) => {
+      if (expand) {
+        sheet.classList.add('expanded');
+        if (scrim) scrim.classList.add('expanded');
+      } else {
+        sheet.classList.remove('expanded');
+        if (scrim) scrim.classList.remove('expanded');
+      }
+    };
+
+    document.getElementById('potrero-sheet-handle-box')?.addEventListener('click', (e) => {
+      e?.stopPropagation();
+      setSheetExpanded(!sheet.classList.contains('expanded'));
+    });
+
+    if (fixedFooter) {
+      fixedFooter.innerHTML = `
+        <button type="button" id="potrero-footer-add-event-btn" style="width:100%; height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; padding:0 16px; white-space:nowrap; box-shadow:0 3px 10px rgba(45,62,44,0.22);">
+          <span class="material-symbols-outlined" style="font-size:19px;">add_circle</span>
+          <span>Registrar Evento</span>
+        </button>
+      `;
+      fixedFooter.classList.add('open');
+      document.getElementById('potrero-footer-add-event-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setSheetExpanded(true);
+        window.openAddPotreroNoteModal?.(potrero.id);
+      });
+    }
+
+    sheet.dataset.activePotreroId = String(potrero.id);
+    const loadSheetDetail = async (targetPotreroId = potrero.id) => {
+      try {
+        const detailHtml = await renderDetallePotrero(targetPotreroId, { embeddedInSheet: true });
+        if (sheet.dataset.activePotreroId !== String(targetPotreroId)) return;
+        const host = document.getElementById('potrero-sheet-full-detail');
+        if (host) {
+          host.innerHTML = detailHtml;
+          initDetallePotrero(targetPotreroId);
+        }
+      } catch (err) {
+        console.warn('[potreros] Error cargando detalle embebido en sheet:', err);
+      }
+    };
+    window._reloadPotreroSheetDetail = (pid) => loadSheetDetail(pid || potrero.id);
+    loadSheetDetail(potrero.id);
+
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let touchCurrentY = 0;
+    let isTrackingTouch = false;
+
+    sheet.ontouchstart = (e) => {
+      if (e.touches.length !== 1) return;
+      const target = e.target;
+      if (target.closest('button') || target.closest('a') || target.closest('input')) {
+        isTrackingTouch = false;
+        return;
+      }
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+      touchCurrentY = touchStartY;
+      isTrackingTouch = true;
+    };
+
+    sheet.ontouchmove = (e) => {
+      if (!isTrackingTouch || e.touches.length !== 1) return;
+      touchCurrentY = e.touches[0].clientY;
+    };
+
+    sheet.ontouchend = (e) => {
+      if (!isTrackingTouch) return;
+      isTrackingTouch = false;
+      const deltaY = touchCurrentY - touchStartY;
+      const deltaX = Math.abs((e.changedTouches[0]?.clientX || touchStartX) - touchStartX);
+      if (Math.abs(deltaY) < 30 || Math.abs(deltaY) < deltaX * 1.2) return;
+
+      if (deltaY < -35) {
+        setSheetExpanded(true);
+      } else if (deltaY > 40) {
+        if (sheet.classList.contains('expanded')) {
+          const detailBody = document.getElementById('potrero-sheet-full-detail');
+          if ((detailBody?.scrollTop || sheet.scrollTop) > 15) return;
+          setSheetExpanded(false);
+        } else {
+          clearPotreroSelection();
+        }
+      }
+    };
   }
 
   withCoords.forEach(potrero => {
@@ -1039,11 +1380,11 @@ export async function initPotreros() {
       const group = L.featureGroup(allBounds.map(b => L.rectangle(b)));
       const mobile = window.innerWidth <= 768;
       if (mobile) {
-        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+        map.fitBounds(group.getBounds(), { padding: [30, 30], animate: false });
         const currentZoom = map.getZoom();
-        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19));
+        map.setView(group.getBounds().getCenter(), Math.min(currentZoom + 0.15, 19), { animate: false });
       } else {
-        map.fitBounds(group.getBounds().pad(0.12));
+        map.fitBounds(group.getBounds().pad(0.12), { animate: false });
       }
     }
   };
@@ -1213,9 +1554,22 @@ export async function initPotreros() {
     map.invalidateSize({ animate: false, pan: false });
     adjustMapView();
   }, 120);
+  window.__selectPotreroInMap = (id) => {
+    if (!document.getElementById('mapa-container')?.isConnected) return false;
+    selectPotrero(id);
+    return true;
+  };
+
   setTimeout(() => {
     fitMapToScreen();
     map.invalidateSize({ animate: false, pan: false });
+    if (window._pendingOpenPotreroId) {
+      const targetId = window._pendingOpenPotreroId;
+      window._pendingOpenPotreroId = null;
+      selectPotrero(targetId);
+    } else if (!selectedPotreroId) {
+      adjustMapView();
+    }
   }, 450);
 }
 

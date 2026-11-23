@@ -3126,6 +3126,10 @@ function openPrenezFormSheet(animal, pesoActual, onReload) {
           `🐮 Preñez Registrada\nAnimal: ${animal.nombre || 'Animal'}\nFecha de monta: ${fechaMonta}\nParto estimado: ${fechaProbable}\nFinca: ${window._empresaNombre || ''}`
         );
 
+        localStorage.removeItem(`push_parto_ts_${animal.id}`);
+        localStorage.removeItem(`wa_parto_ts_${animal.id}`);
+        window.checkPushAlerts?.({ forceAnimalId: animal.id }).catch(() => {});
+
         showSnackbar('Preñez registrada ✓');
         closeSubBottomSheet();
         if (onReload) onReload();
@@ -3220,7 +3224,14 @@ function openEditPrenezFormSheet(animal, preg, allPregs, pesoActual, onReload) {
             fecha_probable_parto: fechaProbable
           })
         });
+        await restFetch(`/rest/v1/notifications?type=eq.ganado_parto&ref_id=eq.${encodeURIComponent(animal.id)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ read: true, ref_id: `${animal.id}_done` })
+        }).catch(() => {});
+        localStorage.removeItem(`push_parto_ts_${animal.id}`);
+        localStorage.removeItem(`wa_parto_ts_${animal.id}`);
         syncTable('animal_preñez');
+        window.checkPushAlerts?.({ forceAnimalId: animal.id }).catch(() => {});
         showSnackbar('Preñez actualizada ✓');
         closeSubBottomSheet();
         if (onReload) onReload();
@@ -3325,6 +3336,9 @@ function openPartoFormSheet(animal, activePreg, pesoActual, onReload) {
 
         syncTable('animal_preñez');
         syncTable('ganado');
+        localStorage.removeItem(`push_parto_ts_${animal.id}`);
+        localStorage.removeItem(`wa_parto_ts_${animal.id}`);
+        window.clearPushBellByRef?.(animal.id);
 
         sendWhatsApp(
           `🐄 Parto Registrado\nMadre: ${animal.nombre || 'Animal'}\nFecha: ${fechaParto}\nCría: ${criaNombre} (${criaSexo})${pesoKg ? ` — ${pesoKg} kg` : ''}\nFinca: ${window._empresaNombre || ''}`
@@ -3354,6 +3368,9 @@ function handleAbortPrenezInSheet(animal, activePreg, onReload) {
       });
       syncTable('animal_preñez');
       syncTable('ganado');
+      localStorage.removeItem(`push_parto_ts_${animal.id}`);
+      localStorage.removeItem(`wa_parto_ts_${animal.id}`);
+      window.clearPushBellByRef?.(animal.id);
 
       sendWhatsApp(
         `⚠️ Aborto Registrado\nAnimal: ${animal.nombre || 'Animal'}\nFecha monta: ${activePreg.fecha_monta || 'N/A'}\nFinca: ${window._empresaNombre || ''}`

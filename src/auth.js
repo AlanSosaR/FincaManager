@@ -532,6 +532,14 @@ export async function updateProfile({ nombre, email }) {
   }
 }
 
+export async function saveUserMetadata(data) {
+  if (!data || typeof data !== 'object') return null;
+  return authFetch('/auth/v1/user', {
+    method: 'PUT',
+    body: JSON.stringify({ data }),
+  });
+}
+
 export async function verifyPassword(password) {
   const user = await getUser();
   if (!user?.email) return false;

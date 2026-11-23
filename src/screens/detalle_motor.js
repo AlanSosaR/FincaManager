@@ -2,6 +2,8 @@ import { supabase } from '../supabase.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
 import { getUser, restFetch } from '../auth.js';
+import { checkPushAlerts, notifyMotorOilChanged } from '../push/push.js';
+import { sendWhatsApp } from '../wa.js';
 
 async function getCurrentUserName() {
   try {
@@ -1707,10 +1709,21 @@ function showMotorSessionDetailSheet(s, motor, sheet, scrim, opMap = {}) {
 
 async function saveSession(motorId, mins, customDate = null, horaInicio = null, horaFin = null, operador = null) {
   try {
-    const { data: motor } = await supabase.from('motores').select('horas').eq('id', motorId).single();
-    const newTotal = (parseFloat(motor.horas) || 0) + (mins / 60);
+    const { data: motor } = await supabase.from('motores').select('horas, max_horas').eq('id', motorId).single();
+    const prevHoras = parseFloat(motor?.horas) || 0;
+    const newTotal = prevHoras + (mins / 60);
     const rounded = Math.round(newTotal * 10) / 10;
+    const limit = window._currentMotorHasPrevMant ? (Number(motor?.max_horas) || 100) : 80;
     const finalOperador = (operador && operador.trim()) ? operador.trim() : await getCurrentUserName();
+
+    if (rounded >= limit && prevHoras < limit) {
+      localStorage.removeItem(`push_motor_ts_${motorId}`);
+      localStorage.removeItem(`wa_motor_aceite_ts_${motorId}`);
+      await restFetch(`/rest/v1/notifications?type=eq.motor_aceite&ref_id=eq.${encodeURIComponent(motorId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ read: true, ref_id: `${motorId}_done` }),
+      }).catch(() => {});
+    }
 
     await supabase.from('motor_sesiones').insert({
       motor_id: motorId,
@@ -1724,6 +1737,10 @@ async function saveSession(motorId, mins, customDate = null, horaInicio = null, 
 
     await supabase.from('motores').update({ horas: rounded }).eq('id', motorId);
     showSnackbar('Sesión registrada con éxito');
+
+    if (rounded >= limit) {
+      checkPushAlerts({ forceMotorId: motorId }).catch(() => {});
+    }
   } catch (err) {
     console.error(err);
     showSnackbar('Error al guardar: ' + err.message, 'error');
@@ -1816,8 +1833,12 @@ function registerOilChange(motorId) {
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = `<span class="material-symbols-outlined animate-spin" style="font-size: 18px;">sync</span><span>Guardando...</span>`;
     try {
-      const { data: motor } = await supabase.from('motores').select('horas').eq('id', motorId).single();
+      const { data: motor } = await supabase.from('motores').select('nombre, horas, max_horas').eq('id', motorId).single();
       const { data: sesiones } = await supabase.from('motor_sesiones').select('*').eq('motor_id', motorId);
+      const horasPrevias = Math.round((parseFloat(motor?.horas) || 0) * 10) / 10;
+      const proximoLimite = Number(motor?.max_horas) || Number(window._currentMotorData?.max_horas) || 100;
+      const equipoNombre = motor?.nombre || window._currentMotorData?.nombre || 'Equipo';
+      const operadorNombre = await getCurrentUserName().catch(() => '');
 
       await supabase.from('motor_mantenimientos').insert({
         motor_id: motorId,
@@ -1835,13 +1856,30 @@ function registerOilChange(motorId) {
         method: 'PATCH',
         body: JSON.stringify({ horas: 0 })
       }).catch(() => {});
-      await restFetch(`/rest/v1/notifications?type=eq.motor_aceite&ref_id=eq.${encodeURIComponent(motorId)}&read=eq.false`, {
+      await restFetch(`/rest/v1/notifications?type=eq.motor_aceite&ref_id=eq.${encodeURIComponent(motorId)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ read: true })
+        body: JSON.stringify({ read: true, ref_id: `${motorId}_done` })
       }).catch(() => {});
       await supabase.from('motor_sesiones').delete().eq('motor_id', motorId);
       localStorage.removeItem(`push_motor_ts_${motorId}`);
+      localStorage.removeItem(`wa_motor_aceite_ts_${motorId}`);
       window.clearPushBellByRef?.(motorId);
+
+      notifyMotorOilChanged({
+        motorId,
+        nombre: equipoNombre,
+        horasPrevias,
+        proximoLimite,
+      }).catch(() => {});
+
+      sendWhatsApp(
+        `✅ *Cambio de aceite realizado*\n` +
+        `Equipo: ${equipoNombre}\n` +
+        `Horas registradas en el cambio: ${horasPrevias} h\n` +
+        `Nuevo ciclo: 0 h / ${proximoLimite} h\n` +
+        (operadorNombre ? `Registrado por: ${operadorNombre}\n` : '') +
+        `Finca: ${window._empresaNombre || ''}`
+      ).catch(() => {});
 
       closeOilSheet();
       window.Snackbar.show('Cambio de aceite registrado');

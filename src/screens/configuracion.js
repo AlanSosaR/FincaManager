@@ -3,6 +3,12 @@ import { supabase } from '../supabase.js';
 import db from '../db.js';
 import { fullDownload } from '../sync.js';
 import { registerPushToken, getPushStatus, checkPushAlerts } from '../push/push.js';
+import {
+  PUSH_MODULES_SCHEMA,
+  getPushAlertPrefs,
+  savePushAlertPrefs,
+  loadPushAlertPrefsFromUser,
+} from '../push/push_prefs.js';
 import { createInstance, deleteInstance, getQR, connectPairing, checkConnection, listGroups, sendWhatsApp, checkMotoresAceite, checkPartosProximos } from '../wa.js';
 import { initM3FullScreenSearch, escapeSearchHtml } from '../components/m3_search.js';
 
@@ -240,6 +246,85 @@ export async function renderConfiguracion() {
       }
       #wa-connected-body:has(#wa-group-ac-wrap.is-open) {
         padding-bottom: 240px;
+      }
+      #push-prefs-sheet {
+        top: 0;
+        bottom: 0;
+        height: 100dvh;
+        max-height: 100dvh;
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+      }
+      #push-prefs-sheet.sheet-expanded {
+        height: 100dvh;
+        max-height: 100dvh;
+      }
+      #push-prefs-sheet .push-prefs-scroll {
+        display: block;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 4px 2px 16px;
+      }
+      .push-mod-card {
+        flex-shrink: 0;
+        margin-bottom: 8px;
+        border-radius: 16px;
+        border: 1px solid #e6ece4;
+        background: #ffffff;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .push-mod-card.is-enabled {
+        border-color: #d3e0d0;
+      }
+      .push-mod-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .push-mod-head:active {
+        background: #f6f8f5;
+      }
+      .push-mod-chevron {
+        font-size: 20px;
+        color: #5a6b58;
+        transition: transform 0.2s ease;
+        flex-shrink: 0;
+      }
+      .push-mod-card.is-expanded .push-mod-chevron {
+        transform: rotate(180deg);
+      }
+      .push-mod-subs {
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 14px 12px;
+        background: #f8faf7;
+        border-top: 1px solid #eef2ec;
+        border-bottom-left-radius: 16px;
+        border-bottom-right-radius: 16px;
+      }
+      .push-mod-card.is-expanded .push-mod-subs {
+        display: flex;
+      }
+      .push-sub-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: #ffffff;
+        border: 1px solid #e6ece4;
       }
     </style>
     <div class="m3-card-filled" style="margin-bottom:80px;">
@@ -555,7 +640,7 @@ export async function renderConfiguracion() {
             </button>
           </div>
         </div>
-        <div style="padding:14px 16px;border-radius:16px;background:#ffffff;border:1px solid #e6ece4;">
+        <div id="card-config-push" role="button" tabindex="0" style="padding:14px 16px;border-radius:16px;background:#ffffff;border:1px solid #e6ece4;cursor:pointer;transition:border-color 0.2s;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;">
             <div style="display:flex;align-items:center;gap:8px;min-width:0;">
               <span class="material-icons" style="color:#2d3e2c;font-size:20px;">notifications_active</span>
@@ -567,13 +652,51 @@ export async function renderConfiguracion() {
               </span>
             </button>
           </div>
-          <p id="config-push-desc" style="font-size:12.5px;color:#5a6b58;margin:0;line-height:1.4;">
-            Recibe alertas en tu celular cuando toque cambio de aceite en Motores o cuando un ternero esté próximo a nacer.
-          </p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <p id="config-push-desc" style="font-size:12.5px;color:#5a6b58;margin:0;line-height:1.4;flex:1;min-width:0;">
+              Elige qué módulos y qué alertas específicas quieres recibir en tu celular.
+            </p>
+            <span class="material-symbols-outlined" style="font-size:20px;color:#5a6b58;flex-shrink:0;">chevron_right</span>
+          </div>
           <p id="config-push-status-note" style="display:none;font-size:12px;font-weight:600;color:#b91c1c;margin:6px 0 0;"></p>
-          <button id="btn-config-push-test" type="button" style="display:none;margin-top:10px;width:100%;padding:10px;border-radius:12px;background:#ffffff;color:#2d3e2c;border:1px solid #cbd8c9;font-weight:700;font-size:13px;cursor:pointer;font-family:'Work Sans',sans-serif;align-items:center;justify-content:center;gap:6px;">
-            <span class="material-icons" style="font-size:17px;">send</span> Enviar notificación de prueba
-          </button>
+        </div>
+
+        <!-- Bottom Sheet Preferencias de Notificaciones Push por Módulo -->
+        <div id="push-prefs-sheet-scrim" class="wa-sheet-scrim"></div>
+        <div id="push-prefs-sheet" class="wa-m3-sheet" aria-hidden="true">
+          <div class="wa-sheet-handle-wrap" title="Toca para expandir">
+            <div class="wa-sheet-handle"></div>
+          </div>
+          <div style="flex-shrink:0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+              <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+                <span class="material-icons" style="color:#2d3e2c;font-size:22px;">notifications_active</span>
+                <h3 style="margin:0;font-size:18px;font-weight:800;color:#1e3e2b;">Notificaciones por módulo</h3>
+              </div>
+              <button id="btn-push-prefs-close" type="button" style="width:36px;height:36px;border-radius:50%;border:none;background:#f1f5f0;color:#2d3e2c;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;" aria-label="Cerrar">
+                <span class="material-icons" style="font-size:20px;">close</span>
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+              <p style="font-size:12.5px;color:#5a6b58;margin:0;line-height:1.4;flex:1;min-width:0;">
+                Toca un módulo para elegir qué notificaciones deseas recibir.
+              </p>
+              <button id="btn-push-prefs-toggle-all" type="button" style="padding:6px 12px;border-radius:999px;border:1px solid #cbd8c9;background:#f6f8f5;color:#2d3e2c;font-size:12px;font-weight:700;cursor:pointer;font-family:'Work Sans',sans-serif;white-space:nowrap;flex-shrink:0;">
+                Desactivar todos
+              </button>
+            </div>
+          </div>
+
+          <div id="push-prefs-modules-list" class="push-prefs-scroll"></div>
+
+          <div style="flex-shrink:0;padding-top:12px;border-top:1px solid #e6ece4;background:#ffffff;display:flex;align-items:center;gap:10px;">
+            <button id="btn-config-push-test" type="button" style="display:none;padding:12px 14px;border-radius:12px;background:#ffffff;color:#2d3e2c;border:1px solid #cbd8c9;font-weight:700;font-size:13px;cursor:pointer;font-family:'Work Sans',sans-serif;align-items:center;justify-content:center;gap:6px;white-space:nowrap;">
+              <span class="material-icons" style="font-size:17px;">send</span> Probar alerta
+            </button>
+            <button id="btn-save-push-prefs" type="button" class="btn-m3-primary" style="flex:1;padding:13px 16px;border-radius:12px;background:#2d3e2c;color:#ffffff;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:'Work Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;">
+              <span class="material-icons" style="font-size:18px;">check</span> Guardar preferencias
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -589,6 +712,7 @@ let waGroupsLoaded = false;
 let selectedWaGroup = { jid: '', name: '' };
 let isShareSheetOpen = false;
 let isOfflineSheetOpen = false;
+let isPushPrefsSheetOpen = false;
 let isRefMapOpen = false;
 let closeRefMapSheetFn = null;
 
@@ -1068,6 +1192,14 @@ function closeOfflineSheet(fromPopState = false) {
   toggleConfigSheet(v => { isOfflineSheetOpen = v; }, () => isOfflineSheetOpen, 'offline-data-sheet-scrim', 'offline-data-sheet', 'offline-sheet', false, fromPopState);
 }
 
+function openPushPrefsSheet() {
+  toggleConfigSheet(v => { isPushPrefsSheetOpen = v; }, () => isPushPrefsSheetOpen, 'push-prefs-sheet-scrim', 'push-prefs-sheet', 'push-prefs-sheet', true);
+}
+
+function closePushPrefsSheet(fromPopState = false) {
+  toggleConfigSheet(v => { isPushPrefsSheetOpen = v; }, () => isPushPrefsSheetOpen, 'push-prefs-sheet-scrim', 'push-prefs-sheet', 'push-prefs-sheet', false, fromPopState);
+}
+
 function updateUIAfterConnect() {
   const config = window._empresaWhatsAppConfig;
   closeWaSheet(false);
@@ -1172,6 +1304,7 @@ export function initConfiguracion() {
   isWaSheetOpen = false;
   isShareSheetOpen = false;
   isOfflineSheetOpen = false;
+  isPushPrefsSheetOpen = false;
   isRefMapOpen = false;
   closeRefMapSheetFn = null;
 
@@ -1187,6 +1320,7 @@ export function initConfiguracion() {
     const waSheet = document.getElementById('wa-connect-sheet');
     const shareSheet = document.getElementById('share-app-sheet');
     const offlineSheet = document.getElementById('offline-data-sheet');
+    const pushPrefsSheet = document.getElementById('push-prefs-sheet');
     const refOpen = Boolean(refSheet && refSheet.isConnected && (isRefMapOpen || refSheet.style.visibility === 'visible'));
     if (refOpen) {
       if (typeof closeRefMapSheetFn === 'function') {
@@ -1214,9 +1348,15 @@ export function initConfiguracion() {
       closeOfflineSheet(true);
       return true;
     }
+    const pushPrefsOpen = Boolean(pushPrefsSheet && pushPrefsSheet.isConnected && (isPushPrefsSheetOpen || pushPrefsSheet.classList.contains('open')));
+    if (pushPrefsOpen) {
+      closePushPrefsSheet(true);
+      return true;
+    }
     isWaSheetOpen = false;
     isShareSheetOpen = false;
     isOfflineSheetOpen = false;
+    isPushPrefsSheetOpen = false;
     isRefMapOpen = false;
     return false;
   };
@@ -1343,6 +1483,8 @@ export function initConfiguracion() {
           closeWaSheet(false);
         } else if (parentSheet.id === 'offline-data-sheet') {
           closeOfflineSheet(false);
+        } else if (parentSheet.id === 'push-prefs-sheet') {
+          closePushPrefsSheet(false);
         }
       }
     }, { passive: true });
@@ -1418,6 +1560,224 @@ export function initConfiguracion() {
   };
   refreshOfflineModulesUI();
 
+  let draftPushPrefs = getPushAlertPrefs(empresaId);
+  const expandedPushModules = new Set();
+
+  const countModuleSubs = (mod, modState) => {
+    const subsTotal = mod.subs.length;
+    if (!modState?.enabled) return { on: 0, total: subsTotal, enabled: false };
+    const on = mod.subs.filter(s => modState.subs?.[s.key] !== false).length;
+    return { on, total: subsTotal, enabled: on > 0 };
+  };
+
+  const getModuleStatusText = (counts) => {
+    if (!counts.enabled || counts.on === 0) return 'Desactivado';
+    if (counts.total === 1) return 'Activa';
+    if (counts.on === counts.total) return 'Todas las alertas activas';
+    return `${counts.on} de ${counts.total} alertas activas`;
+  };
+
+  const isAllPushEnabledInDraft = () => PUSH_MODULES_SCHEMA.every(mod => {
+    const counts = countModuleSubs(mod, draftPushPrefs[mod.key]);
+    return counts.enabled && counts.on === counts.total;
+  });
+
+  const renderPushPrefsModulesList = () => {
+    const listEl = document.getElementById('push-prefs-modules-list');
+    const toggleAllBtn = document.getElementById('btn-push-prefs-toggle-all');
+    if (!listEl) return;
+    const prevScroll = listEl.scrollTop;
+
+    listEl.innerHTML = PUSH_MODULES_SCHEMA.map(mod => {
+      const modState = draftPushPrefs[mod.key] || { enabled: false, subs: {} };
+      const counts = countModuleSubs(mod, modState);
+      const isExpanded = expandedPushModules.has(mod.key);
+      const statusText = getModuleStatusText(counts);
+      return `
+        <div class="push-mod-card ${counts.enabled ? 'is-enabled' : ''} ${isExpanded ? 'is-expanded' : ''}" data-push-mod="${mod.key}">
+          <div class="push-mod-head" data-push-mod-toggle="${mod.key}">
+            <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;">
+              <div style="width:40px;height:40px;border-radius:12px;background:${counts.enabled ? '#eef4ec' : '#f3f4f6'};color:${counts.enabled ? '#2d3e2c' : '#6b7280'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <span class="material-icons" style="font-size:21px;">${mod.icon}</span>
+              </div>
+              <div style="min-width:0;flex:1;">
+                <div style="font-weight:700;font-size:15px;color:#111827;line-height:1.25;">${escapeSearchHtml(mod.label)}</div>
+                <div style="font-size:12px;font-weight:600;color:${counts.enabled ? '#2d3e2c' : '#6b7280'};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  ${escapeSearchHtml(statusText)}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <span style="display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:600;color:#5a6b58;">
+                ${counts.total > 1 ? '<span>Opciones</span>' : ''}
+                <span class="material-icons push-mod-chevron">expand_more</span>
+              </span>
+              <button type="button"
+                class="m3-switch ${counts.enabled ? 'is-checked' : ''}"
+                role="switch"
+                aria-checked="${counts.enabled ? 'true' : 'false'}"
+                aria-label="Activar notificaciones de ${escapeSearchHtml(mod.label)}"
+                data-push-mod-switch="${mod.key}">
+                <span class="m3-switch-thumb">
+                  <span class="material-icons m3-switch-icon">check</span>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="push-mod-subs">
+            ${mod.subs.map(sub => {
+              const subOn = Boolean(counts.enabled && modState.subs?.[sub.key] !== false);
+              return `
+                <div class="push-sub-row">
+                  <div style="min-width:0;flex:1;">
+                    <div style="font-size:13px;font-weight:700;color:#1f2937;">${escapeSearchHtml(sub.label)}</div>
+                    <div style="font-size:11.5px;color:#5a6b58;margin-top:2px;line-height:1.35;">${escapeSearchHtml(sub.desc)}</div>
+                  </div>
+                  <button type="button"
+                    class="m3-switch ${subOn ? 'is-checked' : ''}"
+                    role="switch"
+                    aria-checked="${subOn ? 'true' : 'false'}"
+                    aria-label="${escapeSearchHtml(sub.label)}"
+                    data-push-sub-switch="${mod.key}:${sub.key}">
+                    <span class="m3-switch-thumb">
+                      <span class="material-icons m3-switch-icon">check</span>
+                    </span>
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    listEl.scrollTop = prevScroll;
+    if (toggleAllBtn) {
+      const allOn = isAllPushEnabledInDraft();
+      toggleAllBtn.textContent = allOn ? 'Desactivar todos' : 'Activar todos';
+      toggleAllBtn.style.background = allOn ? '#f9fafb' : '#eef4ec';
+      toggleAllBtn.style.color = allOn ? '#4b5563' : '#2d3e2c';
+      toggleAllBtn.style.borderColor = allOn ? '#e5e7eb' : '#cbd8c9';
+    }
+  };
+
+  const openPushPrefsModal = () => {
+    draftPushPrefs = getPushAlertPrefs(empresaId);
+    expandedPushModules.clear();
+    renderPushPrefsModulesList();
+    openPushPrefsSheet();
+  };
+
+  document.getElementById('card-config-push')?.addEventListener('click', (e) => {
+    if (e.target.closest('#switch-config-push')) return;
+    openPushPrefsModal();
+  });
+  document.getElementById('card-config-push')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (e.target.closest('#switch-config-push')) return;
+      e.preventDefault();
+      openPushPrefsModal();
+    }
+  });
+  document.getElementById('btn-push-prefs-close')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closePushPrefsSheet(false);
+  });
+  document.getElementById('push-prefs-sheet-scrim')?.addEventListener('click', () => closePushPrefsSheet(false));
+
+  document.getElementById('push-prefs-modules-list')?.addEventListener('click', (e) => {
+    const subBtn = e.target.closest('[data-push-sub-switch]');
+    if (subBtn) {
+      e.stopPropagation();
+      const [modKey, subKey] = String(subBtn.dataset.pushSubSwitch || '').split(':');
+      const mod = PUSH_MODULES_SCHEMA.find(m => m.key === modKey);
+      if (!mod || !subKey) return;
+      const prevState = draftPushPrefs[modKey] || { enabled: false, subs: {} };
+      const nextSubVal = !(prevState.enabled && prevState.subs?.[subKey] !== false);
+      const nextSubs = { ...(prevState.subs || {}), [subKey]: nextSubVal };
+      for (const s of mod.subs) {
+        if (typeof nextSubs[s.key] !== 'boolean') nextSubs[s.key] = prevState.enabled;
+      }
+      const anyOn = mod.subs.some(s => Boolean(nextSubs[s.key]));
+      draftPushPrefs[modKey] = { enabled: anyOn, subs: nextSubs };
+      renderPushPrefsModulesList();
+      return;
+    }
+
+    const modSwitch = e.target.closest('[data-push-mod-switch]');
+    if (modSwitch) {
+      e.stopPropagation();
+      const modKey = modSwitch.dataset.pushModSwitch;
+      const mod = PUSH_MODULES_SCHEMA.find(m => m.key === modKey);
+      if (!mod) return;
+      const counts = countModuleSubs(mod, draftPushPrefs[modKey]);
+      const nextOn = !counts.enabled;
+      const nextSubs = {};
+      for (const s of mod.subs) nextSubs[s.key] = nextOn;
+      draftPushPrefs[modKey] = { enabled: nextOn, subs: nextSubs };
+      renderPushPrefsModulesList();
+      return;
+    }
+
+    const headEl = e.target.closest('[data-push-mod-toggle]');
+    if (headEl) {
+      const modKey = headEl.dataset.pushModToggle;
+      if (!modKey) return;
+      const willExpand = !expandedPushModules.has(modKey);
+      if (willExpand) expandedPushModules.add(modKey);
+      else expandedPushModules.delete(modKey);
+      const cardEl = headEl.closest('.push-mod-card');
+      cardEl?.classList.toggle('is-expanded', willExpand);
+      if (willExpand && cardEl) {
+        requestAnimationFrame(() => {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      }
+    }
+  });
+
+  document.getElementById('btn-push-prefs-toggle-all')?.addEventListener('click', () => {
+    const nextVal = !isAllPushEnabledInDraft();
+    for (const mod of PUSH_MODULES_SCHEMA) {
+      const subs = {};
+      for (const s of mod.subs) subs[s.key] = nextVal;
+      draftPushPrefs[mod.key] = { enabled: nextVal, subs };
+    }
+    renderPushPrefsModulesList();
+  });
+
+  document.getElementById('btn-save-push-prefs')?.addEventListener('click', async () => {
+    const saveBtn = document.getElementById('btn-save-push-prefs');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span class="material-icons animate-spin" style="font-size:18px;">sync</span> Guardando...';
+    }
+    try {
+      await savePushAlertPrefs(draftPushPrefs, empresaId);
+      closePushPrefsSheet(false);
+      window.Snackbar?.show('Preferencias de notificaciones guardadas ✓');
+      const status = await getPushStatus().catch(() => 'default');
+      if (status === 'enabled') {
+        checkPushAlerts().catch(() => {});
+      }
+    } catch (err) {
+      window.Snackbar?.show('Error guardando preferencias: ' + (err?.message || err), { type: 'error' });
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span class="material-icons" style="font-size:18px;">check</span> Guardar preferencias';
+      }
+    }
+  });
+
+  loadPushAlertPrefsFromUser(empresaId).then(() => {
+    if (isPushPrefsSheetOpen) {
+      draftPushPrefs = getPushAlertPrefs(empresaId);
+      renderPushPrefsModulesList();
+    }
+  }).catch(() => {});
+
   const refreshPushUI = async () => {
     const sw = document.getElementById('switch-config-push');
     const noteEl = document.getElementById('config-push-status-note');
@@ -1427,20 +1787,12 @@ export function initConfiguracion() {
     const isEnabled = status === 'enabled';
     sw.classList.toggle('is-checked', isEnabled);
     sw.setAttribute('aria-checked', isEnabled ? 'true' : 'false');
-    sw.disabled = status === 'unsupported';
-    if (testBtn) testBtn.style.display = isEnabled ? 'flex' : 'none';
+    sw.disabled = false;
+    if (testBtn) testBtn.style.display = isEnabled ? 'inline-flex' : 'none';
     if (noteEl) {
-      if (status === 'denied') {
-        noteEl.textContent = 'Permiso bloqueado en la configuración del navegador.';
-        noteEl.style.color = '#b91c1c';
-        noteEl.style.display = 'block';
-      } else if (status === 'unconfigured') {
-        noteEl.textContent = 'Falta configurar Firebase Push en el servidor.';
+      if (isEnabled && typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+        noteEl.textContent = 'Permiso bloqueado en el navegador; recibirás las alertas dentro de la app.';
         noteEl.style.color = '#92400e';
-        noteEl.style.display = 'block';
-      } else if (status === 'unsupported') {
-        noteEl.textContent = 'Este navegador no soporta notificaciones push.';
-        noteEl.style.color = '#4b5563';
         noteEl.style.display = 'block';
       } else {
         noteEl.style.display = 'none';
@@ -1449,14 +1801,18 @@ export function initConfiguracion() {
   };
   refreshPushUI();
 
-  document.getElementById('switch-config-push')?.addEventListener('click', async () => {
+  document.getElementById('switch-config-push')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
     const sw = document.getElementById('switch-config-push');
     if (!sw || sw.disabled) return;
     const wasChecked = sw.classList.contains('is-checked');
     sw.disabled = true;
     try {
       if (wasChecked) {
+        localStorage.setItem('push_notifications_enabled', '0');
         localStorage.removeItem('push_token_registered');
+        sw.classList.remove('is-checked');
+        sw.setAttribute('aria-checked', 'false');
         const uid = currentUserId || getSessionUserId?.() || (await getUser().catch(() => null))?.id;
         if (uid) {
           await restFetch(`/rest/v1/push_tokens?user_id=eq.${encodeURIComponent(uid)}&platform=eq.web`, {
@@ -1465,18 +1821,16 @@ export function initConfiguracion() {
         }
         window.Snackbar?.show('Notificaciones push desactivadas');
       } else {
-        const res = await registerPushToken();
-        if (res.ok) {
-          await checkPushAlerts();
-          window.Snackbar?.show('Notificaciones push activadas ✓');
-        } else if (res.reason === 'missing_config') {
-          window.Snackbar?.show('Configura las variables FIREBASE_* en Vercel/.env primero', { type: 'warning' });
-        } else if (res.reason === 'denied') {
-          window.Snackbar?.show('Permiso de notificaciones bloqueado en el navegador', { type: 'error' });
-        } else {
-          window.Snackbar?.show('No se pudo activar push: ' + (res.reason || 'error'), { type: 'warning' });
-        }
+        localStorage.setItem('push_notifications_enabled', '1');
+        localStorage.setItem('push_token_registered', '1');
+        sw.classList.add('is-checked');
+        sw.setAttribute('aria-checked', 'true');
+        await registerPushToken(null, { userInitiated: true }).catch(() => ({ ok: true, mode: 'local' }));
+        checkPushAlerts().catch(() => {});
+        window.Snackbar?.show('Notificaciones push activadas ✓');
       }
+    } catch (err) {
+      console.warn('switch-config-push error:', err);
     } finally {
       sw.disabled = false;
       await refreshPushUI();

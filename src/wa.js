@@ -1,6 +1,7 @@
 import db from './db.js';
-import { restFetch } from './auth.js';
+import { restFetch, loadWhatsAppConfig } from './auth.js';
 import { getDosisPorEdad, getPlanIfcafe, obtenerOrdenDia, normalizarProducto } from './utils/calculadora_dosis.js';
+import { isAlertEnabled } from './push/push_prefs.js';
 
 const EVOLUTION_API = '/api/wa-proxy';
 const NOTIFIED_KEY = 'wa_notified_vaccines';
@@ -198,16 +199,33 @@ export async function joinGroup(inviteCode) {
 }
 
 export async function sendWhatsApp(mensaje) {
-  const groupJid = localStorage.getItem('whatsapp_group_jid') || window._empresaWhatsAppConfig?.whatsapp_group_jid;
+  let groupJid = localStorage.getItem('whatsapp_group_jid') || window._empresaWhatsAppConfig?.whatsapp_group_jid;
+  if (!groupJid) {
+    const empresaId = getActiveEmpresaId();
+    if (empresaId) {
+      await loadWhatsAppConfig(empresaId).catch(() => {});
+      groupJid = localStorage.getItem('whatsapp_group_jid') || window._empresaWhatsAppConfig?.whatsapp_group_jid;
+    }
+  }
   if (!groupJid) return false;
-  const name = getInstanceName();
+  const payload = JSON.stringify({ number: groupJid, text: mensaje });
   try {
-    await waFetch(`message/sendText/${name}`, {
+    await waFetch(`message/sendText/${getInstanceName()}`, {
       method: 'POST',
-      body: JSON.stringify({ number: groupJid, text: mensaje }),
+      body: payload,
     });
     return true;
   } catch (e) {
+    try {
+      const ok = await checkConnection();
+      if (ok) {
+        await waFetch(`message/sendText/${getInstanceName()}`, {
+          method: 'POST',
+          body: payload,
+        });
+        return true;
+      }
+    } catch {}
     console.warn('WhatsApp send failed:', e);
     return false;
   }
@@ -219,6 +237,7 @@ function getLocalToday() {
 }
 
 export async function checkPendingVaccines() {
+  if (!isAlertEnabled('ganado', 'vacunas')) return;
   const today = getLocalToday();
   const sentKey = `${SENT_TODAY_KEY}_${today}`;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
@@ -263,6 +282,7 @@ export async function checkPendingVaccines() {
 }
 
 export async function checkPendingFumigaciones() {
+  if (!isAlertEnabled('ganado', 'fumigaciones')) return;
   const today = getLocalToday();
   const sentKey = `${SENT_FUMIG_TODAY_KEY}_${today}`;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
@@ -315,6 +335,7 @@ function saveFumigNotifiedSet(set) {
 }
 
 export async function checkOverdueVaccines() {
+  if (!isAlertEnabled('ganado', 'vacunas')) return;
   const today = getLocalToday();
   const sentKey = 'wa_overdue_sent_today_' + today;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
@@ -349,6 +370,7 @@ export async function checkOverdueVaccines() {
 }
 
 export async function checkUpcomingVaccines() {
+  if (!isAlertEnabled('ganado', 'vacunas')) return;
   const today = getLocalToday();
   const sentKey = 'wa_upcoming_sent_' + today;
   const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
@@ -395,6 +417,7 @@ function saveLoteNotifiedSet(set) {
 }
 
 export async function checkAplicacionesDelMes() {
+  if (!isAlertEnabled('cafetal', 'calendario_manejo')) return;
   const today = getLocalToday();
   const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
   if (!empresaId) return;
@@ -542,72 +565,22 @@ export async function checkEnmiendaCal() {
 }
 
 export async function actualizarSaludPorPlan() {
-  const today = getLocalToday();
-  const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
-  if (!empresaId) return;
-  const sentKey = 'wa_salud_sent_' + today;
-  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
-  try {
-    const lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*`);
-    let aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
-    if (!Array.isArray(aplicadas)) aplicadas = [];
-
-    for (const lote of (Array.isArray(lotes) ? lotes : [])) {
-      if (!lote.edad_categoria) continue;
-
-      const plan = getPlanIfcafe(parseInt(lote.altura_msnm) || 0);
-      const atrasadas = plan.filter(item => {
-        const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
-        if (matchFecha >= today) return false;
-        const productKey = normalizarProducto(item.producto);
-        return !aplicadas.some(a =>
-          a.lote_id === lote.id &&
-          a.producto && normalizarProducto(a.producto) === productKey &&
-          a.fecha && a.fecha.startsWith(matchFecha.substring(0, 7))
-        );
-      });
-      if (atrasadas.length === 0) continue;
-
-      const penalizacion = atrasadas.length * 5;
-      const saludActual = lote.salud_porcentaje || 100;
-      const nuevaSalud = Math.max(0, saludActual - penalizacion);
-
-      if (nuevaSalud < saludActual) {
-        await restFetch(`/rest/v1/lotes?id=eq.${lote.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ salud_porcentaje: nuevaSalud }),
-        });
-
-        if (alreadySent.has(lote.id)) continue;
-
-        await sendWhatsApp(
-          `⚠️ Salud del lote ${lote.nombre} reducida\n\n` +
-          `Motivo: ${atrasadas.length} aplicación(es) del Plan de Fertilización sin realizar\n` +
-          `Salud anterior: ${saludActual}%\n` +
-          `Salud actual: ${nuevaSalud}%\n\n` +
-          `Finca: ${window._empresaNombre || ''}`
-        );
-
-        alreadySent.add(lote.id);
-      }
-    }
-
-    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
-  } catch (e) {
-    console.warn('actualizarSaludPorPlan error:', e);
-  }
+  // Desactivado: ya no se penaliza la salud ni se envían alertas de salud del lote por WhatsApp
+  return;
 }
 
 function getActiveEmpresaId() {
   return window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
 }
 
-export async function checkMotoresAceite() {
+export async function checkMotoresAceite(opts = {}) {
   const empresaId = getActiveEmpresaId();
   if (!empresaId || !navigator.onLine) return;
+  if (!isAlertEnabled('motores', 'cambio_aceite', empresaId)) return;
   try {
     const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
     const now = Date.now();
+    const forceMotorId = opts?.forceMotorId ? String(opts.forceMotorId) : '';
     const [motores, mants] = await Promise.all([
       restFetch(`/rest/v1/motores?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre,horas,max_horas`).catch(() => []),
       restFetch(`/rest/v1/motor_mantenimientos?empresa_id=eq.${encodeURIComponent(empresaId)}&select=motor_id`).catch(() => []),
@@ -623,6 +596,10 @@ export async function checkMotoresAceite() {
       if (horas < limit) {
         localStorage.removeItem(tsKey);
         continue;
+      }
+
+      if (forceMotorId && String(m.id) === forceMotorId) {
+        localStorage.removeItem(tsKey);
       }
 
       const lastSent = Number(localStorage.getItem(tsKey) || 0);
@@ -643,13 +620,15 @@ export async function checkMotoresAceite() {
   }
 }
 
-export async function checkPartosProximos() {
+export async function checkPartosProximos(opts = {}) {
   const empresaId = getActiveEmpresaId();
   if (!empresaId || !navigator.onLine) return;
+  if (!isAlertEnabled('ganado', 'partos', empresaId)) return;
   const today = getLocalToday();
   const TWO_DAYS_MS = 48 * 60 * 60 * 1000;
   const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
   const now = Date.now();
+  const forceAnimalId = opts?.forceAnimalId ? String(opts.forceAnimalId) : '';
 
   try {
     const [preñeces, animales] = await Promise.all([
@@ -671,6 +650,10 @@ export async function checkPartosProximos() {
       const parto = new Date(`${preg.fecha_probable_parto}T12:00:00`);
       const dias = Math.round((parto - hoy) / 86400000);
       if (dias > 30 || dias < -30) continue;
+
+      if (forceAnimalId && String(preg.animal_id) === forceAnimalId) {
+        localStorage.removeItem(tsKey);
+      }
 
       const minInterval = dias <= 15 ? TWO_DAYS_MS : FIFTEEN_DAYS_MS;
       const lastSent = Number(localStorage.getItem(tsKey) || 0);

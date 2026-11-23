@@ -3872,6 +3872,8 @@ function handleAddPregnancy(animalId) {
             });
             showSnackbar('Preñez registrada');
 
+            localStorage.removeItem(`push_parto_ts_${animalId}`);
+            localStorage.removeItem(`wa_parto_ts_${animalId}`);
             if (currentAnimal) {
                 sendWhatsApp(
                     '🐮 Preñez Registrada\nAnimal: ' + currentAnimal.nombre +
@@ -3880,6 +3882,7 @@ function handleAddPregnancy(animalId) {
                     '\nFinca: ' + (window._empresaNombre || '')
                 );
             }
+            window.checkPushAlerts?.({ forceAnimalId: animalId }).catch(() => {});
             await loadAllData(animalId, document.getElementById('da-container'));
         } catch (err) {
             btn.disabled = false;
@@ -4042,6 +4045,9 @@ async function handleEditPregnancy(pregId, animalId) {
                         body: JSON.stringify({ reproductivo: 'Vacía' }),
                     });
                 }
+                localStorage.removeItem(`push_parto_ts_${animalId}`);
+                localStorage.removeItem(`wa_parto_ts_${animalId}`);
+                window.clearPushBellByRef?.(animalId);
                 restoreButtons();
                 showSnackbar('Registro de preñez eliminado');
                 await loadAllData(animalId, document.getElementById('da-container'));
@@ -4090,6 +4096,20 @@ async function handleEditPregnancy(pregId, animalId) {
                     method: 'PATCH',
                     body: JSON.stringify({ reproductivo: nuevoReproductivo }),
                 });
+            }
+
+            if (nuevoEstado === 'Preñada') {
+                await restFetch(`/rest/v1/notifications?type=eq.ganado_parto&ref_id=eq.${encodeURIComponent(animalId)}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ read: true, ref_id: `${animalId}_done` }),
+                }).catch(() => {});
+                localStorage.removeItem(`push_parto_ts_${animalId}`);
+                localStorage.removeItem(`wa_parto_ts_${animalId}`);
+                window.checkPushAlerts?.({ forceAnimalId: animalId }).catch(() => {});
+            } else {
+                localStorage.removeItem(`push_parto_ts_${animalId}`);
+                localStorage.removeItem(`wa_parto_ts_${animalId}`);
+                window.clearPushBellByRef?.(animalId);
             }
 
             restoreButtons();
@@ -4217,6 +4237,9 @@ async function handleRegistrarParto(animalId) {
 
             closeModal();
             showSnackbar('Parto registrado');
+            localStorage.removeItem(`push_parto_ts_${animalId}`);
+            localStorage.removeItem(`wa_parto_ts_${animalId}`);
+            window.clearPushBellByRef?.(animalId);
 
             if (currentAnimal) {
                 sendWhatsApp(
@@ -4249,6 +4272,9 @@ function handleAbortPregnancy(animalId) {
                 body: JSON.stringify({ reproductivo: 'Vacía' }),
             });
             showSnackbar('Aborto registrado');
+            localStorage.removeItem(`push_parto_ts_${animalId}`);
+            localStorage.removeItem(`wa_parto_ts_${animalId}`);
+            window.clearPushBellByRef?.(animalId);
             if (currentAnimal) {
                 sendWhatsApp(
                     '⚠️ Aborto Registrado\nAnimal: ' + currentAnimal.nombre +
