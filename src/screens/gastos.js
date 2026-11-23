@@ -3,9 +3,20 @@ import { restFetch, restInsert } from '../auth.js';
 import { showModal, closeModal } from '../modals.js';
 import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
 import { mergeCategories, openNewCategoryBottomSheet } from '../utils/custom_categories.js';
+import { isFuelMotor, computeFuelMotorStats, resolveSharedFuelPrice, formatLitersLabel } from '../utils/motor_fuel_config.js';
+import { extractPotreroIdFromGasto, buildFuelSentMap, toLocalIsoDate, getWeeklyExpenseGroupInfo } from '../utils/motor_fuel_cuentas.js';
 
 let _allGastos = [];
-let _refs = { lotes: new Map(), lotesMeta: new Map(), ganado: new Map(), herramientas: new Map(), personal: new Map(), personalMeta: new Map() };
+let _refs = {
+  lotes: new Map(),
+  lotesMeta: new Map(),
+  potreros: new Map(),
+  potrerosMeta: new Map(),
+  ganado: new Map(),
+  herramientas: new Map(),
+  personal: new Map(),
+  personalMeta: new Map()
+};
 let _pendingSummary = { totalAmount: 0, items: [] };
 let activePeriod = 'todo'; // 'todo' | 'dia' | 'semana' | 'mes'
 let activeGroupMode = 'categoria'; // 'categoria' | 'lote'
@@ -14,7 +25,8 @@ let showMonthCalendar = false;
 let activeLoteId = 'all'; // 'all' | lote_id
 let currentGastosSearchQuery = '';
 let expandedCats = new Set(); // e.g. 'egr:Cafetal'
-let showAllCats = new Set();  // categories where "Ver los N movimientos" was clicked
+let expandedCatDays = new Set(); // multi-day category cards explicitly expanded
+let collapsedSingleDays = new Set(); // single-day category cards explicitly collapsed
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const SHORT_MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -67,6 +79,21 @@ function formatShortDate(dateStr) {
   return `${d} ${SHORT_MONTHS[mIdx]}`;
 }
 
+function formatCuentasDayLabel(isoDate) {
+  if (!isoDate) return 'Sin fecha';
+  const todayIso = getTodayLocalStr();
+  if (isoDate === todayIso) return `Hoy · ${formatShortDate(isoDate)}`;
+  const yObj = new Date();
+  yObj.setDate(yObj.getDate() - 1);
+  const yesterdayIso = `${yObj.getFullYear()}-${String(yObj.getMonth() + 1).padStart(2, '0')}-${String(yObj.getDate()).padStart(2, '0')}`;
+  if (isoDate === yesterdayIso) return `Ayer · ${formatShortDate(isoDate)}`;
+  const parts = String(isoDate).slice(0, 10).split('-');
+  if (parts.length !== 3) return isoDate;
+  const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return `${DAYS_CAP[d.getDay()]}, ${formatShortDate(isoDate)}`;
+}
+
 function getCurrentWeekBounds() {
   const now = new Date();
   const day = now.getDay(); // 0=Dom..6=Sab
@@ -99,6 +126,28 @@ function getDisplayGroupName(cat) {
   if (low === 'maquinaria') return 'Maquinaria';
   if (low === 'otro' || low === 'otros') return 'Otros';
   return raw;
+}
+
+function getCafetalSubLabel(g) {
+  const rawCat = String(g?.categoria || '').trim();
+  const catLow = rawCat.toLowerCase();
+  const rawDesc = String(g?.descripcion || '').trim();
+  if (catLow === 'cosecha' || rawDesc.includes('[ref:cosecha_') || /^cosecha\b/i.test(rawDesc)) {
+    return 'Cosecha';
+  }
+  if (rawCat && catLow !== 'cafetal') {
+    return rawCat.charAt(0).toUpperCase() + rawCat.slice(1);
+  }
+  return 'Otra actividad';
+}
+
+function cafetalSubPillHtml(label, compact = false) {
+  const isCosecha = String(label || '').toLowerCase() === 'cosecha';
+  const style = isCosecha
+    ? 'background:#fef3c7; color:#92400e; border:1px solid #fde68a;'
+    : 'background:#e8f1e6; color:#2d3e2c; border:1px solid #cde0ca;';
+  const pad = compact ? '1px 6px; font-size:10px; vertical-align:middle; margin-left:4px;' : '2px 8px; font-size:10.5px;';
+  return `<span style="display:inline-flex; align-items:center; border-radius:999px; font-weight:800; line-height:1.3; letter-spacing:0.2px; ${pad} ${style}">${escapeHtml(label)}</span>`;
 }
 
 // ─── Parser de Personal (Exportado para detalle_personal.js) ──────────────────
@@ -211,9 +260,13 @@ function extractLoteColor(coordJson) {
 async function fetchRefs() {
   const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
   const empFilter = empId ? `empresa_id=eq.${encodeURIComponent(empId)}&` : '';
-  const [lotesData, ganadoRes, herramientasRes, personalData] = await Promise.all([
+  const [lotesData, potrerosData, ganadoRes, herramientasRes, personalData] = await Promise.all([
     restFetch(`/rest/v1/lotes?${empFilter}select=id,nombre,num_plantas,coordenadas_json`).catch(async () => {
       const local = await supabase.from('lotes').select('id,nombre,num_plantas,coordenadas_json').catch(() => ({ data: [] }));
+      return local.data || [];
+    }),
+    restFetch(`/rest/v1/potreros?${empFilter}select=id,nombre,coordenadas_json`).catch(async () => {
+      const local = await supabase.from('potreros').select('id,nombre,coordenadas_json').catch(() => ({ data: [] }));
       return local.data || [];
     }),
     supabase.from('ganado').select('id,nombre'),
@@ -238,11 +291,27 @@ async function fetchRefs() {
       color: extractLoteColor(x.coordenadas_json)
     });
   });
+  const potrerosArr = Array.isArray(potrerosData) ? potrerosData : [];
+  const potrerosMap = new Map();
+  const potrerosMeta = new Map();
+  potrerosArr.forEach(p => {
+    const id = String(p.id);
+    const nombre = String(p.nombre || '').trim();
+    if (!id || !nombre) return;
+    potrerosMap.set(id, nombre);
+    potrerosMeta.set(id, {
+      id,
+      nombre,
+      color: extractLoteColor(p.coordenadas_json)
+    });
+  });
   const personalArr = Array.isArray(personalData) ? personalData : [];
   const personalMeta = new Map(personalArr.map(p => [String(p.id), { id: String(p.id), nombre: p.nombre || '', pago_diario: Number(p.pago_diario) || 0 }]));
   return {
     lotes: lotesMap,
     lotesMeta,
+    potreros: potrerosMap,
+    potrerosMeta,
     ganado: toMap(ganadoRes.data),
     herramientas: toMap(herramientasRes.data),
     personal: toMap(personalArr),
@@ -268,9 +337,17 @@ async function computePendingForCuentas(allGastos, refs) {
     }
   });
 
-  const [appsRes, asisRes] = await Promise.all([
+  const [appsRes, asisRes, motoresData, sesData] = await Promise.all([
     supabase.from('lote_aplicaciones').select('*').catch(() => ({ data: [] })),
-    restFetch(`/rest/v1/personal_asistencia?${empFilter}fecha=gte.${wsIsoCur}&fecha=lte.${weIsoCur}&select=personal_id,fecha,estado`).catch(() => [])
+    restFetch(`/rest/v1/personal_asistencia?${empFilter}fecha=gte.${wsIsoCur}&fecha=lte.${weIsoCur}&select=personal_id,fecha,estado`).catch(() => []),
+    restFetch(`/rest/v1/motores?${empFilter}select=*`).catch(async () => {
+      const local = await supabase.from('motores').select('*').catch(() => ({ data: [] }));
+      return local.data || [];
+    }),
+    restFetch(`/rest/v1/motor_sesiones?${empFilter}select=*&order=fecha.desc`).catch(async () => {
+      const local = await supabase.from('motor_sesiones').select('*').catch(() => ({ data: [] }));
+      return local.data || [];
+    })
   ]);
 
   const appsList = Array.isArray(appsRes?.data) ? appsRes.data : [];
@@ -334,8 +411,32 @@ async function computePendingForCuentas(allGastos, refs) {
   });
 
   // 2. Pendientes de Personal de la semana actual
+  const todayIsoCur = getTodayLocalStr();
   const asisList = Array.isArray(asisRes) ? asisRes : [];
   const personalGastos = (allGastos || []).filter(g => String(g.categoria || '').toLowerCase() === 'personal');
+  const normTxt = (v) => String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const parsePids = (raw) => {
+    if (Array.isArray(raw)) return raw.map(String);
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.map(String) : [];
+      } catch {}
+    }
+    return [];
+  };
+  const extractOps = (rawOp, rawObs) => {
+    let str = String(rawOp || '').trim();
+    if (!str && rawObs) {
+      const m = String(rawObs).match(/Responsables:\s*([^\n]+)/i);
+      if (m) str = m[1].trim();
+    }
+    return str.split(',').map(s => normTxt(s)).filter(s => s && !s.includes('@'));
+  };
+  const matchesOpName = (ops, pNomNorm) => {
+    if (!pNomNorm || !ops.length) return false;
+    return ops.some(op => op === pNomNorm || (op.length >= 4 && pNomNorm.includes(op)) || (pNomNorm.length >= 4 && op.includes(pNomNorm)));
+  };
   const isTrabajoState = (est) => {
     const s = String(est || '').toLowerCase();
     return s.includes('asist') || s.includes('trabaj') || s === 'presente' || s === 'si' || s === 'sí';
@@ -350,20 +451,32 @@ async function computePendingForCuentas(allGastos, refs) {
         .map(a => String(a.fecha || '').slice(0, 10))
         .filter(Boolean)
     );
-    const pNomLow = String(pMeta.nombre || '').toLowerCase().trim();
+    const pNomNorm = normTxt(pMeta.nombre);
     appsList.forEach(app => {
       const f = String(app.fecha || '').slice(0, 10);
       if (!f || f < wsIsoCur || f > weIsoCur) return;
       if (String(app.observaciones || '').startsWith('[COSECHA_JSON]')) return;
-      const pids = Array.isArray(app.personal_ids) ? app.personal_ids.map(String) : [];
-      const opMatch = pNomLow && String(app.operador || '').toLowerCase().includes(pNomLow);
-      if (pids.includes(pId) || opMatch) workedDates.add(f);
+      const estado = String(app.estado || '');
+      const isPerformed = estado === 'Aplicada' || estado === 'Realizada' || (f <= todayIsoCur && estado !== 'Cancelada');
+      if (!isPerformed) return;
+      const pids = parsePids(app.personal_ids);
+      const ops = extractOps(app.operador, app.observaciones);
+      if (pids.includes(pId) || matchesOpName(ops, pNomNorm)) workedDates.add(f);
     });
     const weekGross = workedDates.size * pMeta.pago_diario;
     if (weekGross <= 0) return;
     const refPrefix = `[ref:${pId}_sem_${wsIsoCur}]`;
+    const dayRefPrefix = `[ref:${pId}_dia_`;
     const paid = personalGastos
-      .filter(g => String(g.descripcion || '').includes(refPrefix))
+      .filter((g) => {
+        const desc = String(g.descripcion || '');
+        if (desc.includes('[Por Aprobar]')) return false;
+        if (desc.includes(refPrefix)) return true;
+        if (!desc.includes(dayRefPrefix)) return false;
+        const dm = desc.match(/\[ref:[^\]_]+_dia_(\d{4}-\d{2}-\d{2})\]/);
+        const dIso = dm ? dm[1] : String(g.fecha || '').slice(0, 10);
+        return Boolean(dIso && dIso >= wsIsoCur && dIso <= weIsoCur);
+      })
       .reduce((s, g) => s + (Number(g.monto) || 0), 0);
     const pending = Math.max(0, weekGross - paid);
     if (pending > 0) {
@@ -382,6 +495,39 @@ async function computePendingForCuentas(allGastos, refs) {
     });
   }
 
+  // 3. Pendientes de Gasolina en Equipos
+  const fuelSentMap = buildFuelSentMap(allGastos);
+  const sesByMotor = new Map();
+  (Array.isArray(sesData) ? sesData : []).forEach(s => {
+    if (!s?.motor_id) return;
+    const arr = sesByMotor.get(s.motor_id);
+    if (arr) arr.push(s);
+    else sesByMotor.set(s.motor_id, [s]);
+  });
+  const fuelMotors = (Array.isArray(motoresData) ? motoresData : []).filter(m => isFuelMotor(m));
+  fuelMotors.forEach(m => {
+    const fallbackPrice = resolveSharedFuelPrice(m, fuelMotors, empId);
+    const stats = computeFuelMotorStats(m, sesByMotor.get(m.id) || [], [], fallbackPrice);
+    const pendingLoads = stats.fuelLoads.filter(l => {
+      if (!(l._cost > 0)) return false;
+      const existing = fuelSentMap.get(String(l.id));
+      return !existing || Math.abs((Number(existing.monto) || 0) - l._cost) >= 0.01;
+    });
+    if (!pendingLoads.length) return;
+    const pendAmt = Math.round(pendingLoads.reduce((s, l) => s + l._cost, 0) * 100) / 100;
+    const pendLiters = Math.round(pendingLoads.reduce((s, l) => s + l._liters, 0) * 10) / 10;
+    const isUpd = pendingLoads.some(l => fuelSentMap.has(String(l.id)));
+    items.push({
+      module: 'gasolina',
+      motorId: m.id,
+      title: m.nombre || 'Equipo de gasolina',
+      subtitle: `Gasolina · ${formatLitersLabel(pendLiters)}${isUpd ? ' · Por actualizar' : ''}`,
+      amount: pendAmt,
+      color: '#2d3e2c',
+      actionLabel: 'Ir a Equipo'
+    });
+  });
+
   const totalAmount = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
   return { totalAmount, items };
 }
@@ -399,6 +545,8 @@ function openPendingReviewSheet() {
           <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
             ${it.module === 'personal'
               ? `<span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; flex-shrink:0;">groups</span>`
+              : it.module === 'gasolina'
+              ? `<span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; flex-shrink:0;">local_gas_station</span>`
               : `<span style="width:12px; height:12px; border-radius:50%; background:${escapeHtml(it.color)}; flex-shrink:0;"></span>`}
             <div style="min-width:0; flex:1;">
               <div style="font-size:14px; font-weight:800; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(it.title)}</div>
@@ -424,6 +572,8 @@ function openPendingReviewSheet() {
         window.navigateTo('dashboard');
       } else if (it.module === 'personal') {
         window.navigateTo('personal');
+      } else if (it.module === 'gasolina' && it.motorId) {
+        window.navigateTo('detalle_motor', it.motorId);
       }
     });
   });
@@ -488,8 +638,12 @@ function formatMovDisplay(g, refs) {
   }
 
   if (!cosechaMatch) {
+    const potreroRefId = !loteNombre ? extractPotreroIdFromGasto(g) : null;
+    const potreroNombre = potreroRefId ? (_refs.potreros?.get(String(potreroRefId)) || '') : '';
     if (loteNombre) {
       subParts.push(loteNombre);
+    } else if (potreroNombre) {
+      subParts.push(potreroNombre);
     } else if (g.animal_id && refs.ganado.get(String(g.animal_id))) {
       subParts.push(refs.ganado.get(String(g.animal_id)));
     } else if (g.herramienta_id && refs.herramientas.get(String(g.herramienta_id))) {
@@ -546,20 +700,32 @@ function shiftIsoMonths(iso, delta) {
 function filterByLoteAndSearch(baseList) {
   let list = [...baseList];
   if (activeLoteId !== 'all') {
-    const targetId = String(activeLoteId).trim();
-    const targetLoteName = String(_refs.lotes.get(targetId) || '').trim().toLowerCase();
-    list = list.filter(g => {
-      const gLoteId = String(g.lote_id || '').trim();
-      if (gLoteId && gLoteId === targetId) return true;
-      if (gLoteId && targetLoteName) {
-        const gLoteName = String(_refs.lotes.get(gLoteId) || '').trim().toLowerCase();
-        if (gLoteName && gLoteName === targetLoteName) return true;
-      }
-      const desc = String(g.descripcion || '');
-      if (desc.includes(`[ref:cosecha_${targetId}_`)) return true;
-      if (targetLoteName && desc.toLowerCase().includes(targetLoteName)) return true;
-      return false;
-    });
+    if (String(activeLoteId).startsWith('potrero:')) {
+      const targetPid = String(activeLoteId).slice('potrero:'.length).trim();
+      const targetPName = String(_refs.potreros?.get(targetPid) || '').trim().toLowerCase();
+      list = list.filter(g => {
+        const gpId = extractPotreroIdFromGasto(g);
+        if (gpId && String(gpId) === targetPid) return true;
+        const desc = String(g.descripcion || '').toLowerCase();
+        if (targetPName && desc.includes(targetPName)) return true;
+        return false;
+      });
+    } else {
+      const targetId = String(activeLoteId).trim();
+      const targetLoteName = String(_refs.lotes.get(targetId) || '').trim().toLowerCase();
+      list = list.filter(g => {
+        const gLoteId = String(g.lote_id || '').trim();
+        if (gLoteId && gLoteId === targetId) return true;
+        if (gLoteId && targetLoteName) {
+          const gLoteName = String(_refs.lotes.get(gLoteId) || '').trim().toLowerCase();
+          if (gLoteName && gLoteName === targetLoteName) return true;
+        }
+        const desc = String(g.descripcion || '');
+        if (desc.includes(`[ref:cosecha_${targetId}_`)) return true;
+        if (targetLoteName && desc.toLowerCase().includes(targetLoteName)) return true;
+        return false;
+      });
+    }
   }
 
   if (currentGastosSearchQuery) {
@@ -569,9 +735,11 @@ function filterByLoteAndSearch(baseList) {
       const grp = getDisplayGroupName(g.categoria).toLowerCase();
       const desc = String(g.descripcion || '').toLowerCase();
       const lName = String(_refs.lotes.get(String(g.lote_id || '')) || '').toLowerCase();
+      const ptId = extractPotreroIdFromGasto(g);
+      const ptName = ptId ? String(_refs.potreros?.get(String(ptId)) || '').toLowerCase() : '';
       const aName = String(_refs.ganado.get(String(g.animal_id || '')) || '').toLowerCase();
       const pName = String(_refs.personal.get(String(g.personal_id || '')) || '').toLowerCase();
-      return cat.includes(q) || grp.includes(q) || desc.includes(q) || lName.includes(q) || aName.includes(q) || pName.includes(q);
+      return cat.includes(q) || grp.includes(q) || desc.includes(q) || lName.includes(q) || ptName.includes(q) || aName.includes(q) || pName.includes(q);
     });
   }
   return list;
@@ -781,7 +949,7 @@ function renderCuentasUI() {
     }
   }
 
-  // 2. Pills de lotes (deduplicados por nombre)
+  // 2. Pills de sectores (lotes + potreros deduplicados por nombre)
   if (lotesRow) {
     const prevScrollLeft = lotesRow.scrollLeft;
     const seenNames = new Set();
@@ -792,9 +960,17 @@ function renderCuentasUI() {
       seenNames.add(k);
       lotesEntries.push([id, nombre]);
     }
+    const potrerosEntries = [];
+    for (const [id, nombre] of (_refs.potreros || new Map()).entries()) {
+      const k = String(nombre || '').trim().toLowerCase();
+      if (!k || seenNames.has(k)) continue;
+      seenNames.add(k);
+      potrerosEntries.push([`potrero:${id}`, nombre]);
+    }
     const pills = [
-      { id: 'all', label: 'Todos los lotes' },
-      ...lotesEntries.map(([id, nombre]) => ({ id, label: nombre }))
+      { id: 'all', label: 'Todos los sectores' },
+      ...lotesEntries.map(([id, nombre]) => ({ id, label: nombre })),
+      ...potrerosEntries.map(([id, nombre]) => ({ id, label: nombre }))
     ];
     lotesRow.innerHTML = pills.map(p => `
       <button type="button" class="cuentas-pill ${String(activeLoteId) === String(p.id) ? 'active' : ''}" data-lote-id="${escapeHtml(p.id)}">
@@ -874,9 +1050,11 @@ function renderCuentasUI() {
     if (pItems.length > 0 && _pendingSummary.totalAmount > 0) {
       const cosAmt = pItems.filter(x => x.module === 'cosecha').reduce((s, x) => s + x.amount, 0);
       const perAmt = pItems.filter(x => x.module === 'personal').reduce((s, x) => s + x.amount, 0);
+      const gasAmt = pItems.filter(x => x.module === 'gasolina').reduce((s, x) => s + x.amount, 0);
       const subParts = [];
       if (cosAmt > 0) subParts.push(`${formatShortL(cosAmt)} de cosecha de la semana`);
       if (perAmt > 0) subParts.push(`${formatShortL(perAmt)} de personal`);
+      if (gasAmt > 0) subParts.push(`${formatShortL(gasAmt)} de gasolina`);
       pendingWrap.innerHTML = `
         <button type="button" id="cuentas-pending-review-btn" style="width:100%; text-align:left; background:#fff3e8; border:1px solid #f5d6bc; border-radius:16px; padding:12px 15px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; font-family:inherit;">
           <div style="min-width:0; flex:1;">
@@ -892,7 +1070,7 @@ function renderCuentasUI() {
     }
   }
 
-  // 3c. Encabezado + Segmentado Por categoría | Por lote
+  // 3c. Encabezado + Segmentado Por categoría | Por sector
   const groupToggleWrap = document.getElementById('cuentas-group-toggle');
   if (groupToggleWrap) {
     groupToggleWrap.innerHTML = egresosList.length > 0 ? `
@@ -902,7 +1080,7 @@ function renderCuentasUI() {
           Por categoría
         </button>
         <button type="button" data-gmode="lote" style="height:38px; border-radius:12px; border:none; background:${activeGroupMode === 'lote' ? '#2d3e2c' : 'transparent'}; color:${activeGroupMode === 'lote' ? '#ffffff' : '#1e2a1e'}; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; transition:all 0.16s ease;">
-          Por lote
+          Por sector
         </button>
       </div>
     ` : '';
@@ -914,23 +1092,29 @@ function renderCuentasUI() {
     });
   }
 
-  // 4. Agrupar Egresos (Por categoría o Por lote)
+  // 4. Agrupar Egresos (Por categoría o Por sector)
   let egrEntries = [];
   if (activeGroupMode === 'lote') {
     const loteGroupMap = new Map();
     egresosList.forEach(g => {
       const lid = String(g.lote_id || '').trim();
-      const meta = lid ? _refs.lotesMeta?.get(lid) : null;
-      const key = meta ? `lote:${meta.nombre.toLowerCase()}` : 'sin_lote';
+      const lMeta = lid ? _refs.lotesMeta?.get(lid) : null;
+      const pid = !lMeta ? extractPotreroIdFromGasto(g) : null;
+      const pMeta = pid ? _refs.potrerosMeta?.get(String(pid)) : null;
+
+      const key = lMeta
+        ? `lote:${lMeta.nombre.toLowerCase()}`
+        : (pMeta ? `potrero:${pMeta.nombre.toLowerCase()}` : 'sin_lote');
       if (!loteGroupMap.has(key)) {
         loteGroupMap.set(key, {
-          name: meta ? meta.nombre : 'Finca general',
+          name: lMeta ? lMeta.nombre : (pMeta ? pMeta.nombre : 'Finca general'),
           total: 0,
           items: [],
           subCats: new Set(),
-          dotColor: meta ? (meta.color || '#2d3e2c') : '#8f9890',
-          numPlantas: meta ? (Number(meta.num_plantas) || 0) : 0,
-          isGeneral: !meta
+          dotColor: lMeta ? (lMeta.color || '#2d3e2c') : (pMeta ? (pMeta.color || '#2e7d32') : '#8f9890'),
+          numPlantas: lMeta ? (Number(lMeta.num_plantas) || 0) : 0,
+          isPotrero: Boolean(pMeta),
+          isGeneral: !lMeta && !pMeta
         });
       }
       const bucket = loteGroupMap.get(key);
@@ -984,14 +1168,15 @@ function renderCuentasUI() {
     const cardsHtml = entries.map(cat => {
       const catKey = `${prefix}:${cat.name}`;
       const isOpen = expandedCats.has(catKey);
-      const isShowAll = showAllCats.has(catKey);
       const pctOfTotal = sectionTotal > 0 ? Math.round((cat.total / sectionTotal) * 100) : 0;
       const barPct = Math.max(5, Math.round((cat.total / maxVal) * 100));
 
       let subtitleText = '';
       if (!isIngreso && activeGroupMode === 'lote') {
         if (cat.isGeneral) {
-          subtitleText = `Sin lote · ${pctOfTotal}%`;
+          subtitleText = `Sin sector · ${pctOfTotal}%`;
+        } else if (cat.isPotrero) {
+          subtitleText = `Potrero · ${pctOfTotal}%`;
         } else {
           const perPlant = cat.numPlantas > 0 ? ` · L ${(cat.total / cat.numPlantas).toFixed(2)} por planta` : '';
           subtitleText = `${pctOfTotal}%${perPlant}`;
@@ -1006,49 +1191,136 @@ function renderCuentasUI() {
         subtitleText = `${subtitlePrefix} · ${pctOfTotal}%`;
       }
 
-      const visibleItems = isShowAll ? cat.items : cat.items.slice(0, 3);
-      const remaining = cat.items.length - visibleItems.length;
+      const isCafetalCat = !isIngreso && activeGroupMode === 'categoria' && cat.name === 'Cafetal';
+      const isLoteSectorMode = !isIngreso && activeGroupMode === 'lote';
+      const dayGroupMap = new Map();
+      cat.items.forEach((g) => {
+        const rawIso = String(g.fecha || '').slice(0, 10);
+        const iso = /^\d{4}-\d{2}-\d{2}$/.test(rawIso) ? rawIso : toLocalIsoDate(g.fecha || g.created_at);
+        const weeklyInfo = !isIngreso ? getWeeklyExpenseGroupInfo(g) : null;
+        let subLabel = '';
+        let groupKey = iso;
+        let groupTitle = formatCuentasDayLabel(iso);
+        if (weeklyInfo) {
+          groupKey = `week__${weeklyInfo.kind}__${weeklyInfo.weekStartIso}`;
+          groupTitle = weeklyInfo.label || groupTitle;
+          if (isCafetalCat) subLabel = getCafetalSubLabel(g);
+          else if (isLoteSectorMode && weeklyInfo.kind === 'cosecha') subLabel = 'Cosecha';
+        } else {
+          subLabel = isCafetalCat ? getCafetalSubLabel(g) : '';
+          groupKey = isCafetalCat ? `${iso}__${subLabel}` : iso;
+        }
+        if (!dayGroupMap.has(groupKey)) {
+          dayGroupMap.set(groupKey, {
+            key: groupKey,
+            fecha: iso,
+            sortDate: iso,
+            title: groupTitle,
+            isWeekly: Boolean(weeklyInfo),
+            regDates: new Set(),
+            subLabel,
+            total: 0,
+            items: []
+          });
+        }
+        const bucket = dayGroupMap.get(groupKey);
+        if (iso > bucket.sortDate) bucket.sortDate = iso;
+        if (iso) bucket.regDates.add(iso);
+        bucket.total += (Number(g.monto) || 0);
+        bucket.items.push(g);
+      });
+      const dayGroups = Array.from(dayGroupMap.values())
+        .sort((a, b) => b.sortDate.localeCompare(a.sortDate) || b.total - a.total);
+      const isSingleDay = dayGroups.length === 1;
 
-      const itemsHtml = visibleItems.map((g, idx) => {
-        const disp = formatMovDisplay(g, _refs);
-        const sign = isIngreso ? '+' : '–';
-        return `
-          <div class="cuentas-mov-swipe-wrap" data-mov-id="${escapeHtml(g.id)}" style="${idx < visibleItems.length - 1 ? 'border-bottom:1px solid #f0f4ef;' : ''}">
-            <div class="cuentas-swipe-bg">
-              <div class="cuentas-swipe-del-bg">
-                <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
-                <span>Eliminar</span>
-              </div>
-              <div class="cuentas-swipe-edit-bg">
-                <span>Editar</span>
-                <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
-              </div>
-            </div>
-            <div class="cuentas-mov-row" data-mov-id="${escapeHtml(g.id)}">
-              <div class="cuentas-mov-info">
-                <div class="cuentas-mov-title">
-                  ${escapeHtml(disp.title)}
-                  ${disp.isPorAprobar ? `<span class="cuentas-aprobar-pill">Por Aprobar</span>` : ''}
+      const itemsHtml = `
+        <div style="display:flex; flex-direction:column; gap:7px;">
+          ${dayGroups.map((day) => {
+            const dayKey = `${catKey}__${day.key}`;
+            const isDayOpen = isSingleDay ? !collapsedSingleDays.has(dayKey) : expandedCatDays.has(dayKey);
+            const dayCountLbl = `${day.items.length} ${day.items.length === 1 ? 'movimiento' : 'movimientos'}`;
+            let regDateTxt = '';
+            if (day.isWeekly && day.regDates.size > 0) {
+              const sortedReg = Array.from(day.regDates).sort((a, b) => b.localeCompare(a));
+              regDateTxt = sortedReg.length === 1
+                ? formatShortDate(sortedReg[0])
+                : `${formatShortDate(sortedReg[sortedReg.length - 1])}–${formatShortDate(sortedReg[0])}`;
+            }
+            const daySubLine = (day.isWeekly && regDateTxt)
+              ? `${dayCountLbl} · Registrado ${regDateTxt}`
+              : dayCountLbl;
+            const sign = isIngreso ? '+' : '–';
+            const dayPillHtml = day.subLabel ? cafetalSubPillHtml(day.subLabel, false) : '';
+            return `
+              <div class="cuentas-mov-day-card">
+                <div class="cuentas-day-header" data-day-key="${escapeHtml(dayKey)}" data-single-day="${isSingleDay ? '1' : '0'}">
+                  <div style="min-width:0; flex:1;">
+                    <div class="cuentas-day-title" style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+                      <span>${escapeHtml(day.title)}</span>
+                      ${dayPillHtml}
+                    </div>
+                    <div class="cuentas-day-sub">${escapeHtml(daySubLine)}</div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                    <span class="cuentas-day-amt" style="color:${accentColor};">${sign} ${formatShortL(day.total)}</span>
+                    <span class="material-symbols-outlined cuentas-day-chev" style="transform:${isDayOpen ? 'rotate(180deg)' : 'rotate(0deg)'};">keyboard_arrow_down</span>
+                  </div>
                 </div>
-                ${disp.subtitle ? `<div class="cuentas-mov-sub">${escapeHtml(disp.subtitle)}</div>` : ''}
-                ${disp.extraLine ? `<div style="font-size:12px; font-weight:700; color:#2d3e2c; margin-top:2px;">${escapeHtml(disp.extraLine)}</div>` : ''}
-                ${disp.isPorAprobar ? `
-                  <button type="button" class="cuentas-aprobar-btn" onclick="event.stopPropagation(); window.aprobarGastoPersonal('${escapeHtml(g.id)}')">
-                    <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Aprobar
-                  </button>
-                ` : ''}
+                <div class="cuentas-day-body" style="display:${isDayOpen ? 'block' : 'none'};">
+                  <div style="display:flex; flex-direction:column; gap:5px;">
+                    ${day.items.map((g) => {
+                      const disp = formatMovDisplay(g, _refs);
+                      const rowShortDate = formatShortDate(g.fecha);
+                      const daySubLow = String(day.subLabel || '').toLowerCase();
+                      const cleanedSub = disp.subtitle
+                        ? disp.subtitle
+                            .split(' · ')
+                            .filter(p => p && p !== rowShortDate && (!isCafetalCat || p.toLowerCase() !== daySubLow) && (!day.isWeekly || !/^semana\b/i.test(p)))
+                            .join(' · ')
+                        : '';
+                      const isRowCafetal = CAFETAL_CATS.has(String(g.categoria || '').trim().toLowerCase()) || String(g.descripcion || '').includes('[ref:cosecha_');
+                      const rowBadgeHtml = (isLoteSectorMode && isRowCafetal && !day.isWeekly)
+                        ? cafetalSubPillHtml(getCafetalSubLabel(g), true)
+                        : '';
+                      return `
+                        <div class="cuentas-mov-swipe-wrap" data-mov-id="${escapeHtml(g.id)}">
+                          <div class="cuentas-swipe-bg">
+                            <div class="cuentas-swipe-del-bg">
+                              <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
+                              <span>Eliminar</span>
+                            </div>
+                            <div class="cuentas-swipe-edit-bg">
+                              <span>Editar</span>
+                              <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
+                            </div>
+                          </div>
+                          <div class="cuentas-mov-row" data-mov-id="${escapeHtml(g.id)}">
+                            <div class="cuentas-mov-info">
+                              <div class="cuentas-mov-title">
+                                ${escapeHtml(disp.title)}
+                                ${rowBadgeHtml}
+                                ${disp.isPorAprobar ? `<span class="cuentas-aprobar-pill">Por Aprobar</span>` : ''}
+                              </div>
+                              ${cleanedSub ? `<div class="cuentas-mov-sub">${escapeHtml(cleanedSub)}</div>` : ''}
+                              ${disp.extraLine ? `<div style="font-size:12px; font-weight:700; color:#2d3e2c; margin-top:2px;">${escapeHtml(disp.extraLine)}</div>` : ''}
+                              ${disp.isPorAprobar ? `
+                                <button type="button" class="cuentas-aprobar-btn" onclick="event.stopPropagation(); window.aprobarGastoPersonal('${escapeHtml(g.id)}')">
+                                  <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Aprobar
+                                </button>
+                              ` : ''}
+                            </div>
+                            <div class="cuentas-mov-amt" style="color:${accentColor};">${sign} ${formatShortL(g.monto)}</div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
               </div>
-              <div class="cuentas-mov-amt" style="color:${accentColor};">${sign} ${formatShortL(g.monto)}</div>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      const toggleMoreHtml = cat.items.length > 3 ? `
-        <button type="button" class="cuentas-ver-mas-btn" data-show-all-key="${escapeHtml(catKey)}">
-          ${isShowAll ? 'Mostrar menos ‹' : `Ver los ${cat.items.length} movimientos ›`}
-        </button>
-      ` : '';
+            `;
+          }).join('')}
+        </div>
+      `;
 
       return `
         <div class="cuentas-cat-card ${isOpen ? 'is-open' : ''}" data-cat-key="${escapeHtml(catKey)}">
@@ -1070,7 +1342,6 @@ function renderCuentasUI() {
           </div>
           <div class="cuentas-cat-body" style="display:${isOpen ? 'block' : 'none'};">
             ${itemsHtml}
-            ${toggleMoreHtml}
           </div>
         </div>
       `;
@@ -1116,14 +1387,26 @@ function renderCuentasUI() {
     if (bar) bar.addEventListener('click', toggle);
   });
 
-  // Wire "Ver los N movimientos"
-  sectionsWrap.querySelectorAll('.cuentas-ver-mas-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+  // Wire day accordions inside categories
+  sectionsWrap.querySelectorAll('.cuentas-day-header').forEach(hdr => {
+    hdr.addEventListener('click', (e) => {
       e.stopPropagation();
-      const k = btn.dataset.showAllKey;
-      if (showAllCats.has(k)) showAllCats.delete(k);
-      else showAllCats.add(k);
-      renderCuentasUI();
+      const dayKey = hdr.dataset.dayKey;
+      const isSingle = hdr.dataset.singleDay === '1';
+      const card = hdr.closest('.cuentas-mov-day-card');
+      const body = card?.querySelector('.cuentas-day-body');
+      const chev = hdr.querySelector('.cuentas-day-chev');
+      if (!dayKey || !body) return;
+      const willOpen = body.style.display !== 'block';
+      if (isSingle) {
+        if (willOpen) collapsedSingleDays.delete(dayKey);
+        else collapsedSingleDays.add(dayKey);
+      } else {
+        if (willOpen) expandedCatDays.add(dayKey);
+        else expandedCatDays.delete(dayKey);
+      }
+      body.style.display = willOpen ? 'block' : 'none';
+      if (chev) chev.style.transform = willOpen ? 'rotate(180deg)' : 'rotate(0deg)';
     });
   });
 
@@ -1228,7 +1511,7 @@ function createCosechaInlineController(editMov, refMatch, containerId, onTotalCh
   const refTag = refMatch[0];
 
   const disp = formatMovDisplay(editMov, _refs);
-  const workerName = _refs.personal.get(String(workerKey)) || disp.title || 'Recolector';
+  const workerName = _refs.personal.get(String(workerKey)) || disp.title || 'Colaborador';
   const loteName = _refs.lotes.get(String(loteId)) || 'Lote';
   const empId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || editMov.empresa_id || '';
 
@@ -2079,9 +2362,58 @@ export async function renderGastos() {
       }
 
       .cuentas-cat-body {
-        margin-top: 14px;
-        padding-left: 14px;
-        border-left: 2px solid #cdd9cb;
+        margin-top: 12px;
+        padding-left: 0;
+        border-left: none;
+      }
+      .cuentas-mov-day-card {
+        background: #f9fbf8;
+        border: 1px solid #e2eae0;
+        border-radius: 13px;
+        padding: 9px 11px;
+      }
+      .cuentas-day-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .cuentas-day-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: #192b18;
+        line-height: 1.2;
+      }
+      .cuentas-day-sub {
+        font-size: 11px;
+        font-weight: 600;
+        color: #5a6b58;
+        margin-top: 2px;
+      }
+      .cuentas-day-amt {
+        font-size: 13.5px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      .cuentas-day-chev {
+        font-size: 18px;
+        color: #5a6b58;
+        transition: transform 0.2s ease;
+      }
+      .cuentas-day-body {
+        margin-top: 8px;
+        padding-top: 6px;
+        border-top: 1px dashed #d8e2d5;
+      }
+      .cuentas-day-body .cuentas-mov-swipe-wrap {
+        border: 1px solid #e8eee6;
+        background: #ffffff;
+        border-radius: 10px;
+      }
+      .cuentas-day-body .cuentas-mov-row {
+        padding: 9px 10px;
       }
 
       .cuentas-mov-swipe-wrap {
@@ -2293,7 +2625,9 @@ export function initGastos() {
       const desc = String(g.descripcion || '').toLowerCase();
       const pName = String(_refs.personal.get(String(g.personal_id || '')) || '').toLowerCase();
       const lName = String(_refs.lotes.get(String(g.lote_id || '')) || '').toLowerCase();
-      return cat.includes(qLower) || grp.includes(qLower) || desc.includes(qLower) || pName.includes(qLower) || lName.includes(qLower);
+      const ptId = extractPotreroIdFromGasto(g);
+      const ptName = ptId ? String(_refs.potreros?.get(String(ptId)) || '').toLowerCase() : '';
+      return cat.includes(qLower) || grp.includes(qLower) || desc.includes(qLower) || pName.includes(qLower) || lName.includes(qLower) || ptName.includes(qLower);
     }),
     renderItem: (g) => {
       const disp = formatMovDisplay(g, _refs);

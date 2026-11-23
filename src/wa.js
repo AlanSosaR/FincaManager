@@ -1,7 +1,7 @@
 import db from './db.js';
 import { restFetch, loadWhatsAppConfig } from './auth.js';
-import { getDosisPorEdad, getPlanIfcafe, obtenerOrdenDia, normalizarProducto } from './utils/calculadora_dosis.js';
 import { isAlertEnabled } from './push/push_prefs.js';
+import { isFuelMotor } from './utils/motor_fuel_config.js';
 
 const EVOLUTION_API = '/api/wa-proxy';
 const NOTIFIED_KEY = 'wa_notified_vaccines';
@@ -404,88 +404,6 @@ export async function checkUpcomingVaccines() {
   }
 }
 
-const NOTIFIED_LOTE_KEY = 'wa_notified_lote_apps';
-const SENT_LOTE_TODAY_KEY = 'wa_sent_lote_today';
-
-function getLoteNotifiedSet() {
-  try { return new Set(JSON.parse(localStorage.getItem(NOTIFIED_LOTE_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-
-function saveLoteNotifiedSet(set) {
-  localStorage.setItem(NOTIFIED_LOTE_KEY, JSON.stringify([...set]));
-}
-
-export async function checkAplicacionesDelMes() {
-  if (!isAlertEnabled('cafetal', 'calendario_manejo')) return;
-  const today = getLocalToday();
-  const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
-  if (!empresaId) return;
-  const sentKey = `${SENT_LOTE_TODAY_KEY}_${today}`;
-  const alreadySent = new Set(JSON.parse(localStorage.getItem(sentKey) || '[]'));
-  const notified = getLoteNotifiedSet();
-  try {
-    const lotes = await restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*`);
-    let aplicadas = await restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&estado=eq.Aplicada&select=lote_id,producto,fecha`);
-    if (!Array.isArray(aplicadas)) aplicadas = [];
-
-    for (const lote of (Array.isArray(lotes) ? lotes : [])) {
-      if (!lote.edad_categoria) continue;
-      const plan = getPlanIfcafe(parseInt(lote.altura_msnm) || 0);
-
-      for (const item of plan) {
-        const matchFecha = new Date(2026, item.mes - 1, 15).toISOString().split('T')[0];
-        if (matchFecha !== today) continue;
-
-        const productKey = normalizarProducto(item.producto);
-        const yaHecha = aplicadas.some(a =>
-          a.lote_id === lote.id &&
-          a.producto && normalizarProducto(a.producto) === productKey &&
-          a.fecha && a.fecha.startsWith(matchFecha.substring(0, 7))
-        );
-        if (yaHecha) continue;
-
-        const dedupKey = `wa_notif_lote_${lote.id}_${item.mes}_${productKey}`;
-        if (notified.has(dedupKey)) continue;
-        if (alreadySent.has(dedupKey)) continue;
-
-        let numPlantas = lote.num_plantas || 0;
-        let edadCat = lote.edad_categoria;
-        let operarios = [];
-        try {
-          const personalList = await db.lote_personal.where('lote_id').equals(lote.id).toArray();
-          for (const p of personalList) {
-            const person = await db.personal.get(p.personal_id);
-            if (person?.nombre) operarios.push(person.nombre);
-          }
-        } catch {}
-
-        const dosisCalc = getDosisPorEdad(edadCat);
-        const orden = obtenerOrdenDia(lote.nombre || '', item.producto, dosisCalc, operarios);
-
-        await sendWhatsApp(
-          `🌱 AVISO DE ABONADA - ${lote.nombre}\n\n` +
-          `Producto: ${item.producto}\n` +
-          `🥤 Dosis: ${dosisCalc?.porAplicacion?.vasitoLabel || 'N/A'} por planta\n` +
-          `📦 Total: ${numPlantas} plantas\n` +
-          (operarios.length > 0 ? `👷 Personal: ${operarios.join(', ')}\n\n` : '\n') +
-          `📋 Orden del día:\n"${orden}"\n\n` +
-          `⚠️ NO aplicar si la tierra está seca.\n` +
-          `Esperá al menos 3 días de lluvia fuerte.`
-        );
-
-        notified.add(dedupKey);
-        alreadySent.add(dedupKey);
-      }
-    }
-
-    saveLoteNotifiedSet(notified);
-    localStorage.setItem(sentKey, JSON.stringify([...alreadySent]));
-  } catch (e) {
-    console.warn('checkAplicacionesDelMes error:', e);
-  }
-}
-
 export async function checkAnalisisSueloPendiente() {
   const mesActual = new Date().getMonth() + 1;
   if (mesActual !== 2 && mesActual !== 3) return;
@@ -582,16 +500,20 @@ export async function checkMotoresAceite(opts = {}) {
     const now = Date.now();
     const forceMotorId = opts?.forceMotorId ? String(opts.forceMotorId) : '';
     const [motores, mants] = await Promise.all([
-      restFetch(`/rest/v1/motores?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre,horas,max_horas`).catch(() => []),
+      restFetch(`/rest/v1/motores?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre,icon,horas,max_horas,notas`).catch(() => []),
       restFetch(`/rest/v1/motor_mantenimientos?empresa_id=eq.${encodeURIComponent(empresaId)}&select=motor_id`).catch(() => []),
     ]);
     const mantSet = new Set((Array.isArray(mants) ? mants : []).map(x => x.motor_id));
 
     for (const m of (Array.isArray(motores) ? motores : [])) {
+      const tsKey = `wa_motor_aceite_ts_${m.id}`;
+      if (isFuelMotor(m)) {
+        localStorage.removeItem(tsKey);
+        continue;
+      }
       const hasPrevMant = mantSet.has(m.id);
       const limit = hasPrevMant ? (Number(m.max_horas) || 100) : 80;
       const horas = Number(m.horas) || 0;
-      const tsKey = `wa_motor_aceite_ts_${m.id}`;
 
       if (horas < limit) {
         localStorage.removeItem(tsKey);

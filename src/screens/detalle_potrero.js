@@ -1,6 +1,24 @@
 import { supabase } from '../supabase.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
+import { formatLitersLabel, formatCurrencyL } from '../utils/motor_fuel_config.js';
+import { fetchAreaFuelUsage, sendFuelLoadsToCuentas } from '../utils/motor_fuel_cuentas.js';
+
+function escapePotreroHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatPotreroShortDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace(/\.$/, '');
+}
 
 let currentPotreroId = null;
 
@@ -45,6 +63,17 @@ export async function renderDetallePotrero(potreroId, opts = {}) {
     console.error('Error fetching potrero:', potreroError);
     return `<div class="screen-detalle"><p>Error cargando potrero: ${potreroError.message}</p></div>`;
   }
+
+  const areaFuel = await fetchAreaFuelUsage({
+    areaType: 'potrero',
+    areaId: potrero.id,
+    areaName: potrero.nombre || '',
+  }).catch(() => null);
+  window._currentPotreroAreaFuel = {
+    potreroId: potrero.id,
+    potreroNombre: potrero.nombre || 'Potrero',
+    areaFuel,
+  };
 
   const potreroData = {
     nombre: potrero.nombre || 'Potrero Sin Nombre',
@@ -140,6 +169,40 @@ export async function renderDetallePotrero(potreroId, opts = {}) {
           </div>
         </div>
 
+        <!-- Uso de Equipos y Gasolina -->
+        ${areaFuel && areaFuel.loads.length > 0 ? `
+        <div class="section">
+          <div class="section-title">
+            <h3>Uso de Equipos y Gasolina</h3>
+            <span class="tag" style="background:#eef5ec; color:#1b6e1b; font-weight:800;">${formatLitersLabel(areaFuel.totalLiters)}${areaFuel.totalCost > 0 ? ` · ${escapePotreroHtml(formatCurrencyL(areaFuel.totalCost))}` : ''}</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+            ${areaFuel.loads.map((fl) => `
+              <div style="background:#fafcf9; border:1px solid #e4ece3; border-radius:14px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="min-width:0; flex:1;">
+                  <div style="font-size:13.5px; font-weight:800; color:#192b18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapePotreroHtml(fl._motorIcon)} ${escapePotreroHtml(fl._motorNombre)}</div>
+                  <div style="font-size:12px; color:#5a6b58; margin-top:2px;">⛽ ${formatLitersLabel(fl._liters)} de gasolina · ${escapePotreroHtml(formatPotreroShortDate(fl.fecha || fl.created_at) || 'Reciente')}</div>
+                </div>
+                <div style="text-align:right; flex-shrink:0;">
+                  <div style="font-size:13.5px; font-weight:800; color:${fl._cost > 0 ? '#192b18' : '#7c877a'};">${fl._cost > 0 ? escapePotreroHtml(formatCurrencyL(fl._cost)) : 'Sin precio'}</div>
+                  ${fl._cost > 0 ? (
+                    fl._isSent && !fl._needsUpdate
+                      ? `<div style="font-size:10.5px; font-weight:700; color:#1b6e1b; margin-top:2px;">✓ En Cuentas</div>`
+                      : `<div style="font-size:10.5px; font-weight:700; color:#b34200; margin-top:2px;">Pendiente</div>`
+                  ) : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          ${areaFuel.pendingLoads.length > 0 ? `
+            <button type="button" id="btn-potrero-send-fuel-cuentas" class="press-effect" style="margin-top:10px; width:100%; height:42px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-size:13.5px; font-weight:800; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span class="material-symbols-outlined" style="font-size:17px;">send</span>
+              <span>Enviar a Cuentas · ${escapePotreroHtml(formatCurrencyL(areaFuel.pendingAmount))}</span>
+            </button>
+          ` : ''}
+        </div>
+        ` : ''}
+
         <!-- Log Segment -->
         <div class="section">
           <div class="section-title">
@@ -186,6 +249,33 @@ export async function renderDetallePotrero(potreroId, opts = {}) {
 
 export function initDetallePotrero(potreroId) {
   window.openAddPotreroNoteModal = (id = potreroId) => showAddPotreroNoteModal(id);
+
+  document.getElementById('btn-potrero-send-fuel-cuentas')?.addEventListener('click', () => {
+    const info = window._currentPotreroAreaFuel;
+    const areaFuel = info?.areaFuel;
+    if (!areaFuel?.pendingLoads?.length) return;
+    const totalLit = Math.round(areaFuel.pendingLoads.reduce((s, x) => s + x._liters, 0) * 10) / 10;
+    window.Snackbar?.confirm(
+      `¿Enviar a Cuentas el consumo de gasolina en <b>${escapePotreroHtml(info.potreroNombre)}</b> (<b>${escapePotreroHtml(formatCurrencyL(areaFuel.pendingAmount))}</b> · ${formatLitersLabel(totalLit)} de gasolina)?`,
+      async () => {
+        const btn = document.getElementById('btn-potrero-send-fuel-cuentas');
+        if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+        try {
+          await sendFuelLoadsToCuentas({
+            loads: areaFuel.pendingLoads,
+            sentByLoadId: areaFuel.sentByLoadId,
+          });
+          showSnackbar('✓ Gasto de gasolina enviado a Cuentas');
+          reloadPotreroTarget(potreroId);
+        } catch (err) {
+          showSnackbar('Error enviando a Cuentas: ' + (err?.message || err), 'error');
+          if (btn && document.body.contains(btn)) btn.disabled = false;
+        }
+      },
+      () => {},
+      { confirmText: 'Enviar a Cuentas', cancelText: 'Cancelar' }
+    );
+  });
 
   const btnAddNote = document.getElementById('btn-add-potrero-note');
   if (btnAddNote) {

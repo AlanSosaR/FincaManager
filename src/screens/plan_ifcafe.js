@@ -1,9 +1,29 @@
 import { restFetch, restInsert, getUser } from '../auth.js';
-import { getPlanIfcafe, getZonaLabel, calcularDosis, normalizarProducto } from '../utils/calculadora_dosis.js';
 import { sendWhatsApp } from '../wa.js';
-import { invalidateCache } from '../sync.js';
+import { invalidateCache, syncTable } from '../sync.js';
+import db from '../db.js';
 import { showModal, closeModal } from '../modals.js';
 import { uploadImage } from '../utils/image_uploader.js';
+import {
+  isFuelMotor,
+  isLikelyFuelEquipment,
+  parseMotorConfig,
+  serializeMotorNotas,
+  encodeFuelLoadTag,
+  computeFuelMotorStats,
+  resolveSharedFuelPrice,
+  saveSharedFuelPrice,
+  formatLiters,
+  formatLitersLabel,
+  formatCurrencyL,
+} from '../utils/motor_fuel_config.js';
+import {
+  normalizeAreaName,
+  toLocalIsoDate,
+  buildFuelSentMap,
+  fetchEmpresaGastosFresh,
+  getWeekMondayIso,
+} from '../utils/motor_fuel_cuentas.js';
 
 function compressImage(file, maxWidth = 1000, quality = 0.75) {
   return new Promise((resolve, reject) => {
@@ -48,19 +68,13 @@ let _ifcafeLotes = [];
 let _allLotes = [];
 let _personalList = [];
 let _currentUser = null;
+let _fuelMotoresList = [];
+let _empresaGastosList = [];
 
 const MESES_NOMBRE = {
   1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
   5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
   9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
-};
-
-const descripcionProposito = {
-  0: 'Fertilizar el suelo para el arranque del ciclo productivo',
-  1: 'Estimular la floración y el cuaje del fruto',
-  2: 'Sostener la carga para el desarrollo del grano',
-  3: 'Mantener las hojas sanas y verdes',
-  4: 'Llenado y peso del grano antes de cosecha'
 };
 
 const badgeStyle = {
@@ -108,36 +122,246 @@ function getIconForTipo(tipo) {
   return '🌱';
 }
 
-function eventCardHtml(ev) {
+function resolvePersonalByName(rawName) {
+  const nk = normalizeAreaName(rawName);
+  if (!nk) return null;
+  const exact = (_personalList || []).find(p => normalizeAreaName(p?.nombre) === nk);
+  if (exact) return exact;
+  return (_personalList || []).find((p) => {
+    const pk = normalizeAreaName(p?.nombre);
+    return pk && (pk.includes(nk) || nk.includes(pk));
+  }) || null;
+}
+
+function computeActivityPendingCuentasAmount(ev) {
+  if (!ev || !ev.fecha) return 0;
   const todayStr = getLocalToday();
+  if (!ev.isFuelUsage && (ev.estado === 'Cancelada' || (ev.estado !== 'Aplicada' && ev.estado !== 'Realizada' && ev.fecha > todayStr))) {
+    return 0;
+  }
+
+  const sentFuelByLoadId = buildFuelSentMap(_empresaGastosList || []);
+  const personalGastos = (_empresaGastosList || []).filter(g => String(g.categoria || '').toLowerCase() === 'personal');
+
+  let pendingFuel = 0;
+  for (const fl of (Array.isArray(ev.linkedFuelLoads) ? ev.linkedFuelLoads : [])) {
+    const cost = Math.max(0, Math.round((Number(fl?.cost) || 0) * 100) / 100);
+    if (!(cost > 0)) continue;
+    const sentGasto = fl.id ? sentFuelByLoadId.get(String(fl.id)) : null;
+    if (!sentGasto || Math.abs((Number(sentGasto.monto) || 0) - cost) >= 0.01) {
+      pendingFuel += cost;
+    }
+  }
+
+  let pendingLabor = 0;
+  const seenWorkerIds = new Set();
+  const weekTag = getWeekMondayIso(ev.fecha);
+  String(ev.operador || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .forEach((rawName) => {
+      const pObj = resolvePersonalByName(rawName);
+      if (!pObj?.id) return;
+      const pId = String(pObj.id);
+      if (seenWorkerIds.has(pId)) return;
+      seenWorkerIds.add(pId);
+      const pagoDiario = Math.max(0, Math.round((Number(pObj.pago_diario) || 0) * 100) / 100);
+      if (!(pagoDiario > 0)) return;
+      const dayRefTag = `[ref:${pId}_dia_${ev.fecha}]`;
+      const weekRefTag = `[ref:${pId}_sem_${weekTag}]`;
+      const hasWeekGasto = personalGastos.some(g => String(g.descripcion || '').includes(weekRefTag));
+      if (hasWeekGasto) return;
+      const sentDayGasto = personalGastos.find(g => String(g.descripcion || '').includes(dayRefTag)) || null;
+      if (!sentDayGasto || Math.abs((Number(sentDayGasto.monto) || 0) - pagoDiario) >= 0.01) {
+        pendingLabor += pagoDiario;
+      }
+    });
+
+  return Math.round((pendingFuel + pendingLabor) * 100) / 100;
+}
+
+function notifyExpandedActivityFooter() {
+  const detailsPanel = document.getElementById('plan-day-details');
+  if (!detailsPanel) {
+    window._onPlanExpandedActivityChange?.(null);
+    return;
+  }
+  const openCard = Array.from(detailsPanel.querySelectorAll('.plan-ev')).find(
+    card => card.querySelector('.plan-ev-details')?.style.display === 'block'
+  );
+  if (!openCard) {
+    window._onPlanExpandedActivityChange?.(null);
+    return;
+  }
+  const evId = openCard.dataset.planEvId || '';
+  const ev = _ifcafeEvents.find(e => String(e.id) === String(evId));
+  const pendingAmount = computeActivityPendingCuentasAmount(ev);
+  window._onPlanExpandedActivityChange?.(pendingAmount > 0 ? { evId: ev?.id || evId, pendingAmount } : null);
+}
+
+function eventCardHtml(ev) {
+  const escSafe = (s) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const todayStr = getLocalToday();
+  const linkedLoads = Array.isArray(ev.linkedFuelLoads) ? ev.linkedFuelLoads : [];
+  const totalFuelLiters = Math.round(linkedLoads.reduce((s, fl) => s + (Number(fl.liters) || 0), 0) * 10) / 10;
+  const totalFuelCost = Math.round(linkedLoads.reduce((s, fl) => s + (Number(fl.cost) || 0), 0) * 100) / 100;
+  const anyMotoguadana = linkedLoads.some(fl => fl.motorIcon === '✂️' || /motoguad|guadañ|chapea|desbroz|orillad/i.test(fl.motorNombre || ''));
+
+  const opSeen = new Set();
+  const listaOperadores = [];
+  String(ev.operador || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .forEach((op) => {
+      const k = normalizeAreaName(op);
+      if (!k || opSeen.has(k)) return;
+      opSeen.add(k);
+      listaOperadores.push(op);
+    });
+
+  const colaboradoresConPrecio = listaOperadores.map(op => ({
+    nombre: op,
+    pagoDiario: Math.max(0, Math.round((Number(resolvePersonalByName(op)?.pago_diario) || 0) * 100) / 100),
+  }));
+  const totalLaborCost = Math.round(colaboradoresConPrecio.reduce((s, c) => s + c.pagoDiario, 0) * 100) / 100;
+  const laborHeaderSubHtml = colaboradoresConPrecio.length > 0 && totalLaborCost > 0
+    ? `<div style="font-size:12px; color:#4a5d48; font-weight:700; margin-top:2px;">👥 ${colaboradoresConPrecio.length} ${colaboradoresConPrecio.length === 1 ? 'colaborador' : 'colaboradores'} · <span style="color:#1b6e1b; font-weight:800;">${escSafe(formatCurrencyL(totalLaborCost))}</span></div>`
+    : '';
+
+  let diasTranscurridosTexto = '';
+  const showElapsedTime = ev.isFuelUsage || ev.estado === 'Realizada' || ev.estado === 'Aplicada';
+  if (showElapsedTime && ev.fecha) {
+    const pFecha = ev.fecha.split('-');
+    const fActividad = new Date(parseInt(pFecha[0], 10), parseInt(pFecha[1], 10) - 1, parseInt(pFecha[2], 10) || 1);
+    const pToday = todayStr.split('-');
+    const fHoy = new Date(parseInt(pToday[0], 10), parseInt(pToday[1], 10) - 1, parseInt(pToday[2], 10) || 1);
+    const diffDays = Math.round((fHoy.getTime() - fActividad.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) diasTranscurridosTexto = 'Hoy (hace 0 días)';
+    else if (diffDays === 1) diasTranscurridosTexto = 'Ayer (hace 1 día)';
+    else if (diffDays > 1) diasTranscurridosTexto = `Hace ${diffDays} días (${fActividad.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })})`;
+    else if (diffDays < 0) diasTranscurridosTexto = 'Registrada para hoy';
+  }
+
+  const machinesDetailsHtml = linkedLoads.length > 0 ? `
+    <div style="grid-column: 1 / -1; margin-top: 8px;">
+      <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #526350; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
+        <span>${anyMotoguadana ? '✂️' : '⚙️'}</span>
+        <span>${anyMotoguadana ? 'Motoguadañas usadas:' : 'Equipos usados:'}</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px; background: #f8faf7; border: 1px solid #e3ece1; border-radius: 10px; padding: 8px 10px;">
+        ${linkedLoads.map((fl) => {
+          const cTxt = fl.cost > 0 ? ` · <span style="color:#1b6e1b; font-weight:800;">${escSafe(formatCurrencyL(fl.cost))}</span>` : '';
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px;">
+              <span style="font-weight:700; color:#192b18; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escSafe(fl.motorIcon || '✂️')} ${escSafe(fl.motorNombre)}</span>
+              <span style="font-weight:700; color:#4a5d48; white-space:nowrap; flex-shrink:0;">${formatLitersLabel(fl.liters)} de gasolina${cTxt}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const colaboradoresDetailsHtml = colaboradoresConPrecio.length > 0 ? `
+    <div style="grid-column: 1 / -1; margin-top: 6px;">
+      <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #526350; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
+        <span class="material-symbols-outlined" style="font-size: 14px; color: #2d3e2c;">badge</span>
+        <span>Colaborador${colaboradoresConPrecio.length > 1 ? 'es' : ''}:</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px; background: #f8faf7; border: 1px solid #e3ece1; border-radius: 10px; padding: 8px 10px;">
+        ${colaboradoresConPrecio.map(c => `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px;">
+            <span style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #1b6e1b; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span class="material-symbols-outlined" style="font-size: 15px; color: #1b6e1b; flex-shrink: 0;">person</span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escSafe(c.nombre)}</span>
+            </span>
+            <span style="font-weight: 800; color: ${c.pagoDiario > 0 ? '#1b6e1b' : '#7c877a'}; white-space: nowrap; flex-shrink: 0;">
+              ${c.pagoDiario > 0 ? escSafe(formatCurrencyL(c.pagoDiario)) : 'Sin tarifa'}
+            </span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const wrapPlanEvSwipe = (innerHtml, { appId = '', fuelGroupId = '', canEdit = false } = {}) => {
+    if (!appId && !fuelGroupId) return innerHtml;
+    return `
+      <div class="plan-ev-swipe-wrap" ${appId ? `data-app-id="${escSafe(appId)}"` : ''} ${fuelGroupId ? `data-fuel-group-id="${escSafe(fuelGroupId)}"` : ''} data-can-edit="${canEdit ? '1' : '0'}" style="position:relative; overflow:hidden; border-radius:14px; margin-bottom:8px;">
+        <div class="plan-ev-swipe-bg" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; pointer-events:none; background:transparent; border-radius:14px;">
+          <div class="plan-ev-swipe-del" style="color:#ffffff; display:flex; align-items:center; gap:6px; padding:0 18px; font-size:13px; font-weight:700; opacity:0;">
+            <span class="material-symbols-outlined" style="font-size:19px;">delete</span>
+            <span>Eliminar</span>
+          </div>
+          ${canEdit ? `
+            <div class="plan-ev-swipe-edit" style="color:#ffffff; display:flex; align-items:center; gap:6px; padding:0 18px; font-size:13px; font-weight:700; opacity:0;">
+              <span>Actualizar</span>
+              <span class="material-symbols-outlined" style="font-size:19px;">edit</span>
+            </div>
+          ` : '<div></div>'}
+        </div>
+        <div class="plan-ev-swipe-fg" style="position:relative; z-index:2; background:#ffffff; touch-action:pan-y; user-select:none; -webkit-user-select:none; transition:transform .18s ease;">
+          ${innerHtml}
+        </div>
+      </div>
+    `;
+  };
+
+  if (ev.isFuelUsage) {
+    const fuelDisplayLiters = linkedLoads.length > 0 ? totalFuelLiters : (Number(ev.liters) || 0);
+    const fuelDisplayCost = linkedLoads.length > 0 ? totalFuelCost : (Number(ev.cost) || 0);
+    const costBadge = fuelDisplayCost > 0
+      ? ` · <span style="color:#1b6e1b; font-weight:800;">${escSafe(formatCurrencyL(fuelDisplayCost))}</span>`
+      : '';
+    const subParts = [];
+    if (linkedLoads.length > 0) subParts.push(`${linkedLoads.length} ${linkedLoads.length === 1 ? 'equipo' : 'equipos'}`);
+    subParts.push(`⛽ ${formatLitersLabel(fuelDisplayLiters)} de gasolina${costBadge}`);
+
+    return wrapPlanEvSwipe(`
+      <div class="plan-ev" data-plan-ev-id="${escSafe(ev.id || '')}" onclick="window._togglePlanEvCard?.(this, event)" style="margin-bottom:0; cursor:pointer; border:1.5px solid #c8e6c9; background:#ffffff;">
+        <div class="plan-ev-head" style="align-items:center;">
+          <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+            <span style="font-size:18px; flex-shrink:0;">${escSafe(ev.motorIcon || (anyMotoguadana ? '✂️' : '⛽'))}</span>
+            <div style="min-width:0;">
+              <p class="plan-ev-producto" style="margin:0;">${escSafe(ev.producto || (anyMotoguadana ? 'Motoguadañas' : 'Uso de equipos'))}</p>
+              <div style="font-size:12px; color:#4a5d48; font-weight:700; margin-top:2px;">${subParts.join(' · ')}</div>
+              ${laborHeaderSubHtml}
+              ${ev.showLote ? `<div class="plan-ev-lote"><span class="material-symbols-outlined" style="font-size:13px;">eco</span> ${escSafe(ev.loteNombre)}</div>` : ''}
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <span class="material-symbols-outlined plan-ev-chevron" style="font-size:20px; color:#4a5d48; transition:transform 0.2s;">expand_more</span>
+          </div>
+        </div>
+
+        <div class="plan-ev-details" style="display:none; margin-top:10px;">
+          <div class="plan-ev-meta">
+            <div><strong>Tipo:</strong> Uso de equipos en lote</div>
+            ${machinesDetailsHtml}
+            ${colaboradoresDetailsHtml}
+            ${diasTranscurridosTexto ? `
+              <div style="grid-column: 1 / -1; margin-top: 6px; color: #1b5e20; font-weight: 700; background: #f1f8f0; padding: 6px 10px; border-radius: 8px; border: 1px solid #d0e7ce; display: flex; align-items: center; gap: 6px; font-size: 12px;">
+                <span class="material-symbols-outlined" style="font-size: 16px; color:#2d3e2c;">history</span>
+                <span>Tiempo transcurrido: <strong>${diasTranscurridosTexto}</strong></span>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `, { fuelGroupId: ev.id, canEdit: false });
+  }
+
   const isRealizada = ev.estado === 'Realizada' || ev.estado === 'Aplicada';
   const isAtrasada = ev.estado === 'Atrasada';
   const badgeLabel = isRealizada ? 'Realizada' : isAtrasada ? 'Atrasada' : 'Programada';
   const icon = getIconForTipo(ev.tipo);
-
-  // Calcular días transcurridos desde la aplicación
-  let diasTranscurridosTexto = '';
-  if (isRealizada && ev.fecha) {
-    const pFecha = ev.fecha.split('-');
-    const fActividad = new Date(parseInt(pFecha[0]), parseInt(pFecha[1]) - 1, parseInt(pFecha[2]) || 1);
-    const pToday = todayStr.split('-');
-    const fHoy = new Date(parseInt(pToday[0]), parseInt(pToday[1]) - 1, parseInt(pToday[2]) || 1);
-    
-    const diffTime = fHoy.getTime() - fActividad.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) {
-      diasTranscurridosTexto = 'Hoy (hace 0 días)';
-    } else if (diffDays === 1) {
-      diasTranscurridosTexto = 'Ayer (hace 1 día)';
-    } else if (diffDays > 1) {
-      diasTranscurridosTexto = `Hace ${diffDays} días (${fActividad.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })})`;
-    } else if (diffDays < 0) {
-      diasTranscurridosTexto = `Registrada para hoy`;
-    }
-  }
-
-  // Solo permitir marcar como realizada si NO está realizada y ya llegó o pasó la fecha (fecha <= hoy)
   const canMarkRealizada = !isRealizada && ev.fecha <= todayStr;
 
   const acciones = [];
@@ -149,47 +373,44 @@ function eventCardHtml(ev) {
     `);
   }
 
-  acciones.push(`
-    <button class="plan-btn-ghost" onclick="window.enviarNotifWhatsApp('${ev.loteId}','${esc(ev.loteNombre)}','${ev.fecha}','${esc(ev.producto)}','${esc(ev.dosis)}','${esc(ev.tipo)}')">
-      <span class="material-symbols-outlined" style="font-size:16px;">share</span> WhatsApp
-    </button>
-  `);
-
-  if (ev.isDb && ev.id) {
-    acciones.push(`
-      <button class="plan-btn-ghost" onclick="window.editarAplicacionDirecta('${ev.id}')" title="Editar actividad" style="color: var(--m3-primary); border-color: #c0d4be; padding: 6px 12px;">
-        <span class="material-symbols-outlined" style="font-size:16px;">edit</span>
-        <span>Editar</span>
-      </button>
-    `);
-    acciones.push(`
-      <button class="plan-btn-danger" onclick="window.eliminarAplicacionDirecta('${ev.id}')" title="Eliminar actividad">
-        <span class="material-symbols-outlined" style="font-size:16px;">delete</span>
-      </button>
-    `);
-  }
-
   const tipoLower = (ev.tipo || '').toLowerCase();
+  const isLimpieza = tipoLower.includes('limpieza');
   const isDosisType = tipoLower.includes('foliar') || tipoLower.includes('fertiliz') || tipoLower.includes('abono') || (tipoLower.includes('suelo') && !tipoLower.includes('análisis') && !tipoLower.includes('analisis')) || tipoLower.includes('fitosanit') || tipoLower.includes('fungic') || tipoLower.includes('insectic');
   const showDosis = ev.dosis && ev.dosis.trim() && ev.dosis !== 'N/A' && isDosisType;
-
-  const listaOperadores = ev.operador
-    ? String(ev.operador).split(',').map(s => s.trim()).filter(Boolean)
-    : [];
 
   const cleanObs = (ev.observaciones || '')
     .replace(/👤?\s*Responsables:\s*[^\n]+(\n+|$)/gi, '')
     .trim();
 
-  return `
-    <div class="plan-ev" onclick="if (event.target.closest('button, a, img')) return; const d = this.querySelector('.plan-ev-details'); const c = this.querySelector('.plan-ev-chevron'); if (!d) return; const open = d.style.display === 'block'; d.style.display = open ? 'none' : 'block'; if (c) c.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';" style="cursor:pointer; border:1.5px solid ${isRealizada ? '#c8e6c9' : isAtrasada ? '#ffcdd2' : '#ffe9a8'};">
+  const headerTitle = isLimpieza ? 'Limpieza' : (ev.producto || 'Actividad del cafetal');
+  let headerSubHtml = '';
+  if (isLimpieza) {
+    const parts = [];
+    if (ev.producto) parts.push(escSafe(ev.producto));
+    if (linkedLoads.length > 0) {
+      parts.push(`⛽ ${formatLitersLabel(totalFuelLiters)} de gasolina${totalFuelCost > 0 ? ` · <span style="color:#1b6e1b; font-weight:800;">${escSafe(formatCurrencyL(totalFuelCost))}</span>` : ''}`);
+    }
+    if (parts.length > 0) {
+      headerSubHtml = `<div style="font-size:12px; color:#4a5d48; font-weight:700; margin-top:2px;">${parts.join(' · ')}</div>`;
+    }
+  } else if (showDosis) {
+    headerSubHtml = `<div style="font-size:12px; color:#4a5d48; font-weight:700; margin-top:2px;">Dosis: ${escSafe(ev.dosis)}</div>`;
+  }
+
+  const tipoDetailText = isLimpieza
+    ? `Limpieza${ev.producto ? ` · ${escSafe(ev.producto)}` : ''}`
+    : `${escSafe(ev.tipo || 'General')}${ev.metodo ? ` · ${escSafe(ev.metodo)}` : ''}`;
+
+  return wrapPlanEvSwipe(`
+    <div class="plan-ev" data-plan-ev-id="${escSafe(ev.id || '')}" onclick="window._togglePlanEvCard?.(this, event)" style="margin-bottom:0; cursor:pointer; border:1.5px solid ${isRealizada ? '#c8e6c9' : isAtrasada ? '#ffcdd2' : '#ffe9a8'};">
       <div class="plan-ev-head" style="align-items:center;">
         <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
           <span style="font-size:18px; flex-shrink:0;">${icon}</span>
           <div style="min-width:0;">
-            <p class="plan-ev-producto" style="margin:0;">${ev.producto || 'Actividad del cafetal'}</p>
-            ${showDosis ? `<div style="font-size:12px; color:#4a5d48; font-weight:700; margin-top:2px;">Dosis: ${ev.dosis}</div>` : ''}
-            ${ev.showLote ? `<div class="plan-ev-lote"><span class="material-symbols-outlined" style="font-size:13px;">eco</span> ${ev.loteNombre}</div>` : ''}
+            <p class="plan-ev-producto" style="margin:0;">${escSafe(headerTitle)}</p>
+            ${headerSubHtml}
+            ${laborHeaderSubHtml}
+            ${ev.showLote ? `<div class="plan-ev-lote"><span class="material-symbols-outlined" style="font-size:13px;">eco</span> ${escSafe(ev.loteNombre)}</div>` : ''}
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
@@ -200,48 +421,31 @@ function eventCardHtml(ev) {
 
       <div class="plan-ev-details" style="display:none; margin-top:10px;">
         <div class="plan-ev-meta">
-          <div><strong>Tipo:</strong> ${ev.tipo || 'General'}${ev.metodo ? ` · ${ev.metodo}` : ''}</div>
-
-        ${listaOperadores.length > 0 ? `
-          <div style="grid-column: 1 / -1; margin-top: 6px;">
-            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #526350; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
-              <span class="material-symbols-outlined" style="font-size: 14px; color: #2d3e2c;">badge</span>
-              <span>Colaborador${listaOperadores.length > 1 ? 'es' : ''}:</span>
+          <div><strong>Tipo:</strong> ${tipoDetailText}</div>
+          ${machinesDetailsHtml}
+          ${colaboradoresDetailsHtml}
+          ${isRealizada && diasTranscurridosTexto ? `
+            <div style="grid-column: 1 / -1; margin-top: 6px; color: #1b5e20; font-weight: 700; background: #f1f8f0; padding: 6px 10px; border-radius: 8px; border: 1px solid #d0e7ce; display: flex; align-items: center; gap: 6px; font-size: 12px;">
+              <span class="material-symbols-outlined" style="font-size: 16px; color:#2d3e2c;">history</span>
+              <span>Tiempo transcurrido: <strong>${diasTranscurridosTexto}</strong></span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 3px; padding-left: 2px;">
-              ${listaOperadores.map(op => `
-                <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #1b6e1b; padding: 1px 0;">
-                  <span class="material-symbols-outlined" style="font-size: 15px; color: #1b6e1b;">person</span>
-                  <span>${esc(op)}</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
-
-        ${isRealizada && diasTranscurridosTexto ? `
-          <div style="grid-column: 1 / -1; margin-top: 6px; color: #1b5e20; font-weight: 700; background: #f1f8f0; padding: 6px 10px; border-radius: 8px; border: 1px solid #d0e7ce; display: flex; align-items: center; gap: 6px; font-size: 12px;">
-            <span class="material-symbols-outlined" style="font-size: 16px; color:#2d3e2c;">history</span>
-            <span>Tiempo transcurrido: <strong>${diasTranscurridosTexto}</strong></span>
-          </div>
-        ` : ''}
-      </div>
-
-      ${cleanObs ? `<div class="plan-ev-purpose" style="margin-top:6px; color:#444; background:#f9faf9; padding:6px 10px; border-radius:8px; font-size:12px;"><strong>💬 Obs:</strong> ${esc(cleanObs)}</div>` : ''}
-      ${ev.purpose && !cleanObs ? `<div class="plan-ev-purpose">🎯 ${ev.purpose}</div>` : ''}
-
-      ${ev.foto_url ? `
-        <div style="margin-top:10px; position:relative; overflow:hidden; border-radius:12px; border:1px solid #d4dfd2; background:#f4f7f4;">
-          <img src="${ev.foto_url}" alt="Foto de la planta" onclick="window.verFotoPlantaModal('${ev.foto_url}', '${esc(ev.producto || ev.tipo)} (${ev.fecha})')" style="width:100%; max-height:160px; object-fit:cover; display:block; cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-          <div style="position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); color:#fff; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:6px; pointer-events:none; display:flex; align-items:center; gap:4px;">
-            <span class="material-symbols-outlined" style="font-size:13px;">photo_camera</span> Foto de planta
-          </div>
+          ` : ''}
         </div>
-      ` : ''}
 
-        <div class="plan-ev-actions">${acciones.join('')}</div>
+        ${cleanObs ? `<div class="plan-ev-purpose" style="margin-top:6px; color:#444; background:#f9faf9; padding:6px 10px; border-radius:8px; font-size:12px;"><strong>💬 Obs:</strong> ${escSafe(cleanObs)}</div>` : ''}
+
+        ${ev.foto_url ? `
+          <div style="margin-top:10px; position:relative; overflow:hidden; border-radius:12px; border:1px solid #d4dfd2; background:#f4f7f4;">
+            <img src="${ev.foto_url}" alt="Foto de la planta" onclick="window.verFotoPlantaModal('${ev.foto_url}', '${esc(ev.producto || ev.tipo)} (${ev.fecha})')" style="width:100%; max-height:160px; object-fit:cover; display:block; cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+            <div style="position:absolute; bottom:6px; right:8px; background:rgba(0,0,0,0.65); backdrop-filter:blur(4px); color:#fff; font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:6px; pointer-events:none; display:flex; align-items:center; gap:4px;">
+              <span class="material-symbols-outlined" style="font-size:13px;">photo_camera</span> Foto de planta
+            </div>
+          </div>
+        ` : ''}
+
+        ${acciones.length > 0 ? `<div class="plan-ev-actions">${acciones.join('')}</div>` : ''}
       </div>
-    </div>`;
+    </div>`, { appId: (ev.isDb && ev.id) ? ev.id : '', canEdit: Boolean(ev.isDb && ev.id) });
 }
 
 function calendarShellHtml(activeLote = null, isEmbedded = false, showLotesResumen = false) {
@@ -596,6 +800,129 @@ function showPlanDayDetails(day, dayEvents) {
       ${actionButtonHtml}
     </div>
   `;
+  bindPlanEvSwipes(panel);
+  window._onPlanExpandedActivityChange?.(null);
+}
+
+function bindPlanEvSwipes(container) {
+  if (!container) return;
+  container.querySelectorAll('.plan-ev-swipe-wrap').forEach((wrap) => {
+    const fg = wrap.querySelector('.plan-ev-swipe-fg');
+    const swipeBg = wrap.querySelector('.plan-ev-swipe-bg');
+    const delBg = wrap.querySelector('.plan-ev-swipe-del');
+    const editBg = wrap.querySelector('.plan-ev-swipe-edit');
+    if (!fg) return;
+
+    const appId = wrap.dataset.appId || '';
+    const fuelGroupId = wrap.dataset.fuelGroupId || '';
+    const canEdit = wrap.dataset.canEdit === '1';
+
+    let startX = 0;
+    let startY = 0;
+    let dx = 0;
+    let dragging = false;
+    let lockedAxis = null;
+    let swipedRecently = false;
+
+    const onStart = (x, y, target) => {
+      if (target && target.closest('button, a, input, textarea, select')) return;
+      startX = x;
+      startY = y;
+      dx = 0;
+      dragging = true;
+      lockedAxis = null;
+      swipedRecently = false;
+      fg.style.transition = 'none';
+    };
+
+    const onMove = (x, y, ev) => {
+      if (!dragging) return;
+      const mx = x - startX;
+      const my = y - startY;
+      if (!lockedAxis) {
+        if (Math.abs(mx) > 8 && Math.abs(mx) > Math.abs(my)) {
+          lockedAxis = 'x';
+        } else if (Math.abs(my) > 8) {
+          lockedAxis = 'y';
+          dragging = false;
+          return;
+        } else {
+          return;
+        }
+      }
+      if (Math.abs(mx) > 6) {
+        swipedRecently = true;
+        wrap.dataset.swiped = '1';
+      }
+      if (ev && ev.cancelable) ev.preventDefault();
+      if (ev) ev.stopPropagation();
+      const maxW = wrap.offsetWidth || 320;
+      const minX = canEdit ? -maxW : 0;
+      dx = Math.max(minX, Math.min(maxW, mx));
+      fg.style.transform = `translateX(${dx}px)`;
+      if (swipeBg) swipeBg.style.background = dx > 4 ? '#ba1a1a' : (dx < -4 ? '#2d3e2c' : 'transparent');
+      if (delBg) delBg.style.opacity = dx > 10 ? '1' : '0';
+      if (editBg) editBg.style.opacity = (canEdit && dx < -10) ? '1' : '0';
+    };
+
+    const onEnd = () => {
+      if (!dragging) return;
+      dragging = false;
+      fg.style.transition = 'transform .2s ease';
+      fg.style.transform = 'translateX(0)';
+      if (swipeBg) swipeBg.style.background = 'transparent';
+      if (delBg) delBg.style.opacity = '0';
+      if (editBg) editBg.style.opacity = '0';
+
+      if (dx >= 55) {
+        if (appId) window.eliminarAplicacionDirecta?.(appId);
+        else if (fuelGroupId) window.eliminarCargasFuelGrupoDirecta?.(fuelGroupId);
+      } else if (canEdit && dx <= -55 && appId) {
+        window.editarAplicacionDirecta?.(appId);
+      }
+
+      if (swipedRecently) {
+        setTimeout(() => {
+          delete wrap.dataset.swiped;
+          swipedRecently = false;
+        }, 140);
+      }
+      dx = 0;
+    };
+
+    wrap.addEventListener('click', (e) => {
+      if (swipedRecently) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    }, true);
+
+    wrap.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+      const t = e.touches[0];
+      if (t) onStart(t.clientX, t.clientY, e.target);
+    }, { passive: true });
+    wrap.addEventListener('touchmove', (e) => {
+      const t = e.touches[0];
+      if (t) onMove(t.clientX, t.clientY, e);
+    }, { passive: false });
+    wrap.addEventListener('touchend', onEnd, { passive: true });
+    wrap.addEventListener('touchcancel', onEnd, { passive: true });
+
+    wrap.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      onStart(e.clientX, e.clientY, e.target);
+      if (!dragging) return;
+      const moveH = (me) => onMove(me.clientX, me.clientY, me);
+      const upH = () => {
+        window.removeEventListener('mousemove', moveH);
+        window.removeEventListener('mouseup', upH);
+        onEnd();
+      };
+      window.addEventListener('mousemove', moveH);
+      window.addEventListener('mouseup', upH);
+    });
+  });
 }
 
 function showInlineActividadForm(defaultDate, editAppId = null) {
@@ -747,6 +1074,41 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           <label id="label-plan-producto">Producto o Fórmula recomendada</label>
         </div>
 
+        <!-- 4b. Tipo de Limpieza (Dropdown M3 multi-select) + Motoguadañas / Equipos usados -->
+        <div id="inline-plan-limpieza-section" style="display:none; flex-direction:column; gap:12px;">
+          <div style="position:relative;" id="inline-plan-limpieza-wrap">
+            <button type="button" id="inline-plan-limpieza-trigger" style="width:100%; min-height:54px; padding:12px 16px; border-radius:14px; border:1px solid #757c73; background:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; position:relative; box-sizing:border-box;">
+              <span style="position:absolute; top:-9px; left:12px; background:#ffffff; padding:0 5px; font-size:11.5px; font-weight:700; color:#4a5d48; letter-spacing:0.3px; text-transform:uppercase;">Tipo de Limpieza</span>
+              <span id="inline-plan-limpieza-display" style="font-size:14px; font-weight:600; color:#192b1b; display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+                <span style="color:#6b7280; font-weight:500;">Seleccionar tipo de limpieza...</span>
+              </span>
+              <span class="material-icons" id="inline-plan-limpieza-arrow" style="font-size:20px; color:#2d3e2c; transition:transform 0.15s; flex-shrink:0;">arrow_drop_down</span>
+            </button>
+            <div id="inline-plan-limpieza-menu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:#f5f9f3; border:1px solid #d5e2d2; border-radius:20px; box-shadow:0 12px 32px rgba(0,0,0,0.14); z-index:100025; padding:8px 0 0; max-height:320px; overflow-y:auto;">
+              <div id="inline-plan-limpieza-opts"></div>
+              <div style="position:sticky; bottom:0; background:#f5f9f3; border-top:1px solid #dce6da; padding:8px 14px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <span style="font-size:11.5px; font-weight:600; color:#5a6b58;">Puedes elegir varias</span>
+                <button type="button" id="inline-plan-limpieza-done" style="border:none; background:#2d3e2c; color:#ffffff; font-family:inherit; font-size:12px; font-weight:800; padding:6px 14px; border-radius:999px; cursor:pointer;">Listo</button>
+              </div>
+            </div>
+          </div>
+          <div id="inline-plan-limpieza-otro-wrap" style="display:none;">
+            <div class="m3-field" style="margin-bottom:0;">
+              <input type="text" id="inline-plan-limpieza-otro" value="" placeholder=" " style="font-size:13px;">
+              <label for="inline-plan-limpieza-otro">Especificar otro tipo de limpieza</label>
+            </div>
+          </div>
+          <div id="inline-plan-motoguadanas-box" style="display:none; background:#f8faf8; border:1.5px solid #d4ded3; border-radius:14px; padding:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+              <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">✂️ Motoguadañas / Equipos usados</span>
+              <span id="inline-plan-fuel-area-pill" style="font-size:11px; font-weight:700; color:#2d3e2c; background:#eaf2e8; border:1px solid #c2d8c0; border-radius:999px; padding:3px 9px; white-space:nowrap;"></span>
+            </div>
+            <div id="inline-plan-fuel-existing-box" style="display:none; margin-bottom:10px;"></div>
+            <div id="inline-plan-motoguadanas-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+            <div id="inline-plan-fuel-summary" style="display:none; margin-top:10px;"></div>
+          </div>
+        </div>
+
         <!-- 5. Dosis (visible solo en Foliar, Suelo y Fitosanitario) -->
         <div class="m3-field" id="field-plan-dosis">
           <input type="text" name="dosis" id="inline-plan-dosis" value="${esc(currentDosis)}" placeholder=" " style="font-size:13px;">
@@ -861,10 +1223,19 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   const tipoMenu = document.getElementById('inline-plan-tipo-menu');
   const tipoArrow = document.getElementById('inline-plan-tipo-arrow');
   const tipoDisplay = document.getElementById('inline-plan-tipo-display');
+  const limpiezaTrigger = document.getElementById('inline-plan-limpieza-trigger');
+  const limpiezaDisplay = document.getElementById('inline-plan-limpieza-display');
+  const limpiezaMenu = document.getElementById('inline-plan-limpieza-menu');
+  const limpiezaArrow = document.getElementById('inline-plan-limpieza-arrow');
+  const limpiezaOptsEl = document.getElementById('inline-plan-limpieza-opts');
+  const limpiezaDoneBtn = document.getElementById('inline-plan-limpieza-done');
+
   if (tipoTrigger && tipoMenu) {
     tipoTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
       const isOpen = tipoMenu.style.display === 'block';
+      if (limpiezaMenu) limpiezaMenu.style.display = 'none';
+      if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
       tipoMenu.style.display = isOpen ? 'none' : 'block';
       if (tipoArrow) tipoArrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
     });
@@ -891,6 +1262,406 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   const inputDosis = document.getElementById('inline-plan-dosis');
   const fieldDosis = document.getElementById('field-plan-dosis');
   const labelProducto = document.getElementById('label-plan-producto');
+  const fieldProducto = document.getElementById('field-plan-producto');
+  const limpiezaSection = document.getElementById('inline-plan-limpieza-section');
+  const limpiezaOtroWrap = document.getElementById('inline-plan-limpieza-otro-wrap');
+  const limpiezaOtroInput = document.getElementById('inline-plan-limpieza-otro');
+  const motoguadanasBox = document.getElementById('inline-plan-motoguadanas-box');
+  const fuelAreaPill = document.getElementById('inline-plan-fuel-area-pill');
+  const fuelExistingBox = document.getElementById('inline-plan-fuel-existing-box');
+  const motoguadanasListEl = document.getElementById('inline-plan-motoguadanas-list');
+  const fuelSummaryEl = document.getElementById('inline-plan-fuel-summary');
+  const inputLoteEl = document.getElementById('inline-plan-lote');
+
+  const escHtml = (s) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const LIMPIEZA_OPTIONS = [
+    { key: 'Machete', icon: '🔪', label: 'Machete', sub: 'Chapea manual con machete' },
+    { key: 'Motoguadaña', icon: '✂️', label: 'Motoguadaña', sub: 'Chapea mecánica con equipo' },
+    { key: 'Desyerbe manual', icon: '🌿', label: 'Desyerbe manual', sub: 'Limpia a mano / azadón' },
+    { key: 'Herbicida', icon: '🧪', label: 'Herbicida', sub: 'Control químico de malezas' },
+    { key: 'Otro', icon: '✏️', label: 'Otro', sub: 'Especificar otro tipo de limpieza' },
+  ];
+
+  const selectedLimpiezaTypes = new Set();
+  const selectedFuelUsageMap = new Map();
+
+  if (editApp && currentTipo === 'Limpieza' && currentProducto) {
+    const parts = currentProducto.split(/\s*[,+]\s*/).map(s => s.trim()).filter(Boolean);
+    const otherParts = [];
+    parts.forEach((p) => {
+      const low = p.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (low === 'machete' || low.includes('machete')) {
+        selectedLimpiezaTypes.add('Machete');
+      } else if (low === 'motoguadana' || low.includes('motoguad') || low.includes('guadan')) {
+        selectedLimpiezaTypes.add('Motoguadaña');
+      } else if (low === 'desyerbe manual' || low.includes('desyerb')) {
+        selectedLimpiezaTypes.add('Desyerbe manual');
+      } else if (low === 'herbicida' || low.includes('herbicid')) {
+        selectedLimpiezaTypes.add('Herbicida');
+      } else {
+        otherParts.push(p);
+      }
+    });
+    if (otherParts.length > 0) {
+      selectedLimpiezaTypes.add('Otro');
+      if (limpiezaOtroInput) {
+        limpiezaOtroInput.value = otherParts.join(', ');
+        limpiezaOtroInput.closest('.m3-field')?.classList.add('has-value');
+      }
+    }
+  }
+
+  const getSelectedLoteObj = () => {
+    const lid = document.getElementById('inline-plan-lote')?.value || targetLoteId;
+    return _allLotes.find(l => String(l.id) === String(lid)) || { id: lid, nombre: '' };
+  };
+
+  const getActiveDateStr = () => document.getElementById('inline-plan-fecha')?.value || actDate;
+
+  const syncLimpiezaProductoValue = () => {
+    if (!selectTipo || selectTipo.value !== 'Limpieza' || !inputProducto) return;
+    const ordered = [];
+    LIMPIEZA_OPTIONS.forEach((opt) => {
+      if (!selectedLimpiezaTypes.has(opt.key)) return;
+      if (opt.key === 'Otro') {
+        const custom = (limpiezaOtroInput?.value || '').trim();
+        ordered.push(custom || 'Otro');
+      } else {
+        ordered.push(opt.key);
+      }
+    });
+    inputProducto.value = ordered.join(', ');
+  };
+
+  const updateFuelSummaryUI = () => {
+    if (!fuelSummaryEl) return;
+    const activeDate = getActiveDateStr();
+    if (!selectTipo || selectTipo.value !== 'Limpieza' || !selectedLimpiezaTypes.has('Motoguadaña') || activeDate > todayStr) {
+      fuelSummaryEl.style.display = 'none';
+      fuelSummaryEl.innerHTML = '';
+      return;
+    }
+    const activeEntries = Array.from(selectedFuelUsageMap.values()).filter(e => e.liters > 0);
+    if (activeEntries.length === 0) {
+      fuelSummaryEl.style.display = 'none';
+      fuelSummaryEl.innerHTML = '';
+      return;
+    }
+    const totalLiters = Math.round(activeEntries.reduce((s, e) => s + e.liters, 0) * 10) / 10;
+    const totalCost = Math.round(activeEntries.reduce((s, e) => s + (e.liters * (Number(e.unitPrice) || 0)), 0) * 100) / 100;
+    fuelSummaryEl.style.display = 'block';
+    fuelSummaryEl.innerHTML = `
+      <div style="background:#eef5ec; border:1px solid #c5dcc0; border-radius:12px; padding:10px 12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:12.5px; font-weight:800; color:#192b18;">⛽ ${activeEntries.length} ${activeEntries.length === 1 ? 'equipo' : 'equipos'} · ${formatLitersLabel(totalLiters)} de gasolina</span>
+          ${totalCost > 0 ? `<span style="font-size:13.5px; font-weight:800; color:#1b6e1b;">${escHtml(formatCurrencyL(totalCost))}</span>` : ''}
+        </div>
+        <div style="font-size:11px; font-weight:600; color:#4a5d48; margin-top:3px;">Se registrará en cada equipo y en Balance de cuentas</div>
+      </div>
+    `;
+  };
+
+  const syncSingleMotorCardUI = (motorId) => {
+    if (!motoguadanasListEl) return;
+    const idKey = String(motorId);
+    const entry = selectedFuelUsageMap.get(idKey);
+    if (!entry) return;
+    const litersTxt = formatLiters(entry.liters);
+    const cost = entry.liters > 0 && entry.unitPrice > 0
+      ? Math.round(entry.liters * entry.unitPrice * 100) / 100
+      : 0;
+    motoguadanasListEl.querySelectorAll('[data-fuel-card-liters]').forEach((el) => {
+      if (el.dataset.fuelCardLiters === idKey) el.textContent = litersTxt;
+    });
+    motoguadanasListEl.querySelectorAll('[data-fuel-card-unit]').forEach((el) => {
+      if (el.dataset.fuelCardUnit === idKey) el.textContent = litersTxt === '1' ? 'litro' : 'litros';
+    });
+    motoguadanasListEl.querySelectorAll('[data-fuel-card-cost]').forEach((el) => {
+      if (el.dataset.fuelCardCost === idKey) {
+        el.textContent = cost > 0 ? formatCurrencyL(cost) : 'L 0.00';
+        el.style.color = cost > 0 ? '#1b6e1b' : '#5a6b58';
+      }
+    });
+    motoguadanasListEl.querySelectorAll('[data-fuel-card-badge]').forEach((el) => {
+      if (el.dataset.fuelCardBadge === idKey) {
+        el.textContent = `${formatLitersLabel(entry.liters)}${cost > 0 ? ` · ${formatCurrencyL(cost)}` : ''}`;
+      }
+    });
+    updateFuelSummaryUI();
+  };
+
+  const renderMotoguadanasBox = () => {
+    if (!motoguadanasBox) return;
+    const showBox = selectTipo?.value === 'Limpieza' && selectedLimpiezaTypes.has('Motoguadaña');
+    if (!showBox) {
+      motoguadanasBox.style.display = 'none';
+      return;
+    }
+    motoguadanasBox.style.display = 'block';
+
+    const loteObj = getSelectedLoteObj();
+    const activeDate = getActiveDateStr();
+    if (fuelAreaPill) {
+      fuelAreaPill.textContent = `📍 ${loteObj?.nombre || 'Lote seleccionado'}`;
+    }
+
+    if (fuelExistingBox) {
+      const existingFuel = editApp
+        ? _ifcafeEvents
+            .filter(ev => String(ev.loteId) === String(loteObj?.id) && ev.fecha === activeDate && Array.isArray(ev.linkedFuelLoads))
+            .flatMap(ev => ev.linkedFuelLoads)
+        : [];
+      if (existingFuel.length > 0) {
+        fuelExistingBox.style.display = 'block';
+        fuelExistingBox.innerHTML = `
+          <div style="background:#f3f7f2; border:1px solid #d5e2d2; border-radius:10px; padding:8px 10px; font-size:11.5px; color:#2d3e2c;">
+            <div style="font-weight:800; margin-bottom:3px;">Cargas ya registradas este día:</div>
+            ${existingFuel.map(fl => `
+              <div>${escHtml(fl.motorIcon || '✂️')} <b>${escHtml(fl.motorNombre || 'Equipo')}</b>: ${formatLitersLabel(fl.liters)} de gasolina${fl.cost > 0 ? ` · ${escHtml(formatCurrencyL(fl.cost))}` : ''}</div>
+            `).join('')}
+          </div>
+        `;
+      } else {
+        fuelExistingBox.style.display = 'none';
+        fuelExistingBox.innerHTML = '';
+      }
+    }
+
+    if (!motoguadanasListEl) return;
+    if (activeDate > todayStr) {
+      motoguadanasListEl.innerHTML = `
+        <div style="font-size:12px; color:#5a6b58; background:#ffffff; border:1px solid #d4ded3; border-radius:12px; padding:10px 12px;">
+          📅 Labor programada a futuro: la carga de gasolina se registra al realizar la actividad.
+        </div>
+      `;
+      updateFuelSummaryUI();
+      return;
+    }
+
+    if (_fuelMotoresList.length === 0) {
+      motoguadanasListEl.innerHTML = `
+        <div style="font-size:12px; color:#5a6b58; background:#ffffff; border:1px dashed #c2d8c0; border-radius:12px; padding:12px; text-align:center;">
+          No hay motoguadañas registradas en Equipos.
+        </div>
+      `;
+      updateFuelSummaryUI();
+      return;
+    }
+
+    motoguadanasListEl.innerHTML = _fuelMotoresList.map((m) => {
+      const idKey = String(m.id);
+      const isSel = selectedFuelUsageMap.has(idKey);
+      const entry = isSel ? selectedFuelUsageMap.get(idKey) : null;
+      const entryCost = entry && entry.liters > 0 && entry.unitPrice > 0
+        ? Math.round(entry.liters * entry.unitPrice * 100) / 100
+        : 0;
+      const badgeText = isSel
+        ? `${formatLitersLabel(entry.liters)}${entryCost > 0 ? ` · ${formatCurrencyL(entryCost)}` : ''}`
+        : 'Tocar para usar';
+
+      return `
+        <div style="background:#ffffff; border:1.5px solid ${isSel ? '#2d3e2c' : '#d5e2d2'}; border-radius:14px; overflow:hidden; box-shadow:${isSel ? '0 3px 10px rgba(45,62,44,0.1)' : 'none'};">
+          <button type="button" data-fuel-motor-toggle="${escHtml(idKey)}" style="width:100%; background:${isSel ? '#f4f8f3' : '#ffffff'}; border:none; padding:11px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; font-family:inherit; text-align:left;">
+            <div style="display:flex; align-items:center; gap:9px; min-width:0; flex:1;">
+              <span style="width:20px; height:20px; border-radius:50%; border:1.5px solid ${isSel ? '#2d3e2c' : '#9eb09b'}; background:${isSel ? '#2d3e2c' : '#ffffff'}; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                ${isSel ? '<span class="material-symbols-outlined" style="font-size:14px;">check</span>' : ''}
+              </span>
+              <span style="font-size:16px; flex-shrink:0;">${escHtml(m.icon || '✂️')}</span>
+              <span style="font-size:13.5px; font-weight:800; color:#192b18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(m.nombre || 'Equipo')}</span>
+            </div>
+            <span data-fuel-card-badge="${escHtml(idKey)}" style="font-size:11.5px; font-weight:700; color:${isSel ? '#1b6e1b' : '#5a6b58'}; background:${isSel ? '#e6efe3' : '#f4f7f3'}; border-radius:999px; padding:3px 9px; white-space:nowrap; flex-shrink:0;">${escHtml(badgeText)}</span>
+          </button>
+          ${isSel ? `
+            <div style="padding:12px; border-top:1px solid #e6ece4; display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; justify-content:center; gap:18px; padding:2px 0;">
+                <button type="button" data-fuel-card-minus="${escHtml(idKey)}" aria-label="Disminuir litros" style="width:40px; height:40px; border-radius:50%; border:1.5px solid #cbd5c9; background:#ffffff; color:#192b18; font-size:21px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer;">&minus;</button>
+                <div style="display:flex; align-items:baseline; gap:5px; min-width:84px; justify-content:center;">
+                  <span data-fuel-card-liters="${escHtml(idKey)}" style="font-size:28px; font-weight:800; color:#192b18; line-height:1;">${formatLiters(entry.liters)}</span>
+                  <span data-fuel-card-unit="${escHtml(idKey)}" style="font-size:14px; font-weight:700; color:#4f5d4e;">${formatLiters(entry.liters) === '1' ? 'litro' : 'litros'}</span>
+                </div>
+                <button type="button" data-fuel-card-plus="${escHtml(idKey)}" aria-label="Aumentar litros" style="width:40px; height:40px; border-radius:50%; border:none; background:#2d3e2c; color:#ffffff; font-size:21px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(45,62,44,0.22);">+</button>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:stretch;">
+                <div class="m3-field ${entry.unitPrice > 0 ? 'has-value' : ''}" style="margin-bottom:0;">
+                  <input type="number" min="0" step="0.01" inputmode="decimal" placeholder=" " data-fuel-card-price="${escHtml(idKey)}" value="${entry.unitPrice > 0 ? entry.unitPrice : ''}" style="font-size:13px;">
+                  <label>Precio / litro (L)</label>
+                </div>
+                <div style="background:#f5f9f3; border:1px solid #d5e2d2; border-radius:12px; padding:8px 10px; display:flex; flex-direction:column; justify-content:center;">
+                  <span style="font-size:10.5px; font-weight:700; color:#5a6b58; text-transform:uppercase;">Gasto del equipo</span>
+                  <span data-fuel-card-cost="${escHtml(idKey)}" style="font-size:14px; font-weight:800; color:${entryCost > 0 ? '#1b6e1b' : '#5a6b58'}; margin-top:2px;">${entryCost > 0 ? escHtml(formatCurrencyL(entryCost)) : 'L 0.00'}</span>
+                </div>
+              </div>
+              <div style="font-size:11.5px; font-weight:600; color:#5a6b58;">
+                📍 ${escHtml(loteObj?.nombre || 'Lote actual')} · 📅 ${escHtml(activeDate)}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    motoguadanasListEl.querySelectorAll('[data-fuel-motor-toggle]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mid = btn.dataset.fuelMotorToggle;
+        const motor = _fuelMotoresList.find(m => String(m.id) === String(mid));
+        if (!motor) return;
+        if (selectedFuelUsageMap.has(String(mid))) {
+          selectedFuelUsageMap.delete(String(mid));
+        } else {
+          selectedFuelUsageMap.set(String(mid), {
+            motor,
+            cfg: motor._cfg,
+            liters: 0,
+            unitPrice: Number(motor._resolvedPrice) || Number(motor._cfg?.precioPorLitro) || resolveSharedFuelPrice(motor, _fuelMotoresList) || 0,
+          });
+        }
+        renderMotoguadanasBox();
+      });
+    });
+
+    motoguadanasListEl.querySelectorAll('[data-fuel-card-minus]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mid = btn.dataset.fuelCardMinus;
+        const entry = selectedFuelUsageMap.get(String(mid));
+        if (!entry) return;
+        entry.liters = Math.max(0, Math.round((entry.liters - 0.5) * 10) / 10);
+        syncSingleMotorCardUI(mid);
+      });
+    });
+
+    motoguadanasListEl.querySelectorAll('[data-fuel-card-plus]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mid = btn.dataset.fuelCardPlus;
+        const entry = selectedFuelUsageMap.get(String(mid));
+        if (!entry) return;
+        entry.liters = Math.round((entry.liters + 0.5) * 10) / 10;
+        syncSingleMotorCardUI(mid);
+      });
+    });
+
+    motoguadanasListEl.querySelectorAll('[data-fuel-card-price]').forEach((inp) => {
+      inp.addEventListener('input', () => {
+        const mid = inp.dataset.fuelCardPrice;
+        const entry = selectedFuelUsageMap.get(String(mid));
+        if (!entry) return;
+        entry.unitPrice = Math.max(0, parseFloat(inp.value) || 0);
+        inp.closest('.m3-field')?.classList.toggle('has-value', !!inp.value);
+        syncSingleMotorCardUI(mid);
+      });
+    });
+
+    updateFuelSummaryUI();
+  };
+
+  const renderLimpiezaChips = () => {
+    if (limpiezaDisplay) {
+      const selectedList = LIMPIEZA_OPTIONS.filter(opt => selectedLimpiezaTypes.has(opt.key));
+      if (selectedList.length === 0) {
+        limpiezaDisplay.innerHTML = `<span style="color:#6b7280; font-weight:500;">Seleccionar tipo de limpieza...</span>`;
+      } else {
+        limpiezaDisplay.innerHTML = selectedList
+          .map(opt => `<span style="display:inline-flex; align-items:center; gap:5px;"><span>${opt.icon}</span><span>${escHtml(opt.label)}</span></span>`)
+          .join('<span style="color:#6b7280;">,</span> ');
+      }
+    }
+
+    if (limpiezaOptsEl) {
+      limpiezaOptsEl.innerHTML = LIMPIEZA_OPTIONS.map((opt) => {
+        const active = selectedLimpiezaTypes.has(opt.key);
+        return `
+          <div class="inline-plan-limpieza-opt" data-limpieza-key="${escHtml(opt.key)}" style="padding:10px 18px; cursor:pointer; background:${active ? '#e6efe3' : 'transparent'}; display:flex; align-items:center; justify-content:space-between; gap:10px; transition:background 0.12s;">
+            <div style="min-width:0; flex:1;">
+              <div style="font-size:15px; font-weight:600; color:#192b1b; display:flex; align-items:center; gap:8px;">
+                <span>${opt.icon}</span><span>${escHtml(opt.label)}</span>
+              </div>
+              <div style="font-size:12.5px; color:#4a5d48; margin-top:2px; padding-left:26px;">${escHtml(opt.sub)}</div>
+            </div>
+            <span style="width:20px; height:20px; border-radius:50%; border:1.5px solid ${active ? '#2d3e2c' : '#9eb09b'}; background:${active ? '#2d3e2c' : '#ffffff'}; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+              ${active ? '<span class="material-symbols-outlined" style="font-size:14px;">check</span>' : ''}
+            </span>
+          </div>
+        `;
+      }).join('');
+
+      limpiezaOptsEl.querySelectorAll('.inline-plan-limpieza-opt').forEach((optEl) => {
+        optEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const key = optEl.dataset.limpiezaKey;
+          if (!key) return;
+          if (selectedLimpiezaTypes.has(key)) {
+            selectedLimpiezaTypes.delete(key);
+          } else {
+            selectedLimpiezaTypes.add(key);
+            if (
+              key === 'Motoguadaña' &&
+              _fuelMotoresList.length === 1 &&
+              selectedFuelUsageMap.size === 0 &&
+              !editApp &&
+              getActiveDateStr() <= todayStr
+            ) {
+              const onlyMotor = _fuelMotoresList[0];
+              selectedFuelUsageMap.set(String(onlyMotor.id), {
+                motor: onlyMotor,
+                cfg: onlyMotor._cfg,
+                liters: 0,
+                unitPrice: Number(onlyMotor._resolvedPrice) || Number(onlyMotor._cfg?.precioPorLitro) || resolveSharedFuelPrice(onlyMotor, _fuelMotoresList) || 0,
+              });
+            }
+          }
+          renderLimpiezaChips();
+        });
+      });
+    }
+
+    if (limpiezaOtroWrap) {
+      limpiezaOtroWrap.style.display = selectedLimpiezaTypes.has('Otro') ? 'block' : 'none';
+    }
+    syncLimpiezaProductoValue();
+    renderMotoguadanasBox();
+  };
+
+  if (limpiezaTrigger && limpiezaMenu) {
+    limpiezaTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = limpiezaMenu.style.display === 'block';
+      if (tipoMenu) tipoMenu.style.display = 'none';
+      if (tipoArrow) tipoArrow.style.transform = 'rotate(0deg)';
+      limpiezaMenu.style.display = isOpen ? 'none' : 'block';
+      if (limpiezaArrow) limpiezaArrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    });
+    limpiezaDoneBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      limpiezaMenu.style.display = 'none';
+      if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#inline-plan-limpieza-wrap')) {
+        limpiezaMenu.style.display = 'none';
+        if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
+      }
+    });
+  }
+
+  limpiezaOtroInput?.addEventListener('input', () => {
+    limpiezaOtroInput.closest('.m3-field')?.classList.toggle('has-value', !!limpiezaOtroInput.value);
+    syncLimpiezaProductoValue();
+  });
+
+  if (inputLoteEl && inputLoteEl.tagName === 'SELECT') {
+    inputLoteEl.addEventListener('change', () => {
+      if (selectTipo?.value === 'Limpieza' && selectedLimpiezaTypes.has('Motoguadaña')) {
+        renderMotoguadanasBox();
+      }
+    });
+  }
 
   // Multi-operator management
   let selectedOperadores = resolvedOperador ? resolvedOperador.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -1214,6 +1985,9 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           if (submitIcon) submitIcon.textContent = 'calendar_add_on';
         }
       }
+      if (selectTipo?.value === 'Limpieza' && selectedLimpiezaTypes.has('Motoguadaña')) {
+        renderMotoguadanasBox();
+      }
     });
   }
 
@@ -1281,16 +2055,28 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   // Handle dynamic visibility and placeholders by tipo
   const updateTipoFields = () => {
     const t = selectTipo.value;
+    if (t === 'Limpieza') {
+      if (fieldProducto) fieldProducto.style.display = 'none';
+      if (inputProducto) inputProducto.required = false;
+      if (fieldDosis) fieldDosis.style.display = 'none';
+      if (inputDosis) inputDosis.required = false;
+      if (limpiezaSection) limpiezaSection.style.display = 'flex';
+      renderLimpiezaChips();
+      syncLimpiezaProductoValue();
+      return;
+    }
+
+    if (fieldProducto) fieldProducto.style.display = 'block';
+    if (inputProducto) inputProducto.required = true;
+    if (limpiezaSection) limpiezaSection.style.display = 'none';
+    if (limpiezaMenu) limpiezaMenu.style.display = 'none';
+    if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
+
     if (t === 'Manejo de Tejido') {
       if (fieldDosis) fieldDosis.style.display = 'none';
       if (inputDosis) { inputDosis.required = false; }
       if (labelProducto) labelProducto.textContent = 'Tipo de Poda o Manejo';
       inputProducto.placeholder = 'Ej: Poda de formación, Descope, Deschuponado...';
-    } else if (t === 'Limpieza') {
-      if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; }
-      if (labelProducto) labelProducto.textContent = 'Tipo de Limpieza';
-      inputProducto.placeholder = 'Ej: Chapea manual con machete, Desyerbe...';
     } else if (t === 'Análisis de Suelo') {
       if (fieldDosis) fieldDosis.style.display = 'none';
       if (inputDosis) { inputDosis.required = false; }
@@ -1329,9 +2115,48 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   const form = document.getElementById('form-plan-inline-actividad');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    let fuelLoadsToCreate = [];
+    if (selectTipo.value === 'Limpieza') {
+      syncLimpiezaProductoValue();
+      if (!inputProducto.value.trim()) {
+        window.Snackbar?.show('Selecciona al menos un tipo de limpieza', { type: 'error' });
+        return;
+      }
+      if (selectedLimpiezaTypes.has('Motoguadaña') && getActiveDateStr() <= todayStr) {
+        if (!editApp && _fuelMotoresList.length > 0 && selectedFuelUsageMap.size === 0) {
+          window.Snackbar?.show('Selecciona al menos una motoguadaña usada', { type: 'error' });
+          return;
+        }
+        for (const entry of selectedFuelUsageMap.values()) {
+          if (!editApp && !(entry.liters > 0)) {
+            window.Snackbar?.show(`Indica los litros de gasolina usados en ${entry.motor.nombre}`, { type: 'error' });
+            return;
+          }
+          if (entry.liters > 0) {
+            fuelLoadsToCreate.push({
+              motor: entry.motor,
+              cfg: entry.cfg,
+              liters: entry.liters,
+              unitPrice: Math.max(0, Math.round((Number(entry.unitPrice) || 0) * 100) / 100),
+            });
+          }
+        }
+      }
+    }
+
+    const submitBtn = document.getElementById('inline-plan-btn-submit');
+    if (submitBtn?.disabled) return;
+    if (submitBtn) submitBtn.disabled = true;
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
-    await window.guardarActividadPlanInline(data);
+    data._fuelLoads = fuelLoadsToCreate;
+    try {
+      await window.guardarActividadPlanInline(data);
+    } finally {
+      if (submitBtn && document.body.contains(submitBtn)) {
+        submitBtn.disabled = false;
+      }
+    }
   });
 }
 
@@ -1619,16 +2444,36 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
   }
 
   try {
-    const [lotesData, appsData, personalData, userData] = await Promise.all([
+    const [lotesData, appsData, personalData, userData, motoresData, sesData, gastosData] = await Promise.all([
       restFetch(`/rest/v1/lotes?empresa_id=eq.${empresaId}&select=*&order=nombre.asc`),
       restFetch(`/rest/v1/lote_aplicaciones?empresa_id=eq.${empresaId}&select=*&order=fecha.asc`),
       restFetch(`/rest/v1/personal?empresa_id=eq.${empresaId}&select=*&order=nombre.asc`),
-      getUser()
+      getUser(),
+      restFetch(`/rest/v1/motores?empresa_id=eq.${empresaId}&select=*`).catch(() => []),
+      restFetch(`/rest/v1/motor_sesiones?empresa_id=eq.${empresaId}&select=*&order=fecha.desc`).catch(() => []),
+      fetchEmpresaGastosFresh().catch(() => [])
     ]);
 
     _allLotes = Array.isArray(lotesData) ? lotesData : [];
     _personalList = Array.isArray(personalData) ? personalData : [];
+    _empresaGastosList = Array.isArray(gastosData) ? gastosData : [];
     _currentUser = userData;
+    const isMotoguadana = (m) => m?.icon === '✂️' || /motoguada|guadañ|chapea|desbroz|orillad/i.test(m?.nombre || '');
+    const rawFuelMotores = (Array.isArray(motoresData) ? motoresData : []).filter(m => isFuelMotor(m));
+    const sharedFuelPrice = resolveSharedFuelPrice(null, rawFuelMotores, empresaId);
+    if (sharedFuelPrice > 0) saveSharedFuelPrice(empresaId, sharedFuelPrice);
+    _fuelMotoresList = rawFuelMotores
+      .map(m => ({
+        ...m,
+        _cfg: parseMotorConfig(m),
+        _resolvedPrice: resolveSharedFuelPrice(m, rawFuelMotores, empresaId),
+      }))
+      .sort((a, b) => {
+        const aM = isMotoguadana(a) ? 0 : 1;
+        const bM = isMotoguadana(b) ? 0 : 1;
+        if (aM !== bM) return aM - bM;
+        return String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+      });
 
     let aplicaciones = (Array.isArray(appsData) ? appsData : []).filter(a => !String(a.observaciones || '').startsWith('[COSECHA_JSON]'));
 
@@ -1696,57 +2541,107 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
       });
     });
 
-    // 2. Agregar sugerencias técnicas IHCAFE para los meses que no tengan aún aplicación registrada
-    targetLotes.forEach(lote => {
-      const altura = parseInt(lote.altura_msnm) || 0;
-      const numPlantas = parseInt(lote.num_plantas) || 0;
-      let realizadas = 0;
-      let totalPlan = 0;
+    // 1b. Agrupar usos de equipos por gasolina por (lote, fecha) y vincular a Limpieza
+    const targetLoteByNorm = new Map();
+    targetLotes.forEach((l) => {
+      const k = normalizeAreaName(l.nombre);
+      if (k && !targetLoteByNorm.has(k)) targetLoteByNorm.set(k, l);
+    });
+    const sesByMotor = new Map();
+    (Array.isArray(sesData) ? sesData : []).forEach((s) => {
+      if (!s?.motor_id) return;
+      const arr = sesByMotor.get(s.motor_id);
+      if (arr) arr.push(s);
+      else sesByMotor.set(s.motor_id, [s]);
+    });
+    const fuelGroups = new Map();
+    rawFuelMotores.forEach((m) => {
+      const fallbackPrice = resolveSharedFuelPrice(m, rawFuelMotores, empresaId);
+      const stats = computeFuelMotorStats(m, sesByMotor.get(m.id) || [], [], fallbackPrice);
+      stats.fuelLoads.forEach((load) => {
+        const matchedLote = targetLoteByNorm.get(normalizeAreaName(load.hora_fin));
+        if (!matchedLote) return;
+        const loadFechaIso = toLocalIsoDate(load.fecha || load.created_at);
+        const gk = `${matchedLote.id}__${loadFechaIso}`;
+        if (!fuelGroups.has(gk)) {
+          const parts = loadFechaIso.split('-');
+          fuelGroups.set(gk, {
+            lote: matchedLote,
+            fecha: loadFechaIso,
+            matchFecha: new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10) || 1),
+            loads: [],
+          });
+        }
+        fuelGroups.get(gk).loads.push({
+          id: load.id,
+          motorId: m.id,
+          motorNombre: m.nombre || 'Equipo de gasolina',
+          motorIcon: m.icon || '✂️',
+          liters: load._liters,
+          unitPrice: load._unitPrice,
+          cost: load._cost,
+          operador: load.operador || '',
+        });
+      });
+    });
 
-      if (lote.edad_categoria) {
-        const dosisCalc = calcularDosis(lote.edad_categoria, numPlantas);
-        const plan = getPlanIfcafe(altura);
-        totalPlan = plan.length;
+    for (const group of fuelGroups.values()) {
+      const opSeenGroup = new Set();
+      const groupOps = [];
+      group.loads.forEach((fl) => {
+        String(fl.operador || '').split(',').map(s => s.trim()).filter(Boolean).forEach((op) => {
+          const k = normalizeAreaName(op);
+          if (!k || opSeenGroup.has(k)) return;
+          opSeenGroup.add(k);
+          groupOps.push(op);
+        });
+      });
 
-        plan.forEach((item, idx) => {
-          const mesStr = String(item.mes).padStart(2, '0');
-          const mfs = `${_calYear}-${mesStr}-15`;
-          const matchFecha = new Date(_calYear, item.mes - 1, 15);
+      const limpiezaMatches = _ifcafeEvents.filter(
+        ev => ev.isDb && String(ev.loteId) === String(group.lote.id) && ev.fecha === group.fecha && String(ev.tipo || '').toLowerCase().includes('limpieza')
+      );
+      const targetEv =
+        limpiezaMatches.find(ev => /motoguad|guadañ/i.test(ev.producto || '')) ||
+        limpiezaMatches[0] ||
+        null;
 
-          // Verificar si ya existe una aplicación en DB para ese mes y lote
-          const appExistente = aplicaciones.find(a =>
-            a.lote_id === lote.id &&
-            a.fecha && a.fecha.substring(0, 7) === `${_calYear}-${mesStr}` &&
-            (a.tipo === 'Fertilizante' || a.tipo === 'Fertilización al Suelo' || normalizarProducto(a.producto) === normalizarProducto(item.producto))
-          );
-
-          if (appExistente) {
-            if (appExistente.estado === 'Aplicada') realizadas++;
-          } else {
-            // Sugerencia como guía
-            const estadoGuia = mfs < todayStr ? 'Atrasada' : 'Pendiente';
-            _ifcafeEvents.push({
-              id: null,
-              isDb: false,
-              isGuide: true,
-              loteId: lote.id,
-              loteNombre: lote.nombre,
-              showLote: !_ifcafeLoteId,
-              fecha: mfs,
-              matchFecha,
-              tipo: item.tipo === 'Suelo' ? 'Fertilización al Suelo' : 'Aplicación Foliar',
-              metodo: item.tipo === 'Suelo' ? 'Al suelo' : 'Foliar',
-              producto: item.producto,
-              dosis: dosisCalc.porAplicacion.vasitoLabel,
-              operador: '',
-              observaciones: 'Pauta recomendada por IHCAFE según altitud y edad',
-              estado: estadoGuia,
-              purpose: descripcionProposito[idx] || ''
-            });
-          }
+      if (targetEv) {
+        targetEv.linkedFuelLoads = group.loads;
+        if (!targetEv.operador && groupOps.length > 0) {
+          targetEv.operador = groupOps.join(', ');
+        }
+      } else {
+        const sumLiters = Math.round(group.loads.reduce((s, x) => s + (Number(x.liters) || 0), 0) * 10) / 10;
+        const sumCost = Math.round(group.loads.reduce((s, x) => s + (Number(x.cost) || 0), 0) * 100) / 100;
+        const anyGroupMoto = group.loads.some(fl => fl.motorIcon === '✂️' || /motoguad|guadañ|chapea|desbroz|orillad/i.test(fl.motorNombre || ''));
+        const singleLoad = group.loads.length === 1 ? group.loads[0] : null;
+        _ifcafeEvents.push({
+          id: `fuel_group_${group.lote.id}_${group.fecha}`,
+          isDb: false,
+          isFuelUsage: true,
+          isGuide: false,
+          loteId: group.lote.id,
+          loteNombre: group.lote.nombre,
+          showLote: !_ifcafeLoteId,
+          fecha: group.fecha,
+          matchFecha: group.matchFecha,
+          tipo: anyGroupMoto ? 'Motoguadañas' : 'Uso de equipos',
+          producto: singleLoad
+            ? singleLoad.motorNombre
+            : (anyGroupMoto ? 'Motoguadañas' : 'Equipos usados'),
+          motorIcon: anyGroupMoto ? '✂️' : (singleLoad?.motorIcon || '⚙️'),
+          linkedFuelLoads: group.loads,
+          liters: sumLiters,
+          cost: sumCost,
+          operador: groupOps.join(', '),
+          estado: 'Aplicada',
         });
       }
+    }
 
+    // 2. Resumen de labores por lote
+    targetLotes.forEach(lote => {
+      const numPlantas = parseInt(lote.num_plantas) || 0;
       const appsLoteCount = aplicaciones.filter(a => a.lote_id === lote.id && a.estado === 'Aplicada').length;
       _ifcafeLotes.push({
         id: lote.id,
@@ -1754,7 +2649,7 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
         variedad: lote.variedad || 'Café',
         numPlantas,
         realizadas: appsLoteCount,
-        total: totalPlan || appsLoteCount
+        total: appsLoteCount
       });
     });
 
@@ -1819,10 +2714,41 @@ export async function renderPlanIfcafe(filterLoteId, options = {}) {
 }
 
 export function initPlanIfcafe() {
+  window._togglePlanEvCard = function(cardEl, event) {
+    if (!cardEl || event?.target?.closest('button, a, img') || cardEl.closest('.plan-ev-swipe-wrap')?.dataset.swiped === '1') return;
+    const d = cardEl.querySelector('.plan-ev-details');
+    const c = cardEl.querySelector('.plan-ev-chevron');
+    if (!d) return;
+    const willOpen = d.style.display !== 'block';
+    const panel = document.getElementById('plan-day-details');
+    if (willOpen && panel) {
+      panel.querySelectorAll('.plan-ev').forEach((other) => {
+        if (other === cardEl) return;
+        const od = other.querySelector('.plan-ev-details');
+        const oc = other.querySelector('.plan-ev-chevron');
+        if (od) od.style.display = 'none';
+        if (oc) oc.style.transform = 'rotate(0deg)';
+      });
+    }
+    d.style.display = willOpen ? 'block' : 'none';
+    if (c) c.style.transform = willOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+    notifyExpandedActivityFooter();
+  };
+
+  window._syncPlanGastosFromBalance = (rows) => {
+    if (Array.isArray(rows)) {
+      _empresaGastosList = rows;
+      notifyExpandedActivityFooter();
+    }
+  };
+
+  window._syncExpandedPlanActivityFooter = () => notifyExpandedActivityFooter();
+
   const reloadCurrentView = (loteIdTarget) => {
     window.clearScreenCache?.('plan_ifcafe');
     window.clearScreenCache?.('detalle_lote');
     window.clearScreenCache?.('dashboard');
+    window.clearScreenCache?.('personal');
     if (document.getElementById('lote-bottom-sheet')?.classList.contains('open') && typeof window._reloadLoteSheetDetail === 'function') {
       window._reloadLoteSheetDetail(loteIdTarget || _ifcafeLoteId);
       return;
@@ -1995,12 +2921,80 @@ export function initPlanIfcafe() {
           method: 'PATCH',
           body: JSON.stringify(payload)
         });
-        window.Snackbar?.show('✅ Actividad actualizada exitosamente');
       } else {
         payload.empresa_id = empresaId;
         const result = await restInsert('/rest/v1/lote_aplicaciones', payload);
         if (!result) throw new Error('No se pudo guardar la actividad');
-        window.Snackbar?.show('✅ Actividad guardada correctamente');
+      }
+
+      const fuelLoads = Array.isArray(data._fuelLoads) ? data._fuelLoads : [];
+      if (fuelLoads.length > 0) {
+        const loteObj = _allLotes.find(l => String(l.id) === String(data.lote_id));
+        const loteNombre = loteObj?.nombre || '';
+        const todayIso = getLocalToday();
+        const parsedFecha = (data.fecha && data.fecha !== todayIso) ? new Date(`${data.fecha}T12:00:00`) : null;
+        const fechaIso = (parsedFecha && !Number.isNaN(parsedFecha.getTime()))
+          ? parsedFecha.toISOString()
+          : new Date().toISOString();
+        const operadorFuel = operadores || _currentUser?.user_metadata?.full_name || _currentUser?.email || 'Operador';
+        let anyPriceChanged = false;
+
+        for (const item of fuelLoads) {
+          const duracionMins = Math.max(1, Math.round(item.liters * (item.cfg?.horasPorLitro || 2) * 60));
+          const created = await restFetch('/rest/v1/motor_sesiones', {
+            method: 'POST',
+            body: JSON.stringify({
+              motor_id: item.motor.id,
+              empresa_id: empresaId,
+              fecha: fechaIso,
+              duracion_mins: duracionMins,
+              total_horas: item.liters,
+              operador: operadorFuel,
+              hora_inicio: encodeFuelLoadTag(item.unitPrice),
+              hora_fin: loteNombre || null,
+            }),
+          });
+          const savedRow = Array.isArray(created) ? created[0] : created;
+          if (navigator.onLine && !savedRow?.id) {
+            throw new Error('Supabase no confirmó la carga de gasolina');
+          }
+          if (savedRow?.id) await db.motor_sesiones.put(savedRow).catch(() => {});
+
+          if (item.unitPrice > 0) saveSharedFuelPrice(empresaId, item.unitPrice);
+          if (item.unitPrice > 0 && Math.abs(item.unitPrice - (item.cfg?.precioPorLitro || 0)) > 0.001) {
+            anyPriceChanged = true;
+            const cfg = item.cfg;
+            const updatedNotas = serializeMotorNotas(cfg.cleanNotas, {
+              modo: cfg.modo,
+              horasPorLitro: cfg.horasPorLitro,
+              precioPorLitro: item.unitPrice,
+              mantenimientos: cfg.mantenimientos,
+              forceTag: isLikelyFuelEquipment(item.motor.icon, item.motor.nombre),
+            });
+            const updMotor = await restFetch(`/rest/v1/motores?id=eq.${encodeURIComponent(item.motor.id)}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ notas: updatedNotas }),
+            }).catch(() => null);
+            const savedMotor = Array.isArray(updMotor) ? updMotor[0] : updMotor;
+            if (savedMotor?.id) await db.motores.put(savedMotor).catch(() => {});
+          }
+        }
+
+        invalidateCache('motor_sesiones');
+        invalidateCache('motores');
+        if (navigator.onLine) await syncTable('motor_sesiones', true).catch(() => {});
+        if (navigator.onLine && anyPriceChanged) await syncTable('motores', true).catch(() => {});
+        window.clearScreenCache?.('motores');
+        window.clearScreenCache?.('gastos');
+        window.clearScreenCache?.('personal');
+        const totalLitFuel = Math.round(fuelLoads.reduce((s, x) => s + x.liters, 0) * 10) / 10;
+        window.Snackbar?.show(
+          data.id
+            ? `✅ Actividad actualizada y ${formatLitersLabel(totalLitFuel)} de gasolina registrados`
+            : `✅ Actividad y ${formatLitersLabel(totalLitFuel)} de gasolina (${fuelLoads.length} ${fuelLoads.length === 1 ? 'equipo' : 'equipos'}) guardados`
+        );
+      } else {
+        window.Snackbar?.show(data.id ? '✅ Actividad actualizada exitosamente' : '✅ Actividad guardada correctamente');
       }
 
       invalidateCache('lote_aplicaciones');
@@ -2152,13 +3146,60 @@ export function initPlanIfcafe() {
 
   window.eliminarAplicacionDirecta = async function(appId) {
     if (!appId) return;
-    window.Snackbar?.confirm('¿Deseas eliminar este registro de actividad?', async () => {
+    const ev = _ifcafeEvents.find(e => String(e.id) === String(appId));
+    const linkedFuel = Array.isArray(ev?.linkedFuelLoads) ? ev.linkedFuelLoads.filter(fl => fl?.id) : [];
+    const confirmMsg = linkedFuel.length > 0
+      ? '¿Deseas eliminar esta actividad y sus cargas de gasolina asociadas?'
+      : '¿Deseas eliminar este registro de actividad?';
+    window.Snackbar?.confirm(confirmMsg, async () => {
       try {
-        await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${appId}`, {
+        await restFetch(`/rest/v1/lote_aplicaciones?id=eq.${encodeURIComponent(appId)}`, {
           method: 'DELETE'
         });
+        await db.lote_aplicaciones.delete(appId).catch(() => {});
+        for (const fl of linkedFuel) {
+          await restFetch(`/rest/v1/motor_sesiones?id=eq.${encodeURIComponent(fl.id)}`, {
+            method: 'DELETE'
+          });
+          await db.motor_sesiones.delete(fl.id).catch(() => {});
+        }
         invalidateCache('lote_aplicaciones');
+        if (linkedFuel.length > 0) {
+          invalidateCache('motor_sesiones');
+          window.clearScreenCache?.('motores');
+          window.clearScreenCache?.('gastos');
+        }
+        window.clearScreenCache?.('personal');
         window.Snackbar?.show('Actividad eliminada');
+        reloadCurrentView();
+      } catch (err) {
+        window.Snackbar?.show('Error al eliminar: ' + err.message, { type: 'error' });
+      }
+    });
+  };
+
+  window.eliminarCargasFuelGrupoDirecta = async function(groupId) {
+    if (!groupId) return;
+    const ev = _ifcafeEvents.find(e => String(e.id) === String(groupId));
+    const linkedFuel = Array.isArray(ev?.linkedFuelLoads) ? ev.linkedFuelLoads.filter(fl => fl?.id) : [];
+    if (linkedFuel.length === 0) return;
+    const msg = linkedFuel.length === 1
+      ? `¿Deseas eliminar el uso de "${linkedFuel[0].motorNombre || 'este equipo'}"?`
+      : `¿Deseas eliminar las ${linkedFuel.length} cargas de gasolina registradas en este lote?`;
+    window.Snackbar?.confirm(msg, async () => {
+      try {
+        for (const fl of linkedFuel) {
+          await restFetch(`/rest/v1/motor_sesiones?id=eq.${encodeURIComponent(fl.id)}`, {
+            method: 'DELETE'
+          });
+          await db.motor_sesiones.delete(fl.id).catch(() => {});
+        }
+        invalidateCache('motor_sesiones');
+        window.clearScreenCache?.('motores');
+        window.clearScreenCache?.('gastos');
+        window.clearScreenCache?.('personal');
+        window.clearScreenCache?.('personal');
+        window.Snackbar?.show('Uso de equipos eliminado');
         reloadCurrentView();
       } catch (err) {
         window.Snackbar?.show('Error al eliminar: ' + err.message, { type: 'error' });

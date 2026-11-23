@@ -199,7 +199,7 @@ const updateSW = registerSW({
 
 import { isOnline, processSyncQueue, incrementalSync, fullDownload } from './sync.js';
 import { registerPushToken, initForegroundPush, checkPushAlerts } from './push/push.js';
-import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAplicacionesDelMes, checkAnalisisSueloPendiente, checkEnmiendaCal, checkPartosProximos, checkMotoresAceite } from './wa.js';
+import { checkPendingVaccines, checkPendingFumigaciones, checkOverdueVaccines, checkUpcomingVaccines, checkAnalisisSueloPendiente, checkEnmiendaCal, checkPartosProximos, checkMotoresAceite } from './wa.js';
 import db from './db.js';
 import { isAuthenticated, loadEmpresaId, getUser, restFetch, getUserEmpresas, switchEmpresa, tryRefreshSession, loadWhatsAppConfig, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 import { initRealtime, disconnectRealtime } from './realtime.js';
@@ -655,7 +655,6 @@ function initOnlineSync() {
       await checkPendingFumigaciones();
       await checkOverdueVaccines();
       await checkUpcomingVaccines();
-      await checkAplicacionesDelMes();
       await checkAnalisisSueloPendiente();
       await checkEnmiendaCal();
       await checkPartosProximos();

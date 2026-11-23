@@ -2,7 +2,6 @@ import { supabase } from '../supabase.js';
 import { restFetch, restInsert, loadPuntoReferencia } from '../auth.js';
 import { showNamePrompt } from '../modals.js';
 import { sendWhatsApp } from '../wa.js';
-import { getPlanIfcafe, getZonaLabel, calcularDosis } from '../utils/calculadora_dosis.js';
 import { renderM3SearchBar, initM3FullScreenSearch, escapeSearchHtml } from '../components/m3_search.js';
 
 function escapeHtml(str) {
@@ -199,12 +198,12 @@ export async function renderNuevoLote(id) {
           <div style="margin-top: 24px; margin-bottom: 16px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="material-icons" style="color: var(--m3-primary); font-size: 20px;">eco</span>
-              <h3 style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Plan de Fertilización 2026</h3>
+              <h3 style="font-family: 'Work Sans', sans-serif; font-size: 16px; font-weight: 800; color: var(--m3-on-surface); margin: 0;">Características del Cafetal</h3>
             </div>
           </div>
           <div class="m3-grid-2col">
             <div class="m3-field ${val('edad_categoria') ? 'has-value' : ''}">
-              <select name="edad_categoria" required>
+              <select name="edad_categoria">
                 <option value="" disabled ${!lote ? 'selected' : ''} hidden></option>
                 <option value="1_anio" ${selected('edad_categoria', '1_anio')}>Café Tiernito (1 año)</option>
                 <option value="2_anios" ${selected('edad_categoria', '2_anios')}>Café Creciendo (2 años)</option>
@@ -3127,37 +3126,6 @@ export async function setupNuevoLoteListeners() {
       }
       
       if (!newLoteId) throw new Error('No se pudo crear/actualizar el lote');
-
-      // El plan IFCAFE ya no se materializa en lote_aplicaciones:
-      // se calcula al vuelo desde calculadora_dosis.js. Solo se envía
-      // el resumen por WhatsApp al crear un lote nuevo.
-      if (!submitLoteId && newLoteId) {
-        const edadCat = data.edad_categoria;
-        const altura = parseInt(data.altura_msnm) || 0;
-        const numPlantas = parseInt(data.num_plantas) || 0;
-        const plan = getPlanIfcafe(altura);
-
-        if (edadCat && plan.length > 0) {
-          const zonaLabel = getZonaLabel(altura);
-          const dosisCalc = calcularDosis(edadCat, numPlantas);
-          const planLines = plan.map(function(item) {
-            return '  ' + item.mesLabel + ' — ' + item.tipo + ': ' + item.producto;
-          }).join('\n');
-
-          if (edadCat && numPlantas > 0) {
-            var msg = '📋 Plan de Fertilización 2026 generado\n\n' +
-              'Lote: ' + data.nombre +
-              '\nEdad: ' + dosisCalc.label +
-              '\n🥤 Dosis: ' + dosisCalc.porAplicacion.vasitoLabel + ' (' + dosisCalc.porAplicacion.onzas + ' oz / ' + dosisCalc.porAplicacion.gramos + 'g)' +
-              '\nPlantas: ' + numPlantas +
-              '\n📦 ' + dosisCalc.sacosNecesarios + ' saco(s) por aplicación' +
-              '\n📍 Zona: ' + zonaLabel +
-              '\n\n📅 5 aplicaciones programadas:\n' + planLines +
-              '\n\nFinca: ' + (window._empresaNombre || '');
-            sendWhatsApp(msg);
-          }
-        }
-      }
 
       // Reload existing lotes layer to show updated data
       if (existingLotesLayer && mapInstance) {

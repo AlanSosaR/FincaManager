@@ -6,6 +6,17 @@ import { renderDetalleLote, initDetalleLote } from './detalle_lote.js';
 import { createCosechaController } from './cosecha_lote.js';
 import { showModal, closeModal } from '../modals.js';
 import { mergeCategories, openNewCategoryBottomSheet } from '../utils/custom_categories.js';
+import { formatLitersLabel, formatCurrencyL } from '../utils/motor_fuel_config.js';
+import {
+  fetchAreaFuelUsage,
+  fetchLotePendingLabor,
+  fetchEmpresaGastosFresh,
+  sendFuelLoadsToCuentas,
+  sendLoteLaborToCuentas,
+  stripGastoInternalTags,
+  toLocalIsoDate,
+  getWeeklyExpenseGroupInfo
+} from '../utils/motor_fuel_cuentas.js';
 
 let allLotes = [];
 let currentLotesSearchQuery = '';
@@ -341,6 +352,9 @@ export async function renderDashboard() {
           box-shadow: none !important;
           padding: 12px 0 !important;
           margin-bottom: 8px !important;
+        }
+        #lote-sheet-full-detail .plan-ev-swipe-wrap .plan-ev {
+          margin-bottom: 0 !important;
         }
         #lote-sheet-full-detail .dl-evo-card {
           background: transparent !important;
@@ -721,7 +735,7 @@ export async function renderDashboard() {
                     <span class="ganado-tag-swatch" style="background: rgba(45,62,44,0.08); border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0;">🌿</span>
                     <span class="ganado-tag-info" style="display: flex; flex-direction: column; min-width: 0;">
                       <span style="font-size: 14px; font-weight: 800; color: #2d3e2c; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Manejo Cafetal</span>
-                      <span style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.2px; white-space: nowrap;">Registro / Plan</span>
+                      <span style="font-size: 10px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 0.2px; white-space: nowrap;">Registro / Agenda</span>
                     </span>
                   </div>
                   <span class="material-icons" style="color: #2d3e2c; font-size: 19px; flex-shrink: 0; margin-left: 6px;">chevron_right</span>
@@ -1360,9 +1374,62 @@ export async function initDashboard() {
     const fixedFooter = document.getElementById('lote-sheet-fixed-footer');
     if (fixedFooter) {
       let activeSheetTab = 'manejo';
+      let currentBalanceAreaFuel = null;
+      let currentBalanceAreaLabor = null;
+      let currentExpandedPlanActivity = null;
       const getTodayLocalStr = () => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+      let balActivePeriod = 'todo'; // 'todo' | 'dia' | 'semana' | 'mes'
+      let balSelectedDateIso = getTodayLocalStr();
+      let balCachedLoteMovs = [];
+      const BAL_MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      const BAL_SHORT_MONTHS_CAP = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const BAL_DAYS_CAP = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      const BAL_DAYS_FULL = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const balIsoToDate = (iso) => {
+        const parts = String(iso || '').slice(0, 10).split('-');
+        if (parts.length !== 3) return new Date();
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
+      };
+      const balDateToIso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      const balGetWeekBounds = (iso) => {
+        const dt = balIsoToDate(iso);
+        const day = dt.getDay();
+        const diffToMon = day === 0 ? -6 : 1 - day;
+        const mon = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + diffToMon, 12, 0, 0);
+        const days = [];
+        for (let i = 0; i < 7; i++) {
+          const cur = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i, 12, 0, 0);
+          days.push({ dt: cur, iso: balDateToIso(cur) });
+        }
+        return { start: days[0].iso, end: days[6].iso, days };
+      };
+      const balShiftIsoDays = (iso, delta) => {
+        const dt = balIsoToDate(iso);
+        dt.setDate(dt.getDate() + delta);
+        return balDateToIso(dt);
+      };
+      const balShiftIsoMonths = (iso, delta) => {
+        const dt = balIsoToDate(iso);
+        const targetDay = dt.getDate();
+        const shifted = new Date(dt.getFullYear(), dt.getMonth() + delta, 1, 12, 0, 0);
+        const lastDay = new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0).getDate();
+        shifted.setDate(Math.min(targetDay, lastDay));
+        return balDateToIso(shifted);
+      };
+      const matchesBalPeriod = (isoDate) => {
+        const iso = String(isoDate || '').slice(0, 10);
+        if (balActivePeriod === 'todo') return true;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+        if (balActivePeriod === 'dia') return iso === balSelectedDateIso;
+        if (balActivePeriod === 'semana') {
+          const { start, end } = balGetWeekBounds(balSelectedDateIso);
+          return iso >= start && iso <= end;
+        }
+        if (balActivePeriod === 'mes') return iso.slice(0, 7) === balSelectedDateIso.slice(0, 7);
+        return true;
       };
       const formatShortL = (n) => `L ${Math.round(Number(n) || 0).toLocaleString('es-HN')}`;
       const formatDecL = (n) => `L ${(Number(n) || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1378,10 +1445,259 @@ export async function initDashboard() {
         if (!balWrap) return;
         balWrap.innerHTML = `<div style="padding:24px; text-align:center; color:#556b53; font-size:13px; font-weight:600;">Cargando balance de cuentas...</div>`;
         try {
-          const { data: allGastos = [] } = await supabase.from('gastos').select('*');
-          const loteMovs = (allGastos || [])
+          const allGastos = await fetchEmpresaGastosFresh().catch(async () => {
+            const { data = [] } = await supabase.from('gastos').select('*');
+            return data || [];
+          });
+          window._syncPlanGastosFromBalance?.(allGastos);
+          balCachedLoteMovs = (allGastos || [])
             .filter(g => g.lote_id === lote.id)
             .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+          const [areaFuel, areaLabor] = await Promise.all([
+            fetchAreaFuelUsage({
+              areaType: 'lote',
+              areaId: lote.id,
+              areaName: lote.nombre,
+              existingGastos: allGastos
+            }).catch(() => ({
+              loads: [],
+              pendingLoads: [],
+              unpricedLoads: [],
+              pendingAmount: 0,
+              sentByLoadId: new Map()
+            })),
+            fetchLotePendingLabor({
+              loteId: lote.id,
+              loteNombre: lote.nombre,
+              existingGastos: allGastos
+            }).catch(() => ({
+              items: [],
+              pendingItems: [],
+              unpricedItems: [],
+              pendingAmount: 0,
+              totalAmount: 0
+            }))
+          ]);
+          currentBalanceAreaFuel = areaFuel;
+          currentBalanceAreaLabor = areaLabor;
+          syncFooterButtons();
+          renderLoteBalanceUI();
+        } catch (err) {
+          balCachedLoteMovs = [];
+          currentBalanceAreaFuel = null;
+          currentBalanceAreaLabor = null;
+          syncFooterButtons();
+          balWrap.innerHTML = `<div style="padding:20px; text-align:center; color:#ba1a1a; font-size:13px;">Error cargando balance: ${escapeHtml(err.message)}</div>`;
+        }
+      };
+
+      const renderLoteBalanceUI = () => {
+        const balWrap = document.getElementById('dl-balance-wrap');
+        if (!balWrap) return;
+        if (!balSelectedDateIso) balSelectedDateIso = getTodayLocalStr();
+        const prevBalPeriodScroll = document.getElementById('bal-period-pills')?.scrollLeft || 0;
+        const areaFuel = currentBalanceAreaFuel || { loads: [], pendingLoads: [], unpricedLoads: [], pendingAmount: 0, sentByLoadId: new Map() };
+        const areaLabor = currentBalanceAreaLabor || { items: [], pendingItems: [], unpricedItems: [], pendingAmount: 0, totalAmount: 0 };
+
+        const allFuelDisplayRows = [...areaFuel.pendingLoads, ...areaFuel.unpricedLoads];
+        const allLaborDisplayRows = [...areaLabor.pendingItems, ...areaLabor.unpricedItems];
+        const todayIso = getTodayLocalStr();
+
+        const balMovDatesSet = new Set();
+        for (const m of balCachedLoteMovs) {
+          const f = String(m.fecha || '').slice(0, 10);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(f)) balMovDatesSet.add(f);
+        }
+        for (const fl of allFuelDisplayRows) {
+          const f = toLocalIsoDate(fl.fecha || fl.created_at);
+          if (f) balMovDatesSet.add(f);
+        }
+        for (const it of allLaborDisplayRows) {
+          const f = String(it.fecha || '').slice(0, 10);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(f)) balMovDatesSet.add(f);
+        }
+
+        const fuelDisplayRows = allFuelDisplayRows.filter(fl => matchesBalPeriod(toLocalIsoDate(fl.fecha || fl.created_at)));
+        const laborDisplayRows = allLaborDisplayRows.filter(it => matchesBalPeriod(String(it.fecha || '').slice(0, 10) || todayIso));
+        const hasAnyPendingCard = fuelDisplayRows.length > 0 || laborDisplayRows.length > 0;
+        const filteredFuelPendingAmt = fuelDisplayRows
+          .filter(fl => fl._needsSync)
+          .reduce((s, fl) => s + (Number(fl._cost) || 0), 0);
+        const filteredLaborPendingAmt = laborDisplayRows
+          .filter(it => it._needsSync)
+          .reduce((s, it) => s + (Number(it.pagoDiario) || 0), 0);
+        const visiblePendingAmount = Math.round((filteredFuelPendingAmt + filteredLaborPendingAmt) * 100) / 100;
+        const combinedPendingAmount = visiblePendingAmount;
+
+          const yObj = new Date();
+          yObj.setDate(yObj.getDate() - 1);
+          const yesterdayIso = `${yObj.getFullYear()}-${String(yObj.getMonth() + 1).padStart(2, '0')}-${String(yObj.getDate()).padStart(2, '0')}`;
+          const formatPendingDayLabel = (isoDate) => {
+            if (!isoDate) return 'Sin fecha';
+            if (isoDate === todayIso) return `Hoy · ${formatShortDate(isoDate)}`;
+            if (isoDate === yesterdayIso) return `Ayer · ${formatShortDate(isoDate)}`;
+            const d = new Date(`${isoDate}T12:00:00`);
+            if (Number.isNaN(d.getTime())) return isoDate;
+            const wd = d.toLocaleDateString('es-ES', { weekday: 'short' }).replace('.', '');
+            const wdCap = wd.charAt(0).toUpperCase() + wd.slice(1);
+            return `${wdCap}, ${formatShortDate(isoDate)}`;
+          };
+
+          const pendingByDayMap = new Map();
+          const ensurePendingDay = (isoDate) => {
+            if (!pendingByDayMap.has(isoDate)) {
+              pendingByDayMap.set(isoDate, {
+                fecha: isoDate,
+                fuelLoads: [],
+                laborItems: [],
+                fuelLiters: 0,
+                fuelCost: 0,
+                laborCost: 0,
+                totalCost: 0,
+              });
+            }
+            return pendingByDayMap.get(isoDate);
+          };
+
+          for (const fl of fuelDisplayRows) {
+            const iso = toLocalIsoDate(fl.fecha || fl.created_at);
+            const bucket = ensurePendingDay(iso);
+            bucket.fuelLoads.push(fl);
+            bucket.fuelLiters = Math.round((bucket.fuelLiters + (Number(fl._liters) || 0)) * 10) / 10;
+            bucket.fuelCost = Math.round((bucket.fuelCost + (Number(fl._cost) || 0)) * 100) / 100;
+            bucket.totalCost = Math.round((bucket.fuelCost + bucket.laborCost) * 100) / 100;
+          }
+
+          for (const it of laborDisplayRows) {
+            const rawFecha = String(it.fecha || '').slice(0, 10);
+            const iso = /^\d{4}-\d{2}-\d{2}$/.test(rawFecha) ? rawFecha : todayIso;
+            const bucket = ensurePendingDay(iso);
+            bucket.laborItems.push(it);
+            bucket.laborCost = Math.round((bucket.laborCost + (Number(it.pagoDiario) || 0)) * 100) / 100;
+            bucket.totalCost = Math.round((bucket.fuelCost + bucket.laborCost) * 100) / 100;
+          }
+
+          const pendingDayEntries = Array.from(pendingByDayMap.values())
+            .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+          const loteMovs = balCachedLoteMovs.filter(m => matchesBalPeriod(String(m.fecha || '').slice(0, 10)));
+
+          const balPeriods = [
+            { key: 'todo', label: 'Todo' },
+            { key: 'dia', label: 'Día' },
+            { key: 'semana', label: 'Semana' },
+            { key: 'mes', label: 'Mes' },
+          ];
+          const balPeriodPillsHtml = `
+            <div id="bal-period-pills" style="display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:2px; scrollbar-width:none;">
+              ${balPeriods.map(p => {
+                const isAct = balActivePeriod === p.key;
+                return `
+                  <button type="button" class="bal-period-pill ${isAct ? 'active' : ''}" data-bal-period="${p.key}" style="flex:0 0 auto; height:38px; padding:0 16px; border-radius:999px; border:1.5px solid ${isAct ? '#2d3e2c' : '#d5e2d2'}; background:${isAct ? '#2d3e2c' : '#ffffff'}; color:${isAct ? '#ffffff' : '#1e3e2b'}; font-family:'Work Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .15s;">
+                    ${p.label}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          `;
+
+          let balDateNavHtml = '';
+          if (balActivePeriod !== 'todo') {
+            const selDt = balIsoToDate(balSelectedDateIso);
+            const weekInfo = balGetWeekBounds(balSelectedDateIso);
+            if (balActivePeriod === 'dia') {
+              const isToday = balSelectedDateIso === todayIso;
+              const dayName = BAL_DAYS_FULL[selDt.getDay()];
+              const dayNum = selDt.getDate();
+              const monthYear = `${BAL_MONTH_NAMES[selDt.getMonth()]} ${selDt.getFullYear()}`;
+              balDateNavHtml = `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 4px 12px;">
+                  <button type="button" id="bal-nav-prev" aria-label="Día anterior" style="width:38px; height:38px; border-radius:50%; border:1px solid #d5e2d2; background:#f2f6f1; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                    <span class="material-symbols-outlined" style="font-size:21px;">chevron_left</span>
+                  </button>
+                  <div style="text-align:center; flex:1;">
+                    <div style="font-size:14.5px; font-weight:700; color:#2d3e2c;">${escapeHtml(dayName)}</div>
+                    <div style="font-size:42px; font-weight:800; line-height:1.08; margin:2px 0; color:${isToday ? '#f97316' : '#111827'};">${dayNum}</div>
+                    <div style="font-size:14px; font-weight:700; color:#2d3e2c;">${escapeHtml(monthYear)}</div>
+                  </div>
+                  <button type="button" id="bal-nav-next" aria-label="Día siguiente" style="width:38px; height:38px; border-radius:50%; border:1px solid #d5e2d2; background:#f2f6f1; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                    <span class="material-symbols-outlined" style="font-size:21px;">chevron_right</span>
+                  </button>
+                </div>
+              `;
+            } else if (balActivePeriod === 'semana') {
+              const sDt = weekInfo.days[0].dt;
+              const eDt = weekInfo.days[6].dt;
+              const weekTitle = sDt.getMonth() === eDt.getMonth()
+                ? `${sDt.getDate()} – ${eDt.getDate()} ${BAL_SHORT_MONTHS_CAP[sDt.getMonth()]} ${sDt.getFullYear()}`
+                : `${sDt.getDate()} ${BAL_SHORT_MONTHS_CAP[sDt.getMonth()]} – ${eDt.getDate()} ${BAL_SHORT_MONTHS_CAP[eDt.getMonth()]} ${eDt.getFullYear()}`;
+              balDateNavHtml = `
+                <div style="margin:2px 0 12px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+                    <button type="button" id="bal-nav-prev" aria-label="Semana anterior" style="width:34px; height:34px; border-radius:50%; border:1px solid #d5e2d2; background:#f2f6f1; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                      <span class="material-symbols-outlined" style="font-size:19px;">chevron_left</span>
+                    </button>
+                    <span style="font-size:14.5px; font-weight:800; color:#111827;">${escapeHtml(weekTitle)}</span>
+                    <button type="button" id="bal-nav-next" aria-label="Semana siguiente" style="width:34px; height:34px; border-radius:50%; border:1px solid #d5e2d2; background:#f2f6f1; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                      <span class="material-symbols-outlined" style="font-size:19px;">chevron_right</span>
+                    </button>
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:6px;">
+                    ${weekInfo.days.map(({ dt, iso }) => {
+                      const isToday = iso === todayIso;
+                      const hasMov = balMovDatesSet.has(iso);
+                      return `
+                        <button type="button" class="bal-nav-day-card" data-iso="${iso}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 2px; min-height:56px; border-radius:16px; border:1px solid #e6ece4; background:#fafcf9; color:#111827; cursor:pointer; font-family:inherit;">
+                          <span style="font-size:11px; font-weight:600; opacity:0.65;">${BAL_DAYS_CAP[dt.getDay()]}</span>
+                          <span style="font-size:15px; font-weight:800; margin-top:2px; color:${isToday ? '#f97316' : '#111827'};">${dt.getDate()}</span>
+                          <span style="width:5px; height:5px; border-radius:50%; margin-top:3px; background:${hasMov ? '#2d3e2c' : 'transparent'};"></span>
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              `;
+            } else if (balActivePeriod === 'mes') {
+              const y = selDt.getFullYear();
+              const m = selDt.getMonth();
+              const firstDay = new Date(y, m, 1);
+              const startOffset = (firstDay.getDay() + 6) % 7;
+              const daysInMonth = new Date(y, m + 1, 0).getDate();
+              const cells = [];
+              for (let i = 0; i < startOffset; i++) cells.push({ empty: true });
+              for (let d = 1; d <= daysInMonth; d++) {
+                const iso = balDateToIso(new Date(y, m, d));
+                cells.push({ day: d, iso, isToday: iso === todayIso, hasMov: balMovDatesSet.has(iso) });
+              }
+              balDateNavHtml = `
+                <div style="background:#f8faf7; border:1px solid #e3ebe1; border-radius:18px; padding:12px; margin:2px 0 12px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <button type="button" id="bal-nav-prev" aria-label="Mes anterior" style="width:32px; height:32px; border-radius:50%; border:1px solid #d5e2d2; background:#ffffff; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                      <span class="material-symbols-outlined" style="font-size:19px;">chevron_left</span>
+                    </button>
+                    <span style="font-size:14.5px; font-weight:800; color:#1e3e2b;">${BAL_MONTH_NAMES[m]} ${y}</span>
+                    <button type="button" id="bal-nav-next" aria-label="Mes siguiente" style="width:32px; height:32px; border-radius:50%; border:1px solid #d5e2d2; background:#ffffff; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer;">
+                      <span class="material-symbols-outlined" style="font-size:19px;">chevron_right</span>
+                    </button>
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center; margin-bottom:4px;">
+                    ${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(w => `<span style="font-size:11px; font-weight:700; color:#647462; padding:3px 0;">${w}</span>`).join('')}
+                  </div>
+                  <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; text-align:center;">
+                    ${cells.map(c => {
+                      if (c.empty) return `<span></span>`;
+                      return `
+                        <button type="button" class="bal-nav-cal-day" data-iso="${c.iso}" style="height:36px; border-radius:12px; border:none; background:transparent; color:${c.isToday ? '#f97316' : '#111827'}; font-size:13px; font-weight:${c.isToday || c.hasMov ? '800' : '600'}; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;">
+                          <span>${c.day}</span>
+                          ${c.hasMov ? `<span style="width:4px; height:4px; border-radius:50%; background:#2d3e2c;"></span>` : `<span style="height:4px;"></span>`}
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              `;
+            }
+          }
 
           const isIngresoMov = (m) => {
             const cat = String(m.categoria || '').toLowerCase();
@@ -1428,6 +1744,33 @@ export async function initDashboard() {
             const countLabel = `${count} ${count === 1 ? 'movimiento' : 'movimientos'}`;
             const cardId = `bal-cat-${isIngSection ? 'ing' : 'egr'}-${idx}`;
             const accentColor = isIngSection ? '#1b6e1b' : '#b34200';
+            const dayGroupMap = new Map();
+            info.items.forEach(g => {
+              const rawIso = String(g.fecha || '').slice(0, 10);
+              const iso = /^\d{4}-\d{2}-\d{2}$/.test(rawIso) ? rawIso : toLocalIsoDate(g.fecha || g.created_at);
+              const weeklyInfo = !isIngSection ? getWeeklyExpenseGroupInfo(g) : null;
+              const groupKey = weeklyInfo ? `week__${weeklyInfo.kind}__${weeklyInfo.weekStartIso}` : iso;
+              if (!dayGroupMap.has(groupKey)) {
+                dayGroupMap.set(groupKey, {
+                  key: groupKey,
+                  fecha: iso,
+                  sortDate: iso,
+                  title: weeklyInfo?.label || formatPendingDayLabel(iso),
+                  isWeekly: Boolean(weeklyInfo),
+                  weeklyKind: weeklyInfo?.kind || '',
+                  regDates: new Set(),
+                  total: 0,
+                  items: []
+                });
+              }
+              const bucket = dayGroupMap.get(groupKey);
+              if (iso > bucket.sortDate) bucket.sortDate = iso;
+              if (iso) bucket.regDates.add(iso);
+              bucket.total += (Number(g.monto) || 0);
+              bucket.items.push(g);
+            });
+            const catDayEntries = Array.from(dayGroupMap.values())
+              .sort((a, b) => b.sortDate.localeCompare(a.sortDate) || b.total - a.total);
             return `
               <div class="bal-cat-card" data-target="${cardId}" style="background:#ffffff; border:1px solid #e6ece4; border-radius:16px; padding:12px 14px; margin-bottom:10px; cursor:pointer;">
                 <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:8px;">
@@ -1443,34 +1786,92 @@ export async function initDashboard() {
                 <div style="width:100%; height:6px; background:${isIngSection ? '#e7eee6' : '#f1ebe7'}; border-radius:999px; overflow:hidden;">
                   <div style="width:${pct}%; height:100%; background:${accentColor}; border-radius:999px;"></div>
                 </div>
-                <div id="${cardId}" class="bal-cat-body" style="display:none; margin-top:12px; padding-left:12px; border-left:2px solid #d5e2d2;">
-                  ${info.items.map((g, itemIdx) => `
-                    <div class="bal-mov-swipe-wrap" data-mov-id="${escapeHtml(g.id)}" style="position:relative; overflow:hidden; border-radius:10px; ${itemIdx < info.items.length - 1 ? 'border-bottom:1px solid #f0f4ef;' : ''}">
-                      <div class="bal-swipe-bg" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; pointer-events:none; background:transparent;">
-                        <div class="bal-swipe-del-bg" style="color:#ffffff; display:flex; align-items:center; gap:6px; padding:0 16px; font-size:12.5px; font-weight:700; opacity:0;">
-                          <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
-                          <span>Eliminar</span>
+                <div id="${cardId}" class="bal-cat-body" style="display:none; margin-top:10px;">
+                  <div style="display:flex; flex-direction:column; gap:7px;">
+                    ${catDayEntries.map((day, dayIdx) => {
+                      const dayBodyId = `${cardId}-day-${dayIdx}`;
+                      const openDayByDefault = catDayEntries.length === 1;
+                      const dayMovCountLabel = `${day.items.length} ${day.items.length === 1 ? 'movimiento' : 'movimientos'}`;
+                      let regDateSuffix = '';
+                      if (day.isWeekly && day.regDates.size > 0) {
+                        const sortedReg = Array.from(day.regDates).sort((a, b) => b.localeCompare(a));
+                        const regTxt = sortedReg.length === 1
+                          ? formatShortDate(sortedReg[0])
+                          : `${formatShortDate(sortedReg[sortedReg.length - 1])}–${formatShortDate(sortedReg[0])}`;
+                        if (regTxt) regDateSuffix = ` · Registrado ${regTxt}`;
+                      }
+                      return `
+                        <div class="bal-cat-day-card" data-target="${dayBodyId}" style="background:#f9fbf8; border:1px solid #e2eae0; border-radius:12px; padding:9px 11px; cursor:pointer;">
+                          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                            <div style="min-width:0; flex:1;">
+                              <div style="font-size:13px; font-weight:800; color:#192b18; line-height:1.2;">${escapeHtml(day.title)}</div>
+                              <div style="font-size:11px; font-weight:600; color:#5a6b58; margin-top:2px;">${escapeHtml(dayMovCountLabel + regDateSuffix)}</div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                              <span style="font-size:13.5px; font-weight:800; color:${accentColor}; white-space:nowrap;">${isIngSection ? '+' : '–'} ${formatShortL(day.total)}</span>
+                              <span class="material-symbols-outlined bal-cat-day-chev" style="font-size:18px; color:#5a6b58; transition:transform .2s; transform:${openDayByDefault ? 'rotate(180deg)' : 'rotate(0deg)'};">keyboard_arrow_down</span>
+                            </div>
+                          </div>
+                          <div id="${dayBodyId}" style="display:${openDayByDefault ? 'block' : 'none'}; margin-top:8px; padding-top:6px; border-top:1px dashed #d8e2d5;">
+                            <div style="display:flex; flex-direction:column; gap:5px;">
+                              ${day.items.map((g) => {
+                                const cleanText = stripGastoInternalTags(g.descripcion) || 'Sin descripción';
+                                let rowMainTitle = cleanText;
+                                let rowSubText = '';
+                                if (day.isWeekly) {
+                                  const cosMatch = cleanText.match(/^Cosecha\s+(Semana\s+[^·]+?)\s*·\s*([^(]+?)(?:\s*\(([^)]+)\))?$/i);
+                                  if (cosMatch) {
+                                    rowMainTitle = cosMatch[2].trim() || cleanText;
+                                    const latasTxt = (cosMatch[3] || '').trim();
+                                    if (latasTxt) {
+                                      rowSubText = /de\s+caf[eé]/i.test(latasTxt) ? latasTxt : `${latasTxt} de café`;
+                                    }
+                                  } else if (day.weeklyKind === 'personal') {
+                                    rowMainTitle = cleanText
+                                      .replace(/^Planilla\s+Semanal:\s*/i, '')
+                                      .replace(/\(\s*Semana\s+[^)]+\)\s*/gi, '')
+                                      .replace(/\s{2,}/g, ' ')
+                                      .trim() || cleanText;
+                                  }
+                                }
+                                return `
+                                  <div class="bal-mov-swipe-wrap" data-mov-id="${escapeHtml(g.id)}" style="position:relative; overflow:hidden; border-radius:10px; border:1px solid #e8eee6; background:#ffffff;">
+                                    <div class="bal-swipe-bg" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; pointer-events:none; background:transparent;">
+                                      <div class="bal-swipe-del-bg" style="color:#ffffff; display:flex; align-items:center; gap:6px; padding:0 16px; font-size:12.5px; font-weight:700; opacity:0;">
+                                        <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
+                                        <span>Eliminar</span>
+                                      </div>
+                                      <div class="bal-swipe-edit-bg" style="color:#ffffff; display:flex; align-items:center; gap:6px; padding:0 16px; font-size:12.5px; font-weight:700; opacity:0;">
+                                        <span>Editar</span>
+                                        <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
+                                      </div>
+                                    </div>
+                                    <div class="bal-mov-row" style="position:relative; z-index:2; background:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:10px; touch-action:pan-y; user-select:none; -webkit-user-select:none; transition:transform .18s ease;">
+                                      <div style="min-width:0; flex:1;">
+                                        <div style="font-size:13px; font-weight:600; color:#111827; line-height:1.25;">${escapeHtml(rowMainTitle)}</div>
+                                        ${rowSubText ? `<div style="font-size:11px; color:#5a6b58; margin-top:2px;">${escapeHtml(rowSubText)}</div>` : ''}
+                                      </div>
+                                      <div style="font-size:13px; font-weight:800; color:${accentColor}; white-space:nowrap; flex-shrink:0;">${isIngSection ? '+' : '–'} ${formatShortL(g.monto)}</div>
+                                    </div>
+                                  </div>
+                                `;
+                              }).join('')}
+                            </div>
+                          </div>
                         </div>
-                        <div class="bal-swipe-edit-bg" style="color:#ffffff; display:flex; align-items:center; gap:6px; padding:0 16px; font-size:12.5px; font-weight:700; opacity:0;">
-                          <span>Editar</span>
-                          <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
-                        </div>
-                      </div>
-                      <div class="bal-mov-row" style="position:relative; z-index:2; background:#ffffff; display:flex; align-items:flex-start; gap:14px; padding:9px 4px; touch-action:pan-y; user-select:none; -webkit-user-select:none; transition:transform .18s ease;">
-                        <div style="font-size:13.5px; font-weight:800; color:${accentColor}; min-width:82px; white-space:nowrap;">${isIngSection ? '+' : '–'} ${formatShortL(g.monto)}</div>
-                        <div style="min-width:0; flex:1;">
-                          <div style="font-size:13.5px; font-weight:600; color:#111827; line-height:1.25;">${escapeHtml(g.descripcion || 'Sin descripción')}</div>
-                          <div style="font-size:11.5px; color:#5a6b58; margin-top:2px;">${escapeHtml(formatShortDate(g.fecha))}</div>
-                        </div>
-                      </div>
-                    </div>
-                  `).join('')}
+                      `;
+                    }).join('')}
+                  </div>
                 </div>
               </div>
             `;
           }).join('');
 
           balWrap.innerHTML = `
+            <!-- Filtro de Período: Todo | Día | Semana | Mes -->
+            ${balPeriodPillsHtml}
+            <div id="bal-date-nav-wrap">${balDateNavHtml}</div>
+
             <!-- 3 Tarjetas de Resumen: Invertido | Ingresos | Balance -->
             <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:10px;">
               <div style="background:#ffffff; border:1px solid #e6ece4; border-radius:14px; padding:10px 12px;">
@@ -1493,6 +1894,85 @@ export async function initDashboard() {
               <span style="font-size:14.5px; font-weight:800; color:#111827;">${numPlantas > 0 ? formatDecL(costoPorPlanta) : '—'}</span>
             </div>
 
+            <!-- Gastos del Lote pendientes de enviar agrupados por día (Equipos y Personal) -->
+            ${hasAnyPendingCard ? `
+              <div id="dl-fuel-pending-card" style="background:#fff9f5; border:1.5px solid #f0c29c; border-radius:16px; padding:13px 14px; margin-bottom:16px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+                  <div style="display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:800; color:#9a3412; text-transform:uppercase; letter-spacing:0.5px;">
+                    <span class="material-symbols-outlined" style="font-size:16px;">receipt_long</span>
+                    <span>Gastos del lote · Pendiente por día</span>
+                  </div>
+                  <span style="font-size:11px; font-weight:700; color:#9a3412; opacity:0.8;">Toca para ver</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                  ${pendingDayEntries.map((day, idx) => {
+                    const dayCardId = `bal-pending-day-${idx}`;
+                    const openByDefault = pendingDayEntries.length === 1;
+                    const hasBoth = day.fuelLoads.length > 0 && day.laborItems.length > 0;
+                    const summaryParts = [];
+                    if (day.fuelLoads.length > 0) {
+                      summaryParts.push(`⛽ ${formatLitersLabel(day.fuelLiters)}${hasBoth && day.fuelCost > 0 ? ` (${escapeHtml(formatCurrencyL(day.fuelCost))})` : ''}`);
+                    }
+                    if (day.laborItems.length > 0) {
+                      summaryParts.push(`👥 ${day.laborItems.length} ${day.laborItems.length === 1 ? 'persona' : 'personas'}${hasBoth && day.laborCost > 0 ? ` (${escapeHtml(formatCurrencyL(day.laborCost))})` : ''}`);
+                    }
+                    return `
+                      <div class="bal-pending-day-card" data-target="${dayCardId}" style="background:#ffffff; border:1px solid #f0d7c2; border-radius:13px; padding:10px 12px; cursor:pointer;">
+                        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+                          <div style="min-width:0; flex:1;">
+                            <div style="font-size:13.5px; font-weight:800; color:#192b18; line-height:1.2;">${escapeHtml(formatPendingDayLabel(day.fecha))}</div>
+                            ${summaryParts.length > 0 ? `<div style="font-size:11.5px; font-weight:700; color:#5a6b58; margin-top:3px; line-height:1.3;">${summaryParts.join(' · ')}</div>` : ''}
+                          </div>
+                          <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                            <span style="font-size:14px; font-weight:800; color:${day.totalCost > 0 ? '#b34200' : '#7c877a'}; white-space:nowrap;">${day.totalCost > 0 ? escapeHtml(formatCurrencyL(day.totalCost)) : 'Sin precio'}</span>
+                            <span class="material-symbols-outlined bal-pending-day-chev" style="font-size:19px; color:#9a3412; transition:transform .2s; transform:${openByDefault ? 'rotate(180deg)' : 'rotate(0deg)'};">keyboard_arrow_down</span>
+                          </div>
+                        </div>
+                        <div id="${dayCardId}" style="display:${openByDefault ? 'block' : 'none'}; margin-top:10px; padding-top:9px; border-top:1px dashed #eed5be;">
+                          ${day.fuelLoads.length > 0 ? `
+                            <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:${day.laborItems.length > 0 ? '6px' : '0'};">
+                              ${day.fuelLoads.map(fl => `
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#fffaf6; border:1px solid #f5e6d8; border-radius:10px; padding:7px 9px;">
+                                  <div style="min-width:0; flex:1;">
+                                    <div style="font-size:12.5px; font-weight:800; color:#192b18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(fl._motorIcon)} ${escapeHtml(fl._motorNombre)}</div>
+                                    <div style="font-size:11px; color:#5a6b58; margin-top:1px;">${formatLitersLabel(fl._liters)} de gasolina</div>
+                                  </div>
+                                  <div style="font-size:12.5px; font-weight:800; color:${fl._cost > 0 ? '#b34200' : '#7c877a'}; white-space:nowrap; flex-shrink:0;">
+                                    ${fl._cost > 0 ? escapeHtml(formatCurrencyL(fl._cost)) : 'Sin precio'}
+                                  </div>
+                                </div>
+                              `).join('')}
+                            </div>
+                          ` : ''}
+                          ${day.laborItems.length > 0 ? `
+                            <div style="display:flex; flex-direction:column; gap:5px;">
+                              ${day.laborItems.map(it => `
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#fffaf6; border:1px solid #f5e6d8; border-radius:10px; padding:7px 9px;">
+                                  <div style="min-width:0; flex:1;">
+                                    <div style="font-size:12.5px; font-weight:800; color:#192b18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">👤 ${escapeHtml(it.nombre)}</div>
+                                    <div style="font-size:11px; color:#5a6b58; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml((it.labores || []).join(', ') || 'Labor')}</div>
+                                  </div>
+                                  <div style="font-size:12.5px; font-weight:800; color:${it.pagoDiario > 0 ? '#b34200' : '#7c877a'}; white-space:nowrap; flex-shrink:0;">
+                                    ${it.pagoDiario > 0 ? escapeHtml(formatCurrencyL(it.pagoDiario)) : 'Sin tarifa diaria'}
+                                  </div>
+                                </div>
+                              `).join('')}
+                            </div>
+                          ` : ''}
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+                ${combinedPendingAmount > 0 && pendingDayEntries.length > 1 ? `
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; padding-top:9px; border-top:1px dashed #e7c2a3;">
+                    <span style="font-size:12px; font-weight:800; color:#7c2d12;">Total pendiente (${pendingDayEntries.length} días)</span>
+                    <span style="font-size:14.5px; font-weight:900; color:#b34200;">${escapeHtml(formatCurrencyL(combinedPendingAmount))}</span>
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+
             <!-- Gastos por Categoría (Unificado con movimientos desplegables) -->
             ${catEntries.length > 0 ? `
               <div style="margin-bottom:14px;">
@@ -1509,19 +1989,45 @@ export async function initDashboard() {
               </div>
             ` : ''}
 
-            ${loteMovs.length === 0 ? `
+            ${loteMovs.length === 0 && !hasAnyPendingCard ? `
               <div style="padding:24px 12px; text-align:center; color:#777; font-size:13px;">
-                Sin movimientos registrados en este lote todavía.
+                ${balActivePeriod !== 'todo' ? 'Sin movimientos registrados en este período.' : 'Sin movimientos registrados en este lote todavía.'}
               </div>
             ` : ''}
           `;
 
+          balWrap.querySelectorAll('.bal-pending-day-card').forEach(card => {
+            card.addEventListener('click', () => {
+              const targetId = card.dataset.target;
+              const body = targetId ? document.getElementById(targetId) : null;
+              const chev = card.querySelector('.bal-pending-day-chev');
+              if (!body) return;
+              const isOpen = body.style.display === 'block';
+              body.style.display = isOpen ? 'none' : 'block';
+              if (chev) chev.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+            });
+          });
+
           balWrap.querySelectorAll('.bal-cat-card').forEach(card => {
             card.addEventListener('click', (e) => {
-              if (e.target.closest('.bal-mov-swipe-wrap')) return;
+              if (e.target.closest('.bal-mov-swipe-wrap, .bal-cat-day-card')) return;
               const targetId = card.dataset.target;
               const body = targetId ? document.getElementById(targetId) : null;
               const chev = card.querySelector('.bal-cat-chev');
+              if (!body) return;
+              const isOpen = body.style.display === 'block';
+              body.style.display = isOpen ? 'none' : 'block';
+              if (chev) chev.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+            });
+          });
+
+          balWrap.querySelectorAll('.bal-cat-day-card').forEach(dayCard => {
+            dayCard.addEventListener('click', (e) => {
+              if (e.target.closest('.bal-mov-swipe-wrap')) return;
+              e.stopPropagation();
+              const targetId = dayCard.dataset.target;
+              const body = targetId ? document.getElementById(targetId) : null;
+              const chev = dayCard.querySelector('.bal-cat-day-chev');
               if (!body) return;
               const isOpen = body.style.display === 'block';
               body.style.display = isOpen ? 'none' : 'block';
@@ -1583,7 +2089,7 @@ export async function initDashboard() {
                 // Deslizó a la derecha -> Eliminar
                 if (typeof window.Snackbar?.confirm === 'function') {
                   window.Snackbar.confirm(
-                    `¿Eliminar "${movObj.descripcion || 'este movimiento'}"?`,
+                    `¿Eliminar "${stripGastoInternalTags(movObj.descripcion) || 'este movimiento'}"?`,
                     async () => {
                       const { error } = await supabase.from('gastos').delete().eq('id', movObj.id);
                       if (error) {
@@ -1627,9 +2133,46 @@ export async function initDashboard() {
               window.addEventListener('mouseup', upH);
             });
           });
-        } catch (err) {
-          balWrap.innerHTML = `<div style="padding:20px; text-align:center; color:#ba1a1a; font-size:13px;">Error cargando balance: ${escapeHtml(err.message)}</div>`;
-        }
+
+          const balPeriodRow = document.getElementById('bal-period-pills');
+          if (balPeriodRow) {
+            balPeriodRow.scrollLeft = prevBalPeriodScroll;
+            balPeriodRow.querySelectorAll('button[data-bal-period]').forEach(btn => {
+              btn.addEventListener('click', () => {
+                balActivePeriod = btn.dataset.balPeriod;
+                renderLoteBalanceUI();
+                requestAnimationFrame(() => {
+                  document.querySelector('#bal-period-pills button.active')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                });
+              });
+            });
+          }
+
+          const balDateNavWrap = document.getElementById('bal-date-nav-wrap');
+          if (balDateNavWrap && balActivePeriod !== 'todo') {
+            balDateNavWrap.querySelector('#bal-nav-prev')?.addEventListener('click', () => {
+              if (balActivePeriod === 'dia') balSelectedDateIso = balShiftIsoDays(balSelectedDateIso, -1);
+              else if (balActivePeriod === 'semana') balSelectedDateIso = balShiftIsoDays(balSelectedDateIso, -7);
+              else if (balActivePeriod === 'mes') balSelectedDateIso = balShiftIsoMonths(balSelectedDateIso, -1);
+              renderLoteBalanceUI();
+            });
+            balDateNavWrap.querySelector('#bal-nav-next')?.addEventListener('click', () => {
+              if (balActivePeriod === 'dia') balSelectedDateIso = balShiftIsoDays(balSelectedDateIso, 1);
+              else if (balActivePeriod === 'semana') balSelectedDateIso = balShiftIsoDays(balSelectedDateIso, 7);
+              else if (balActivePeriod === 'mes') balSelectedDateIso = balShiftIsoMonths(balSelectedDateIso, 1);
+              renderLoteBalanceUI();
+            });
+            balDateNavWrap.querySelectorAll('.bal-nav-day-card, .bal-nav-cal-day').forEach(btn => {
+              btn.addEventListener('click', () => {
+                balSelectedDateIso = btn.dataset.iso;
+                balActivePeriod = 'dia';
+                renderLoteBalanceUI();
+                requestAnimationFrame(() => {
+                  document.querySelector('#bal-period-pills button.active')?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                });
+              });
+            });
+          }
       };
 
       const openNewGastoForLoteModal = (editMov = null) => {
@@ -2069,19 +2612,113 @@ export async function initDashboard() {
 
       const cosechaCtrl = createCosechaController(lote, 'dl-cosecha-wrap');
 
+      const triggerSendLoteFuelToCuentas = () => {
+        const areaFuel = currentBalanceAreaFuel;
+        const areaLabor = currentBalanceAreaLabor;
+        const pendingFuel = areaFuel?.pendingLoads || [];
+        const pendingLabor = areaLabor?.pendingItems || [];
+        if (pendingFuel.length === 0 && pendingLabor.length === 0) return;
+
+        const hasUpdates = pendingFuel.some(fl => fl._needsUpdate) || pendingLabor.some(it => it._needsUpdate);
+        const totalLit = Math.round(pendingFuel.reduce((s, x) => s + x._liters, 0) * 10) / 10;
+        const fuelAmt = Number(areaFuel?.pendingAmount) || 0;
+        const laborAmt = Number(areaLabor?.pendingAmount) || 0;
+        const combinedAmt = Math.round((fuelAmt + laborAmt) * 100) / 100;
+        const detailParts = [];
+        if (pendingFuel.length > 0) {
+          detailParts.push(`${pendingFuel.length} ${pendingFuel.length === 1 ? 'equipo' : 'equipos'} (${formatLitersLabel(totalLit)} de gasolina · ${escapeHtml(formatCurrencyL(fuelAmt))})`);
+        }
+        if (pendingLabor.length > 0) {
+          detailParts.push(`${pendingLabor.length} ${pendingLabor.length === 1 ? 'colaborador' : 'colaboradores'} (${escapeHtml(formatCurrencyL(laborAmt))})`);
+        }
+
+        window.Snackbar?.confirm(
+          `${hasUpdates ? '¿Actualizar' : '¿Enviar'} a Cuentas los gastos pendientes en <b>${escapeHtml(lote.nombre || 'este lote')}</b> (<b>${escapeHtml(formatCurrencyL(combinedAmt))}</b>)?` +
+            (detailParts.length > 0 ? `<br><small style="color:#5a6b58;">${detailParts.join(' · ')}</small>` : ''),
+          async () => {
+            const btn = document.getElementById('lote-footer-bal-send-fuel');
+            const titleEl = document.getElementById('lote-footer-bal-send-title');
+            if (btn) {
+              btn.disabled = true;
+              btn.style.opacity = '0.6';
+            }
+            if (titleEl) titleEl.textContent = 'Enviando...';
+            try {
+              if (pendingFuel.length > 0) {
+                await sendFuelLoadsToCuentas({
+                  loads: pendingFuel,
+                  sentByLoadId: areaFuel.sentByLoadId,
+                });
+              }
+              if (pendingLabor.length > 0) {
+                await sendLoteLaborToCuentas({
+                  items: pendingLabor,
+                  loteId: lote.id,
+                  loteNombre: lote.nombre || '',
+                });
+              }
+              window.Snackbar?.show('✓ Gastos enviados a Cuentas');
+              loadLoteBalance();
+            } catch (err) {
+              window.Snackbar?.show('Error enviando a Cuentas: ' + (err?.message || err), { type: 'error' });
+              syncFooterButtons();
+            }
+          },
+          () => {},
+          { confirmText: hasUpdates ? 'Actualizar en Cuentas' : 'Enviar a Cuentas', cancelText: 'Cancelar' }
+        );
+      };
+
       const syncFooterButtons = () => {
         const singleBtn = document.getElementById('lote-footer-register-btn');
         const cosechaRow = document.getElementById('lote-footer-cosecha-row');
+        const balanceRow = document.getElementById('lote-footer-balance-row');
+        const manejoRow = document.getElementById('lote-footer-manejo-row');
         const rIcon = document.getElementById('lote-footer-register-icon');
         const rLbl = document.getElementById('lote-footer-register-label');
         const selDate = window._planSelectedDateStr || getTodayLocalStr();
         const isFutureDate = selDate > getTodayLocalStr();
+        const pendingFuel = currentBalanceAreaFuel?.pendingLoads || [];
+        const pendingLabor = currentBalanceAreaLabor?.pendingItems || [];
+        const hasPendingBalance = pendingFuel.length > 0 || pendingLabor.length > 0;
+        const combinedPendingAmt = Math.round(((currentBalanceAreaFuel?.pendingAmount || 0) + (currentBalanceAreaLabor?.pendingAmount || 0)) * 100) / 100;
+        const expandedPendingAmt = Number(currentExpandedPlanActivity?.pendingAmount) || 0;
 
         if (activeSheetTab === 'cosecha') {
           if (singleBtn) singleBtn.style.display = 'none';
+          if (balanceRow) balanceRow.style.display = 'none';
+          if (manejoRow) manejoRow.style.display = 'none';
           if (cosechaRow) cosechaRow.style.display = 'grid';
+        } else if (activeSheetTab === 'balance' && hasPendingBalance) {
+          if (singleBtn) singleBtn.style.display = 'none';
+          if (cosechaRow) cosechaRow.style.display = 'none';
+          if (manejoRow) manejoRow.style.display = 'none';
+          if (balanceRow) balanceRow.style.display = 'grid';
+          const sendBtn = document.getElementById('lote-footer-bal-send-fuel');
+          const sendTitle = document.getElementById('lote-footer-bal-send-title');
+          const sendAmt = document.getElementById('lote-footer-bal-send-amt');
+          const hasUpdates = pendingFuel.some(fl => fl._needsUpdate) || pendingLabor.some(it => it._needsUpdate);
+          if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.style.opacity = '1';
+          }
+          if (sendTitle) sendTitle.textContent = hasUpdates ? 'Actualizar Cuentas' : 'Enviar a Cuentas';
+          if (sendAmt) sendAmt.textContent = formatCurrencyL(combinedPendingAmt);
+        } else if (activeSheetTab === 'manejo' && expandedPendingAmt > 0) {
+          if (singleBtn) singleBtn.style.display = 'none';
+          if (cosechaRow) cosechaRow.style.display = 'none';
+          if (balanceRow) balanceRow.style.display = 'none';
+          if (manejoRow) manejoRow.style.display = 'grid';
+          const manBalAmt = document.getElementById('lote-footer-manejo-bal-amt');
+          const manRegIcon = document.getElementById('lote-footer-manejo-reg-icon');
+          const manRegLbl = document.getElementById('lote-footer-manejo-reg-label');
+          if (manBalAmt) manBalAmt.textContent = formatCurrencyL(expandedPendingAmt);
+          if (manRegIcon) manRegIcon.textContent = isFutureDate ? 'calendar_add_on' : 'add_circle';
+          if (manRegLbl) manRegLbl.textContent = isFutureDate ? 'Programar Actividad' : 'Registrar Actividad';
         } else {
           if (cosechaRow) cosechaRow.style.display = 'none';
+          if (balanceRow) balanceRow.style.display = 'none';
+          if (manejoRow) manejoRow.style.display = 'none';
           if (singleBtn) singleBtn.style.display = 'flex';
           if (activeSheetTab === 'timeline') {
             if (rIcon) rIcon.textContent = 'add_a_photo';
@@ -2097,7 +2734,14 @@ export async function initDashboard() {
         const mapWrap = document.getElementById('dl-embedded-sheet-map-wrap');
         if (mapWrap) mapWrap.style.display = activeSheetTab === 'manejo' ? 'block' : 'none';
       };
-      window._onPlanDateChangeForFooter = () => syncFooterButtons();
+      window._onPlanDateChangeForFooter = () => {
+        currentExpandedPlanActivity = null;
+        syncFooterButtons();
+      };
+      window._onPlanExpandedActivityChange = (info) => {
+        currentExpandedPlanActivity = info || null;
+        syncFooterButtons();
+      };
       window._switchSheetTab = (tab) => {
         activeSheetTab = tab;
         document.querySelectorAll('#dl-sheet-pills-carousel .dl-sheet-pill').forEach(pill => {
@@ -2133,6 +2777,7 @@ export async function initDashboard() {
           if (cosWrap) cosWrap.style.display = 'none';
           if (balWrap) balWrap.style.display = 'none';
           window.onSelectActividadEvolucion?.('cal');
+          window._syncExpandedPlanActivityFooter?.();
         }
         syncFooterButtons();
       };
@@ -2142,16 +2787,59 @@ export async function initDashboard() {
           <span class="material-symbols-outlined" id="lote-footer-register-icon" style="font-size:19px;">add_circle</span>
           <span id="lote-footer-register-label">Registrar Actividad</span>
         </button>
-        <div id="lote-footer-cosecha-row" style="display:none; width:100%; grid-template-columns:1fr 1.25fr; gap:10px;">
-          <button type="button" id="lote-footer-cos-gastos" style="height:44px; border-radius:999px; border:1.5px solid #2d3e2c; background:#ffffff; color:#2d3e2c; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;">
+        <div id="lote-footer-manejo-row" style="display:none; width:100%; grid-template-columns:minmax(0, 1fr) minmax(0, 1.25fr); gap:8px;">
+          <button type="button" id="lote-footer-manejo-balance" class="press-effect" style="min-height:44px; padding:4px 10px; border-radius:999px; border:1.5px solid #2d3e2c; background:#ffffff; color:#2d3e2c; font-family:'Work Sans',sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; cursor:pointer; box-sizing:border-box;">
+            <span style="display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:800; line-height:1.15; white-space:nowrap;">
+              <span class="material-symbols-outlined" style="font-size:14px;">account_balance_wallet</span>
+              <span>Ver en Balance</span>
+            </span>
+            <span id="lote-footer-manejo-bal-amt" style="font-size:11.5px; font-weight:800; color:#2e7d32; line-height:1.15; white-space:nowrap;">L 0.00</span>
+          </button>
+          <button type="button" id="lote-footer-manejo-register" class="press-effect" style="min-height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; padding:0 12px; white-space:nowrap; box-shadow:0 3px 10px rgba(45,62,44,0.22);">
+            <span class="material-symbols-outlined" id="lote-footer-manejo-reg-icon" style="font-size:18px;">add_circle</span>
+            <span id="lote-footer-manejo-reg-label">Registrar Actividad</span>
+          </button>
+        </div>
+        <div id="lote-footer-cosecha-row" style="display:none; width:100%; grid-template-columns:1fr; gap:8px;">
+          <button type="button" id="lote-footer-cos-gastos" style="display:none; min-height:44px; padding:4px 10px; border-radius:999px; border:1.5px solid #2d3e2c; background:#ffffff; color:#2d3e2c; font-family:'Work Sans',sans-serif; flex-direction:column; align-items:center; justify-content:center; gap:1px; cursor:pointer; box-sizing:border-box;">
             Enviar a Cuentas
           </button>
-          <button type="button" id="lote-footer-cos-register" style="height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; box-shadow:0 3px 10px rgba(45,62,44,0.22);">
+          <button type="button" id="lote-footer-cos-register" style="min-height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; padding:0 12px; cursor:pointer; white-space:nowrap; box-shadow:0 3px 10px rgba(45,62,44,0.22);">
             + Registrar hoy
+          </button>
+        </div>
+        <div id="lote-footer-balance-row" style="display:none; width:100%; grid-template-columns:minmax(0, 1fr) minmax(0, 1.25fr); gap:8px;">
+          <button type="button" id="lote-footer-bal-send-fuel" class="press-effect" style="min-height:44px; padding:4px 10px; border-radius:999px; border:1.5px solid #2d3e2c; background:#ffffff; color:#2d3e2c; font-family:'Work Sans',sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; cursor:pointer; box-sizing:border-box;">
+            <span id="lote-footer-bal-send-title" style="font-size:12px; font-weight:800; line-height:1.15; white-space:nowrap;">Enviar a Cuentas</span>
+            <span id="lote-footer-bal-send-amt" style="font-size:11.5px; font-weight:800; color:#2e7d32; line-height:1.15; white-space:nowrap;">L 0.00</span>
+          </button>
+          <button type="button" id="lote-footer-bal-register" class="press-effect" style="min-height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:5px; cursor:pointer; padding:0 10px; white-space:nowrap; box-shadow:0 3px 10px rgba(45,62,44,0.22);">
+            <span class="material-symbols-outlined" style="font-size:18px;">receipt_long</span>
+            <span>Registrar Movimiento</span>
           </button>
         </div>
       `;
       fixedFooter.classList.add('open');
+
+      document.getElementById('lote-footer-manejo-balance')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window._switchSheetTab?.('balance');
+      });
+      document.getElementById('lote-footer-manejo-register')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setSheetExpanded(true);
+        window.showInlineActividadForm?.(window._planSelectedDateStr || getTodayLocalStr());
+      });
+
+      document.getElementById('lote-footer-bal-send-fuel')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        triggerSendLoteFuelToCuentas();
+      });
+      document.getElementById('lote-footer-bal-register')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setSheetExpanded(true);
+        openNewGastoForLoteModal();
+      });
 
       document.getElementById('lote-footer-cos-gastos')?.addEventListener('click', (e) => {
         e.stopPropagation();

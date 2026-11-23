@@ -78,8 +78,12 @@ export function initNuevoPersonal(personalId, returnScreen, returnId) {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     delete data.personal_id;
-    data.iniciales = data.nombre.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
-    if (data.pago_diario) data.pago_diario = parseFloat(data.pago_diario);
+    delete data.iniciales;
+    if (data.pago_diario !== '' && data.pago_diario != null) {
+      data.pago_diario = parseFloat(data.pago_diario);
+    } else {
+      delete data.pago_diario;
+    }
 
     try {
       if (personalId) {

@@ -4,6 +4,7 @@ import db from '../db.js';
 import { syncTable } from '../sync.js';
 import { renderDetalleMotor, initDetalleMotor } from './detalle_motor.js';
 import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
+import { isFuelMotor, computeFuelMotorStats, formatLiters, formatLitersLabel } from '../utils/motor_fuel_config.js';
 
 let currentMotorsPage = 1;
 let currentMotorsFilter = 'all';
@@ -12,6 +13,28 @@ let totalFilteredCount = 0;
 const PAGE_SIZE = 50;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function groupByMotorId(rows) {
+  const map = new Map();
+  for (const r of (rows || [])) {
+    if (!r?.motor_id) continue;
+    const list = map.get(r.motor_id);
+    if (list) list.push(r);
+    else map.set(r.motor_id, [r]);
+  }
+  return map;
+}
+
+function buildMotorUrgentChecker(mantByMotor, sesByMotor) {
+  return (m) => {
+    const eqMants = mantByMotor.get(m.id) || [];
+    if (isFuelMotor(m)) {
+      return computeFuelMotorStats(m, sesByMotor.get(m.id) || [], eqMants).hasUrgent;
+    }
+    const maxH = eqMants.length > 0 ? (m.max_horas || 100) : 80;
+    return (m.horas || 0) >= maxH;
+  };
+}
 
 function paginationFooterHtml() {
   return '';
@@ -33,16 +56,19 @@ window.changeMotorsPage = async function(page, { silent = false } = {}) {
       </div>`;
   }
 
-  // Fetch maintenances and motors to determine first-change 80h limit and live counters
-  const [{ data: mantsData }, { data: allMotors }] = await Promise.all([
-    supabase.from('motor_mantenimientos').select('motor_id'),
-    supabase.from('motores').select('id, horas, max_horas')
+  // Fetch maintenances, fuel loads, and motors to determine limits and live counters
+  const [{ data: mantsData }, { data: allMotors }, { data: sesionesData }] = await Promise.all([
+    supabase.from('motor_mantenimientos').select('*'),
+    supabase.from('motores').select('id, nombre, icon, horas, max_horas, notas'),
+    supabase.from('motor_sesiones').select('*')
   ]);
-  const mantMotorIds = new Set((mantsData || []).map(x => x.motor_id).filter(Boolean));
-  const getMotorMaxHours = (m) => (mantMotorIds.has(m.id) ? (m.max_horas || 100) : 80);
+  const mantByMotor = groupByMotorId(mantsData);
+  const sesByMotor = groupByMotorId(sesionesData);
+  const getMotorMaxHours = (m) => ((mantByMotor.get(m.id)?.length || 0) > 0 ? (m.max_horas || 100) : 80);
+  const isMotorUrgent = buildMotorUrgentChecker(mantByMotor, sesByMotor);
 
   const allCount = (allMotors || []).length;
-  const urgentIds = (allMotors || []).filter(m => (m.horas || 0) >= getMotorMaxHours(m)).map(m => m.id);
+  const urgentIds = (allMotors || []).filter(isMotorUrgent).map(m => m.id);
   const countAllEl = document.getElementById('motores-count-all');
   const countUrgentEl = document.getElementById('motores-count-urgent');
   if (countAllEl) countAllEl.textContent = `Todos · ${allCount}`;
@@ -60,7 +86,7 @@ window.changeMotorsPage = async function(page, { silent = false } = {}) {
   totalFilteredCount = count || 0;
   listContainer.innerHTML = equipos.length === 0
     ? `<div class="ganado-empty" style="grid-column: 1 / -1;"><p>No se encontraron equipos.</p></div>`
-    : equipos.map(eq => renderMotorCard(eq, getMotorMaxHours(eq))).join('');
+    : equipos.map(eq => renderMotorCard(eq, getMotorMaxHours(eq), sesByMotor.get(eq.id) || [], mantByMotor.get(eq.id) || [])).join('');
 
   if (footerContainer) footerContainer.innerHTML = paginationFooterHtml();
 };
@@ -91,7 +117,8 @@ export async function renderMotores(page = 1, filter = 'all') {
   if (navigator.onLine) {
     await Promise.all([
       syncTable('motores', true),
-      syncTable('motor_mantenimientos', true)
+      syncTable('motor_mantenimientos', true),
+      syncTable('motor_sesiones', true)
     ]).catch(() => {});
   }
 
@@ -99,17 +126,21 @@ export async function renderMotores(page = 1, filter = 'all') {
   const [
     { count: totalMachinery },
     { data: allMotors },
-    { data: allMants }
+    { data: allMants },
+    { data: allSesiones }
   ] = await Promise.all([
     supabase.from('motores').select('*', { count: 'exact', head: true }),
-    supabase.from('motores').select('id, horas, max_horas'),
-    supabase.from('motor_mantenimientos').select('motor_id')
+    supabase.from('motores').select('id, nombre, icon, horas, max_horas, notas'),
+    supabase.from('motor_mantenimientos').select('*'),
+    supabase.from('motor_sesiones').select('*')
   ]);
 
-  const mantMotorIds = new Set((allMants || []).map(x => x.motor_id).filter(Boolean));
-  const getMotorMaxHours = (m) => (mantMotorIds.has(m.id) ? (m.max_horas || 100) : 80);
+  const mantByMotor = groupByMotorId(allMants);
+  const sesByMotor = groupByMotorId(allSesiones);
+  const getMotorMaxHours = (m) => ((mantByMotor.get(m.id)?.length || 0) > 0 ? (m.max_horas || 100) : 80);
+  const isMotorUrgent = buildMotorUrgentChecker(mantByMotor, sesByMotor);
 
-  const urgentList  = (allMotors || []).filter(m => (m.horas || 0) >= getMotorMaxHours(m));
+  const urgentList  = (allMotors || []).filter(isMotorUrgent);
   const urgentIds   = urgentList.map(m => m.id);
   const urgentCount = urgentList.length;
   const activeCount = (allMotors || []).filter(m => (m.horas || 0) > 0).length;
@@ -168,7 +199,7 @@ export async function renderMotores(page = 1, filter = 'all') {
         <div class="motores-grid" id="motors-list-container">
           ${equipos.length === 0
             ? `<div class="ganado-empty"><p>No se encontraron equipos.</p></div>`
-            : equipos.map(eq => renderMotorCard(eq, getMotorMaxHours(eq))).join('')}
+            : equipos.map(eq => renderMotorCard(eq, getMotorMaxHours(eq), sesByMotor.get(eq.id) || [], mantByMotor.get(eq.id) || [])).join('')}
         </div>
       </div>
 
@@ -387,8 +418,9 @@ export function initMotores() {
   });
 
   // Material 3 Full-Screen Search
-  let searchMantIds = new Set();
-  const getSearchMaxH = (m) => (searchMantIds.has(m.id) ? (m.max_horas || 100) : 80);
+  let searchMantByMotor = new Map();
+  let searchSesByMotor = new Map();
+  const getSearchMaxH = (m) => ((searchMantByMotor.get(m.id)?.length || 0) > 0 ? (m.max_horas || 100) : 80);
 
   initM3FullScreenSearch({
     moduleKey: 'motores',
@@ -404,11 +436,13 @@ export function initMotores() {
     setQuery: (v) => { currentMotorsSearchQuery = v; },
     onApplySearch: () => window.changeMotorsPage(1),
     loadItems: async () => {
-      const [eqRes, mRes] = await Promise.all([
+      const [eqRes, mRes, sRes] = await Promise.all([
         supabase.from('motores').select('*').order('created_at', { ascending: false }).range(0, 299),
-        supabase.from('motor_mantenimientos').select('motor_id')
+        supabase.from('motor_mantenimientos').select('*'),
+        supabase.from('motor_sesiones').select('*')
       ]);
-      searchMantIds = new Set((mRes?.data || []).map(x => x.motor_id).filter(Boolean));
+      searchMantByMotor = groupByMotorId(mRes?.data);
+      searchSesByMotor = groupByMotorId(sRes?.data);
       return eqRes?.data || [];
     },
     getQuickChips: (items) => {
@@ -429,7 +463,7 @@ export function initMotores() {
       (m.modelo || '').toLowerCase().includes(qLower) ||
       (m.tipo || '').toLowerCase().includes(qLower)
     ),
-    renderItem: (eq) => renderMotorCard(eq, getSearchMaxH(eq)),
+    renderItem: (eq) => renderMotorCard(eq, getSearchMaxH(eq), searchSesByMotor.get(eq.id) || [], searchMantByMotor.get(eq.id) || []),
     itemSelector: '.motor-card-compact[data-id]',
     getItemTitle: (el) => el.dataset.nombre || ''
   });
@@ -445,20 +479,44 @@ export function initMotores() {
 
 // ─── Row renderer ─────────────────────────────────────────────────────────────
 
-function renderMotorCard(eq, customMaxHours = null) {
+function renderMotorCard(eq, customMaxHours = null, eqSesiones = [], eqMants = []) {
   const hours     = Number((parseFloat(eq.horas) || 0).toFixed(1));
   const maxHours  = customMaxHours || eq.max_horas || 100;
-  const pct       = Math.min(100, Math.round((hours / maxHours) * 100));
-  const remaining = Math.max(0, Number((maxHours - hours).toFixed(1)));
-  const isLimit   = hours >= maxHours || pct >= 100;
-  const isNear    = !isLimit && pct >= 90;
-  const needsOil  = isLimit;
-  const barWidth  = isLimit ? 100 : (hours > 0 ? Math.max(3, pct) : 0);
+  let isLimit = false;
+  let isNear  = false;
+  let barWidth = 0;
+  let rightText = '';
+  let metricIcon = 'water_drop';
+  let metricLabel = 'Cambio de aceite';
+  let limitNote = '';
 
+  if (isFuelMotor(eq)) {
+    const stats = computeFuelMotorStats(eq, eqSesiones, eqMants);
+    const target = stats.mostUrgent || stats.items[0];
+    if (target) {
+      isLimit = target.isDue;
+      isNear = target.isNear;
+      barWidth = isLimit ? 100 : (target.pct > 0 ? Math.max(3, target.pct) : 0);
+      const remTxt = formatLiters(target.remaining);
+      rightText = isLimit ? 'Toca hacerlo' : `${remTxt === '1' ? 'Falta' : 'Faltan'} ${formatLitersLabel(target.remaining)}`;
+      metricIcon = 'local_gas_station';
+      metricLabel = `${target.nombre} · ${formatLitersLabel(stats.totalLiters)} usados`;
+      limitNote = `Llegó a ${formatLitersLabel(target.cada_litros)} (${target.nombre.toLowerCase()})`;
+    }
+  } else {
+    const pct       = Math.min(100, Math.round((hours / maxHours) * 100));
+    const remaining = Math.max(0, Number((maxHours - hours).toFixed(1)));
+    isLimit   = hours >= maxHours || pct >= 100;
+    isNear    = !isLimit && pct >= 90;
+    barWidth  = isLimit ? 100 : (hours > 0 ? Math.max(3, pct) : 0);
+    rightText = isLimit ? 'Toca cambiarlo' : `Faltan ${remaining} h`;
+    limitNote = `Llegó a las ${maxHours} h programadas`;
+  }
+
+  const needsAlert  = isLimit;
   const statusColor = isLimit ? '#c2410c' : (isNear ? '#a16207' : '#2d6a2e');
   const trackBg     = isLimit ? '#fde4d8' : (isNear ? '#f5ebd6' : '#e6ede6');
   const fillBg      = isLimit ? '#c2410c' : (isNear ? '#b7791f' : '#2d6a2e');
-  const rightText   = isLimit ? 'Toca cambiarlo' : `Faltan ${remaining} h`;
 
   const imgHtml = eq.image_url
     ? `<img src="${eq.image_url}" alt="${eq.nombre}" style="width: 100%; height: 100%; object-fit: cover;">`
@@ -470,7 +528,7 @@ function renderMotorCard(eq, customMaxHours = null) {
         <!-- Image with Status Indicator -->
         <div class="motor-compact-img">
           ${imgHtml}
-          ${needsOil ? `
+          ${needsAlert ? `
           <div style="position: absolute; bottom: 2px; right: 2px; width: 18px; height: 18px; background: #ff4103; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid #ffffff;">
             <span class="material-icons" style="font-size: 12px; color: #ffffff;">warning</span>
           </div>` : ''}
@@ -496,12 +554,12 @@ function renderMotorCard(eq, customMaxHours = null) {
         </div>
       </div>
 
-      <!-- Cambio de aceite -->
+      <!-- Métrica de mantenimiento -->
       <div style="width: 100%; padding-top: 10px; border-top: 1px solid ${isLimit ? 'rgba(253, 186, 116, 0.35)' : isNear ? 'rgba(253, 230, 138, 0.5)' : '#f0f3ef'};">
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
           <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: #3c423c;">
-            <span class="material-symbols-outlined" style="font-size: 18px; color: #525852;">water_drop</span>
-            <span>Cambio de aceite</span>
+            <span class="material-symbols-outlined" style="font-size: 18px; color: #525852;">${metricIcon}</span>
+            <span>${metricLabel}</span>
           </span>
           <span style="font-size: 13.5px; font-weight: 700; color: ${statusColor};">${rightText}</span>
         </div>
@@ -510,7 +568,7 @@ function renderMotorCard(eq, customMaxHours = null) {
         </div>
         ${isLimit ? `
         <div style="margin-top: 7px; font-size: 12px; font-weight: 600; color: #555b55;">
-          Llegó a las ${maxHours} h programadas
+          ${limitNote}
         </div>` : ''}
       </div>
     </div>

@@ -80,11 +80,40 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
   let currentWeekStart = getMonday(new Date());
   let selectedDateStr = fmtIso(new Date());
+  let isDayFilterExplicit = false;
+  let cosechaViewMode = 'week'; // 'week' | 'all'
+  let allCollectorTotals = new Map(); // colKey -> { latas, pay, daysCount, weeksCount }
   let precioLata = parseFloat(localStorage.getItem(priceKey) || '40') || 40;
   let allPersonal = [];
   let weekRecordsByDate = new Map(); // iso -> { rowId, precio_lata, registros: [{ personal_id, nombre, latas }] }
   let collectorSummaries = [];
   let weekPaidMap = new Map(); // refTag -> { id, monto, descripcion }
+  let activePendingWeeks = []; // pending/unupdated weeks (current or past)
+  let registerBlockReason = '';
+
+  const formatWeekTitleFullForIso = (wsIsoStr) => {
+    const parts = String(wsIsoStr || '').slice(0, 10).split('-').map(Number);
+    if (parts.length !== 3) return '';
+    const s = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, 12, 0, 0);
+    if (Number.isNaN(s.getTime())) return '';
+    const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6, 12, 0, 0);
+    if (s.getMonth() === e.getMonth()) {
+      return `Semana ${s.getDate()} - ${e.getDate()} ${MONTHS_FULL[s.getMonth()]} ${s.getFullYear()}`;
+    }
+    return `Semana ${s.getDate()} ${MONTHS_FULL[s.getMonth()]} - ${e.getDate()} ${MONTHS_FULL[e.getMonth()]} ${e.getFullYear()}`;
+  };
+
+  const formatWeekShortForIso = (wsIsoStr) => {
+    const parts = String(wsIsoStr || '').slice(0, 10).split('-').map(Number);
+    if (parts.length !== 3) return wsIsoStr || '';
+    const s = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, 12, 0, 0);
+    if (Number.isNaN(s.getTime())) return wsIsoStr || '';
+    const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6, 12, 0, 0);
+    if (s.getMonth() === e.getMonth()) {
+      return `${s.getDate()}–${e.getDate()} ${MONTHS_SHORT[s.getMonth()]}`;
+    }
+    return `${s.getDate()} ${MONTHS_SHORT[s.getMonth()]}–${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`;
+  };
 
   const getWeekDates = () => {
     const arr = [];
@@ -106,17 +135,9 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
     return `${s.getDate()} ${MONTHS_SHORT[s.getMonth()]} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]} ${e.getFullYear()}`;
   };
 
-  const getWeekTitleFull = () => {
-    const days = getWeekDates();
-    const s = days[0];
-    const e = days[6];
-    if (s.getMonth() === e.getMonth()) {
-      return `Semana ${s.getDate()} - ${e.getDate()} ${MONTHS_FULL[s.getMonth()]} ${s.getFullYear()}`;
-    }
-    return `Semana ${s.getDate()} ${MONTHS_FULL[s.getMonth()]} - ${e.getDate()} ${MONTHS_FULL[e.getMonth()]} ${e.getFullYear()}`;
-  };
+  const getWeekTitleFull = () => formatWeekTitleFullForIso(fmtIso(getWeekDates()[0]));
 
-  const loadAndRender = async () => {
+  const loadAndRender = async (autoOpenColKey = null) => {
     const wrap = document.getElementById(containerId);
     if (!wrap) return;
     wrap.innerHTML = `<div style="padding:24px; text-align:center; color:#556b53; font-size:13px; font-weight:600;">Cargando cosecha...</div>`;
@@ -137,7 +158,8 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       ]);
 
       allPersonal = Array.isArray(personalRes) ? personalRes : [];
-      const apps = (appsQuery?.data || []).filter(app => {
+      const allLoteApps = Array.isArray(appsQuery?.data) ? appsQuery.data : [];
+      const apps = allLoteApps.filter(app => {
         const f = String(app.fecha || '').slice(0, 10);
         return f && f >= wsIso && f <= weIso;
       });
@@ -156,6 +178,175 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
           });
         }
       });
+
+      const allWeeksMap = new Map(); // wsIso -> Map<colKey, { colKey, personal_id, nombre, latas, pay }>
+      let allLoteTotalLatas = 0;
+      let allLoteTotalPay = 0;
+      const allLoteCutDays = new Set();
+      const weekDaysMap = new Map(); // wKey -> Set<iso>
+      const allColsMap = new Map(); // colKey -> totals across the whole lote
+      allLoteApps.forEach(app => {
+        const parsed = parseCosechaObs(app.observaciones);
+        if (!parsed) return;
+        const f = String(app.fecha || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return;
+        const wKey = fmtIso(getMonday(new Date(`${f}T12:00:00`)));
+        if (!allWeeksMap.has(wKey)) allWeeksMap.set(wKey, new Map());
+        const weekCols = allWeeksMap.get(wKey);
+        const pPrice = Number(parsed.precio_lata) || precioLata;
+        (Array.isArray(parsed.registros) ? parsed.registros : []).forEach(r => {
+          const l = Number(r.latas) || 0;
+          if (l <= 0) return;
+          const colKey = String(r.personal_id || r.nombre);
+          if (!weekCols.has(colKey)) {
+            weekCols.set(colKey, {
+              colKey,
+              personal_id: r.personal_id,
+              nombre: r.nombre || 'Colaborador',
+              latas: 0,
+              pay: 0,
+            });
+          }
+          const entry = weekCols.get(colKey);
+          entry.latas += l;
+          entry.pay += Math.round(l * pPrice);
+
+          allLoteTotalLatas += l;
+          allLoteTotalPay += Math.round(l * pPrice);
+          allLoteCutDays.add(f);
+          if (!weekDaysMap.has(wKey)) weekDaysMap.set(wKey, new Set());
+          weekDaysMap.get(wKey).add(f);
+          if (!allColsMap.has(colKey)) {
+            allColsMap.set(colKey, {
+              colKey,
+              personal_id: r.personal_id,
+              nombre: r.nombre || 'Colaborador',
+              latas: 0,
+              pay: 0,
+              daysSet: new Set(),
+              weeksSet: new Set(),
+              lastWsIso: ''
+            });
+          }
+          const gEntry = allColsMap.get(colKey);
+          gEntry.latas += l;
+          gEntry.pay += Math.round(l * pPrice);
+          gEntry.daysSet.add(f);
+          gEntry.weeksSet.add(wKey);
+          if (wKey > gEntry.lastWsIso) gEntry.lastWsIso = wKey;
+        });
+      });
+
+      const allCollectorsHistory = Array.from(allColsMap.values())
+        .map(c => ({ ...c, daysCount: c.daysSet.size, weeksCount: c.weeksSet.size }))
+        .sort((a, b) => (b.latas - a.latas) || String(a.nombre || '').localeCompare(String(b.nombre || '')));
+      allCollectorTotals = new Map(allCollectorsHistory.map(c => [c.colKey, c]));
+
+      const allWeeksHistory = Array.from(allWeeksMap.entries()).map(([wKey, weekCols]) => {
+        let totalLatas = 0;
+        let totalPay = 0;
+        let colsCount = 0;
+        let anyUnsent = false;
+        let anyChanged = false;
+        for (const c of weekCols.values()) {
+          totalLatas += Number(c.latas) || 0;
+          totalPay += Number(c.pay) || 0;
+          if ((Number(c.latas) || 0) > 0) colsCount++;
+          const paid = weekPaidMap.get(`[ref:cosecha_${lote.id}_${c.colKey}_${wKey}]`);
+          if (!paid && c.pay > 0) anyUnsent = true;
+          else if (paid && Math.round(paid.monto) !== Math.round(c.pay)) anyChanged = true;
+        }
+        const status = anyChanged ? 'update' : (anyUnsent ? 'unsent' : 'paid');
+        return {
+          wsIso: wKey,
+          weekShort: formatWeekShortForIso(wKey),
+          weekYear: wKey.slice(0, 4),
+          totalLatas,
+          totalPay,
+          colsCount,
+          cutDaysCount: weekDaysMap.get(wKey)?.size || 0,
+          status
+        };
+      }).filter(w => w.totalLatas > 0).sort((a, b) => b.wsIso.localeCompare(a.wsIso));
+
+      const personalNameById = new Map(allPersonal.map(p => [String(p.id), p.nombre || '']));
+      const tagPrefix = `[ref:cosecha_${lote.id}_`;
+      for (const [tag, paidObj] of weekPaidMap.entries()) {
+        if (!tag.startsWith(tagPrefix) || !tag.endsWith(']')) continue;
+        const inner = tag.slice(tagPrefix.length, -1);
+        const dateMatch = inner.match(/^(.+)_(\d{4}-\d{2}-\d{2})$/);
+        if (!dateMatch) continue;
+        const colKey = dateMatch[1];
+        const wKey = dateMatch[2];
+        if (!allWeeksMap.has(wKey)) allWeeksMap.set(wKey, new Map());
+        const weekCols = allWeeksMap.get(wKey);
+        if (!weekCols.has(colKey)) {
+          weekCols.set(colKey, {
+            colKey,
+            personal_id: personalNameById.has(colKey) ? colKey : null,
+            nombre: personalNameById.get(colKey) || colKey || 'Colaborador',
+            latas: 0,
+            pay: 0,
+          });
+        }
+      }
+
+      const pendingWeeksList = [];
+      for (const [wKey, weekCols] of allWeeksMap.entries()) {
+        const newCols = [];
+        const changedCols = [];
+        let totalLatas = 0;
+        let paidTotal = 0;
+        let targetTotal = 0;
+        for (const col of weekCols.values()) {
+          const refTag = `[ref:cosecha_${lote.id}_${col.colKey}_${wKey}]`;
+          const paid = weekPaidMap.get(refTag);
+          totalLatas += Number(col.latas) || 0;
+          if (paid) paidTotal += Math.round(Number(paid.monto) || 0);
+          targetTotal += Math.round(Number(col.pay) || 0);
+          if (!paid && col.pay > 0) {
+            newCols.push({ col, refTag });
+          } else if (paid && Math.round(Number(paid.monto) || 0) !== Math.round(Number(col.pay) || 0)) {
+            changedCols.push({ col, refTag, paid });
+          }
+        }
+        if (newCols.length > 0 || changedCols.length > 0) {
+          pendingWeeksList.push({
+            wsIso: wKey,
+            weekTitleFull: formatWeekTitleFullForIso(wKey),
+            weekShort: formatWeekShortForIso(wKey),
+            totalLatas,
+            newCols,
+            changedCols,
+            paidTotal,
+            targetTotal,
+            isUpdate: paidTotal > 0,
+          });
+        }
+      }
+      pendingWeeksList.sort((a, b) => b.wsIso.localeCompare(a.wsIso));
+
+      const currentPendingWeek = pendingWeeksList.find(w => w.wsIso === wsIso) || null;
+      if (currentPendingWeek) {
+        activePendingWeeks = [currentPendingWeek];
+      } else if (pendingWeeksList.length > 0) {
+        activePendingWeeks = pendingWeeksList;
+      } else {
+        activePendingWeeks = [];
+      }
+
+      const otherPendingWeeks = pendingWeeksList.filter(w => w.wsIso !== wsIso);
+      const priorPendingWeeks = pendingWeeksList.filter(w => w.wsIso < wsIso);
+      if (priorPendingWeeks.length > 0) {
+        const hasPriorUpdate = priorPendingWeeks.some(w => w.isUpdate);
+        registerBlockReason = hasPriorUpdate
+          ? 'Actualiza primero la semana anterior en Cuentas antes de registrar nuevos cortes.'
+          : 'Envía primero la semana anterior a Cuentas antes de registrar nuevos cortes.';
+      } else if (currentPendingWeek?.isUpdate) {
+        registerBlockReason = 'Actualiza primero los cambios pendientes en Cuentas.';
+      } else {
+        registerBlockReason = '';
+      }
 
       weekRecordsByDate = new Map();
       apps.forEach(app => {
@@ -234,7 +425,12 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
       const todayIso = fmtIso(new Date());
       if (selectedDateStr < wsIso || selectedDateStr > weIso) {
-        selectedDateStr = (todayIso >= wsIso && todayIso <= weIso) ? todayIso : wsIso;
+        if (todayIso >= wsIso && todayIso <= weIso) {
+          selectedDateStr = todayIso;
+        } else {
+          const activeDay = [...days].reverse().find(d => (dayTotals.get(fmtIso(d)) || 0) > 0);
+          selectedDateStr = activeDay ? fmtIso(activeDay) : wsIso;
+        }
       }
 
       const hasAnyWeekPay = collectorSummaries.some(c => c.pay > 0);
@@ -260,6 +456,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       }, 0);
 
       const syncCosechaFooterLabel = () => {
+        const cosechaRow = document.getElementById('lote-footer-cosecha-row');
         const regBtn = document.getElementById('lote-footer-cos-register');
         if (regBtn) {
           if (selectedDateStr === todayIso) {
@@ -268,30 +465,59 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
             const sp = selectedDateStr.split('-').map(Number);
             regBtn.textContent = `+ Registrar ${sp[2]} ${MONTHS_SHORT[(sp[1] || 1) - 1] || ''}`;
           }
+          if (registerBlockReason) {
+            regBtn.disabled = true;
+            regBtn.style.background = '#d8dfd6';
+            regBtn.style.color = '#7a8a78';
+            regBtn.style.boxShadow = 'none';
+            regBtn.style.cursor = 'not-allowed';
+            regBtn.style.opacity = '0.85';
+            regBtn.title = registerBlockReason;
+          } else {
+            regBtn.disabled = false;
+            regBtn.style.background = '#2d3e2c';
+            regBtn.style.color = '#ffffff';
+            regBtn.style.boxShadow = '0 3px 10px rgba(45,62,44,0.22)';
+            regBtn.style.cursor = 'pointer';
+            regBtn.style.opacity = '1';
+            regBtn.title = '';
+          }
         }
         const gastosBtn = document.getElementById('lote-footer-cos-gastos');
         if (gastosBtn) {
-          if (allWeekSent) {
-            gastosBtn.disabled = true;
-            gastosBtn.textContent = '✓ Enviado a Cuentas';
-            gastosBtn.style.background = '#eff4ed';
-            gastosBtn.style.borderColor = '#c7d6c3';
-            gastosBtn.style.color = '#1b6e1b';
-            gastosBtn.style.cursor = 'not-allowed';
-          } else if (weekNeedsUpdate) {
-            gastosBtn.disabled = false;
-            gastosBtn.textContent = 'Actualizar en Cuentas';
-            gastosBtn.style.background = '#fff4ed';
-            gastosBtn.style.borderColor = '#b34200';
-            gastosBtn.style.color = '#b34200';
-            gastosBtn.style.cursor = 'pointer';
+          if (activePendingWeeks.length === 0) {
+            gastosBtn.style.display = 'none';
+            if (cosechaRow) cosechaRow.style.gridTemplateColumns = '1fr';
           } else {
+            if (cosechaRow) cosechaRow.style.gridTemplateColumns = 'minmax(0, 1.15fr) minmax(0, 1fr)';
+            gastosBtn.style.display = 'flex';
             gastosBtn.disabled = false;
-            gastosBtn.textContent = 'Enviar a Cuentas';
-            gastosBtn.style.background = '#ffffff';
-            gastosBtn.style.borderColor = '#2d3e2c';
-            gastosBtn.style.color = '#2d3e2c';
+            gastosBtn.style.opacity = '1';
             gastosBtn.style.cursor = 'pointer';
+            const totalPaidPrev = activePendingWeeks.reduce((s, w) => s + w.paidTotal, 0);
+            const totalTargetNew = activePendingWeeks.reduce((s, w) => s + w.targetTotal, 0);
+            const isUpdateMode = activePendingWeeks.some(w => w.isUpdate);
+            if (isUpdateMode) {
+              gastosBtn.style.background = '#fff4ed';
+              gastosBtn.style.borderColor = '#b34200';
+              gastosBtn.style.color = '#b34200';
+              gastosBtn.innerHTML = `
+                <span style="font-size:11.5px; font-weight:800; line-height:1.15; white-space:nowrap;">Actualizar en Cuentas</span>
+                <span style="font-size:11px; line-height:1.15; white-space:nowrap;">
+                  <span style="text-decoration:line-through; color:#6b7280; font-weight:700;">L ${totalPaidPrev.toLocaleString('es-HN')}</span>
+                  <span style="color:#5a6b58;">→</span>
+                  <span style="font-weight:800; color:#b34200;">L ${totalTargetNew.toLocaleString('es-HN')}</span>
+                </span>
+              `;
+            } else {
+              gastosBtn.style.background = '#ffffff';
+              gastosBtn.style.borderColor = '#2d3e2c';
+              gastosBtn.style.color = '#2d3e2c';
+              gastosBtn.innerHTML = `
+                <span style="font-size:11.5px; font-weight:800; line-height:1.15; white-space:nowrap;">Enviar a Cuentas</span>
+                <span style="font-size:11.5px; font-weight:800; color:#2e7d32; line-height:1.15; white-space:nowrap;">L ${totalTargetNew.toLocaleString('es-HN')}</span>
+              `;
+            }
           }
         }
       };
@@ -308,22 +534,198 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       const selDayLabel = `${DAYS_SHORT[selDateObj.getDay()]} ${selDateObj.getDate()} ${MONTHS_SHORT[selDateObj.getMonth()]}`;
 
       collectorSummaries.sort((a, b) => {
-        const la = selDayLatasMap.get(String(a.personal_id || a.nombre)) || 0;
-        const lb = selDayLatasMap.get(String(b.personal_id || b.nombre)) || 0;
-        if (lb !== la) return lb - la;
+        if (isDayFilterExplicit) {
+          const la = selDayLatasMap.get(String(a.personal_id || a.nombre)) || 0;
+          const lb = selDayLatasMap.get(String(b.personal_id || b.nombre)) || 0;
+          if (lb !== la) return lb - la;
+        }
+        if (b.latas !== a.latas) return b.latas - a.latas;
+        if (b.pay !== a.pay) return b.pay - a.pay;
         return String(a.nombre || '').localeCompare(String(b.nombre || ''));
       });
 
+      const showOtherInMain = weekTotalLatas === 0 && otherPendingWeeks.length > 0;
+      const pendingOtherCols = [];
+      if (showOtherInMain) {
+        otherPendingWeeks.forEach(pw => {
+          [...(pw.changedCols || []), ...(pw.newCols || [])].forEach(entry => {
+            if (!entry?.col) return;
+            pendingOtherCols.push({
+              col: entry.col,
+              refTag: entry.refTag,
+              paid: entry.paid || null,
+              pw
+            });
+          });
+        });
+        pendingOtherCols.sort((a, b) => {
+          if (b.pw.wsIso !== a.pw.wsIso) return b.pw.wsIso.localeCompare(a.pw.wsIso);
+          if ((b.col.latas || 0) !== (a.col.latas || 0)) return (b.col.latas || 0) - (a.col.latas || 0);
+          return String(a.col.nombre || '').localeCompare(String(b.col.nombre || ''));
+        });
+      }
+      const showPendingOtherCols = showOtherInMain && pendingOtherCols.length > 0;
+      const otherPendingLatas = otherPendingWeeks.reduce((s, w) => s + (Number(w.totalLatas) || 0), 0);
+      const otherHasUpdate = otherPendingWeeks.some(w => w.isUpdate);
+      const currentWeekUnsent = hasAnyWeekPay && !allWeekSent && !weekNeedsUpdate;
+
+      const summaryTitleText = showOtherInMain
+        ? (otherPendingWeeks.length === 1
+          ? `Total sem. ${escapeHtml(otherPendingWeeks[0].weekShort)}`
+          : `Pendiente · ${otherPendingWeeks.length} semanas`)
+        : 'Total de la semana';
+
+      const summaryLatasText = showOtherInMain
+        ? `${formatLatas(otherPendingLatas)} latas`
+        : `${formatLatas(weekTotalLatas)} latas`;
+
+      const summaryBadgeHtml = showOtherInMain
+        ? (otherHasUpdate
+          ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#ffede1; color:#b34200; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">↻ Por actualizar</span>`
+          : `<span style="display:inline-flex; align-items:center; gap:2px; background:#fef3c7; color:#92400e; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">Sin enviar</span>`)
+        : (allWeekSent
+          ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#e2f2e0; color:#1b6e1b; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">✓ Pagado</span>`
+          : (weekNeedsUpdate
+            ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#ffede1; color:#b34200; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">↻ Por actualizar</span>`
+            : (currentWeekUnsent
+              ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#fef3c7; color:#92400e; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">Sin enviar</span>`
+              : '')));
+
+      const otherPendingRowsHtml = otherPendingWeeks.length > 0 ? `
+        <div style="border-top:1px dashed #d5e2d2; margin-top:10px; padding-top:8px; display:flex; flex-direction:column; gap:6px;">
+          ${(showOtherInMain && otherPendingWeeks.length === 1) ? (() => {
+            const pw = otherPendingWeeks[0];
+            return `
+              <button type="button" class="cos-jump-pending-week" data-ws-iso="${pw.wsIso}" style="width:100%; background:none; border:none; padding:2px 0; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; font-family:'Work Sans',sans-serif; text-align:left;">
+                <span style="font-size:11.5px; font-weight:600; color:#8a4b24;">${pw.isUpdate ? 'Pendiente de actualizar en Cuentas' : 'Pendiente de enviar a Cuentas'}</span>
+                <span style="display:inline-flex; align-items:center; gap:2px; font-size:11.5px; font-weight:700; color:#b34200; white-space:nowrap;">
+                  <span>Ver semana</span>
+                  <span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span>
+                </span>
+              </button>
+            `;
+          })() : otherPendingWeeks.map(pw => `
+            <button type="button" class="cos-jump-pending-week" data-ws-iso="${pw.wsIso}" style="width:100%; background:none; border:none; padding:2px 0; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; font-family:'Work Sans',sans-serif; text-align:left;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0;">
+                <span style="font-size:11.5px; font-weight:700; color:#5a6b58;">Pendiente · Sem. ${escapeHtml(pw.weekShort)}</span>
+                ${pw.isUpdate
+                  ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#ffede1; color:#b34200; font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:999px;">↻ Por actualizar</span>`
+                  : `<span style="display:inline-flex; align-items:center; gap:2px; background:#fef3c7; color:#92400e; font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:999px;">Sin enviar</span>`}
+                <span style="font-size:12px; font-weight:800; color:#1b6e1b;">${formatLatas(pw.totalLatas)} latas</span>
+              </div>
+              <span style="display:inline-flex; align-items:center; gap:2px; font-size:11.5px; font-weight:700; color:#b34200; white-space:nowrap; flex-shrink:0;">
+                <span>Ver</span>
+                <span class="material-symbols-outlined" style="font-size:16px;">chevron_right</span>
+              </span>
+            </button>
+          `).join('')}
+        </div>
+      ` : '';
+
+      const toggleBtnHtml = (isAll) => `
+        <button type="button" id="cos-toggle-view-btn" style="height:34px; padding:0 12px; border-radius:999px; border:1px solid #d5e2d2; background:#eff4ed; color:#1e3e2b; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap; flex-shrink:0; font-family:'Work Sans',sans-serif;">
+          <span class="material-symbols-outlined" style="font-size:16px;">${isAll ? 'calendar_view_week' : 'bar_chart'}</span>
+          <span>${isAll ? 'Ver semana' : 'Toda la cosecha'}</span>
+        </button>
+      `;
+
+      const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+      const statusChipHtml = (st) => st === 'paid'
+        ? '<span style="color:#1b6e1b;font-weight:700;">✔ Pagado</span>'
+        : (st === 'update'
+          ? '<span style="color:#b34200;font-weight:700;">↻ Por actualizar</span>'
+          : '<span style="color:#92400e;font-weight:700;">Sin enviar</span>');
+
+      const allModeHtml = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; padding:0 2px;">
+          <span style="font-size:14.5px; font-weight:800; color:#111827;">Toda la cosecha</span>
+          ${toggleBtnHtml(true)}
+        </div>
+
+        <div style="background:#f2f5f0; border-radius:16px; padding:12px 14px; margin-bottom:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div>
+              <div style="font-size:11.5px; color:#5a6b58; font-weight:600;">Total cosecha del lote</div>
+              <div style="font-size:21px; font-weight:800; color:${allLoteTotalLatas > 0 ? '#1b6e1b' : '#111827'}; margin-top:2px;">${formatLatas(allLoteTotalLatas)} ${allLoteTotalLatas === 1 ? 'lata' : 'latas'}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11.5px; color:#5a6b58; font-weight:600;">Costo de corte</div>
+              <div style="font-size:20px; font-weight:800; color:#b34200; margin-top:2px;">L ${Math.round(allLoteTotalPay).toLocaleString('es-HN')}</div>
+            </div>
+          </div>
+          <div style="border-top:1px dashed #d5e2d2; margin-top:10px; padding-top:8px; font-size:11.5px; font-weight:600; color:#5a6b58;">
+            ${plural(allWeeksHistory.length, 'semana', 'semanas')} · ${plural(allLoteCutDays.size, 'día de corte', 'días de corte')} · ${plural(allCollectorsHistory.length, 'colaborador', 'colaboradores')}
+          </div>
+        </div>
+
+        ${allWeeksHistory.length === 0 ? `
+          <div style="padding:24px 12px; text-align:center; color:#6b7280; font-size:13px; background:#f5f7f3; border-radius:14px;">
+            Aún no hay cosecha registrada en este lote.
+          </div>
+        ` : `
+          <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:#4a5d48; margin-bottom:8px;">
+            Total por colaborador · Toca para ver
+          </div>
+          ${allCollectorsHistory.map(c => `
+            <div class="cos-all-col-card" data-col-key="${escapeHtml(c.colKey)}" data-ws-iso="${escapeHtml(c.lastWsIso)}" style="background:#f5f7f3; border-radius:16px; padding:11px 14px; margin-bottom:8px; cursor:pointer; border:1px solid #e6ece4;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+                  <div style="width:40px; height:40px; border-radius:50%; background:${getAvatarColor(c.nombre)}; color:#ffffff; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    ${escapeHtml(getInitials(c.nombre))}
+                  </div>
+                  <div style="min-width:0; flex:1;">
+                    <div style="font-size:13.5px; font-weight:700; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.nombre)}</div>
+                    <div style="font-size:12px; color:#5a6b58; margin-top:1px;">
+                      <span style="color:#1b6e1b; font-weight:800;">${formatLatas(c.latas)} ${c.latas === 1 ? 'lata' : 'latas'}</span> · ${plural(c.daysCount, 'día', 'días')} · ${plural(c.weeksCount, 'semana', 'semanas')}
+                    </div>
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                  <span style="font-size:14.5px; font-weight:800; color:#b34200;">L ${Math.round(c.pay).toLocaleString('es-HN')}</span>
+                  <span class="material-symbols-outlined" style="font-size:18px; color:#5a6b58;">chevron_right</span>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+
+          <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:#4a5d48; margin:14px 0 8px;">
+            Por semana · Toca para ver
+          </div>
+          ${allWeeksHistory.map(w => `
+            <div class="cos-all-week-card" data-ws-iso="${escapeHtml(w.wsIso)}" style="background:#f5f7f3; border-radius:16px; padding:11px 14px; margin-bottom:8px; cursor:pointer; border:1px solid #e6ece4;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="min-width:0; flex:1;">
+                  <div style="font-size:13.5px; font-weight:700; color:#111827;">Sem. ${escapeHtml(w.weekShort)} ${escapeHtml(w.weekYear)}</div>
+                  <div style="font-size:12px; color:#5a6b58; margin-top:1px;">
+                    ${plural(w.cutDaysCount, 'día', 'días')} · ${plural(w.colsCount, 'colaborador', 'colaboradores')} · ${statusChipHtml(w.status)}
+                  </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                  <span style="display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.15;">
+                    <span style="font-size:13.5px; font-weight:800; color:#1b6e1b;">${formatLatas(w.totalLatas)} ${w.totalLatas === 1 ? 'lata' : 'latas'}</span>
+                    <span style="font-size:12px; font-weight:800; color:#b34200;">L ${Math.round(w.totalPay).toLocaleString('es-HN')}</span>
+                  </span>
+                  <span class="material-symbols-outlined" style="font-size:18px; color:#5a6b58;">chevron_right</span>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        `}
+      `;
+
       wrap.innerHTML = `
         <!-- Navegación semanal -->
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; padding:0 4px;">
-          <button type="button" id="cos-prev-week" aria-label="Semana anterior" style="width:34px; height:34px; border-radius:50%; border:1px solid #d5e2d2; background:#f4f7f3; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-            <span class="material-symbols-outlined" style="font-size:19px;">chevron_left</span>
-          </button>
-          <span style="font-size:14px; font-weight:800; color:#111827;">${escapeHtml(getWeekRangeLabel())}</span>
-          <button type="button" id="cos-next-week" aria-label="Semana siguiente" style="width:34px; height:34px; border-radius:50%; border:1px solid #d5e2d2; background:#f4f7f3; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-            <span class="material-symbols-outlined" style="font-size:19px;">chevron_right</span>
-          </button>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; padding:0 2px;">
+          <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+            <button type="button" id="cos-prev-week" aria-label="Semana anterior" style="width:34px; height:34px; border-radius:50%; border:1px solid #d5e2d2; background:#f4f7f3; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+              <span class="material-symbols-outlined" style="font-size:19px;">chevron_left</span>
+            </button>
+            <span style="font-size:13.5px; font-weight:800; color:#111827; white-space:nowrap;">${escapeHtml(formatWeekShortForIso(wsIso))}</span>
+            <button type="button" id="cos-next-week" aria-label="Semana siguiente" style="width:34px; height:34px; border-radius:50%; border:1px solid #d5e2d2; background:#f4f7f3; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+              <span class="material-symbols-outlined" style="font-size:19px;">chevron_right</span>
+            </button>
+          </div>
+          ${toggleBtnHtml(false)}
         </div>
 
         <!-- Franja de 7 días -->
@@ -333,61 +735,107 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
             const isSel = iso === selectedDateStr;
             const isToday = iso === todayIso;
             const latas = dayTotals.get(iso) || 0;
-            const dayNumColor = isToday ? '#f97316' : (isSel ? '#ffffff' : '#111827');
+            const isStrong = (isDayFilterExplicit && isSel) || (!isDayFilterExplicit && isToday);
+            const pillBg = isStrong ? '#2d3e2c' : (latas > 0 ? '#eef5ec' : '#f4f7f3');
+            const pillBorder = isStrong ? '1px solid #2d3e2c' : (latas > 0 ? '1px solid #c5dcc0' : '1px solid transparent');
+            const pillText = isStrong ? '#ffffff' : '#111827';
+            const dayNumColor = isToday ? '#f97316' : (isStrong ? '#ffffff' : '#111827');
             return `
-              <button type="button" class="cos-day-pill" data-iso="${iso}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 2px; border-radius:14px; border:none; background:${isSel ? '#2d3e2c' : '#f4f7f3'}; color:${isSel ? '#ffffff' : '#111827'}; cursor:pointer; font-family:'Work Sans',sans-serif;">
-                <span style="font-size:10px; font-weight:700; opacity:${isSel ? '0.85' : '0.6'};">${DAYS_SHORT[d.getDay()]}</span>
+              <button type="button" class="cos-day-pill" data-iso="${iso}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px 2px; border-radius:14px; border:${pillBorder}; background:${pillBg}; color:${pillText}; cursor:pointer; font-family:'Work Sans',sans-serif;">
+                <span style="font-size:10px; font-weight:700; opacity:${isStrong ? '0.85' : '0.6'};">${DAYS_SHORT[d.getDay()]}</span>
                 <span style="font-size:14px; font-weight:800; margin:2px 0; color:${dayNumColor};">${d.getDate()}</span>
-                <span style="font-size:10.5px; font-weight:700; color:${isSel ? '#e5f3e4' : (latas > 0 ? '#1b6e1b' : '#8a9988')}; white-space:nowrap;">${formatLatas(latas, true)}</span>
+                <span style="font-size:10.5px; font-weight:700; color:${isStrong ? '#e5f3e4' : (latas > 0 ? '#1b6e1b' : '#8a9988')}; white-space:nowrap;">${formatLatas(latas, true)}</span>
               </button>
             `;
           }).join('')}
         </div>
 
         <!-- Tarjeta Resumen Semanal -->
-        <div style="background:#f2f5f0; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;">
-          <div>
-            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-              <span style="font-size:11.5px; color:#5a6b58; font-weight:600;">Total de la semana</span>
-              ${allWeekSent
-                ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#e2f2e0; color:#1b6e1b; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">✓ Pagado</span>`
-                : (weekNeedsUpdate
-                  ? `<span style="display:inline-flex; align-items:center; gap:2px; background:#ffede1; color:#b34200; font-size:10px; font-weight:800; padding:2px 7px; border-radius:999px;">↻ Por actualizar</span>`
-                  : '')}
-            </div>
-            <div style="font-size:20px; font-weight:800; color:#111827; margin-top:2px;">${formatLatas(weekTotalLatas)} latas</div>
-          </div>
-          <div style="text-align:right;">
-            <button type="button" id="cos-edit-price-btn" style="background:none; border:none; padding:0; font-size:11.5px; color:#5a6b58; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
-              <span>L${precioLata.toLocaleString('es-HN')} por lata · ${weekNeedsUpdate ? 'Actualizar' : 'A pagar'}</span>
-            </button>
-            ${weekNeedsUpdate ? `
-              <div style="display:flex; align-items:baseline; justify-content:flex-end; gap:6px; margin-top:2px; flex-wrap:wrap;">
-                <span style="font-size:13px; font-weight:700; color:#6b7280; text-decoration:line-through;">L ${weekPaidTotal.toLocaleString('es-HN')}</span>
-                <span style="font-size:13px; font-weight:700; color:#5a6b58;">→</span>
-                <span style="font-size:20px; font-weight:800; color:#b34200;">L ${weekTotalPay.toLocaleString('es-HN')}</span>
+        <div style="background:#f2f5f0; border-radius:16px; padding:12px 14px; margin-bottom:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span style="font-size:11.5px; color:#5a6b58; font-weight:600;">${summaryTitleText}</span>
+                ${summaryBadgeHtml}
               </div>
-            ` : `
-              <div style="font-size:20px; font-weight:800; color:#b34200; margin-top:2px;">L ${weekTotalPay.toLocaleString('es-HN')}</div>
-            `}
+              <div style="font-size:20px; font-weight:800; color:${(showOtherInMain ? otherPendingLatas : weekTotalLatas) > 0 ? '#1b6e1b' : '#111827'}; margin-top:2px;">${summaryLatasText}</div>
+            </div>
+            <button type="button" id="cos-edit-price-btn" style="background:none; border:none; padding:0; text-align:right; cursor:pointer; font-family:'Work Sans',sans-serif; flex-shrink:0;">
+              <div style="font-size:11.5px; color:#5a6b58; font-weight:600; display:inline-flex; align-items:center; justify-content:flex-end; gap:3px;">
+                <span>Valor por lata</span>
+                <span class="material-symbols-outlined" style="font-size:13px; color:#5a6b58;">edit</span>
+              </div>
+              <div style="font-size:20px; font-weight:800; color:#b34200; margin-top:2px;">L ${precioLata.toLocaleString('es-HN')}</div>
+            </button>
           </div>
+          ${otherPendingRowsHtml}
         </div>
 
-        <!-- Por Recolector -->
+        <!-- Por Colaborador -->
         <div>
           <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:#4a5d48; margin-bottom:8px;">
-            Por recolector · Toca para ver
+            ${showPendingOtherCols ? 'Pendientes por enviar · Toca para ver' : 'Por colaborador · Toca para ver'}
           </div>
-          ${collectorSummaries.length > 0 ? collectorSummaries.map((col, idx) => {
+          ${(!showPendingOtherCols && isDayFilterExplicit) ? `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#eef4ed; border:1px solid #d5e2d2; border-radius:12px; padding:7px 12px; margin-bottom:10px;">
+              <span style="font-size:12px; font-weight:700; color:#2d3e2c;">Filtrando: ${escapeHtml(selDayLabel)}</span>
+              <button type="button" id="cos-clear-day-filter" style="background:#ffffff; border:1px solid #c5d5c1; color:#2d3e2c; border-radius:999px; padding:3px 10px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:'Work Sans',sans-serif;">Ver semana ×</button>
+            </div>
+          ` : ''}
+          ${showPendingOtherCols ? pendingOtherCols.map(({ col, paid, pw }) => {
+            const colKey = String(col.colKey || col.personal_id || col.nombre);
+            const targetPay = Math.round(Number(col.pay) || 0);
+            const prevPay = paid ? Math.round(Number(paid.monto) || 0) : 0;
+            const badgeHtml = paid
+              ? '<span style="color:#b34200;font-weight:700;">↻ Por actualizar</span>'
+              : '<span style="color:#92400e;font-weight:700;">Sin enviar</span>';
+            const amountHtml = paid
+              ? `<span style="display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.1;"><span style="font-size:11px; text-decoration:line-through; color:#6b7280; font-weight:700;">L ${prevPay.toLocaleString('es-HN')}</span><span style="font-size:14px; font-weight:800; color:#b34200;">L ${targetPay.toLocaleString('es-HN')}</span></span>`
+              : `<span style="font-size:14.5px; font-weight:800; color:#b34200;">L ${targetPay.toLocaleString('es-HN')}</span>`;
+            return `
+              <div class="cos-pending-col-card" data-ws-iso="${escapeHtml(pw.wsIso)}" data-col-key="${escapeHtml(colKey)}" style="background:#f5f7f3; border-radius:16px; padding:11px 14px; margin-bottom:8px; cursor:pointer; border:1px solid #e6ece4;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+                    <div style="width:40px; height:40px; border-radius:50%; background:${getAvatarColor(col.nombre)}; color:#ffffff; font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                      ${escapeHtml(getInitials(col.nombre))}
+                    </div>
+                    <div style="min-width:0; flex:1;">
+                      <div style="font-size:13.5px; font-weight:700; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(col.nombre)}</div>
+                      <div style="font-size:12px; color:#5a6b58; margin-top:1px;">
+                        <span style="color:${col.latas > 0 ? '#1b6e1b' : '#5a6b58'}; font-weight:800;">${formatLatas(col.latas)} ${col.latas === 1 ? 'lata' : 'latas'}</span> · Sem. ${escapeHtml(pw.weekShort)} · ${badgeHtml}
+                        ${(allCollectorTotals.get(String(col.colKey || col.personal_id || col.nombre)) || null) ? `<div style="font-size:11.5px; color:#5a6b58; margin-top:1px;">Total en el lote: <b style="color:#1b6e1b;">${formatLatas(allCollectorTotals.get(String(col.colKey || col.personal_id || col.nombre)).latas)} latas</b></div>` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                    ${amountHtml}
+                    <span class="material-symbols-outlined" style="font-size:18px; color:#5a6b58;">chevron_right</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('') : (collectorSummaries.length > 0 ? collectorSummaries.map((col, idx) => {
             const refTag = `[ref:cosecha_${lote.id}_${col.personal_id || col.nombre}_${wsIso}]`;
             const paidInfo = weekPaidMap.get(refTag);
             const isSentSynced = Boolean(paidInfo && Math.round(paidInfo.monto) === Math.round(col.pay));
             const isSentChanged = Boolean(paidInfo && Math.round(paidInfo.monto) !== Math.round(col.pay));
             const statusHtml = isSentSynced
               ? ' · <span style="color:#1b6e1b;font-weight:700;">✔ Pagado</span>'
-              : (isSentChanged ? ' · <span style="color:#b34200;font-weight:700;">↻ Por actualizar</span>' : '');
+              : (isSentChanged
+                ? ' · <span style="color:#b34200;font-weight:700;">↻ Por actualizar</span>'
+                : (col.pay > 0 ? ' · <span style="color:#92400e;font-weight:700;">Sin enviar</span>' : ''));
             const dayLatas = selDayLatasMap.get(String(col.personal_id || col.nombre)) || 0;
             const dayPay = Math.round(dayLatas * selDayPrice);
+            const dispLatas = isDayFilterExplicit ? dayLatas : col.latas;
+            const dispPay = isDayFilterExplicit ? dayPay : Math.round(col.pay);
+            const dispDaysText = isDayFilterExplicit
+              ? selDayLabel
+              : (col.days.length > 0
+                ? col.days.map(d => `${DAYS_SHORT[d.dateObj.getDay()]} ${d.dateObj.getDate()}`).join(', ')
+                : `Sem. ${formatWeekShortForIso(wsIso)}`);
+            const amountHtml = (!isDayFilterExplicit && isSentChanged && paidInfo)
+              ? `<span style="display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.1;"><span style="font-size:11px; text-decoration:line-through; color:#6b7280; font-weight:700;">L ${Math.round(paidInfo.monto).toLocaleString('es-HN')}</span><span style="font-size:14px; font-weight:800; color:#b34200;">L ${dispPay.toLocaleString('es-HN')}</span></span>`
+              : `<span style="font-size:14.5px; font-weight:800; color:${dispPay > 0 ? '#b34200' : '#6b7280'};">L ${dispPay.toLocaleString('es-HN')}</span>`;
             return `
               <div class="cos-col-swipe-wrap" data-idx="${idx}" data-pid="${escapeHtml(String(col.personal_id || col.nombre))}" style="position:relative; overflow:hidden; border-radius:16px; margin-bottom:8px;">
                 <div class="cos-col-swipe-bg" style="position:absolute; inset:0; background:transparent; display:flex; align-items:center; padding:0 18px; pointer-events:none;">
@@ -405,12 +853,13 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
                       <div style="min-width:0; flex:1;">
                         <div style="font-size:13.5px; font-weight:700; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(col.nombre)}</div>
                         <div style="font-size:12px; color:#5a6b58; margin-top:1px;">
-                          ${formatLatas(dayLatas)} latas · ${escapeHtml(selDayLabel)}${statusHtml}
+                          <span style="color:${dispLatas > 0 ? '#1b6e1b' : '#5a6b58'}; font-weight:800;">${formatLatas(dispLatas)} ${dispLatas === 1 ? 'lata' : 'latas'}</span> · ${escapeHtml(dispDaysText)}${statusHtml}
+                          ${(allCollectorTotals.get(String(col.personal_id || col.nombre)) || null) ? `<div style="font-size:11.5px; color:#5a6b58; margin-top:1px;">Total en el lote: <b style="color:#1b6e1b;">${formatLatas(allCollectorTotals.get(String(col.personal_id || col.nombre)).latas)} latas</b></div>` : ''}
                         </div>
                       </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                      <span style="font-size:14.5px; font-weight:800; color:${dayPay > 0 ? '#b34200' : '#6b7280'};">L ${dayPay.toLocaleString('es-HN')}</span>
+                      ${amountHtml}
                       <span class="material-symbols-outlined" style="font-size:18px; color:#5a6b58;">chevron_right</span>
                     </div>
                   </div>
@@ -421,20 +870,90 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
             <div style="padding:24px 12px; text-align:center; color:#6b7280; font-size:13px; background:#f5f7f3; border-radius:14px;">
               No hay colaboradores activos en esta semana.
             </div>
-          `}
+          `)}
           <button type="button" id="cos-main-add-worker-btn" style="width:100%; height:42px; margin-top:4px; border-radius:999px; border:1.5px dashed #b5c7b2; background:#ffffff; color:#2d3e2c; font-family:'Work Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer;">
-            + Agregar recolector
+            + Agregar colaborador
           </button>
         </div>
       `;
 
+      if (cosechaViewMode === 'all') {
+        wrap.innerHTML = allModeHtml;
+        document.getElementById('cos-toggle-view-btn')?.addEventListener('click', () => {
+          cosechaViewMode = 'week';
+          isDayFilterExplicit = false;
+          loadAndRender();
+        });
+        wrap.querySelectorAll('.cos-all-week-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const parts = String(card.dataset.wsIso || '').split('-').map(Number);
+            if (parts.length !== 3) return;
+            currentWeekStart = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, 0, 0, 0);
+            selectedDateStr = '';
+            isDayFilterExplicit = false;
+            cosechaViewMode = 'week';
+            loadAndRender();
+          });
+        });
+        wrap.querySelectorAll('.cos-all-col-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const parts = String(card.dataset.wsIso || '').split('-').map(Number);
+            if (parts.length !== 3) return;
+            currentWeekStart = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, 0, 0, 0);
+            selectedDateStr = '';
+            isDayFilterExplicit = false;
+            cosechaViewMode = 'week';
+            loadAndRender(card.dataset.colKey || null);
+          });
+        });
+        return;
+      }
+
+      document.getElementById('cos-toggle-view-btn')?.addEventListener('click', () => {
+        cosechaViewMode = 'all';
+        isDayFilterExplicit = false;
+        loadAndRender();
+      });
+
       document.getElementById('cos-prev-week')?.addEventListener('click', () => {
         currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+        isDayFilterExplicit = false;
         loadAndRender();
       });
       document.getElementById('cos-next-week')?.addEventListener('click', () => {
         currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+        isDayFilterExplicit = false;
         loadAndRender();
+      });
+
+      wrap.querySelectorAll('.cos-jump-pending-week').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const targetIso = btn.dataset.wsIso;
+          const parts = String(targetIso || '').split('-').map(Number);
+          if (parts.length !== 3) return;
+          currentWeekStart = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, 0, 0, 0);
+          selectedDateStr = '';
+          isDayFilterExplicit = false;
+          loadAndRender();
+        });
+      });
+
+      document.getElementById('cos-clear-day-filter')?.addEventListener('click', () => {
+        isDayFilterExplicit = false;
+        loadAndRender();
+      });
+
+      wrap.querySelectorAll('.cos-pending-col-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const targetIso = card.dataset.wsIso;
+          const colKey = card.dataset.colKey;
+          const parts = String(targetIso || '').split('-').map(Number);
+          if (parts.length !== 3) return;
+          currentWeekStart = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1, 0, 0, 0);
+          selectedDateStr = '';
+          isDayFilterExplicit = false;
+          loadAndRender(colKey || null);
+        });
       });
 
       document.getElementById('cos-edit-price-btn')?.addEventListener('click', () => {
@@ -474,7 +993,13 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
       wrap.querySelectorAll('.cos-day-pill').forEach(btn => {
         btn.addEventListener('click', () => {
-          selectedDateStr = btn.dataset.iso;
+          const picked = btn.dataset.iso;
+          if (isDayFilterExplicit && selectedDateStr === picked) {
+            isDayFilterExplicit = false;
+          } else {
+            selectedDateStr = picked;
+            isDayFilterExplicit = true;
+          }
           loadAndRender();
         });
       });
@@ -575,6 +1100,11 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       document.getElementById('cos-main-add-worker-btn')?.addEventListener('click', () => {
         openAddCollectorSheet(wsIso);
       });
+
+      if (autoOpenColKey) {
+        const targetCol = collectorSummaries.find(c => String(c.personal_id || c.nombre) === String(autoOpenColKey));
+        if (targetCol) openCollectorDetailModal(targetCol);
+      }
     } catch (err) {
       wrap.innerHTML = `<div style="padding:20px; text-align:center; color:#ba1a1a; font-size:13px;">Error cargando cosecha: ${escapeHtml(err.message)}</div>`;
     }
@@ -587,7 +1117,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       return Boolean(fromIso && wsIso >= fromIso);
     });
 
-    showModal('Agregar recolector', `
+    showModal('Agregar colaborador', `
       <div style="display:flex; flex-direction:column; gap:16px;">
         ${hiddenWorkers.length > 0 ? `
           <div>
@@ -614,13 +1144,14 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
         <div>
           <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:#5a6b58; margin-bottom:8px;">
-            Registrar nuevo recolector
+            Registrar nuevo colaborador
           </div>
           <div class="m3-field" style="margin-bottom:0;">
             <input type="text" id="cos-new-worker-name" placeholder=" " style="font-size:14px; font-weight:600; background:#ffffff;">
             <label for="cos-new-worker-name" style="background:#ffffff;">Nombre completo</label>
           </div>
           <div id="cos-new-worker-err" style="display:none; font-size:11.5px; font-weight:600; color:#ba1a1a; margin-top:4px; padding-left:12px;"></div>
+          <div style="font-size:11.5px; color:#5a6b58; margin-top:6px; padding-left:4px;">Se registrará también en Personal como Colaborador (sin pago diario).</div>
           <div style="display:grid; grid-template-columns:1fr 1.5fr; gap:10px; margin-top:12px;">
             <button type="button" id="cos-add-sheet-cancel" style="height:44px; border-radius:999px; border:1px solid #d5e2d2; background:#ffffff; color:#2d3e2c; font-size:14px; font-weight:700; cursor:pointer;">Cancelar</button>
             <button type="button" id="cos-add-sheet-save" style="height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-size:14px; font-weight:700; cursor:pointer;">Agregar</button>
@@ -650,7 +1181,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       const nombre = String(inp?.value || '').trim();
       if (!nombre) {
         if (errEl) {
-          errEl.textContent = 'Ingresa el nombre del recolector';
+          errEl.textContent = 'Ingresa el nombre del colaborador';
           errEl.style.display = 'block';
         }
         inp?.focus();
@@ -663,8 +1194,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
       try {
         const { error: pErr } = await supabase.from('personal').insert([{
           nombre,
-          iniciales: getInitials(nombre),
-          rol: 'Recolector',
+          rol: 'Colaborador',
           pago_diario: 0
         }]);
         if (pErr) throw pErr;
@@ -673,7 +1203,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
         window.Snackbar?.show(`✔ ${nombre} agregado al equipo`);
         await loadAndRender();
       } catch (err) {
-        window.Snackbar?.show('Error agregando recolector: ' + (err.message || err), { type: 'error' });
+        window.Snackbar?.show('Error agregando colaborador: ' + (err.message || err), { type: 'error' });
         if (saveBtn) {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Agregar';
@@ -775,11 +1305,11 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
             </button>
           </div>
 
-          <!-- Tarjeta Resumen del Recolector -->
+          <!-- Tarjeta Resumen del Colaborador -->
           <div style="background:#f3f5f1; border-radius:16px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
             <div>
               <div style="font-size:11.5px; color:#5a6b58; font-weight:600;">Recolectó en la semana</div>
-              <div style="font-size:20px; font-weight:800; color:#111827; margin-top:2px;">${formatLatas(totalLatas)} ${totalLatas === 1 ? 'lata' : 'latas'}</div>
+              <div style="font-size:20px; font-weight:800; color:${totalLatas > 0 ? '#1b6e1b' : '#111827'}; margin-top:2px;">${formatLatas(totalLatas)} ${totalLatas === 1 ? 'lata' : 'latas'}</div>
             </div>
             <div style="text-align:right;">
               <div style="font-size:11.5px; color:#5a6b58; font-weight:600;">${formatLatas(totalLatas)} × L${precioLata.toLocaleString('es-HN')} · ${paidInfo ? (needsUpdate ? `En Cuentas: L ${paidMonto.toLocaleString('es-HN')}` : 'En Cuentas') : 'Por pagar'}</div>
@@ -1112,7 +1642,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
     showModal('Cosecha · Registrar latas de café', `
       <div id="cos-reg-root" style="display:flex; flex-direction:column; gap:10px;">
-        <!-- Bloque superior fijo: fecha + encabezado + tarjeta del recolector activo -->
+        <!-- Bloque superior fijo: fecha + encabezado + tarjeta del colaborador activo -->
         <div id="cos-reg-sticky-top" style="position:sticky; top:0; z-index:4; background:#ffffff; padding-bottom:8px; display:flex; flex-direction:column; gap:10px;">
           <!-- Navegación de fecha -->
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 4px;">
@@ -1127,15 +1657,15 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
           <!-- Encabezado lista + Total del día -->
           <div style="display:flex; align-items:center; justify-content:space-between; padding:0 2px;">
-            <span style="font-size:11px; font-weight:800; letter-spacing:0.5px; color:#5a6b58; text-transform:uppercase;">Latas de cada recolector</span>
+            <span style="font-size:11px; font-weight:800; letter-spacing:0.5px; color:#5a6b58; text-transform:uppercase;">Latas de cada colaborador</span>
             <span id="cos-reg-day-total" style="font-size:13.5px; font-weight:800; color:#111827;"></span>
           </div>
 
-          <!-- Tarjeta fija del recolector activo -->
+          <!-- Tarjeta fija del colaborador activo -->
           <div id="cos-active-card-slot"></div>
         </div>
 
-        <!-- Lista desplazable del resto de recolectores -->
+        <!-- Lista desplazable del resto de colaboradores -->
         <div id="cos-workers-list" style="display:flex; flex-direction:column; gap:9px;"></div>
       </div>
     `);
@@ -1169,7 +1699,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
 
       if (!workers.length) {
         activeSlot.innerHTML = '';
-        listEl.innerHTML = `<div style="padding:20px; text-align:center; color:#6b7280; font-size:13px;">No hay colaboradores registrados. Usa <b>+ Agregar recolector</b>.</div>`;
+        listEl.innerHTML = `<div style="padding:20px; text-align:center; color:#6b7280; font-size:13px;">No hay colaboradores registrados. Usa <b>+ Agregar colaborador</b>.</div>`;
         return;
       }
 
@@ -1193,7 +1723,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
               </div>
               <div style="min-width:0; flex:1;">
                 <div style="font-size:13.5px; font-weight:800; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(w.nombre)}</div>
-                <div style="font-size:11.5px; color:#5a6b58;">Recolector ${activeIdx + 1} de ${workers.length}</div>
+                <div style="font-size:11.5px; color:#5a6b58;">Colaborador ${activeIdx + 1} de ${workers.length}</div>
               </div>
             </div>
             <div style="font-size:16px; font-weight:800; color:#111827; white-space:nowrap;">${formatLatas(latasVal)} latas</div>
@@ -1373,88 +1903,75 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
   let isSendingWeek = false;
   const sendWeekToGastos = () => {
     if (isSendingWeek) return;
-    const days = getWeekDates();
-    const wsIso = fmtIso(days[0]);
-    const newCols = [];
-    const changedCols = [];
-    collectorSummaries.forEach(col => {
-      const refTag = `[ref:cosecha_${lote.id}_${col.personal_id || col.nombre}_${wsIso}]`;
-      const paid = weekPaidMap.get(refTag);
-      if (!paid && col.pay > 0) {
-        newCols.push({ col, refTag });
-      } else if (paid && Math.round(paid.monto) !== Math.round(col.pay)) {
-        changedCols.push({ col, refTag, paid });
-      }
-    });
-
-    if (!newCols.length && !changedCols.length) {
-      window.Snackbar?.show('Todos los cortes de esta semana ya están al día en Cuentas');
+    if (!activePendingWeeks.length) {
+      window.Snackbar?.show('Todos los cortes ya están al día en Cuentas');
       return;
     }
 
-    const isUpdateFlow = changedCols.length > 0;
-    const prevSum = changedCols.reduce((s, x) => s + Math.round(x.paid.monto), 0);
-    const newSum = changedCols.reduce((s, x) => s + Math.round(x.col.pay), 0) + newCols.reduce((s, x) => s + Math.round(x.col.pay), 0);
-    const totalCount = newCols.length + changedCols.length;
+    const isUpdateFlow = activePendingWeeks.some(w => w.isUpdate);
+    const totalCount = activePendingWeeks.reduce((s, w) => s + w.newCols.length + w.changedCols.length, 0);
+    const prevSum = activePendingWeeks.reduce((s, w) => s + w.paidTotal, 0);
+    const newSum = activePendingWeeks.reduce((s, w) => s + w.targetTotal, 0);
+    const weeksLabel = activePendingWeeks.map(w => w.weekTitleFull || `Semana ${w.weekShort}`).join(', ');
     const confirmMsg = isUpdateFlow
-      ? `¿Actualizar en Cuentas <b>${totalCount}</b> ${totalCount === 1 ? 'pago de cosecha' : 'pagos de cosecha'} (<b>L ${prevSum.toLocaleString('es-HN')} → L ${newSum.toLocaleString('es-HN')}</b>)?`
-      : `¿Enviar a Cuentas <b>${newCols.length}</b> ${newCols.length === 1 ? 'pago de cosecha' : 'pagos de cosecha'} (<b>L ${newSum.toLocaleString('es-HN')}</b>)?`;
+      ? `¿Actualizar en Cuentas <b>${totalCount}</b> ${totalCount === 1 ? 'pago de cosecha' : 'pagos de cosecha'} (<b>L ${prevSum.toLocaleString('es-HN')} → L ${newSum.toLocaleString('es-HN')}</b>)?<br><small style="color:#5a6b58;">${escapeHtml(weeksLabel)}</small>`
+      : `¿Enviar a Cuentas <b>${totalCount}</b> ${totalCount === 1 ? 'pago de cosecha' : 'pagos de cosecha'} (<b>L ${newSum.toLocaleString('es-HN')}</b>)?<br><small style="color:#5a6b58;">${escapeHtml(weeksLabel)}</small>`;
 
     window.Snackbar?.confirm(
       confirmMsg,
       async () => {
         if (isSendingWeek) return;
         isSendingWeek = true;
+        const gastosBtn = document.getElementById('lote-footer-cos-gastos');
+        if (gastosBtn) {
+          gastosBtn.disabled = true;
+          gastosBtn.style.opacity = '0.6';
+        }
         try {
-          const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || lote?.empresa_id || '';
-          const weekTitle = getWeekTitleFull();
           const todayIso = fmtIso(new Date());
+          for (const w of activePendingWeeks) {
+            const weekTitle = w.weekTitleFull || getWeekTitleFull();
+            for (const { col, refTag } of w.newCols) {
+              const desc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(col.latas)} ${col.latas === 1 ? 'lata' : 'latas'}) ${refTag}`;
+              const { data: insData, error: iErr } = await supabase.from('gastos').insert([{
+                lote_id: lote.id,
+                fecha: todayIso,
+                categoria: 'Cosecha',
+                descripcion: desc,
+                monto: col.pay
+              }]);
+              if (iErr) throw iErr;
+              const created = Array.isArray(insData) ? insData[0] : insData;
+              weekPaidMap.set(refTag, { id: created?.id || '', monto: col.pay, descripcion: desc });
+            }
 
-          for (const { col, refTag } of newCols) {
-            const desc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(col.latas)} ${col.latas === 1 ? 'lata' : 'latas'}) ${refTag}`;
-            const { data: insData, error: iErr } = await supabase.from('gastos').insert([{
-              lote_id: lote.id,
-              fecha: todayIso,
-              categoria: 'Cosecha',
-              descripcion: desc,
-              monto: col.pay
-            }]);
-            if (iErr) throw iErr;
-            const created = Array.isArray(insData) ? insData[0] : insData;
-            weekPaidMap.set(refTag, { id: created?.id || '', monto: col.pay, descripcion: desc });
-          }
-
-          for (const { col, refTag, paid } of changedCols) {
-            const desc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(col.latas)} ${col.latas === 1 ? 'lata' : 'latas'}) ${refTag}`;
-            if (col.pay > 0) {
-              const { error: uErr } = await supabase.from('gastos').update({ monto: col.pay, descripcion: desc }).eq('id', paid.id);
-              if (uErr) throw uErr;
-              weekPaidMap.set(refTag, { id: paid.id, monto: col.pay, descripcion: desc });
-            } else {
-              const { error: dErr } = await supabase.from('gastos').delete().eq('id', paid.id);
-              if (dErr) throw dErr;
-              weekPaidMap.delete(refTag);
+            for (const { col, refTag, paid } of w.changedCols) {
+              const desc = `Cosecha ${weekTitle} · ${col.nombre} (${formatLatas(col.latas)} ${col.latas === 1 ? 'lata' : 'latas'}) ${refTag}`;
+              if (col.pay > 0) {
+                const { error: uErr } = await supabase.from('gastos').update({ monto: col.pay, descripcion: desc }).eq('id', paid.id);
+                if (uErr) throw uErr;
+                weekPaidMap.set(refTag, { id: paid.id, monto: col.pay, descripcion: desc });
+              } else {
+                const { error: dErr } = await supabase.from('gastos').delete().eq('id', paid.id);
+                if (dErr) throw dErr;
+                weekPaidMap.delete(refTag);
+              }
             }
           }
 
-          const gastosBtn = document.getElementById('lote-footer-cos-gastos');
-          if (gastosBtn) {
-            gastosBtn.disabled = true;
-            gastosBtn.textContent = '✓ Enviado a Cuentas';
-            gastosBtn.style.background = '#eff4ed';
-            gastosBtn.style.borderColor = '#c7d6c3';
-            gastosBtn.style.color = '#1b6e1b';
-            gastosBtn.style.cursor = 'not-allowed';
-          }
           window.clearScreenCache?.('gastos');
           window.Snackbar?.show(
             isUpdateFlow
               ? `✔ Actualizado en Cuentas (L ${prevSum.toLocaleString('es-HN')} → L ${newSum.toLocaleString('es-HN')})`
-              : `✔ Enviado a Cuentas: ${newCols.length === 1 ? '1 pago de cosecha' : `${newCols.length} pagos de cosecha`}`
+              : `✔ Enviado a Cuentas: ${totalCount === 1 ? '1 pago de cosecha' : `${totalCount} pagos de cosecha`}`
           );
           await loadAndRender();
         } catch (err) {
           window.Snackbar?.show('Error sincronizando con Cuentas: ' + (err.message || err), { type: 'error' });
+          if (gastosBtn) {
+            gastosBtn.disabled = false;
+            gastosBtn.style.opacity = '1';
+          }
         } finally {
           isSendingWeek = false;
         }
@@ -1467,6 +1984,10 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
   return {
     loadAndRender,
     openRegisterToday: () => {
+      if (registerBlockReason) {
+        window.Snackbar?.show(registerBlockReason);
+        return;
+      }
       openRegisterDayModal(selectedDateStr || fmtIso(new Date()));
     },
     sendWeekToGastos

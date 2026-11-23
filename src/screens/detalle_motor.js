@@ -1,9 +1,198 @@
 import { supabase } from '../supabase.js';
 import { showModal, closeModal } from '../modals.js';
 import { showSnackbar } from '../snackbar.js';
-import { getUser, restFetch } from '../auth.js';
+import { getUser, restFetch, loadEmpresaId } from '../auth.js';
+import db from '../db.js';
+import { syncTable } from '../sync.js';
 import { checkPushAlerts, notifyMotorOilChanged } from '../push/push.js';
 import { sendWhatsApp } from '../wa.js';
+import {
+  isFuelMotor,
+  computeFuelMotorStats,
+  resolveSharedFuelPrice,
+  saveSharedFuelPrice,
+  formatLiters,
+  formatLitersLabel,
+  formatCurrencyL,
+  encodeFuelLoadTag,
+  serializeMotorNotas,
+  isLikelyFuelEquipment
+} from '../utils/motor_fuel_config.js';
+import {
+  buildFuelSentMap,
+  sendFuelLoadsToCuentas,
+  fetchEmpresaGastosFresh,
+  fetchAreaCatalogs,
+  normalizeAreaName
+} from '../utils/motor_fuel_cuentas.js';
+
+function escapeFuelHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getLocalTodayIso() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+}
+
+function formatFuelShortDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const todayStr = getLocalTodayIso();
+  const dLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (dLocal === todayStr) return 'Hoy';
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace(/\.$/, '');
+}
+
+function extractFuelThumbLabel(motor) {
+  const nombre = String(motor?.nombre || '').trim();
+  const codeMatch = nombre.match(/([A-Za-z]{1,4}[-\s]?\d{2,4}[A-Za-z0-9]*)$/);
+  if (codeMatch) return codeMatch[1].trim();
+  const words = nombre.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return words.slice(-2).join(' ');
+  return nombre.slice(0, 10) || 'Equipo';
+}
+
+function renderFuelDetalleMotor(motor, stats) {
+  const thumbInner = motor.image_url
+    ? `<img src="${escapeFuelHtml(motor.image_url)}" alt="${escapeFuelHtml(motor.nombre || 'Equipo')}" style="width: 100%; height: 100%; object-fit: cover;">`
+    : `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 6px; gap: 3px;">
+         <span style="font-size: 13.5px; font-weight: 800; color: #192b18; line-height: 1.15;">${escapeFuelHtml(extractFuelThumbLabel(motor))}</span>
+       </div>`;
+
+  const mantsHtml = stats.items.map((item) => {
+    const barW = item.isDue ? 100 : (item.pct > 0 ? Math.max(4, item.pct) : 0);
+    const remTxt = formatLiters(item.remaining);
+    const remPrefix = remTxt === '1' ? 'Falta' : 'Faltan';
+    if (item.needsAction) {
+      const rightTxt = item.isDue ? '¡Toca hacerlo!' : `${remPrefix} ${formatLitersLabel(item.remaining)}`;
+      return `
+        <div class="fuel-mant-card is-alert" style="background: #fff9f5; border: 1.5px solid #e8a472; border-radius: 18px; padding: 14px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+            <span style="font-size: 15.5px; font-weight: 800; color: #192b18;">${escapeFuelHtml(item.nombre)}</span>
+            <span style="font-size: 13.5px; font-weight: 800; color: #c2410c; white-space: nowrap;">${rightTxt}</span>
+          </div>
+          <div style="font-size: 12.5px; color: #5c685a; margin-top: 2px;">
+            ${item.desc ? `${escapeFuelHtml(item.desc)} · ` : ''}cada ${formatLitersLabel(item.cada_litros)}
+          </div>
+          <div style="height: 6px; background: #f6dfd0; border-radius: 9999px; overflow: hidden; margin-top: 10px;">
+            <div style="width: ${barW}%; height: 100%; background: #c2410c; border-radius: 9999px; transition: width 0.3s ease;"></div>
+          </div>
+          ${item.isDue ? `
+            <button type="button" class="fuel-mant-done-btn press-effect" data-fuel-mant-done="${escapeFuelHtml(item.key)}" style="margin-top: 12px; width: 100%; height: 42px; border-radius: 9999px; border: 1.5px solid #e0915c; background: #ffffff; color: #c2410c; font-size: 14px; font-weight: 800; font-family: inherit; cursor: pointer;">
+              Marcar como hecho
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="fuel-mant-card fuel-mant-normal-card" style="background: #f3f5f1; border: 1px solid #e3e8df; border-radius: 18px; padding: 14px; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px;">
+          <span style="font-size: 15.5px; font-weight: 800; color: #192b18;">${escapeFuelHtml(item.nombre)}</span>
+          <span style="font-size: 13.5px; font-weight: 800; color: #1e2d1e; white-space: nowrap;">${remPrefix} ${formatLitersLabel(item.remaining)}</span>
+        </div>
+        <div style="font-size: 12.5px; color: #5c685a; margin-top: 2px;">
+          ${item.desc ? `${escapeFuelHtml(item.desc)} · ` : ''}cada ${formatLitersLabel(item.cada_litros)}
+        </div>
+        <div style="height: 6px; background: #dce4da; border-radius: 9999px; overflow: hidden; margin-top: 10px;">
+          <div style="width: ${barW}%; height: 100%; background: #2e7d32; border-radius: 9999px; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const curPeriod = (window._fuelPeriodState && window._fuelPeriodState.period) || 'week';
+  const periodTabsHtml = [
+    ['day', 'Día'],
+    ['week', 'Semana'],
+    ['month', 'Mes'],
+    ['all', 'Todo'],
+  ].map(([key, label]) => {
+    const active = curPeriod === key;
+    return `
+      <button type="button" class="fuel-period-tab" data-period="${key}" style="flex:1 0 auto; min-width:72px; height:34px; padding:0 14px; border-radius:9999px; border:1px solid ${active ? '#2d3e2c' : '#d8e1d5'}; font-size:12.5px; font-weight:700; font-family:inherit; white-space:nowrap; cursor:pointer; transition:all 0.15s ease; background:${active ? '#2d3e2c' : '#ffffff'}; color:${active ? '#ffffff' : '#3c4a3b'};">
+        ${label}
+      </button>
+    `;
+  }).join('');
+
+  return `
+    <div class="screen-detalle-motor screen-detalle-fuel" style="padding: 14px 16px 0; max-width: 560px; margin: 0 auto; font-family: 'Plus Jakarta Sans', 'Work Sans', sans-serif; box-sizing: border-box;">
+      <style>#fuel-period-tabs::-webkit-scrollbar { display: none; }</style>
+      <h2 class="motor-header-title" style="margin: 0 0 14px; font-size: 20px; font-weight: 800; color: #192b18;">${escapeFuelHtml(motor.nombre || 'Equipo')}</h2>
+
+      <!-- Tarjeta unificada: resumen + filtros + gráfica -->
+      <div style="background: #f2f5f0; border: 1px solid #e1e8de; border-radius: 22px; padding: 14px; margin-bottom: 18px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 68px; height: 68px; border-radius: 16px; background: #ffffff; border: 1px solid #e3e8df; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            ${thumbInner}
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: #5b6859; font-weight: 700; line-height: 1.2;">
+              <span class="material-symbols-outlined" style="font-size: 15px; color: #2d3e2c; flex-shrink: 0;">local_gas_station</span>
+              <span id="fuel-hero-title">Gasolina usada</span>
+            </div>
+            <div id="fuel-hero-liters" style="font-size: 21px; font-weight: 800; color: #182917; margin-top: 2px; line-height: 1.15; white-space: nowrap;">${formatLitersLabel(stats.totalLiters)}</div>
+            <div id="fuel-hero-meta" style="font-size: 12px; font-weight: 800; margin-top: 3px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+          </div>
+          <button type="button" id="btn-edit-fuel-price" class="press-effect" style="text-align: right; flex-shrink: 0; background: #ffffff; border: 1px solid #d9e2d6; border-radius: 14px; padding: 8px 10px; cursor: pointer; font-family: inherit;">
+            <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 11px; color: #5b6859; font-weight: 700;">
+              <span>Precio por litro</span>
+              <span class="material-symbols-outlined" style="font-size: 13px; color: #2d3e2c;">edit</span>
+            </div>
+            <div style="font-size: 13.5px; font-weight: 800; color: #182917; margin-top: 3px; white-space: nowrap;">${stats.config.precioPorLitro > 0 ? escapeFuelHtml(formatCurrencyL(stats.config.precioPorLitro)) : 'Definir'}</div>
+          </button>
+        </div>
+
+        <div id="fuel-period-tabs" style="display: flex; align-items: center; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-top: 12px; padding: 2px 0;">
+          ${periodTabsHtml}
+        </div>
+
+        <div id="fuel-period-nav" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;">
+          <button type="button" id="fuel-period-prev" aria-label="Período anterior" style="width: 30px; height: 30px; border-radius: 50%; border: 1px solid #dce5da; background: #ffffff; color: #2d3e2c; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <span class="material-symbols-outlined" style="font-size: 18px;">chevron_left</span>
+          </button>
+          <span id="fuel-period-label" style="font-size: 13px; font-weight: 800; color: #192b18; text-align: center;"></span>
+          <button type="button" id="fuel-period-next" aria-label="Período siguiente" style="width: 30px; height: 30px; border-radius: 50%; border: 1px solid #dce5da; background: #ffffff; color: #2d3e2c; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <span class="material-symbols-outlined" style="font-size: 18px;">chevron_right</span>
+          </button>
+        </div>
+
+        <div id="fuel-period-bars" style="margin-top: 10px; background: #ffffff; border: 1px solid #e3e8df; border-radius: 14px; padding: 8px 10px;"></div>
+      </div>
+
+      <!-- Mantenimiento -->
+      <div style="font-size: 11px; font-weight: 800; color: #5a6658; letter-spacing: 0.7px; text-transform: uppercase; margin: 0 0 10px;">
+        MANTENIMIENTO
+      </div>
+      <div style="padding-bottom: 24px;">
+        ${mantsHtml}
+      </div>
+
+      <!-- Bottom sticky CTA -->
+      <div style="position: sticky; bottom: 0; background: linear-gradient(to top, #ffffff 78%, rgba(255,255,255,0)); padding: 14px 0 calc(18px + env(safe-area-inset-bottom, 0px)); margin-top: 8px; z-index: 20;">
+        <div id="fuel-cta-grid" style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+          <button type="button" id="btn-send-fuel-cuentas" class="press-effect" style="display: none; min-height: 50px; padding: 6px 12px; border-radius: 9999px; border: 1.5px solid #2d3e2c; background: #ffffff; color: #2d3e2c; font-family: inherit; flex-direction: column; align-items: center; justify-content: center; gap: 1px; cursor: pointer; box-sizing: border-box;">
+            <span id="btn-send-fuel-cuentas-title" style="font-size: 12.5px; font-weight: 800; line-height: 1.15; white-space: nowrap;">Enviar a Cuentas</span>
+            <span id="btn-send-fuel-cuentas-amt" style="font-size: 12px; font-weight: 800; color: #2e7d32; line-height: 1.15; white-space: nowrap;">L 0.00</span>
+          </button>
+          <button type="button" id="btn-open-fuel-load-sheet" class="press-effect" style="min-height: 50px; padding: 0 14px; border-radius: 9999px; border: none; background: #2d3e2c; color: #ffffff; font-size: 14px; font-weight: 800; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; box-shadow: 0 4px 14px rgba(45,62,44,0.28); white-space: nowrap;">
+            <span class="material-symbols-outlined" style="font-size: 19px;">local_gas_station</span>
+            <span>Cargar gasolina</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
 
 async function getCurrentUserName() {
   try {
@@ -36,19 +225,54 @@ function getInitials(name) {
 export async function renderDetalleMotor(motorId) {
   if (!motorId) return '<div class="screen-detalle"><p>No se especificó un ID de motor.</p></div>';
 
-  const { data: motor, error: mErr } = await supabase
-    .from('motores')
-    .select('*')
-    .eq('id', motorId)
-    .single();
+  let motor = null;
+  let mErr = null;
+  let sesiones = [];
+  let mants = [];
 
-  if (mErr) return `<div class="screen-detalle"><p>Error cargando motor: ${mErr.message}</p></div>`;
+  if (navigator.onLine) {
+    try {
+      const [mRows, sRows, mtRows] = await Promise.all([
+        restFetch(`/rest/v1/motores?id=eq.${encodeURIComponent(motorId)}&select=*`),
+        restFetch(`/rest/v1/motor_sesiones?motor_id=eq.${encodeURIComponent(motorId)}&select=*&order=fecha.desc`),
+        restFetch(`/rest/v1/motor_mantenimientos?motor_id=eq.${encodeURIComponent(motorId)}&select=*&order=fecha.desc`),
+      ]);
+      motor = Array.isArray(mRows) ? mRows[0] : mRows;
+      sesiones = Array.isArray(sRows) ? sRows : [];
+      mants = Array.isArray(mtRows) ? mtRows : [];
+      if (motor?.id) db.motores.put(motor).catch(() => {});
+      if (sesiones.length) db.motor_sesiones.bulkPut(sesiones).catch(() => {});
+      if (mants.length) db.motor_mantenimientos.bulkPut(mants).catch(() => {});
+    } catch (err) {
+      console.warn('restFetch detalle_motor fallback:', err);
+    }
+  }
 
-  const { data: sesiones } = await supabase
-    .from('motor_sesiones')
-    .select('*')
-    .eq('motor_id', motorId)
-    .order('fecha', { ascending: false });
+  if (!motor) {
+    const resM = await supabase
+      .from('motores')
+      .select('*')
+      .eq('id', motorId)
+      .single();
+    motor = resM.data;
+    mErr = resM.error;
+    if (mErr || !motor) return `<div class="screen-detalle"><p>Error cargando motor: ${mErr?.message || 'No encontrado'}</p></div>`;
+
+    const [{ data: sData }, { data: mtData }] = await Promise.all([
+      supabase
+        .from('motor_sesiones')
+        .select('*')
+        .eq('motor_id', motorId)
+        .order('fecha', { ascending: false }),
+      supabase
+        .from('motor_mantenimientos')
+        .select('*')
+        .eq('motor_id', motorId)
+        .order('fecha', { ascending: false }),
+    ]);
+    sesiones = sData || [];
+    mants = mtData || [];
+  }
 
   // 1. Resolver operadores legados
   if (sesiones && sesiones.length > 0) {
@@ -73,11 +297,27 @@ export async function renderDetalleMotor(motorId) {
     } catch {}
   }
 
-  const { data: mants } = await supabase
-    .from('motor_mantenimientos')
-    .select('*')
-    .eq('motor_id', motorId)
-    .order('fecha', { ascending: false });
+  const currentUserName = await getCurrentUserName();
+
+  // Guardar datos en window para Bottom Sheet
+  window._currentMotorData = motor;
+  window._currentMotorSesiones = sesiones || [];
+  window._currentMotorMants = mants || [];
+  window._currentOperadorNombreMap = operadorNombreMap || {};
+  window._currentUserName = currentUserName || 'Operador';
+
+  if (isFuelMotor(motor)) {
+    const cachedMotores = await db.motores.toArray().catch(() => []);
+    const sameEmpFuel = cachedMotores.filter(m => m && isFuelMotor(m) && (!motor.empresa_id || !m.empresa_id || String(m.empresa_id) === String(motor.empresa_id)));
+    const fallbackPrice = resolveSharedFuelPrice(motor, sameEmpFuel, motor.empresa_id);
+    if (fallbackPrice > 0) saveSharedFuelPrice(motor.empresa_id, fallbackPrice);
+    const fuelStats = computeFuelMotorStats(motor, sesiones || [], mants || [], fallbackPrice);
+    const gastosRows = await fetchEmpresaGastosFresh().catch(() => []);
+    window._currentFuelSentMap = buildFuelSentMap(gastosRows);
+    window._currentFuelStats = fuelStats;
+    window._currentMotorHasPrevMant = (mants || []).length > 0;
+    return renderFuelDetalleMotor(motor, fuelStats);
+  }
 
   const totalHoras = motor.horas || 0;
   const hasPrevMant = (mants || []).length > 0;
@@ -86,16 +326,9 @@ export async function renderDetalleMotor(motorId) {
   const pct = totalHoras > 0 ? Math.min(100, Math.max(1, Math.round((totalHoras / maxHoras) * 100))) : 0;
   const requiresAlert = horasRestantes <= 0;
   const today = new Date().toISOString().split('T')[0];
-  const currentUserName = await getCurrentUserName();
   const operatorInitials = getInitials(currentUserName);
 
-  // Guardar datos en window para Bottom Sheet
-  window._currentMotorData = motor;
   window._currentMotorHasPrevMant = hasPrevMant;
-  window._currentMotorSesiones = sesiones || [];
-  window._currentMotorMants = mants || [];
-  window._currentOperadorNombreMap = operadorNombreMap || {};
-  window._currentUserName = currentUserName || 'Operador';
 
   // Calcular marca y modelo limpios (si no tiene o son valores por defecto, se omite)
   const rawMarca = (motor.marca || '').trim();
@@ -894,6 +1127,17 @@ export function initDetalleMotor(motorId) {
   // If rendered inside mobile bottom sheet, place summary + action bar in fixed top area
   const sheetBody = document.getElementById('motor-list-sheet-body');
   const fixedTop = document.getElementById('motor-sheet-fixed-top');
+  const fuelRoot = document.querySelector('.screen-detalle-fuel');
+  if (fuelRoot) {
+    if (sheetBody) sheetBody.style.padding = '0';
+    if (fixedTop) fixedTop.innerHTML = '';
+    const headerTitle = fuelRoot.querySelector('.motor-header-title');
+    if (sheetBody && headerTitle) headerTitle.style.display = 'none';
+    document.querySelectorAll('[data-motor-portal="1"]').forEach(el => el.remove());
+    initFuelDetalleMotor(motorId);
+    return;
+  }
+
   if (sheetBody) {
     sheetBody.style.padding = '0';
     sheetBody.querySelectorAll('.motor-sticky-summary, .section > .card').forEach(cardEl => {
@@ -1757,8 +2001,1181 @@ async function reloadDetalleSinParpadeo(motorId) {
     parent.innerHTML = html;
     initDetalleMotor(motorId);
   } else {
-    await reloadDetalleSinParpadeo(motorId);
+    window.navigateTo('detalle_motor', motorId);
   }
+}
+
+async function openFuelLoadBottomSheet(motorId) {
+  const motor = window._currentMotorData;
+  const stats = window._currentFuelStats;
+  if (!motor || !stats) return;
+
+  document.getElementById('fuel-load-sheet-overlay')?.remove();
+
+  const seenLocations = new Set();
+  const loteNames = [];
+  const potreroNames = [];
+  try {
+    const [lotesRes, potrerosRes] = await Promise.all([
+      supabase.from('lotes').select('id, nombre'),
+      supabase.from('potreros').select('id, nombre'),
+    ]);
+    for (const x of (lotesRes?.data || [])) {
+      const name = String(x?.nombre || '').trim();
+      if (name && !seenLocations.has(name.toLowerCase())) {
+        seenLocations.add(name.toLowerCase());
+        loteNames.push(name);
+      }
+    }
+    for (const x of (potrerosRes?.data || [])) {
+      const name = String(x?.nombre || '').trim();
+      if (name && !seenLocations.has(name.toLowerCase())) {
+        seenLocations.add(name.toLowerCase());
+        potreroNames.push(name);
+      }
+    }
+  } catch {}
+
+  let liters = 0;
+  const todayIso = getLocalTodayIso();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'fuel-load-sheet-overlay';
+  overlay.setAttribute('data-motor-portal', '1');
+  overlay.style.cssText = 'position:fixed; inset:0; z-index:100025; background:rgba(0,0,0,0.45); backdrop-filter:blur(2px); display:flex; align-items:flex-end; justify-content:center; opacity:0; transition:opacity 0.22s ease;';
+
+  const locationOptionsHtml = [
+    ...loteNames.map(name => `<option value="${escapeFuelHtml(name)}" data-icon="🌱" data-sub="Lote de cafetal">${escapeFuelHtml(name)}</option>`),
+    ...potreroNames.map(name => `<option value="${escapeFuelHtml(name)}" data-icon="🌿" data-sub="Potrero">${escapeFuelHtml(name)}</option>`),
+  ].join('');
+
+  overlay.innerHTML = `
+    <div id="fuel-load-sheet" style="width:100%; max-width:540px; height:100dvh; max-height:100dvh; background:#ffffff; display:flex; flex-direction:column; overflow:hidden; transform:translateY(100%); transition:transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); font-family:'Plus Jakarta Sans', 'Work Sans', sans-serif; box-sizing:border-box;">
+      <div style="flex-shrink:0; padding:calc(12px + env(safe-area-inset-top, 0px)) 18px 12px; border-bottom:1px solid #eef2ec; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+        <div style="min-width:0;">
+          <h3 style="margin:0; font-size:18px; font-weight:800; color:#192b18;">Cargar gasolina</h3>
+          <p style="margin:2px 0 0; font-size:12.5px; font-weight:600; color:#5a6658; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeFuelHtml(motor.nombre || 'Equipo')}</p>
+        </div>
+        <button type="button" id="fuel-load-sheet-close" aria-label="Cerrar" style="width:36px; height:36px; border-radius:50%; border:none; background:#f2f5f0; color:#192b18; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+          <span class="material-symbols-outlined" style="font-size:20px;">close</span>
+        </button>
+      </div>
+
+      <div style="flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:18px 18px 24px; box-sizing:border-box;">
+        <!-- Stepper -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:24px; margin:6px 0 24px;">
+          <button type="button" id="fuel-step-minus" aria-label="Disminuir litros" style="width:46px; height:46px; border-radius:50%; border:1.5px solid #cbd5c9; background:#ffffff; color:#192b18; font-size:24px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer;">&minus;</button>
+          <div style="display:flex; align-items:baseline; gap:5px; min-width:86px; justify-content:center;">
+            <span id="fuel-liters-display" style="font-size:38px; font-weight:800; color:#192b18; line-height:1;">0</span>
+            <span id="fuel-liters-unit" style="font-size:18px; font-weight:700; color:#4f5d4e;">litros</span>
+          </div>
+          <button type="button" id="fuel-step-plus" aria-label="Aumentar litros" style="width:46px; height:46px; border-radius:50%; border:none; background:#2d3e2c; color:#ffffff; font-size:24px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 3px 10px rgba(45,62,44,0.22);">+</button>
+        </div>
+
+        <!-- Dónde se usó -->
+        <div class="m3-field has-value" style="margin-bottom:16px;">
+          <select id="fuel-load-location">
+            <option value="" data-icon="📍" data-sub="Dejar sin ubicación específica">Sin especificar</option>
+            ${locationOptionsHtml}
+          </select>
+          <label for="fuel-load-location">¿Dónde se usó? (opcional)</label>
+        </div>
+
+        <!-- Fecha -->
+        <div style="margin-bottom:14px;">
+          <div class="m3-field has-value" style="margin-bottom:0;">
+            <input type="date" id="fuel-load-date" value="${todayIso}" placeholder=" ">
+            <label for="fuel-load-date">Fecha</label>
+          </div>
+        </div>
+
+        <!-- Precio por litro -->
+        <div style="margin-bottom:8px;">
+          <div class="m3-field ${stats.config.precioPorLitro > 0 ? 'has-value' : ''}" style="margin-bottom:0;">
+            <input type="number" id="fuel-load-price" min="0" step="0.01" value="${stats.config.precioPorLitro > 0 ? stats.config.precioPorLitro : ''}" placeholder=" ">
+            <label for="fuel-load-price">Precio por litro (L) · opcional</label>
+          </div>
+          <div id="fuel-load-cost-preview" style="display:none; font-size:12.5px; font-weight:700; color:#2e7d32; margin-top:6px; padding-left:4px;"></div>
+        </div>
+
+        <!-- Aviso Al guardar -->
+        <div id="fuel-load-warning" style="display:none; background:#fff4ed; border:1px solid #fdba74; border-radius:14px; padding:12px 14px; margin-top:14px;"></div>
+      </div>
+
+      <div style="flex-shrink:0; background:#ffffff; border-top:1px solid #eef2ec; padding:12px 18px calc(18px + env(safe-area-inset-bottom, 0px));">
+        <button type="button" id="btn-save-fuel-load" class="press-effect" style="width:100%; height:50px; border-radius:9999px; border:none; background:#2d3e2c; color:#ffffff; font-size:15px; font-weight:800; font-family:inherit; cursor:pointer; box-shadow:0 4px 14px rgba(45,62,44,0.28);">
+          Guardar carga
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  const sheet = overlay.querySelector('#fuel-load-sheet');
+  const litersDisplay = overlay.querySelector('#fuel-liters-display');
+  const litersUnit = overlay.querySelector('#fuel-liters-unit');
+  const priceInput = overlay.querySelector('#fuel-load-price');
+  const costPreview = overlay.querySelector('#fuel-load-cost-preview');
+  const warningBox = overlay.querySelector('#fuel-load-warning');
+  const saveBtn = overlay.querySelector('#btn-save-fuel-load');
+
+  const closeSheet = () => {
+    overlay.style.opacity = '0';
+    if (sheet) sheet.style.transform = 'translateY(100%)';
+    setTimeout(() => overlay.remove(), 260);
+  };
+
+  const syncLitersUI = () => {
+    const litersTxt = formatLiters(liters);
+    if (litersDisplay) litersDisplay.textContent = litersTxt;
+    if (litersUnit) litersUnit.textContent = litersTxt === '1' ? 'litro' : 'litros';
+    const unitPrice = parseFloat(priceInput?.value || '0') || 0;
+    if (costPreview) {
+      if (liters > 0 && unitPrice > 0) {
+        costPreview.textContent = `Costo de esta carga: ${formatCurrencyL(liters * unitPrice)}`;
+        costPreview.style.display = 'block';
+      } else {
+        costPreview.style.display = 'none';
+      }
+    }
+    if (warningBox) {
+      const triggered = liters > 0 ? stats.items.filter(it => (it.usedSince + liters) >= it.cada_litros) : [];
+      if (triggered.length > 0) {
+        const msgs = triggered.map(it =>
+          `${escapeFuelHtml(it.nombre)} llega a su límite: toca ${escapeFuelHtml(it.desc ? it.desc.toLowerCase() : 'realizar mantenimiento')}.`
+        );
+        warningBox.innerHTML = `
+          <div style="font-size:13px; font-weight:800; color:#c2410c;">Al guardar</div>
+          <div style="font-size:12.5px; font-weight:600; color:#7c2d12; margin-top:2px; line-height:1.4;">${msgs.join('<br>')}</div>
+        `;
+        warningBox.style.display = 'block';
+      } else {
+        warningBox.style.display = 'none';
+      }
+    }
+  };
+
+  syncLitersUI();
+  requestAnimationFrame(() => {
+    overlay.style.opacity = '1';
+    if (sheet) sheet.style.transform = 'translateY(0)';
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeSheet();
+  });
+  overlay.querySelector('#fuel-load-sheet-close')?.addEventListener('click', closeSheet);
+
+  priceInput?.addEventListener('input', () => {
+    priceInput.closest('.m3-field')?.classList.toggle('has-value', !!priceInput.value);
+    syncLitersUI();
+  });
+
+  overlay.querySelector('#fuel-step-minus')?.addEventListener('click', () => {
+    liters = Math.max(0, Math.round((liters - 0.5) * 10) / 10);
+    syncLitersUI();
+  });
+  overlay.querySelector('#fuel-step-plus')?.addEventListener('click', () => {
+    liters = Math.round((liters + 0.5) * 10) / 10;
+    syncLitersUI();
+  });
+
+  saveBtn?.addEventListener('click', async () => {
+    if (!saveBtn) return;
+    if (!(liters > 0)) {
+      showSnackbar('Indica los litros de gasolina a cargar', 'error');
+      return;
+    }
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Guardando...';
+    try {
+      const empresaId = motor.empresa_id || window._currentEmpresaId || loadEmpresaId() || localStorage.getItem('current_empresa_id');
+      if (!empresaId) throw new Error('No se encontró la finca activa');
+      const operador = window._currentUserName || await getCurrentUserName();
+      const selectedLocation = (overlay.querySelector('#fuel-load-location')?.value || '').trim();
+      const unitPrice = Math.max(0, Math.round((parseFloat(priceInput?.value || '0') || 0) * 100) / 100);
+      const dateVal = overlay.querySelector('#fuel-load-date')?.value || todayIso;
+      const parsedDate = dateVal === todayIso ? null : new Date(`${dateVal}T12:00:00`);
+      const fechaIso = (parsedDate && !Number.isNaN(parsedDate.getTime()))
+        ? parsedDate.toISOString()
+        : new Date().toISOString();
+      const duracionMins = Math.max(1, Math.round(liters * (stats.config?.horasPorLitro || 2) * 60));
+
+      const created = await restFetch('/rest/v1/motor_sesiones', {
+        method: 'POST',
+        body: JSON.stringify({
+          motor_id: motorId,
+          empresa_id: empresaId,
+          fecha: fechaIso,
+          duracion_mins: duracionMins,
+          total_horas: liters,
+          operador,
+          hora_inicio: encodeFuelLoadTag(unitPrice),
+          hora_fin: selectedLocation || null,
+        }),
+      });
+      const savedRow = Array.isArray(created) ? created[0] : created;
+      if (navigator.onLine && !savedRow?.id) {
+        throw new Error('Supabase no confirmó el guardado de la carga');
+      }
+      if (savedRow?.id) await db.motor_sesiones.put(savedRow).catch(() => {});
+
+      if (unitPrice > 0) saveSharedFuelPrice(empresaId, unitPrice);
+      if (unitPrice > 0 && Math.abs(unitPrice - (stats.config?.precioPorLitro || 0)) > 0.001) {
+        const cfg = stats.config;
+        const updatedNotas = serializeMotorNotas(cfg.cleanNotas, {
+          modo: cfg.modo,
+          horasPorLitro: cfg.horasPorLitro,
+          precioPorLitro: unitPrice,
+          mantenimientos: cfg.mantenimientos,
+          forceTag: isLikelyFuelEquipment(motor.icon, motor.nombre),
+        });
+        const updMotor = await restFetch(`/rest/v1/motores?id=eq.${encodeURIComponent(motorId)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ notas: updatedNotas }),
+        }).catch(() => null);
+        const savedMotor = Array.isArray(updMotor) ? updMotor[0] : updMotor;
+        if (savedMotor?.id) await db.motores.put(savedMotor).catch(() => {});
+        if (navigator.onLine) await syncTable('motores', true).catch(() => {});
+      }
+
+      if (navigator.onLine) await syncTable('motor_sesiones', true).catch(() => {});
+
+      closeSheet();
+      showSnackbar('Carga de gasolina guardada');
+      await reloadDetalleSinParpadeo(motorId);
+    } catch (err) {
+      console.error('Error guardando carga gasolina:', err);
+      showSnackbar('Error al guardar: ' + (err?.message || err), 'error');
+    } finally {
+      if (document.body.contains(saveBtn)) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Guardar carga';
+      }
+    }
+  });
+}
+
+function openFuelPriceBottomSheet(motorId) {
+  const motor = window._currentMotorData;
+  const stats = window._currentFuelStats;
+  if (!motor || !stats) return;
+
+  document.getElementById('fuel-price-sheet-overlay')?.remove();
+
+  const curPrice = stats.config?.precioPorLitro > 0 ? String(stats.config.precioPorLitro) : '';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'fuel-price-sheet-overlay';
+  overlay.setAttribute('data-motor-portal', '1');
+  overlay.style.cssText = 'position:fixed; inset:0; z-index:100026; background:rgba(15,25,16,0.48); backdrop-filter:blur(2px); display:flex; align-items:flex-end; justify-content:center; opacity:0; transition:opacity 0.2s ease;';
+
+  overlay.innerHTML = `
+    <div id="fuel-price-sheet" style="width:100%; max-width:520px; background:#ffffff; border-radius:28px 28px 0 0; padding:12px 20px calc(22px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 32px rgba(0,0,0,0.18); transform:translateY(100%); transition:transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1); font-family:'Plus Jakarta Sans', 'Work Sans', sans-serif;">
+      <div style="width:36px; height:4px; border-radius:99px; background:#c5cdc2; margin:0 auto 14px;"></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px;">
+        <div style="font-size:18px; font-weight:800; color:#192b18;">Precio de la gasolina</div>
+        <button type="button" id="fuel-price-sheet-close" aria-label="Cerrar" style="width:36px; height:36px; border-radius:50%; border:none; background:#f2f5f0; color:#192b18; font-size:20px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">&times;</button>
+      </div>
+      <div style="font-size:12.5px; color:#5a6658; font-weight:600; margin-bottom:14px;">${escapeFuelHtml(motor.nombre || 'Equipo')}</div>
+
+      <div class="m3-field ${curPrice ? 'has-value' : ''}" id="fuel-price-field" style="margin:0 0 8px;">
+        <input type="number" id="fuel-price-sheet-input" min="0" step="0.01" value="${escapeFuelHtml(curPrice)}" placeholder=" ">
+        <label for="fuel-price-sheet-input">Precio por litro (L)</label>
+      </div>
+      <div style="font-size:12px; color:#657263; line-height:1.4;">Se usará para calcular el gasto consumido por día, semana, mes y total.</div>
+
+      <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:20px;">
+        <button type="button" id="fuel-price-sheet-cancel" style="height:44px; padding:0 18px; border-radius:99px; border:none; background:transparent; color:#2d3e2c; font-weight:700; font-size:14px; font-family:inherit; cursor:pointer;">Cancelar</button>
+        <button type="button" id="fuel-price-sheet-save" style="height:44px; padding:0 22px; border-radius:99px; border:none; background:#2d3e2c; color:#ffffff; font-weight:800; font-size:14px; font-family:inherit; cursor:pointer; box-shadow:0 2px 6px rgba(45,62,44,0.25);">Guardar precio</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  const sheet = overlay.querySelector('#fuel-price-sheet');
+  const priceField = overlay.querySelector('#fuel-price-field');
+  const priceInp = overlay.querySelector('#fuel-price-sheet-input');
+  const savePriceBtn = overlay.querySelector('#fuel-price-sheet-save');
+
+  const closePriceSheet = () => {
+    overlay.style.opacity = '0';
+    if (sheet) sheet.style.transform = 'translateY(100%)';
+    setTimeout(() => overlay.remove(), 220);
+  };
+
+  requestAnimationFrame(() => {
+    overlay.style.opacity = '1';
+    if (sheet) sheet.style.transform = 'translateY(0)';
+  });
+
+  priceInp?.addEventListener('input', () => {
+    priceField?.classList.toggle('has-value', !!priceInp.value);
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePriceSheet();
+  });
+  overlay.querySelector('#fuel-price-sheet-close')?.addEventListener('click', closePriceSheet);
+  overlay.querySelector('#fuel-price-sheet-cancel')?.addEventListener('click', closePriceSheet);
+
+  const handleSavePrice = async () => {
+    const rawStr = (priceInp?.value || '').trim();
+    const parsed = rawStr === '' ? 0 : parseFloat(rawStr);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      showSnackbar('Ingresa un precio válido', 'error');
+      priceInp?.focus();
+      return;
+    }
+    const newPrice = Math.round(parsed * 100) / 100;
+    if (savePriceBtn) {
+      savePriceBtn.disabled = true;
+      savePriceBtn.textContent = 'Guardando...';
+    }
+    try {
+      const cfg = stats.config;
+      const updatedNotas = serializeMotorNotas(cfg.cleanNotas, {
+        modo: cfg.modo,
+        horasPorLitro: cfg.horasPorLitro,
+        precioPorLitro: newPrice,
+        mantenimientos: cfg.mantenimientos,
+        forceTag: isLikelyFuelEquipment(motor.icon, motor.nombre),
+      });
+      const updated = await restFetch(`/rest/v1/motores?id=eq.${encodeURIComponent(motorId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ notas: updatedNotas }),
+      });
+      const savedRow = Array.isArray(updated) ? updated[0] : updated;
+      if (savedRow?.id) await db.motores.put(savedRow).catch(() => {});
+      if (newPrice > 0) saveSharedFuelPrice(motor.empresa_id || window._currentEmpresaId || loadEmpresaId() || localStorage.getItem('current_empresa_id'), newPrice);
+      if (navigator.onLine) await syncTable('motores', true).catch(() => {});
+      window.clearScreenCache?.('motores');
+      window.clearScreenCache?.('detalle_motor');
+      closePriceSheet();
+      showSnackbar(newPrice > 0 ? 'Precio por litro guardado' : 'Precio eliminado');
+      await reloadDetalleSinParpadeo(motorId);
+    } catch (err) {
+      console.error('Error guardando precio gasolina:', err);
+      showSnackbar('Error al guardar: ' + (err?.message || err), 'error');
+      if (savePriceBtn && document.body.contains(savePriceBtn)) {
+        savePriceBtn.disabled = false;
+        savePriceBtn.textContent = 'Guardar precio';
+      }
+    }
+  };
+
+  priceInp?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSavePrice();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closePriceSheet();
+    }
+  });
+  savePriceBtn?.addEventListener('click', handleSavePrice);
+
+  setTimeout(() => priceInp?.focus(), 90);
+}
+
+function parseFuelLocalIso(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+
+function formatFuelLocalIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function shiftFuelIsoDays(iso, delta) {
+  const d = parseFuelLocalIso(iso);
+  d.setDate(d.getDate() + delta);
+  return formatFuelLocalIso(d);
+}
+
+function shiftFuelIsoMonths(iso, delta) {
+  const d = parseFuelLocalIso(iso);
+  const targetDay = d.getDate();
+  const shifted = new Date(d.getFullYear(), d.getMonth() + delta, 1);
+  const lastDay = new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0).getDate();
+  shifted.setDate(Math.min(targetDay, lastDay));
+  return formatFuelLocalIso(shifted);
+}
+
+function getFuelMondayDate(iso) {
+  const base = parseFuelLocalIso(iso);
+  const jsDay = base.getDay();
+  const diffToMon = jsDay === 0 ? -6 : 1 - jsDay;
+  return new Date(base.getFullYear(), base.getMonth(), base.getDate() + diffToMon);
+}
+
+function getFuelMonthWeeks(year, month) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const weeks = [];
+  let d = 1;
+  let idx = 1;
+  while (d <= daysInMonth) {
+    const startDt = new Date(year, month, d);
+    const jsDay = startDt.getDay();
+    const diffToSun = jsDay === 0 ? 0 : 7 - jsDay;
+    const dMax = Math.min(daysInMonth, d + diffToSun);
+    weeks.push({
+      idx,
+      label: `Sem ${idx}`,
+      rangeText: d === dMax ? String(d) : `${d}–${dMax}`,
+      dMin: d,
+      dMax,
+      anchorIso: formatFuelLocalIso(new Date(year, month, d)),
+    });
+    d = dMax + 1;
+    idx += 1;
+  }
+  return weeks;
+}
+
+function canFuelNavigateNext(period, dateIso) {
+  const todayIso = getLocalTodayIso();
+  if (period === 'day' || period === 'week') {
+    const curMon = formatFuelLocalIso(getFuelMondayDate(dateIso));
+    const todayMon = formatFuelLocalIso(getFuelMondayDate(todayIso));
+    return curMon < todayMon;
+  }
+  if (period === 'month') {
+    const c = parseFuelLocalIso(dateIso);
+    const t = parseFuelLocalIso(todayIso);
+    return (c.getFullYear() * 12 + c.getMonth()) < (t.getFullYear() * 12 + t.getMonth());
+  }
+  return false;
+}
+
+function getFuelPeriodRange(period, dateIso) {
+  const target = parseFuelLocalIso(dateIso);
+  const fmtDM = (d) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace(/\.$/, '');
+  const fmtDMY = (d) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }).replace(/\.$/, '');
+
+  if (period === 'day') {
+    const start = new Date(target.getFullYear(), target.getMonth(), target.getDate(), 0, 0, 0, 0);
+    const end = new Date(target.getFullYear(), target.getMonth(), target.getDate(), 23, 59, 59, 999);
+    const wd = start.toLocaleDateString('es-ES', { weekday: 'short' }).replace(/\.$/, '');
+    const mn = start.toLocaleDateString('es-ES', { month: 'short' }).replace(/\.$/, '');
+    const label = `${wd.charAt(0).toUpperCase() + wd.slice(1)}, ${start.getDate()} ${mn.charAt(0).toUpperCase() + mn.slice(1)}`;
+    return { start, end, label };
+  }
+
+  if (period === 'week') {
+    const start = getFuelMondayDate(dateIso);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+    const label = start.getFullYear() === end.getFullYear()
+      ? `${fmtDM(start)} – ${fmtDM(end)}`
+      : `${fmtDMY(start)} – ${fmtDMY(end)}`;
+    return { start, end, label };
+  }
+
+  if (period === 'month') {
+    const start = new Date(target.getFullYear(), target.getMonth(), 1, 0, 0, 0, 0);
+    const end = new Date(target.getFullYear(), target.getMonth() + 1, 0, 23, 59, 59, 999);
+    const rawM = start.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    const label = rawM.charAt(0).toUpperCase() + rawM.slice(1);
+    return { start, end, label };
+  }
+
+  return { start: null, end: null, label: 'Todo el historial' };
+}
+
+function initFuelDetalleMotor(motorId) {
+  if (!window._fuelPeriodState || window._fuelPeriodState.motorId !== motorId || !window._fuelPeriodState.dateIso) {
+    window._fuelPeriodState = {
+      motorId,
+      period: window._fuelPeriodState?.period || 'week',
+      dateIso: getLocalTodayIso(),
+      subDayIso: null,
+    };
+  } else if (window._fuelPeriodState.subDayIso === undefined) {
+    window._fuelPeriodState.subDayIso = null;
+  }
+
+  const areaCatalogsPromise = fetchAreaCatalogs().catch(() => ({ lotes: [], potreros: [] }));
+
+  const bindLoadDeletes = () => {
+    document.querySelectorAll('[data-fuel-load-delete]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const loadId = btn.dataset.fuelLoadDelete;
+        if (!loadId) return;
+        const linkedGasto = window._currentFuelSentMap?.get(String(loadId)) || null;
+        const confirmMsg = linkedGasto
+          ? '¿Eliminar esta carga de gasolina y su gasto registrado en Cuentas?'
+          : '¿Eliminar esta carga de gasolina?';
+        window.Snackbar.confirm(confirmMsg, async () => {
+          try {
+            const deleted = await restFetch(`/rest/v1/motor_sesiones?id=eq.${encodeURIComponent(loadId)}`, {
+              method: 'DELETE',
+            });
+            if (navigator.onLine && (!Array.isArray(deleted) || deleted.length === 0)) {
+              throw new Error('No se pudo eliminar la carga en Supabase');
+            }
+            await db.motor_sesiones.delete(loadId).catch(() => {});
+            if (linkedGasto?.id) {
+              await restFetch(`/rest/v1/gastos?id=eq.${encodeURIComponent(linkedGasto.id)}`, {
+                method: 'DELETE',
+              }).catch(() => {});
+              await db.gastos.delete(linkedGasto.id).catch(() => {});
+              if (navigator.onLine) await syncTable('gastos', true).catch(() => {});
+              window.clearScreenCache?.('gastos');
+            }
+            if (navigator.onLine) await syncTable('motor_sesiones', true).catch(() => {});
+            showSnackbar('Carga eliminada');
+            await reloadDetalleSinParpadeo(motorId);
+          } catch (err) {
+            console.error('Error eliminando carga:', err);
+            showSnackbar('Error: ' + (err?.message || err), 'error');
+          }
+        });
+      });
+    });
+  };
+
+  const bindLoadNavigations = () => {
+    document.querySelectorAll('[data-fuel-row-nav="cuentas"], [data-fuel-row-nav="pending"]').forEach((el) => {
+      el.addEventListener('click', async () => {
+        const navType = el.dataset.fuelRowNav;
+        if (navType === 'cuentas') {
+          window.closeSubBottomSheet?.();
+          window.navigateTo('gastos');
+          return;
+        }
+        if (navType === 'pending') {
+          const rawLoc = el.dataset.fuelLoc || '';
+          const normLoc = normalizeAreaName(rawLoc);
+          if (!normLoc || normLoc === 'sin especificar') {
+            showSnackbar('Esta carga no está asociada a un lote o potrero registrado');
+            return;
+          }
+          const { lotes = [], potreros = [] } = await areaCatalogsPromise;
+          const matchLote =
+            lotes.find(l => normalizeAreaName(l.nombre) === normLoc) ||
+            lotes.find(l => {
+              const n = normalizeAreaName(l.nombre);
+              return n && (n.includes(normLoc) || normLoc.includes(n));
+            });
+          if (matchLote) {
+            window._pendingOpenLote = { loteId: matchLote.id, tab: 'balance' };
+            window.closeSubBottomSheet?.();
+            window.navigateTo('dashboard');
+            return;
+          }
+          const matchPotrero =
+            potreros.find(pt => normalizeAreaName(pt.nombre) === normLoc) ||
+            potreros.find(pt => {
+              const n = normalizeAreaName(pt.nombre);
+              return n && (n.includes(normLoc) || normLoc.includes(n));
+            });
+          if (matchPotrero) {
+            window._pendingOpenPotreroId = matchPotrero.id;
+            window.closeSubBottomSheet?.();
+            window.navigateTo('potreros');
+            return;
+          }
+          showSnackbar('Esta carga no está asociada a un lote o potrero registrado');
+        }
+      });
+    });
+  };
+
+  const renderFuelPeriodView = (shouldCenterTab = false) => {
+    const stats = window._currentFuelStats;
+    if (!stats) return;
+    const todayIso = getLocalTodayIso();
+    const period = window._fuelPeriodState?.period || 'week';
+    const dateIso = window._fuelPeriodState?.dateIso || todayIso;
+    const range = getFuelPeriodRange(period, dateIso);
+
+    const tabsWrap = document.getElementById('fuel-period-tabs');
+    const prevScroll = tabsWrap ? tabsWrap.scrollLeft : 0;
+    let activeTab = null;
+    document.querySelectorAll('.fuel-period-tab').forEach((tab) => {
+      const active = tab.dataset.period === period;
+      tab.style.background = active ? '#2d3e2c' : '#ffffff';
+      tab.style.color = active ? '#ffffff' : '#3c4a3b';
+      tab.style.borderColor = active ? '#2d3e2c' : '#d8e1d5';
+      if (active) activeTab = tab;
+    });
+    if (tabsWrap) tabsWrap.scrollLeft = prevScroll;
+    if (shouldCenterTab && activeTab) {
+      requestAnimationFrame(() => {
+        activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      });
+    }
+
+    const navEl = document.getElementById('fuel-period-nav');
+    const labelEl = document.getElementById('fuel-period-label');
+    const nextBtn = document.getElementById('fuel-period-next');
+    if (navEl) navEl.style.display = period === 'all' ? 'none' : 'flex';
+    if (labelEl) labelEl.textContent = range.label;
+    if (nextBtn) {
+      const canNext = canFuelNavigateNext(period, dateIso);
+      nextBtn.disabled = !canNext;
+      nextBtn.style.opacity = canNext ? '1' : '0.35';
+      nextBtn.style.cursor = canNext ? 'pointer' : 'default';
+    }
+
+    const litersByIso = new Map();
+    for (const l of stats.fuelLoads) {
+      const d = new Date(l.fecha || l.created_at || 0);
+      if (Number.isNaN(d.getTime())) continue;
+      const k = formatFuelLocalIso(d);
+      litersByIso.set(k, Math.round(((litersByIso.get(k) || 0) + l._liters) * 10) / 10);
+    }
+
+    const periodLoads = period === 'all'
+      ? stats.fuelLoads
+      : stats.fuelLoads.filter((l) => {
+          const d = new Date(l.fecha || l.created_at || 0);
+          return !Number.isNaN(d.getTime()) && d >= range.start && d <= range.end;
+        });
+
+    const rawSubDay = (period === 'month' || period === 'week') ? (window._fuelPeriodState?.subDayIso || null) : null;
+    const activeSubDay = (rawSubDay && range.start && range.end && rawSubDay >= formatFuelLocalIso(range.start) && rawSubDay <= formatFuelLocalIso(range.end))
+      ? rawSubDay
+      : null;
+
+    const filteredLoads = activeSubDay
+      ? periodLoads.filter((l) => {
+          const d = new Date(l.fecha || l.created_at || 0);
+          return !Number.isNaN(d.getTime()) && formatFuelLocalIso(d) === activeSubDay;
+        })
+      : periodLoads;
+
+    const periodLiters = Math.round(filteredLoads.reduce((a, b) => a + b._liters, 0) * 10) / 10;
+    const periodCost = Math.round(filteredLoads.reduce((a, b) => a + b._cost, 0) * 100) / 100;
+
+    window._currentPeriodFilteredLoads = filteredLoads;
+    const sentMap = window._currentFuelSentMap || new Map();
+    const pricedLoads = filteredLoads.filter(l => l._cost > 0);
+    const pendingLoads = pricedLoads.filter((l) => {
+      const existing = sentMap.get(String(l.id));
+      return !existing || Math.abs((Number(existing.monto) || 0) - l._cost) >= 0.01;
+    });
+    const hasUpdates = pendingLoads.some(l => sentMap.has(String(l.id)));
+    const pendingAmount = Math.round(pendingLoads.reduce((s, l) => s + l._cost, 0) * 100) / 100;
+
+    const ctaGrid = document.getElementById('fuel-cta-grid');
+    const sendBtn = document.getElementById('btn-send-fuel-cuentas');
+    const sendTitle = document.getElementById('btn-send-fuel-cuentas-title');
+    const sendAmt = document.getElementById('btn-send-fuel-cuentas-amt');
+    if (sendBtn && sendTitle && sendAmt) {
+      if (pendingLoads.length > 0) {
+        if (ctaGrid) ctaGrid.style.gridTemplateColumns = '1fr 1fr';
+        sendBtn.style.display = 'flex';
+        sendBtn.disabled = false;
+        sendBtn.style.opacity = '1';
+        sendBtn.style.cursor = 'pointer';
+        sendBtn.style.background = '#ffffff';
+        sendBtn.style.borderColor = '#2d3e2c';
+        sendBtn.style.color = '#2d3e2c';
+        sendTitle.textContent = hasUpdates ? 'Actualizar Cuentas' : 'Enviar a Cuentas';
+        sendAmt.textContent = formatCurrencyL(pendingAmount);
+        sendAmt.style.color = '#2e7d32';
+      } else {
+        sendBtn.style.display = 'none';
+        if (ctaGrid) ctaGrid.style.gridTemplateColumns = '1fr';
+      }
+    }
+
+    const heroTitleEl = document.getElementById('fuel-hero-title');
+    const heroLitersEl = document.getElementById('fuel-hero-liters');
+    const heroMetaEl = document.getElementById('fuel-hero-meta');
+    if (heroTitleEl) {
+      heroTitleEl.textContent = activeSubDay
+        ? `Gasolina usada · ${getFuelPeriodRange('day', activeSubDay).label}`
+        : (period === 'all' ? 'Gasolina usada en total' : 'Gasolina usada');
+    }
+    if (heroLitersEl) {
+      heroLitersEl.textContent = formatLitersLabel(periodLiters);
+    }
+    if (heroMetaEl) {
+      const loadsTxt = `${filteredLoads.length} ${filteredLoads.length === 1 ? 'carga' : 'cargas'}`;
+      if (periodCost > 0) {
+        heroMetaEl.innerHTML = `<span style="color:#2e7d32;">${escapeFuelHtml(formatCurrencyL(periodCost))}</span><span style="color:#657263; font-weight:600;"> · ${loadsTxt}</span>`;
+      } else if (filteredLoads.length > 0) {
+        heroMetaEl.innerHTML = `<span style="color:#657263; font-weight:600;">${loadsTxt}</span>`;
+      } else {
+        heroMetaEl.innerHTML = `<span style="color:#657263; font-weight:600;">Sin cargas</span>`;
+      }
+    }
+
+    const renderDayLoadsHtml = (loadsList, emptyMsg) => {
+      if (!loadsList.length) {
+        return `<div style="text-align:center; font-size:12px; font-weight:600; color:#6d786c; padding:10px 0 4px;">${emptyMsg}</div>`;
+      }
+      const maxL = Math.max(...loadsList.map(l => l._liters), 0.1);
+      return `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${loadsList.map((load) => {
+            const loc = String(load.hora_fin || '').trim() || 'Sin especificar';
+            const wPct = Math.max(8, Math.round((load._liters / maxL) * 100));
+            const sentRow = sentMap.get(String(load.id));
+            const isSent = Boolean(sentRow);
+            const isChanged = isSent && Math.abs((Number(sentRow.monto) || 0) - load._cost) >= 0.01;
+            const isInCuentas = load._cost > 0 && isSent && !isChanged;
+            const isPendingState = load._cost > 0 && !isInCuentas;
+            const rowNavType = isInCuentas ? 'cuentas' : (isPendingState ? 'pending' : '');
+            const statusBadge = load._cost > 0
+              ? (isInCuentas
+                  ? `<button type="button" data-fuel-go-cuentas="1" style="border:none; cursor:pointer; font-family:inherit; padding:2px 8px; border-radius:999px; background:#eef5ec; color:#1b6e1b; font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;"><span>✓ En Cuentas</span><span aria-hidden="true" style="font-size:11px; opacity:0.8;">›</span></button>`
+                  : `<button type="button" data-fuel-go-pending-loc="${escapeFuelHtml(loc)}" style="border:none; cursor:pointer; font-family:inherit; padding:2px 8px; border-radius:999px; background:#fff4ed; color:#b34200; font-size:10px; font-weight:700; display:inline-flex; align-items:center; gap:2px; white-space:nowrap;"><span>${isChanged ? 'Por actualizar' : 'Pendiente'}</span><span aria-hidden="true" style="font-size:11px; opacity:0.8;">›</span></button>`)
+              : '';
+            return `
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:4px;">
+                  <div ${rowNavType ? `data-fuel-row-nav="${rowNavType}" data-fuel-loc="${escapeFuelHtml(loc)}"` : ''} style="min-width:0; flex:1; display:flex; align-items:center; gap:6px; flex-wrap:wrap; ${rowNavType ? 'cursor:pointer;' : ''}">
+                    <span style="font-size:12.5px; font-weight:700; color:#192b18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeFuelHtml(loc)}</span>
+                    ${statusBadge}
+                  </div>
+                  <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                    <span style="font-size:12px; font-weight:800; color:#192b18; white-space:nowrap;">${formatLitersLabel(load._liters)}${load._cost > 0 ? ` · ${escapeFuelHtml(formatCurrencyL(load._cost))}` : ''}</span>
+                    <button type="button" data-fuel-load-delete="${escapeFuelHtml(load.id)}" aria-label="Eliminar carga" title="Eliminar carga" style="width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:#7a8578; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                      <span class="material-symbols-outlined" style="font-size:16px;">delete</span>
+                    </button>
+                  </div>
+                </div>
+                <div style="height:5px; background:#e6ece4; border-radius:9999px; overflow:hidden;">
+                  <div style="width:${wPct}%; height:100%; background:#2d3e2c; border-radius:9999px;"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    };
+
+    const barsEl = document.getElementById('fuel-period-bars');
+    if (barsEl) {
+      const weekDayShort = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+      if (period === 'day') {
+        const monDt = getFuelMondayDate(dateIso);
+        const stripHtml = `
+          <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:4px;">
+            ${weekDayShort.map((dName, idx) => {
+              const dt = new Date(monDt.getFullYear(), monDt.getMonth(), monDt.getDate() + idx);
+              const dIso = formatFuelLocalIso(dt);
+              const isSel = dIso === dateIso;
+              const isToday = dIso === todayIso;
+              const hasLit = (litersByIso.get(dIso) || 0) > 0;
+              return `
+                <button type="button" data-fuel-select-day="${dIso}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:7px 2px; min-height:54px; border-radius:14px; border:1px solid ${isSel ? '#2d3e2c' : '#e6ece4'}; background:${isSel ? '#2d3e2c' : '#fafcf9'}; color:${isSel ? '#ffffff' : '#192b18'}; cursor:pointer; font-family:inherit; transition:all 0.15s ease;">
+                  <span style="font-size:10.5px; font-weight:700; opacity:${isSel ? '0.9' : '0.68'};">${dName}</span>
+                  <span style="font-size:14.5px; font-weight:800; margin-top:2px; color:${isToday ? '#ff6b00' : (isSel ? '#ffffff' : '#192b18')};">${dt.getDate()}</span>
+                  <span style="width:5px; height:5px; border-radius:50%; margin-top:3px; background:${hasLit ? (isSel ? '#ffffff' : '#2e7d32') : 'transparent'};"></span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        `;
+
+        const dayBodyHtml = renderDayLoadsHtml(filteredLoads, 'Sin actividad registrada este día.');
+        barsEl.innerHTML = `${stripHtml}<div style="border-top:1px solid #eef2ec; margin-top:10px; padding-top:10px;">${dayBodyHtml}</div>`;
+      } else if (period === 'week' && range.start) {
+        const buckets = weekDayShort.map((lbl, idx) => {
+          const dayD = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate() + idx);
+          const dayIso = formatFuelLocalIso(dayD);
+          const dayLit = Math.round(
+            periodLoads
+              .filter((l) => {
+                const d = new Date(l.fecha || l.created_at || 0);
+                return !Number.isNaN(d.getTime()) && formatFuelLocalIso(d) === dayIso;
+              })
+              .reduce((a, b) => a + b._liters, 0) * 10
+          ) / 10;
+          return { lbl, dayNum: dayD.getDate(), dayIso, isToday: dayIso === todayIso, liters: dayLit };
+        });
+        const maxL = Math.max(...buckets.map(b => b.liters), 0.1);
+        const dayStripHtml = `
+          <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:4px;">
+            ${buckets.map(b => {
+              const hasLit = b.liters > 0;
+              const isSel = b.dayIso === activeSubDay;
+              return `
+                <button type="button" data-fuel-toggle-subday="${b.dayIso}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:7px 2px; min-height:52px; border-radius:14px; border:1px solid ${isSel ? '#2d3e2c' : (hasLit ? '#c5dcc0' : '#e6ece4')}; background:${isSel ? '#2d3e2c' : (hasLit ? '#eff5ec' : '#fafcf9')}; color:${isSel ? '#ffffff' : '#192b18'}; cursor:pointer; font-family:inherit; transition:all 0.15s ease;">
+                  <span style="font-size:10.5px; font-weight:700; opacity:${isSel ? '0.9' : '0.68'};">${b.lbl}</span>
+                  <span style="font-size:14px; font-weight:800; margin-top:2px; color:${b.isToday ? '#ff6b00' : (isSel ? '#ffffff' : '#192b18')};">${b.dayNum}</span>
+                  <span style="width:5px; height:5px; border-radius:50%; margin-top:3px; background:${hasLit ? (isSel ? '#ffffff' : '#2e7d32') : 'transparent'};"></span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        `;
+        const weekBarsHtml = `
+          <div style="border-top:1px solid #eef2ec; margin-top:10px; padding-top:8px;">
+            <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:4px; align-items:end; min-height:68px;">
+              ${buckets.map(b => {
+                const barH = b.liters > 0 ? Math.max(10, Math.round((b.liters / maxL) * 46)) : 4;
+                const dimmed = activeSubDay && b.dayIso !== activeSubDay;
+                return `
+                  <button type="button" data-fuel-toggle-subday="${b.dayIso}" style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; border:none; background:transparent; padding:0; cursor:pointer; font-family:inherit; opacity:${dimmed ? '0.4' : '1'}; transition:opacity 0.15s ease;">
+                    <span style="font-size:10px; font-weight:800; color:${b.liters > 0 ? '#2d3e2c' : 'transparent'}; margin-bottom:3px; white-space:nowrap;">${b.liters > 0 ? `${formatLiters(b.liters)} lt` : '0'}</span>
+                    <div style="width:100%; max-width:26px; height:${barH}px; border-radius:6px; background:${b.liters > 0 ? '#2d3e2c' : '#e4ebe2'}; transition:height 0.25s ease;"></div>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        const subDayPanelHtml = activeSubDay ? `
+          <div style="border-top:1px solid #eef2ec; margin-top:10px; padding-top:8px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#eff5ec; border:1px solid #cfe0cc; border-radius:10px; padding:6px 10px;">
+              <span style="font-size:11.5px; font-weight:700; color:#2d3e2c;">Filtrando: ${escapeFuelHtml(getFuelPeriodRange('day', activeSubDay).label)}</span>
+              <button type="button" data-fuel-clear-subday="1" style="border:none; background:#ffffff; color:#2d3e2c; border-radius:999px; padding:3px 9px; font-size:11px; font-weight:800; cursor:pointer; font-family:inherit;">Ver semana ✕</button>
+            </div>
+            <div style="margin-top:8px;">
+              ${renderDayLoadsHtml(filteredLoads, 'Sin actividad registrada este día.')}
+            </div>
+          </div>
+        ` : '';
+        barsEl.innerHTML = dayStripHtml + weekBarsHtml + subDayPanelHtml;
+      } else if (period === 'month' && range.start && range.end) {
+        const y = range.start.getFullYear();
+        const m = range.start.getMonth();
+        const daysInMonth = range.end.getDate();
+        const firstDayJs = new Date(y, m, 1).getDay();
+        const startOffset = (firstDayJs + 6) % 7;
+
+        const cells = [];
+        for (let i = 0; i < startOffset; i++) cells.push({ empty: true });
+        for (let day = 1; day <= daysInMonth; day++) {
+          const iso = formatFuelLocalIso(new Date(y, m, day));
+          cells.push({
+            day,
+            iso,
+            isToday: iso === todayIso,
+            liters: litersByIso.get(iso) || 0,
+          });
+        }
+
+        const monthCalHtml = `
+          <div>
+            <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); text-align:center; margin-bottom:4px;">
+              ${weekDayShort.map(w => `<span style="font-size:10.5px; font-weight:700; color:#647462; padding:2px 0;">${w}</span>`).join('')}
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:3px; text-align:center;">
+              ${cells.map(c => {
+                if (c.empty) return `<span></span>`;
+                const hasLit = c.liters > 0;
+                const isSel = c.iso === activeSubDay;
+                return `
+                  <button type="button" data-fuel-toggle-subday="${c.iso}" style="height:34px; border-radius:10px; border:1px solid ${isSel ? '#2d3e2c' : (hasLit ? '#c5dcc0' : 'transparent')}; background:${isSel ? '#2d3e2c' : (hasLit ? '#e8f3e6' : 'transparent')}; color:${c.isToday ? '#ff6b00' : (isSel ? '#ffffff' : '#192b18')}; font-size:12.5px; font-weight:${c.isToday || hasLit || isSel ? '800' : '600'}; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding:0; font-family:inherit;">
+                    <span>${c.day}</span>
+                    <span style="width:4px; height:4px; border-radius:50%; background:${hasLit ? (isSel ? '#ffffff' : '#2e7d32') : 'transparent'};"></span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        const subDayPanelHtml = activeSubDay ? `
+          <div style="margin-top:8px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:#eff5ec; border:1px solid #cfe0cc; border-radius:10px; padding:6px 10px;">
+              <span style="font-size:11.5px; font-weight:700; color:#2d3e2c;">Filtrando: ${escapeFuelHtml(getFuelPeriodRange('day', activeSubDay).label)}</span>
+              <button type="button" data-fuel-clear-subday="1" style="border:none; background:#ffffff; color:#2d3e2c; border-radius:999px; padding:3px 9px; font-size:11px; font-weight:800; cursor:pointer; font-family:inherit;">Ver todo el mes ✕</button>
+            </div>
+            <div style="margin-top:8px;">
+              ${renderDayLoadsHtml(filteredLoads, 'Sin actividad registrada este día.')}
+            </div>
+          </div>
+        ` : '';
+
+        const weeks = getFuelMonthWeeks(y, m);
+        const weekBuckets = weeks.map((w) => {
+          const lit = Math.round(
+            periodLoads
+              .filter((l) => {
+                const dayNum = new Date(l.fecha || l.created_at || 0).getDate();
+                return dayNum >= w.dMin && dayNum <= w.dMax;
+              })
+              .reduce((a, b) => a + b._liters, 0) * 10
+          ) / 10;
+          return { ...w, liters: lit };
+        });
+        const maxL = Math.max(...weekBuckets.map(b => b.liters), 0.1);
+        const weekBarsHtml = `
+          <div style="border-top:1px solid #edf2ec; margin-top:10px; padding-top:10px;">
+            <div style="font-size:10.5px; font-weight:700; color:#5a6658; margin-bottom:6px;">Toca una semana para ver su detalle</div>
+            <div style="display:grid; grid-template-columns:repeat(${weekBuckets.length}, minmax(0, 1fr)); gap:4px; align-items:end; min-height:84px;">
+              ${weekBuckets.map(b => {
+                const barH = b.liters > 0 ? Math.max(8, Math.round((b.liters / maxL) * 40)) : 4;
+                return `
+                  <button type="button" data-fuel-jump-week="${b.anchorIso}" style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; border:none; background:transparent; padding:2px 0 0; cursor:pointer; font-family:inherit;">
+                    <span style="font-size:9.5px; font-weight:800; color:${b.liters > 0 ? '#2d3e2c' : 'transparent'}; margin-bottom:3px; white-space:nowrap;">${b.liters > 0 ? `${formatLiters(b.liters)} lt` : '0'}</span>
+                    <div style="width:100%; max-width:28px; height:${barH}px; border-radius:6px; background:${b.liters > 0 ? '#2d3e2c' : '#e4ebe2'}; transition:height 0.25s ease;"></div>
+                    <span style="font-size:10px; font-weight:800; color:#2d3e2c; margin-top:4px; white-space:nowrap;">${b.label}</span>
+                    <span style="font-size:9.5px; font-weight:600; color:#6b7769; white-space:nowrap;">${b.rangeText}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        barsEl.innerHTML = monthCalHtml + subDayPanelHtml + weekBarsHtml;
+      } else {
+        const monthMap = new Map();
+        for (const l of periodLoads) {
+          const d = new Date(l.fecha || l.created_at || 0);
+          if (Number.isNaN(d.getTime())) continue;
+          const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          const lbl = d.toLocaleDateString('es-ES', { month: 'short' }).replace(/\.$/, '');
+          const prev = monthMap.get(k) || { monthIso: `${k}-01`, lbl, liters: 0 };
+          monthMap.set(k, { monthIso: `${k}-01`, lbl, liters: Math.round((prev.liters + l._liters) * 10) / 10 });
+        }
+        const buckets = Array.from(monthMap.entries())
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .slice(-6)
+          .map(([, val]) => val);
+        if (buckets.length === 0) {
+          barsEl.innerHTML = `<div style="text-align:center; font-size:12px; font-weight:600; color:#6d786c; padding:6px 0;">Sin cargas registradas todavía.</div>`;
+        } else {
+          const maxL = Math.max(...buckets.map(b => b.liters), 0.1);
+          barsEl.innerHTML = `
+            <div style="display:grid; grid-template-columns:repeat(${buckets.length}, 1fr); gap:8px; align-items:end; min-height:92px; padding-top:14px; padding-bottom:4px;">
+              ${buckets.map(b => {
+                const barH = Math.max(8, Math.round((b.liters / maxL) * 48));
+                return `
+                  <button type="button" data-fuel-jump-month="${b.monthIso}" style="display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; border:none; background:transparent; padding:0; cursor:pointer; font-family:inherit;">
+                    <span style="font-size:10.5px; font-weight:800; color:#2d3e2c; margin-bottom:3px; white-space:nowrap;">${formatLiters(b.liters)} lt</span>
+                    <div style="width:100%; max-width:34px; height:${barH}px; border-radius:7px; background:#2d3e2c; transition:height 0.25s ease;"></div>
+                    <span style="font-size:11px; font-weight:700; color:#5a6658; margin-top:5px; text-transform:capitalize;">${escapeFuelHtml(b.lbl)}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      }
+
+      barsEl.querySelectorAll('[data-fuel-select-day]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const picked = btn.dataset.fuelSelectDay;
+          if (!picked) return;
+          window._fuelPeriodState = { motorId, period: 'day', dateIso: picked, subDayIso: null };
+          renderFuelPeriodView(true);
+        });
+      });
+
+      barsEl.querySelectorAll('[data-fuel-toggle-subday]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const picked = btn.dataset.fuelToggleSubday;
+          if (!picked) return;
+          const curSub = window._fuelPeriodState?.subDayIso || null;
+          window._fuelPeriodState = {
+            motorId,
+            period,
+            dateIso,
+            subDayIso: curSub === picked ? null : picked,
+          };
+          renderFuelPeriodView(false);
+        });
+      });
+
+      barsEl.querySelectorAll('[data-fuel-clear-subday]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          window._fuelPeriodState = {
+            motorId,
+            period,
+            dateIso,
+            subDayIso: null,
+          };
+          renderFuelPeriodView(false);
+        });
+      });
+
+      barsEl.querySelectorAll('[data-fuel-jump-week]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const anchor = btn.dataset.fuelJumpWeek;
+          if (!anchor) return;
+          window._fuelPeriodState = { motorId, period: 'week', dateIso: anchor, subDayIso: null };
+          renderFuelPeriodView(true);
+        });
+      });
+
+      barsEl.querySelectorAll('[data-fuel-jump-month]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const mIso = btn.dataset.fuelJumpMonth;
+          if (!mIso) return;
+          window._fuelPeriodState = { motorId, period: 'month', dateIso: mIso, subDayIso: null };
+          renderFuelPeriodView(true);
+        });
+      });
+
+      bindLoadDeletes();
+      bindLoadNavigations();
+    }
+  };
+
+  document.querySelectorAll('.fuel-period-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const p = tab.dataset.period || 'week';
+      const sameTab = window._fuelPeriodState?.period === p;
+      window._fuelPeriodState = {
+        motorId,
+        period: p,
+        dateIso: sameTab ? getLocalTodayIso() : (window._fuelPeriodState?.dateIso || getLocalTodayIso()),
+        subDayIso: null,
+      };
+      renderFuelPeriodView(true);
+    });
+  });
+
+  document.getElementById('fuel-period-prev')?.addEventListener('click', () => {
+    const curP = window._fuelPeriodState?.period || 'week';
+    if (curP === 'all') return;
+    const curIso = window._fuelPeriodState?.dateIso || getLocalTodayIso();
+    window._fuelPeriodState.dateIso = curP === 'month'
+      ? shiftFuelIsoMonths(curIso, -1)
+      : shiftFuelIsoDays(curIso, -7);
+    window._fuelPeriodState.subDayIso = null;
+    renderFuelPeriodView();
+  });
+
+  document.getElementById('fuel-period-next')?.addEventListener('click', () => {
+    const curP = window._fuelPeriodState?.period || 'week';
+    const curIso = window._fuelPeriodState?.dateIso || getLocalTodayIso();
+    if (!canFuelNavigateNext(curP, curIso)) return;
+    window._fuelPeriodState.dateIso = curP === 'month'
+      ? shiftFuelIsoMonths(curIso, 1)
+      : shiftFuelIsoDays(curIso, 7);
+    window._fuelPeriodState.subDayIso = null;
+    renderFuelPeriodView();
+  });
+
+  renderFuelPeriodView(false);
+
+  const markMantDone = async (key, triggerBtn = null) => {
+    const motor = window._currentMotorData;
+    const stats = window._currentFuelStats;
+    const item = stats?.items?.find(i => i.key === key);
+    if (!motor || !item || !item.isDue) return;
+
+    if (triggerBtn) {
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = 'Guardando...';
+    }
+    try {
+      const empresaId = motor.empresa_id || window._currentEmpresaId || loadEmpresaId() || localStorage.getItem('current_empresa_id');
+      if (!empresaId) throw new Error('No se encontró la finca activa');
+
+      const created = await restFetch('/rest/v1/motor_mantenimientos', {
+        method: 'POST',
+        body: JSON.stringify({
+          motor_id: motorId,
+          empresa_id: empresaId,
+          titulo: item.nombre,
+          descripcion: item.desc || `Cada ${formatLitersLabel(item.cada_litros)}`,
+          fecha: new Date().toISOString(),
+          icon: 'local_gas_station',
+          color: `gas_mant:${item.key}`,
+          total_horas: stats.totalLiters || 0,
+          historial_sesiones: {
+            tipo: 'gasolina',
+            mant_key: item.key,
+            litros_al_momento: stats.totalLiters || 0,
+            intervalo_litros: item.cada_litros,
+          },
+        }),
+      });
+      const savedRow = Array.isArray(created) ? created[0] : created;
+      if (navigator.onLine && !savedRow?.id) {
+        throw new Error('Supabase no confirmó el registro del mantenimiento');
+      }
+      if (savedRow?.id) await db.motor_mantenimientos.put(savedRow).catch(() => {});
+      if (navigator.onLine) await syncTable('motor_mantenimientos', true).catch(() => {});
+
+      showSnackbar(`${item.nombre} registrado`);
+      await reloadDetalleSinParpadeo(motorId);
+    } catch (err) {
+      console.error('Error registrando mantenimiento gasolina:', err);
+      showSnackbar('Error al registrar: ' + (err?.message || err), 'error');
+      if (triggerBtn && document.body.contains(triggerBtn)) {
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = 'Marcar como hecho';
+      }
+    }
+  };
+
+  document.querySelectorAll('[data-fuel-mant-done]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      markMantDone(btn.dataset.fuelMantDone, btn);
+    });
+  });
+
+  document.getElementById('btn-edit-fuel-price')?.addEventListener('click', () => {
+    openFuelPriceBottomSheet(motorId);
+  });
+
+  document.getElementById('btn-open-fuel-load-sheet')?.addEventListener('click', () => {
+    openFuelLoadBottomSheet(motorId);
+  });
+
+  document.getElementById('btn-send-fuel-cuentas')?.addEventListener('click', () => {
+    const motor = window._currentMotorData;
+    const filteredLoads = window._currentPeriodFilteredLoads || [];
+    const sentMap = window._currentFuelSentMap || new Map();
+    if (!motor || filteredLoads.length === 0) return;
+
+    const pricedLoads = filteredLoads.filter(l => l._cost > 0);
+    if (pricedLoads.length === 0) {
+      showSnackbar('Define el precio por litro para enviar a Cuentas', 'error');
+      openFuelPriceBottomSheet(motorId);
+      return;
+    }
+
+    const pendingLoads = pricedLoads.filter((l) => {
+      const existing = sentMap.get(String(l.id));
+      return !existing || Math.abs((Number(existing.monto) || 0) - l._cost) >= 0.01;
+    });
+    if (pendingLoads.length === 0) {
+      showSnackbar('Estas cargas ya están registradas en Cuentas');
+      return;
+    }
+
+    const pendingAmount = Math.round(pendingLoads.reduce((s, l) => s + l._cost, 0) * 100) / 100;
+    const pendingLiters = Math.round(pendingLoads.reduce((s, l) => s + l._liters, 0) * 10) / 10;
+    const sectors = Array.from(new Set(pendingLoads.map(l => String(l.hora_fin || '').trim()).filter(Boolean)));
+    const sectorsText = sectors.length > 0 ? `<br><small style="color:#5a6658;">Sector: ${escapeFuelHtml(sectors.join(', '))}</small>` : '';
+    const hasUpdates = pendingLoads.some(l => sentMap.has(String(l.id)));
+
+    window.Snackbar.confirm(
+      `${hasUpdates ? '¿Actualizar' : '¿Enviar'} a Cuentas <b>${formatCurrencyL(pendingAmount)}</b> (${formatLitersLabel(pendingLiters)})?${sectorsText}`,
+      async () => {
+        const sendBtn = document.getElementById('btn-send-fuel-cuentas');
+        const sendTitle = document.getElementById('btn-send-fuel-cuentas-title');
+        if (sendBtn) sendBtn.disabled = true;
+        if (sendTitle) sendTitle.textContent = 'Enviando...';
+        try {
+          const res = await sendFuelLoadsToCuentas({
+            loads: pendingLoads,
+            motor,
+            sentByLoadId: sentMap,
+          });
+          showSnackbar(
+            res.updatedCount > 0 && res.createdCount === 0
+              ? `✓ Actualizado en Cuentas (${formatCurrencyL(res.totalSentAmount)})`
+              : `✓ Enviado a Cuentas (${formatCurrencyL(res.totalSentAmount)})`
+          );
+          await reloadDetalleSinParpadeo(motorId);
+        } catch (err) {
+          console.error('Error enviando gasolina a Cuentas:', err);
+          showSnackbar('Error enviando a Cuentas: ' + (err?.message || err), 'error');
+          if (sendBtn && document.body.contains(sendBtn)) sendBtn.disabled = false;
+          if (sendTitle && document.body.contains(sendTitle)) sendTitle.textContent = 'Enviar a Cuentas';
+        }
+      },
+      null,
+      { confirmText: hasUpdates ? 'Actualizar en Cuentas' : 'Enviar a Cuentas', cancelText: 'Cancelar' }
+    );
+  });
 }
 
 function registerOilChange(motorId) {

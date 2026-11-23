@@ -32,6 +32,35 @@ function lpIsDescanso(e) {
   return s === 'descanso' || s === 'ausente' || s === 'falto' || s === 'faltó' || s === 'no' || s === 'a' || s === 'd' || s === '0' || s === 'inactivo';
 }
 
+function lpNormText(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function lpParsePersonalIds(raw) {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch (_) {}
+  }
+  return [];
+}
+
+function lpExtractOperators(row) {
+  let raw = String(row?.operador || '').trim();
+  if (!raw && row?.observaciones) {
+    const m = String(row.observaciones).match(/Responsables:\s*([^\n]+)/i);
+    if (m) raw = m[1].trim();
+  }
+  return raw.split(',').map(s => lpNormText(s)).filter(s => s && !s.includes('@'));
+}
+
+function lpMatchesOperatorName(opNames, pNomNorm) {
+  if (!pNomNorm || !opNames.length) return false;
+  return opNames.some(op => op === pNomNorm || (op.length >= 4 && pNomNorm.includes(op)) || (pNomNorm.length >= 4 && op.includes(pNomNorm)));
+}
+
 async function lpPersistAsistencia(personalId, empresaId, dateStr, wantWork) {
   const existentes = await restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(personalId)}&fecha=eq.${dateStr}&select=*`).catch(() => []);
   const existente = (Array.isArray(existentes) ? existentes[0] : existentes) || null;
@@ -99,12 +128,16 @@ function personalRowsHtml(list) {
             </div>`;
   }
   return list.map(p => {
-    const info = _lpSummaryMap.get(String(p.id)) || { days: 0, pending: 0, todayEstado: null };
+    const info = _lpSummaryMap.get(String(p.id)) || { days: 0, pending: 0, paid: 0, diario: Number(p.pago_diario) || 0, todayEstado: null };
     let subtitleHtml = '';
     if (info.pending > 0) {
       subtitleHtml = `${info.days} ${info.days === 1 ? 'día' : 'días'} · <span style="color:#b34200; font-weight:700;">L${info.pending.toLocaleString('es-HN')}</span> por pagar`;
+    } else if (info.days > 0 && info.diario <= 0) {
+      subtitleHtml = `${info.days} ${info.days === 1 ? 'día' : 'días'} · <span style="color:#5a6b58; font-weight:600;">Sin pago diario configurado</span>`;
     } else if (info.days > 0) {
-      subtitleHtml = 'Al día · sin pagos pendientes';
+      subtitleHtml = info.paid > 0
+        ? `${info.days} ${info.days === 1 ? 'día' : 'días'} · Al día (L${info.paid.toLocaleString('es-HN')} pagado)`
+        : 'Al día · sin pagos pendientes';
     } else {
       subtitleHtml = [
         p.rol || '',
@@ -168,14 +201,15 @@ export async function renderListaPersonal() {
     _lpWeekEndStr = lpFmtDate(weekEnd);
 
     const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
+    const empFilter = eid ? `empresa_id=eq.${encodeURIComponent(eid)}&` : '';
     const gastosPath = eid
-      ? `/rest/v1/gastos?categoria=eq.Personal&empresa_id=eq.${eid}&select=*`
-      : `/rest/v1/gastos?categoria=eq.Personal&select=*`;
+      ? `/rest/v1/gastos?categoria=in.(Personal,Cosecha)&empresa_id=eq.${eid}&select=*`
+      : `/rest/v1/gastos?categoria=in.(Personal,Cosecha)&select=*`;
 
     const [personalRes, asisRes, appsRes, gastosRes] = await Promise.all([
       restFetch('/rest/v1/personal?order=nombre.asc&select=*'),
-      restFetch(`/rest/v1/personal_asistencia?fecha=gte.${_lpWeekStartStr}&fecha=lte.${_lpWeekEndStr}&select=*`).catch(() => []),
-      restFetch(`/rest/v1/lote_aplicaciones?fecha=gte.${_lpWeekStartStr}&fecha=lte.${_lpWeekEndStr}&select=fecha,personal_ids,operador`).catch(() => []),
+      restFetch(`/rest/v1/personal_asistencia?${empFilter}fecha=gte.${_lpWeekStartStr}&fecha=lte.${_lpWeekEndStr}&select=*`).catch(() => []),
+      restFetch(`/rest/v1/lote_aplicaciones?${empFilter}fecha=gte.${_lpWeekStartStr}&fecha=lte.${_lpWeekEndStr}&select=fecha,personal_ids,operador,observaciones,estado`).catch(() => []),
       restFetch(gastosPath).catch(() => [])
     ]);
 
@@ -183,9 +217,22 @@ export async function renderListaPersonal() {
     const asisList = Array.isArray(asisRes) ? asisRes : [];
     const appsList = Array.isArray(appsRes) ? appsRes : [];
     const gastosList = Array.isArray(gastosRes) ? gastosRes : [];
+    const onlyPersonalGastos = gastosList.filter(g => String(g?.categoria || '').toLowerCase() === 'personal');
+
+    let totalPagadoJornales = 0;
+    let totalPagadoCosecha = 0;
+    gastosList.forEach(g => {
+      const desc = String(g?.descripcion || '');
+      if (desc.includes('[Por Aprobar]')) return;
+      if (String(g?.tipo || '').toLowerCase() === 'ingreso') return;
+      const catLow = String(g?.categoria || '').toLowerCase();
+      const monto = Number(g?.monto) || 0;
+      if (catLow === 'personal') totalPagadoJornales += monto;
+      else if (catLow === 'cosecha') totalPagadoCosecha += monto;
+    });
+    const totalPagadoColaboradores = Math.round(totalPagadoJornales + totalPagadoCosecha);
 
     _lpSummaryMap = new Map();
-    let marcadosHoy = 0;
     let totalPorPagar = 0;
     let totalPagadoSemana = 0;
     let colabPorPagar = 0;
@@ -194,27 +241,44 @@ export async function renderListaPersonal() {
       const pId = String(p.id);
       const pAsis = asisList.filter(a => String(a.personal_id) === pId);
       const todayRec = pAsis.find(a => String(a.fecha || '').slice(0, 10) === _lpTodayStr);
-      const todayEstado = todayRec ? todayRec.estado : null;
-      if (lpIsTrabajo(todayEstado) || lpIsDescanso(todayEstado)) marcadosHoy++;
 
+      let todayHasActivity = false;
       const workedDates = new Set(
         pAsis.filter(a => lpIsTrabajo(a.estado)).map(a => String(a.fecha || '').slice(0, 10)).filter(Boolean)
       );
-      const pNomLower = String(p.nombre || '').toLowerCase().trim();
+      const pNomNorm = lpNormText(p.nombre);
       appsList.forEach(app => {
         const f = String(app.fecha || '').slice(0, 10);
-        if (!f) return;
-        const pids = Array.isArray(app.personal_ids) ? app.personal_ids.map(String) : [];
-        const opMatch = pNomLower && String(app.operador || '').toLowerCase().includes(pNomLower);
-        if (pids.includes(pId) || opMatch) workedDates.add(f);
+        if (!f || f < _lpWeekStartStr || f > _lpWeekEndStr) return;
+        if (String(app.observaciones || '').startsWith('[COSECHA_JSON]')) return;
+        const estado = String(app.estado || '');
+        const isPerformed = estado === 'Aplicada' || estado === 'Realizada' || (f <= _lpTodayStr && estado !== 'Cancelada');
+        if (!isPerformed) return;
+        const pids = lpParsePersonalIds(app.personal_ids);
+        const ops = lpExtractOperators(app);
+        if (pids.includes(pId) || lpMatchesOperatorName(ops, pNomNorm)) {
+          workedDates.add(f);
+          if (f === _lpTodayStr) todayHasActivity = true;
+        }
       });
+
+      const todayEstado = todayHasActivity ? 'trabajo' : (todayRec ? todayRec.estado : null);
 
       const days = workedDates.size;
       const diario = Number(p.pago_diario) || 0;
       const weekGross = days * diario;
       const refPrefix = `[ref:${pId}_sem_${_lpWeekStartStr}]`;
-      const paid = gastosList
-        .filter(g => String(g.descripcion || '').includes(refPrefix))
+      const dayRefPrefix = `[ref:${pId}_dia_`;
+      const paid = onlyPersonalGastos
+        .filter((g) => {
+          const desc = String(g.descripcion || '');
+          if (desc.includes('[Por Aprobar]')) return false;
+          if (desc.includes(refPrefix)) return true;
+          if (!desc.includes(dayRefPrefix)) return false;
+          const dm = desc.match(/\[ref:[^\]_]+_dia_(\d{4}-\d{2}-\d{2})\]/);
+          const dIso = dm ? dm[1] : String(g.fecha || '').slice(0, 10);
+          return Boolean(dIso && dIso >= _lpWeekStartStr && dIso <= _lpWeekEndStr);
+        })
         .reduce((s, g) => s + (Number(g.monto) || 0), 0);
       const pending = Math.max(0, weekGross - paid);
 
@@ -223,11 +287,10 @@ export async function renderListaPersonal() {
         totalPorPagar += pending;
         colabPorPagar++;
       }
-      _lpSummaryMap.set(pId, { days, pending, todayEstado });
+      _lpSummaryMap.set(pId, { days, pending, paid, diario, todayEstado, todayFromActivity: todayHasActivity });
     });
 
     const personal = filterPersonal();
-    const todayLabel = `Hoy · ${LP_DAYS_SHORT[now.getDay()]} ${now.getDate()} ${LP_MONTHS_SHORT[now.getMonth()]}`;
 
     return `
       <style>
@@ -392,9 +455,15 @@ export async function renderListaPersonal() {
         </div>
         <section class="lp-summary-grid" id="personal-summary-grid">
           <div class="lp-summary-card">
-            <div style="font-size:12px; color:#5a6b58; font-weight:600;">${todayLabel}</div>
-            <div id="lp-sum-marcados" style="font-size:21px; font-weight:800; color:#111827; margin-top:2px; line-height:1.15;">${marcadosHoy} de ${allPersonalData.length}</div>
-            <div style="font-size:12px; color:#5a6b58; margin-top:2px;">marcados</div>
+            <div style="font-size:12px; color:#5a6b58; font-weight:600;">Total pagado</div>
+            <div id="lp-sum-total-pagado" style="font-size:21px; font-weight:800; color:${totalPagadoColaboradores > 0 ? '#1b6e1b' : '#111827'}; margin-top:2px; line-height:1.15;">L ${totalPagadoColaboradores.toLocaleString('es-HN')}</div>
+            <div style="font-size:12px; color:#5a6b58; margin-top:2px;">
+              ${(totalPagadoJornales > 0 && totalPagadoCosecha > 0)
+                ? `Jornales: L${Math.round(totalPagadoJornales).toLocaleString('es-HN')} · Cosecha: L${Math.round(totalPagadoCosecha).toLocaleString('es-HN')}`
+                : (totalPagadoColaboradores > 0
+                  ? `${allPersonalData.length} ${allPersonalData.length === 1 ? 'colaborador' : 'colaboradores'}`
+                  : 'Sin pagos registrados')}
+            </div>
           </div>
           <div class="lp-summary-card" style="display:flex; flex-direction:column; justify-content:space-between;">
             <div>
@@ -403,7 +472,7 @@ export async function renderListaPersonal() {
               <div id="lp-sum-colabs" style="font-size:12px; color:#5a6b58; margin-top:2px;">
                 ${totalPorPagar > 0
                   ? `${colabPorPagar} ${colabPorPagar === 1 ? 'colaborador' : 'colaboradores'}`
-                  : (totalPagadoSemana > 0 ? `✔ Al día (L ${totalPagadoSemana.toLocaleString('es-HN')} en Gastos)` : 'Sin pagos pendientes')}
+                  : (totalPagadoSemana > 0 ? `✔ Al día (L ${totalPagadoSemana.toLocaleString('es-HN')} en Cuentas)` : 'Sin pagos pendientes')}
               </div>
             </div>
             ${totalPorPagar > 0 ? `
@@ -414,7 +483,7 @@ export async function renderListaPersonal() {
             ` : (totalPagadoSemana > 0 ? `
               <button type="button" onclick="window.navigateTo('gastos')" style="margin-top:8px; width:100%; height:30px; border-radius:999px; border:1px solid #d5e2d2; background:#eff4ed; color:#1b6e1b; font-family:'Work Sans',sans-serif; font-size:11.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
                 <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span>
-                <span>Ver en Gastos →</span>
+                <span>Ver en Cuentas →</span>
               </button>
             ` : '')}
           </div>
@@ -501,7 +570,11 @@ export function initListaPersonal() {
   window.togglePersonalTodayStatus = async (pId) => {
     const p = (allPersonalData || []).find(x => String(x.id) === String(pId));
     if (!p) return;
-    const info = _lpSummaryMap.get(String(pId)) || { days: 0, pending: 0, todayEstado: null };
+    const info = _lpSummaryMap.get(String(pId)) || { days: 0, pending: 0, todayEstado: null, todayFromActivity: false };
+    if (info.todayFromActivity) {
+      window.Snackbar?.show(`${p.nombre} ya cuenta como Trabajó hoy por actividad registrada`);
+      return;
+    }
     const wantWork = !lpIsTrabajo(info.todayEstado);
     const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || p.empresa_id;
     try {
@@ -543,6 +616,7 @@ export function initListaPersonal() {
             will-change: auto !important;
             padding-bottom: 88px !important;
           }
+          #lp-sheet-dp-body #dp-desktop-footer-bar { display: none !important; }
           #lp-sheet-dp-body .dp-screen-pad { padding: 0 0 24px 0 !important; }
           #lp-sheet-dp-body .m3-card {
             padding: 0 !important;
@@ -580,7 +654,16 @@ export function initListaPersonal() {
             padding: 0 !important;
             flex-shrink: 0;
           }
-          #lp-sheet-dp-body .dp-cal-views { width: 100%; justify-content: flex-start; }
+          #lp-sheet-dp-body .dp-cal-views {
+            width: 100%;
+            justify-content: flex-start;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 2px;
+          }
+          #lp-sheet-dp-body .dp-cal-views::-webkit-scrollbar { display: none; }
+          #lp-sheet-dp-body .dp-cal-views .cal-view-btn { white-space: nowrap; flex-shrink: 0; }
           #lp-sheet-dp-body #dp-mobile-footer-bar { display: block !important; }
           #lp-sheet-dp-body #cal-container .dp-day-actions-bar { display: none !important; }
           #lp-sheet-dp-body #dp-mobile-footer-bar .dp-day-actions-bar {
@@ -593,13 +676,19 @@ export function initListaPersonal() {
             margin: 0 !important;
             border-top: 1px solid #e5ebe4;
             box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+            box-sizing: border-box;
             z-index: 10005;
           }
           #lp-sheet-dp-body .dp-day-actions-bar .cal-view-btn {
             flex: 1;
             justify-content: center;
+            min-height: 46px;
+            box-sizing: border-box;
             padding: 12px 16px !important;
             font-size: 14px !important;
+          }
+          #lp-sheet-dp-body .dp-day-actions-bar .dp-work-swipe-btn {
+            padding: 10px 12px !important;
           }
         </style>
         <div id="lp-sheet-dp-body" style="padding-top: 4px;">

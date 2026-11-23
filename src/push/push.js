@@ -3,6 +3,7 @@ import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messagi
 import { restFetch, getUser, getSessionUserId } from '../auth.js';
 import db from '../db.js';
 import { checkMotoresAceite, checkPartosProximos } from '../wa.js';
+import { isFuelMotor } from '../utils/motor_fuel_config.js';
 import {
   PUSH_MODULES_SCHEMA,
   getPushAlertPrefs,
@@ -336,15 +337,19 @@ export async function checkPushAlerts(opts = {}) {
     const now = Date.now();
 
     const [motores, mants] = await Promise.all([
-      restFetch(`/rest/v1/motores?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre,horas,max_horas`).catch(() => []),
+      restFetch(`/rest/v1/motores?empresa_id=eq.${encodeURIComponent(empresaId)}&select=id,nombre,icon,horas,max_horas,notas`).catch(() => []),
       restFetch(`/rest/v1/motor_mantenimientos?empresa_id=eq.${encodeURIComponent(empresaId)}&select=motor_id`).catch(() => []),
     ]);
     const mantSet = new Set((mants || []).map(x => x.motor_id));
 
     for (const m of (motores || [])) {
+      const tsKey = `push_motor_ts_${m.id}`;
+      if (isFuelMotor(m)) {
+        localStorage.removeItem(tsKey);
+        continue;
+      }
       const limit = mantSet.has(m.id) ? (Number(m.max_horas) || 100) : 80;
       const horas = Number(m.horas) || 0;
-      const tsKey = `push_motor_ts_${m.id}`;
 
       if (horas < limit) {
         localStorage.removeItem(tsKey);

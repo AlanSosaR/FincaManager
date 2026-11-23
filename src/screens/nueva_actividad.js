@@ -2,8 +2,6 @@ import { supabase } from '../supabase.js';
 import { restFetch, restInsert } from '../auth.js';
 import { sendWhatsApp } from '../wa.js';
 import { invalidateCache } from '../sync.js';
-import { getDosisPorEdad, calcularDosis } from '../utils/calculadora_dosis.js';
-import { dibujarVasitoCompacto } from '../utils/vasito_medidor.js';
 
 const methodOptionsByType = {
   'Fertilizante': ['Al voleo', 'Foliar', 'Fertirriego', 'Enterrado'],
@@ -75,19 +73,10 @@ export async function renderNuevaActividad(loteId, tipo) {
               <label>Nombre del Producto</label>
             </div>
 
-<!-- 4. Dosis (with IFCAFE suggestion) -->
+<!-- 4. Dosis -->
             <div class="m3-field" id="field-dosis">
               <input type="text" name="dosis" placeholder="${ph.dosis}">
               <label>Dosis</label>
-            </div>
-          </div>
-
-          <!-- IFCAFE dosage suggestion bar (only for Fertilizante when lot has edad_categoria) -->
-          <div id="ifcafe-sugerencia-dosis" style="display: none; margin: -12px 0 16px 0; padding: 12px 14px; background: #f0f7e6; border-radius: 12px; border: 1px solid #c8e6c9;">
-            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-              <div style="font-size:13px; font-weight:600; color:#2d3e2c;">💡 Sugerencia de dosis</div>
-              <div id="sugerencia-vasito"></div>
-              <div id="sugerencia-texto" style="font-size:12px; color:#4a6b48;"></div>
             </div>
           </div>
 
@@ -416,29 +405,6 @@ export function initNuevaActividad(loteId, tipo) {
     if (fechaLabel) fechaLabel.textContent = 'Fecha de Muestreo';
   }
 
-  // IFCAFE sugerencia de dosis (only for Fertilizante)
-  if (tipo === 'Fertilizante') {
-    (async () => {
-      try {
-        const lotes = await restFetch(`lotes?id=eq.${loteId}&select=edad_categoria,num_plantas`);
-        const lote = lotes?.[0];
-        if (lote?.edad_categoria) {
-          const dosisCalc = calcularDosis(lote.edad_categoria, lote.num_plantas || 0);
-          const sugerenciaEl = document.getElementById('ifcafe-sugerencia-dosis');
-          const vasitoEl = document.getElementById('sugerencia-vasito');
-          const textoEl = document.getElementById('sugerencia-texto');
-          if (sugerenciaEl && vasitoEl && textoEl) {
-            sugerenciaEl.style.display = 'block';
-            vasitoEl.innerHTML = dibujarVasitoCompacto(dosisCalc.porAplicacion.fraccion);
-            textoEl.textContent = `${dosisCalc.porAplicacion.vasitoLabel} (${dosisCalc.porAplicacion.gramos}g/planta) — ${dosisCalc.totalSacos} sacos para ${lote.num_plantas} plantas`;
-          }
-        }
-      } catch (err) {
-        console.warn('IFCAFE dosage suggestion unavailable:', err);
-      }
-    })();
-  }
-
   // 2. MULTIPLE OPERATORS UX LOGIC
   // listOperadores: [{name, id}] — id may be null for free-text entries
   const listOperadores = [];
@@ -572,6 +538,7 @@ export function initNuevaActividad(loteId, tipo) {
 
       window.Snackbar.show('Actividad registrada');
       window.clearScreenCache?.('detalle_lote');
+      window.clearScreenCache?.('personal');
       window.navigateTo('detalle_lote', loteId);
     } catch (err) {
       console.error(err);
