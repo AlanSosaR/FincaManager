@@ -5,6 +5,8 @@ function isOnline() {
   return navigator.onLine;
 }
 
+const isClientError = (e) => (e?.status >= 400 && e.status < 500) || /Supabase API 4\d\d/.test(e?.message || '');
+
 const BUSINESS_TABLES = new Set([
   'motores', 'motor_sesiones', 'motor_mantenimientos',
   'potreros', 'ganado', 'herramientas',
@@ -38,7 +40,8 @@ export default class QueryBuilder {
 
   _ensureEmpresaFilter() {
     if (!BUSINESS_TABLES.has(this.tableName)) return;
-    const empresaId = typeof window !== 'undefined' ? window._currentEmpresaId : null;
+    const empresaId = (typeof window !== 'undefined' && window._currentEmpresaId)
+      || (typeof localStorage !== 'undefined' ? localStorage.getItem('current_empresa_id') : null);
     if (!empresaId) return;
     const alreadyFiltered = this._filters.some(
       f => f.type === 'eq' && f.field === 'empresa_id'
@@ -171,8 +174,10 @@ export default class QueryBuilder {
             });
       }
       if (!record.created_at) record.created_at = now;
-      if (typeof window !== 'undefined' && window._currentEmpresaId && this.tableName !== 'usuarios' && this.tableName !== 'empresas' && this.tableName !== 'usuario_empresas' && this.tableName !== 'invitaciones') {
-        if (!record.empresa_id) record.empresa_id = window._currentEmpresaId;
+      const activeEmpId = (typeof window !== 'undefined' && window._currentEmpresaId)
+        || (typeof localStorage !== 'undefined' ? localStorage.getItem('current_empresa_id') : null);
+      if (activeEmpId && this.tableName !== 'usuarios' && this.tableName !== 'empresas' && this.tableName !== 'usuario_empresas' && this.tableName !== 'invitaciones') {
+        if (!record.empresa_id) record.empresa_id = activeEmpId;
       }
 
       if (isOnline()) {
@@ -189,6 +194,9 @@ export default class QueryBuilder {
           results.push(merged);
           continue;
         } catch (e) {
+          if (isClientError(e)) {
+            return { data: null, error: e };
+          }
           console.warn(`online insert failed for ${this.tableName}, fallback to local:`, e);
         }
       }
@@ -219,11 +227,17 @@ export default class QueryBuilder {
           { method: 'PATCH', body: JSON.stringify(body) }
         );
         const serverRecords = await res.json();
+        if (Array.isArray(serverRecords) && serverRecords.length === 0) {
+          return { data: null, error: new Error('El servidor rechazó la actualización (sin permisos o registro no encontrado)') };
+        }
         const serverRecord = Array.isArray(serverRecords) ? serverRecords[0] : serverRecords;
         const merged = { ...updated, ...(serverRecord || {}) };
         if (merged.id) await table.put(merged);
         return { data: merged, error: null };
       } catch (e) {
+        if (isClientError(e)) {
+          return { data: null, error: e };
+        }
         console.warn(`online update failed for ${this.tableName}, fallback to local:`, e);
       }
     }
@@ -242,13 +256,20 @@ export default class QueryBuilder {
 
     if (isOnline()) {
       try {
-        await supabaseFetch(
+        const res = await supabaseFetch(
           `/rest/v1/${this.tableName}?id=eq.${encodeURIComponent(eqFilter.value)}`,
           { method: 'DELETE' }
         );
+        const deletedRows = await res.json().catch(() => []);
+        if (Array.isArray(deletedRows) && deletedRows.length === 0 && items.length > 0) {
+          return { data: null, error: new Error('No se pudo eliminar en Supabase (sin permisos o registro no encontrado)') };
+        }
         await table.where(eqFilter.field).equals(eqFilter.value).delete();
         return { data: items, error: null };
       } catch (e) {
+        if (isClientError(e)) {
+          return { data: null, error: e };
+        }
         console.warn(`online delete failed for ${this.tableName}, will retry via queue:`, e);
       }
     }

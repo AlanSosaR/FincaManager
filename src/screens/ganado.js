@@ -1082,7 +1082,7 @@ export function initGanado() {
     const menu = btn.nextElementSibling;
     if (!menu) return;
 
-    const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+    const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
     document.querySelectorAll('.action-menu.active').forEach(m => {
       if (isMobile || m !== menu) {
         m.classList.remove('active');

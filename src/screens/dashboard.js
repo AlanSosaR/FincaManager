@@ -2489,7 +2489,12 @@ window.toggleActionMenu = (btn) => {
   const menu = btn.nextElementSibling;
   if (!menu) return;
   const isActive = menu.classList.contains('active');
+  const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
   document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+  if (isMobile && window.openMobileMenuBottomSheet) {
+    window.openMobileMenuBottomSheet(menu);
+    return;
+  }
   if (!isActive) menu.classList.add('active');
 };
 

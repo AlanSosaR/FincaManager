@@ -469,6 +469,14 @@ export function initNuevoAnimal(id) {
         );
       }
 
+      window.clearScreenCache?.('ganado');
+      window.clearScreenCache?.('detalle_animal');
+      if (window.isMobileFormSheetOpen?.()) {
+        window.closeMobileFormSheet?.();
+        window.refreshGanadoList?.();
+        return;
+      }
+
       if (id) {
         window.navigateTo('detalle_animal', newId || id);
       } else {

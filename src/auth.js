@@ -166,7 +166,7 @@ async function executeOfflineRest(fullPath, options = {}, isInsertOnly = false) 
         await enqueue('delete', id, null);
       }
     }
-    return [];
+    return matched;
   }
 
   return [];
@@ -177,10 +177,17 @@ async function restFetch(path, options = {}) {
   if (!navigator.onLine && fullPath.startsWith('/rest/v1/')) {
     return executeOfflineRest(fullPath, options, false);
   }
-  const headers = buildHeaders({ Prefer: 'return=representation', ...options.headers });
+  const makeRequest = () => fetch(`${SUPABASE_URL}${fullPath}`, {
+    ...options,
+    headers: buildHeaders({ Prefer: 'return=representation', ...options.headers }),
+  });
   let res;
   try {
-    res = await fetch(`${SUPABASE_URL}${fullPath}`, { ...options, headers });
+    res = await makeRequest();
+    if (res.status === 401) {
+      const refreshed = await tryRefreshSession();
+      if (refreshed) res = await makeRequest();
+    }
   } catch (err) {
     if (fullPath.startsWith('/rest/v1/')) {
       return executeOfflineRest(fullPath, options, false);
@@ -202,22 +209,27 @@ async function restFetch(path, options = {}) {
 async function restInsert(path, body) {
   const fullPath = path.startsWith('/') ? path : `/rest/v1/${path}`;
   let data = body;
-  if (data && typeof data === 'object' && !Array.isArray(data) && !data.empresa_id && window._currentEmpresaId) {
+  const activeEmpresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+  if (data && typeof data === 'object' && !Array.isArray(data) && !data.empresa_id && activeEmpresaId) {
     if (!fullPath.includes('/usuarios') && !fullPath.includes('/empresas') && !fullPath.includes('/usuario_empresas')) {
-      data = { ...data, empresa_id: window._currentEmpresaId };
+      data = { ...data, empresa_id: activeEmpresaId };
     }
   }
   if (!navigator.onLine && fullPath.startsWith('/rest/v1/')) {
     return executeOfflineRest(fullPath, { method: 'POST', body: data }, true);
   }
-  const headers = buildHeaders();
+  const makeRequest = () => fetch(`${SUPABASE_URL}${fullPath}`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(data),
+  });
   let res;
   try {
-    res = await fetch(`${SUPABASE_URL}${fullPath}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data),
-    });
+    res = await makeRequest();
+    if (res.status === 401) {
+      const refreshed = await tryRefreshSession();
+      if (refreshed) res = await makeRequest();
+    }
   } catch (err) {
     if (fullPath.startsWith('/rest/v1/')) {
       return executeOfflineRest(fullPath, { method: 'POST', body: data }, true);
@@ -355,31 +367,39 @@ export function getSessionUserId() {
   return getSession()?.user?.id || null;
 }
 
+let _refreshPromise = null;
+
 export async function tryRefreshSession() {
-  const session = getSession();
-  if (!session?.refresh_token) return false;
-  if (!navigator.onLine) {
-    return !!session.access_token;
-  }
-  try {
-    const data = await authFetch('/auth/v1/token?grant_type=refresh_token', {
-      method: 'POST',
-      body: JSON.stringify({ refresh_token: session.refresh_token }),
-    });
-    if (data?.access_token) {
-      saveSession(data);
-      return true;
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = (async () => {
+    const session = getSession();
+    if (!session?.refresh_token) return false;
+    if (!navigator.onLine) {
+      return !!session.access_token;
     }
-  } catch (err) {
-    // Solo cerrar sesión si el servidor rechazó explícitamente el refresh_token (400/401/403).
-    // Si es error de red o servidor (sin internet), conservar la sesión local.
-    if (err?.status && err.status >= 400 && err.status < 500) {
-      saveSession(null);
-      return false;
+    try {
+      const data = await authFetch('/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if (data?.access_token) {
+        saveSession(data);
+        return true;
+      }
+    } catch (err) {
+      // Solo cerrar sesión si el servidor rechazó explícitamente el refresh_token (400/401/403).
+      // Si es error de red o servidor (sin internet), conservar la sesión local.
+      if (err?.status && err.status >= 400 && err.status < 500) {
+        saveSession(null);
+        return false;
+      }
+      return !!session.access_token;
     }
-    return !!session.access_token;
-  }
-  return false;
+    return false;
+  })().finally(() => {
+    _refreshPromise = null;
+  });
+  return _refreshPromise;
 }
 
 export function loadEmpresaId() {

@@ -497,6 +497,7 @@ async function initApp() {
     showOfflineNotif();
   }
 }
+loadEmpresaId();
 initApp();
 
 // ─── Empresa selector & sidebar name ─────────────────────────────────────────
@@ -843,7 +844,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Detail screens: their render() only returns a spinner skeleton;
         // data is loaded via init(). Caching the spinner causes triple re-renders
         // (cached HTML → initDetalleX → IndexedDB render → REST render).
-        'detalle_animal','detalle_motor','detalle_potrero',
+        'detalle_animal','detalle_motor','motores','detalle_potrero',
         'detalle_herramienta','detalle_lote','detalle_personal','mapa_lotes',
         // potreros: render() solo devuelve el shell del mapa; initPotreros() dibuja
         'potreros',
@@ -866,16 +867,35 @@ document.addEventListener('DOMContentLoaded', () => {
         return screenId + (args.length ? '/' + args.join('/') : '');
     }
 
+    const MOBILE_SHEET_FORMS = new Set([
+        'nuevo_motor', 'nuevo_animal', 'nuevo_potrero', 'nuevo_lote',
+        'nueva_actividad', 'nueva_herramienta', 'nuevo_gasto', 'nuevo_cultivo', 'nuevo_personal'
+    ]);
+
+    function getFormSheetTitle(screenId, args = []) {
+        const isEdit = args.length > 0 && Boolean(args[0]) && args[0] !== 'null' && args[0] !== 'undefined';
+        if (screenId === 'nuevo_motor') return isEdit ? 'Actualizar Equipo' : 'Nuevo Equipo';
+        if (screenId === 'nuevo_animal') return isEdit ? 'Editar Animal' : 'Registrar Animal';
+        if (screenId === 'nuevo_potrero') return isEdit ? 'Editar Potrero' : 'Nuevo Potrero';
+        if (screenId === 'nuevo_lote') return isEdit ? 'Editar Lote' : 'Nuevo Lote de Cafetal';
+        if (screenId === 'nueva_herramienta') return isEdit ? 'Editar Herramienta' : 'Nueva Herramienta';
+        if (screenId === 'nuevo_gasto') return isEdit ? 'Editar Gasto' : 'Nuevo Gasto';
+        if (screenId === 'nuevo_cultivo') return isEdit ? 'Editar Cultivo' : 'Nuevo Cultivo';
+        if (screenId === 'nuevo_personal') return isEdit ? 'Editar Personal' : 'Nuevo Personal';
+        if (screenId === 'nueva_actividad') return 'Nueva Actividad';
+        return screens[screenId]?.title || 'Registrar';
+    }
+
     function runFormInit(screenId, args) {
-        if (screenId === 'nuevo_motor') initNuevoMotor(...args);
-        else if (screenId === 'nueva_herramienta') initNuevaHerramienta(...args);
-        else if (screenId === 'nuevo_gasto') initNuevoGasto(...args);
-        else if (screenId === 'nuevo_cultivo') initNuevoCultivo(...args);
-        else if (screenId === 'nuevo_animal') initNuevoAnimal(...args);
-        else if (screenId === 'nuevo_potrero') initNuevoPotrero(...args);
-        else if (screenId === 'nuevo_lote') setupNuevoLoteListeners();
-        else if (screenId === 'nueva_actividad') initNuevaActividad(...args);
-        else if (screenId === 'nuevo_personal') initNuevoPersonal(...args);
+        if (screenId === 'nuevo_motor') return initNuevoMotor(...args);
+        else if (screenId === 'nueva_herramienta') return initNuevaHerramienta(...args);
+        else if (screenId === 'nuevo_gasto') return initNuevoGasto(...args);
+        else if (screenId === 'nuevo_cultivo') return initNuevoCultivo(...args);
+        else if (screenId === 'nuevo_animal') return initNuevoAnimal(...args);
+        else if (screenId === 'nuevo_potrero') return initNuevoPotrero(...args);
+        else if (screenId === 'nuevo_lote') return setupNuevoLoteListeners();
+        else if (screenId === 'nueva_actividad') return initNuevaActividad(...args);
+        else if (screenId === 'nuevo_personal') return initNuevoPersonal(...args);
     }
 
     function hideMobileFab(removeAfter = true) {
@@ -896,6 +916,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const scrim = document.getElementById('mobile-form-sheet-scrim');
         const sheet = document.getElementById('mobile-form-sheet');
         if (!sheet) return;
+        if (typeof sheet._formCleanup === 'function') {
+            try { sheet._formCleanup(); } catch (e) { console.warn('Form sheet cleanup error:', e); }
+            sheet._formCleanup = null;
+        }
         sheet.classList.remove('open');
         if (scrim) scrim.classList.remove('open');
         const fab = document.getElementById('mobile-screen-fab');
@@ -928,6 +952,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 260);
     }
 
+    window.closeMobileFormSheet = closeMobileFormSheet;
+    window.isMobileFormSheetOpen = () => Boolean(document.getElementById('mobile-form-sheet')?.classList.contains('open'));
+
     async function openMobileFormSheet(titleText, onMount) {
         let scrim = document.getElementById('mobile-form-sheet-scrim');
         let sheet = document.getElementById('mobile-form-sheet');
@@ -941,11 +968,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!sheet) {
             sheet = document.createElement('div');
             sheet.id = 'mobile-form-sheet';
-            sheet.className = 'm3-sub-action-sheet m3-mobile-form-sheet expanded';
             sheet.setAttribute('role', 'dialog');
             sheet.setAttribute('aria-modal', 'true');
             document.body.appendChild(sheet);
         }
+        if (typeof sheet._formCleanup === 'function') {
+            try { sheet._formCleanup(); } catch (e) { console.warn('Form sheet cleanup error:', e); }
+            sheet._formCleanup = null;
+        }
+        scrim.style.zIndex = '100004';
+        sheet.style.zIndex = '100005';
+        sheet.className = 'm3-sub-action-sheet m3-mobile-form-sheet expanded';
         sheet.scrollTop = 0;
         sheet.innerHTML = `
             <div class="m3-mobile-form-sheet-header">
@@ -986,12 +1019,37 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!btn.getAttribute('form')) btn.setAttribute('form', parentForm.id);
                     });
                 }
-                actionsEl.querySelector('#invite-cancel-inline')?.addEventListener('click', closeMobileFormSheet);
+                actionsEl.querySelectorAll('.da-action-btn.secondary, .btn-m3-text, #invite-cancel-inline').forEach(btn => {
+                    if (btn.id === 'invite-cancel-inline' || /cancelar|volver/i.test(btn.textContent || '')) {
+                        btn.removeAttribute('onclick');
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            closeMobileFormSheet();
+                        });
+                    }
+                });
                 footerEl.innerHTML = '';
                 footerEl.appendChild(actionsEl);
                 footerEl.style.display = 'block';
             }
         }
+    }
+
+    async function openFormInMobileSheet(screenId, args = []) {
+        const targetCfg = screens[screenId];
+        if (!targetCfg || typeof targetCfg.render !== 'function') return;
+        await openMobileFormSheet(getFormSheetTitle(screenId, args), async (bodyEl, sheetEl) => {
+            const prevCleanup = window.__screenCleanup;
+            window.__screenCleanup = null;
+            try {
+                bodyEl.innerHTML = await targetCfg.render(...args);
+                await runFormInit(screenId, args);
+                sheetEl._formCleanup = window.__screenCleanup;
+            } finally {
+                window.__screenCleanup = prevCleanup;
+            }
+        });
     }
 
     async function renderAndInit(screenId, args, html) {
@@ -1097,10 +1155,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             const targetArgs = parsedArgs.slice(1);
                             const targetCfg = screens[targetId];
                             if (targetCfg && typeof targetCfg.render === 'function') {
-                                openMobileFormSheet(targetCfg.title || 'Registrar', async (bodyEl) => {
-                                    bodyEl.innerHTML = await targetCfg.render(...targetArgs);
-                                    runFormInit(targetId, targetArgs);
-                                });
+                                openFormInMobileSheet(targetId, targetArgs);
                                 return;
                             }
                         }
@@ -1154,12 +1209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     async function navigate(screenId, ...args) {
-        if (!isNavigatingBack) {
-            const last = navHistoryStack[navHistoryStack.length - 1];
-            if (!last || last.screenId !== screenId || JSON.stringify(last.args) !== JSON.stringify(args)) {
-                navHistoryStack.push({ screenId, args });
-            }
-        }
+        const pushToNavHistory = !isNavigatingBack;
         isNavigatingBack = false;
         if (DETAIL_SCREENS.has(screenId) && (!args || args.length === 0 || !args[0])) {
             const screenCfg = screens[screenId];
@@ -1193,6 +1243,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!screen.noAuth && !isAuthenticated()) {
             await tryRefreshSession();
             if (!isAuthenticated()) return navigate('login');
+        }
+
+        const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
+        if (isMobile && MOBILE_SHEET_FORMS.has(screenId) && container && container.children.length > 0) {
+            await openFormInMobileSheet(screenId, args);
+            return;
+        }
+
+        if (pushToNavHistory) {
+            const last = navHistoryStack[navHistoryStack.length - 1];
+            if (!last || last.screenId !== screenId || JSON.stringify(last.args) !== JSON.stringify(args)) {
+                navHistoryStack.push({ screenId, args });
+            }
         }
 
         document.body.classList.toggle('screen-auth', !!screen.noAuth);

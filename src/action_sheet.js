@@ -3415,6 +3415,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('hashchange', () => {
+  document.getElementById('m3-menu-sheet')?.remove();
+  document.getElementById('m3-menu-sheet-scrim')?.remove();
   if (isSubBottomSheetOpen()) {
     closeSubBottomSheet();
   }
@@ -3429,9 +3431,9 @@ window.isActionBottomSheetOpen = isActionBottomSheetOpen;
 window.openSubBottomSheet = openSubBottomSheet;
 window.closeSubBottomSheet = closeSubBottomSheet;
 
-export function openMobileMenuBottomSheet(menuEl) {
+export function openMobileMenuBottomSheet(menuEl, { title = '' } = {}) {
   if (!menuEl) return;
-  const buttons = Array.from(menuEl.querySelectorAll('button'));
+  const buttons = Array.from(menuEl.querySelectorAll('button, .action-item'));
   if (buttons.length === 0) return;
 
   document.getElementById('m3-menu-sheet-scrim')?.remove();
@@ -3440,12 +3442,12 @@ export function openMobileMenuBottomSheet(menuEl) {
   const scrim = document.createElement('div');
   scrim.id = 'm3-menu-sheet-scrim';
   scrim.className = 'm3-action-sheet-scrim';
-  scrim.style.zIndex = '10020';
+  scrim.style.zIndex = '100020';
 
   const sheet = document.createElement('div');
   sheet.id = 'm3-menu-sheet';
   sheet.className = 'm3-menu-bottom-sheet';
-  sheet.style.zIndex = '10021';
+  sheet.style.zIndex = '100021';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
 
@@ -3467,6 +3469,7 @@ export function openMobileMenuBottomSheet(menuEl) {
 
   sheet.innerHTML = `
     <div class="m3-menu-sheet-handle" aria-hidden="true"></div>
+    ${title ? `<div class="m3-menu-sheet-title" style="padding: 4px 18px 10px; font-size: 14px; font-weight: 700; color: #4a5a49; border-bottom: 1px solid #e3eae2; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(title)}</div>` : ''}
     <div class="m3-menu-sheet-list">
       ${itemsHtml}
     </div>

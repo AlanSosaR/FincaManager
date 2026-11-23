@@ -340,7 +340,7 @@ export async function renderNuevoLote(id) {
             </div>
 
             <!-- Fullscreen Google Earth Style Map + Medir Lote Bottom Sheet -->
-            <div id="lote-map-sheet" style="position: fixed; inset: 0; z-index: 10050; background: #141614; display: flex; flex-direction: column; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity 0.22s ease;">
+            <div id="lote-map-sheet" style="position: fixed; inset: 0; z-index: 100015; background: #141614; display: flex; flex-direction: column; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity 0.22s ease;">
               <div style="height: 100dvh; width: 100%; background: #141614; overflow: hidden; display: flex; flex-direction: column;">
 
                 <div id="lote-map-container" style="flex: 1 1 0%; min-height: 0; width: 100%; position: relative; overflow: hidden;">
@@ -1029,7 +1029,7 @@ function initMap() {
     }
   });
   const mapFsOverlay = document.getElementById('lote_map-fullscreen-search');
-  if (mapFsOverlay) mapFsOverlay.style.zIndex = '10100';
+  if (mapFsOverlay) mapFsOverlay.style.zIndex = '100018';
 
   function showSaveBar(currentName, onSave, onDelete) {
     let saveBar = document.getElementById('temp-save-bar');

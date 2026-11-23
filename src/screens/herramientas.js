@@ -186,8 +186,15 @@ export async function renderHerramientas() {
 export function initHerramientas() {
   window.toggleActionMenu = (btn) => {
     const menu = btn.nextElementSibling;
+    if (!menu) return;
     const isActive = menu.classList.contains('active');
+    const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
     document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+    if (isMobile && window.openMobileMenuBottomSheet) {
+      const title = btn.closest('.ganado-row')?.querySelector('.ganado-col-value')?.textContent?.trim() || '';
+      window.openMobileMenuBottomSheet(menu, { title });
+      return;
+    }
     if (!isActive) menu.classList.add('active');
   };
 

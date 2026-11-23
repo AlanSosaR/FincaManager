@@ -1,4 +1,4 @@
-import { getAccessToken, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
+import { getAccessToken, tryRefreshSession, SUPABASE_URL, SUPABASE_KEY } from './auth.js';
 import db from './db.js';
 
 let syncInProgress = false;
@@ -28,21 +28,30 @@ const BUSINESS_TABLES = new Set([
 ]);
 
 export async function supabaseFetch(path, options = {}) {
-  const apikey = SUPABASE_KEY;
-  const session = getAccessToken();
-  const headers = {
-    'apikey': apikey,
-    'Content-Type': 'application/json',
-    ...options.headers,
+  const doFetch = () => {
+    const apikey = SUPABASE_KEY;
+    const session = getAccessToken();
+    const headers = {
+      'apikey': apikey,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    if (!headers['Prefer']) headers['Prefer'] = 'return=representation';
+    if (session) {
+      headers['Authorization'] = `Bearer ${session}`;
+    }
+    return fetch(`${SUPABASE_URL}${path}`, { method: options.method || 'GET', body: options.body, headers });
   };
-  if (!headers['Prefer']) headers['Prefer'] = 'return=representation';
-  if (session) {
-    headers['Authorization'] = `Bearer ${session}`;
+  let res = await doFetch();
+  if (res.status === 401) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) res = await doFetch();
   }
-  const res = await fetch(`${SUPABASE_URL}${path}`, { method: options.method || 'GET', body: options.body, headers });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Supabase API ${res.status} en ${path}: ${body.slice(0, 200)}`);
+    const err = new Error(`Supabase API ${res.status} en ${path}: ${body.slice(0, 200)}`);
+    err.status = res.status;
+    throw err;
   }
   return res;
 }
@@ -94,8 +103,9 @@ export async function fullDownload(onProgress) {
         let allData = [];
         let from = 0;
         const limit = 1000;
-        const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
-          ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+        const activeEmpId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+        const empresaFilter = BUSINESS_TABLES.has(tableName) && activeEmpId
+          ? `&empresa_id=eq.${encodeURIComponent(activeEmpId)}`
           : '';
         while (true) {
           const res = await supabaseFetch(
@@ -258,8 +268,9 @@ export async function syncTable(tableName, force = false) {
 
   const promise = (async () => {
     try {
-      const empresaFilter = BUSINESS_TABLES.has(tableName) && window._currentEmpresaId
-        ? `&empresa_id=eq.${encodeURIComponent(window._currentEmpresaId)}`
+      const activeEmpId = window._currentEmpresaId || localStorage.getItem('current_empresa_id');
+      const empresaFilter = BUSINESS_TABLES.has(tableName) && activeEmpId
+        ? `&empresa_id=eq.${encodeURIComponent(activeEmpId)}`
         : '';
       let allData = [];
       let from = 0;

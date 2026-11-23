@@ -1,4 +1,7 @@
 import { supabase } from '../supabase.js';
+import { restFetch } from '../auth.js';
+import db from '../db.js';
+import { syncTable } from '../sync.js';
 import { renderDetalleMotor, initDetalleMotor } from './detalle_motor.js';
 import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
 
@@ -30,17 +33,20 @@ window.changeMotorsPage = async function(page, { silent = false } = {}) {
       </div>`;
   }
 
-  // Fetch maintenances to determine first-change 80h limit vs regular limit
-  const { data: mantsData } = await supabase.from('motor_mantenimientos').select('motor_id');
+  // Fetch maintenances and motors to determine first-change 80h limit and live counters
+  const [{ data: mantsData }, { data: allMotors }] = await Promise.all([
+    supabase.from('motor_mantenimientos').select('motor_id'),
+    supabase.from('motores').select('id, horas, max_horas')
+  ]);
   const mantMotorIds = new Set((mantsData || []).map(x => x.motor_id).filter(Boolean));
   const getMotorMaxHours = (m) => (mantMotorIds.has(m.id) ? (m.max_horas || 100) : 80);
 
-  // Re-fetch urgent IDs if needed
-  let urgentIds = [];
-  if (currentMotorsFilter === 'urgent') {
-    const { data } = await supabase.from('motores').select('id, horas, max_horas');
-    urgentIds = (data || []).filter(m => (m.horas || 0) >= getMotorMaxHours(m)).map(m => m.id);
-  }
+  const allCount = (allMotors || []).length;
+  const urgentIds = (allMotors || []).filter(m => (m.horas || 0) >= getMotorMaxHours(m)).map(m => m.id);
+  const countAllEl = document.getElementById('motores-count-all');
+  const countUrgentEl = document.getElementById('motores-count-urgent');
+  if (countAllEl) countAllEl.textContent = `Todos · ${allCount}`;
+  if (countUrgentEl) countUrgentEl.textContent = `Urgentes · ${urgentIds.length}`;
 
   const { data: equipos, count, error } = await buildQuery(urgentIds)
     .order('created_at', { ascending: false })
@@ -81,6 +87,13 @@ function buildQuery(urgentIds) {
 export async function renderMotores(page = 1, filter = 'all') {
   currentMotorsPage = page || 1;
   currentMotorsFilter = filter || 'all';
+
+  if (navigator.onLine) {
+    await Promise.all([
+      syncTable('motores', true),
+      syncTable('motor_mantenimientos', true)
+    ]).catch(() => {});
+  }
 
   // Fetch summary stats
   const [
@@ -142,10 +155,10 @@ export async function renderMotores(page = 1, filter = 'all') {
       <section style="position: sticky; top: 0; z-index: 20; background: #ffffff; padding: 10px 0 12px; margin: 0 0 12px;">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <button type="button" class="motores-card-filter press-effect" data-filter="all" style="padding: 8px 18px; border-radius: 9999px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid ${currentMotorsFilter === 'all' ? '#2d3e2c' : '#d5e0d4'}; background: ${currentMotorsFilter === 'all' ? '#2d3e2c' : '#f2f6f2'}; color: ${currentMotorsFilter === 'all' ? '#ffffff' : '#2d3e2c'}; transition: all 0.15s ease;">
-            <span>Todos · ${totalMachinery ?? (allMotors || []).length}</span>
+            <span id="motores-count-all">Todos · ${totalMachinery ?? (allMotors || []).length}</span>
           </button>
           <button type="button" class="motores-card-filter press-effect" data-filter="urgent" style="padding: 8px 18px; border-radius: 9999px; font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid ${currentMotorsFilter === 'urgent' ? '#9a3412' : '#f5d0b5'}; background: ${currentMotorsFilter === 'urgent' ? '#9a3412' : '#fff1e6'}; color: ${currentMotorsFilter === 'urgent' ? '#ffffff' : '#8a3b08'}; transition: all 0.15s ease;">
-            <span>Urgentes · ${urgentCount}</span>
+            <span id="motores-count-urgent">Urgentes · ${urgentCount}</span>
           </button>
         </div>
       </section>
@@ -177,18 +190,19 @@ export async function renderMotores(page = 1, filter = 'all') {
         }
         .motor-list-sheet {
           position: fixed;
+          top: 0;
           left: 0;
           right: 0;
           bottom: 0;
           background: #ffffff;
-          border-radius: 26px 26px 0 0;
+          border-radius: 0;
           padding: 0;
           z-index: 99991;
           transform: translateY(100%);
           transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.16);
-          height: 92vh;
-          max-height: 92vh;
+          height: 100dvh;
+          max-height: 100dvh;
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -237,7 +251,7 @@ export async function renderMotores(page = 1, filter = 'all') {
       </style>
       <div id="motor-list-scrim" class="motor-list-scrim"></div>
       <div id="motor-list-sheet" class="motor-list-sheet">
-        <div style="flex-shrink: 0; background: #ffffff; padding: 10px 14px 10px; border-bottom: 1px solid #eef2ed;">
+        <div style="flex-shrink: 0; background: #ffffff; padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px; border-bottom: 1px solid #eef2ed;">
           <div style="width: 36px; height: 4px; background: #d0d7cf; border-radius: 9999px; margin: 0 auto 10px;"></div>
           <div style="display: flex; align-items: center; justify-content: space-between;">
             <span id="motor-list-sheet-title" style="font-size: 16px; font-weight: 800; color: #1e3e2b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 8px;">Detalle de Motor</span>
@@ -313,16 +327,42 @@ export function initMotores() {
 
   window.toggleActionMenu = (btn) => {
     const menu = btn.nextElementSibling;
+    if (!menu) return;
     const isActive = menu.classList.contains('active');
+    const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
     document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+    if (isMobile && window.openMobileMenuBottomSheet) {
+      const title = btn.closest('.motor-card-compact')?.dataset?.nombre || '';
+      window.openMobileMenuBottomSheet(menu, { title });
+      return;
+    }
     if (!isActive) menu.classList.add('active');
   };
 
   window.confirmDeleteMotor = (id, name) => {
     window.Snackbar.confirm(`¿Eliminar equipo ${name}?`, async () => {
-      const { error } = await supabase.from('motores').delete().eq('id', id);
-      if (error) window.Snackbar.show('Error: ' + error.message, { type: 'error' });
-      else { window.Snackbar.show('Motor eliminado'); window.navigateTo('motores'); }
+      try {
+        const deleted = await restFetch(`/rest/v1/motores?id=eq.${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+        if (navigator.onLine && (!Array.isArray(deleted) || deleted.length === 0)) {
+          throw new Error('No se pudo eliminar el equipo en Supabase (verifica permisos o sesión)');
+        }
+        await db.motores.delete(id).catch(() => {});
+        const queued = await db._sync_queue.toArray().catch(() => []);
+        const queueIds = queued.filter(q => String(q.record_id) === String(id)).map(q => q.id);
+        if (queueIds.length) await db._sync_queue.bulkDelete(queueIds).catch(() => {});
+        window.clearScreenCache?.('motores');
+        window.clearScreenCache?.('detalle_motor');
+        if (navigator.onLine) {
+          await syncTable('motores', true).catch(() => {});
+        }
+        window.Snackbar.show('Motor eliminado');
+        await window.refreshMotoresList?.();
+      } catch (err) {
+        console.error('Error eliminando motor:', err);
+        window.Snackbar.show('Error: ' + (err?.message || err), { type: 'error' });
+      }
     });
   };
 
@@ -442,14 +482,14 @@ function renderMotorCard(eq, customMaxHours = null) {
         </div>
         <!-- More Actions -->
         <div style="position: relative;">
-          <button onclick="event.stopPropagation(); window.toggleActionMenu(this)" style="border: none; background: transparent; color: #666; cursor: pointer; padding: 8px; border-radius: 50%;">
+          <button type="button" class="ganado-btn-more" onclick="event.stopPropagation(); window.toggleActionMenu(this)" style="border: none; background: transparent; color: #666; cursor: pointer; padding: 8px; border-radius: 50%;">
             <span class="material-icons">more_vert</span>
           </button>
           <div class="action-menu" style="right: 0; bottom: auto; top: 100%;">
             <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_motor', '${eq.id}')">
               <span class="material-icons">edit</span><span>Editar</span>
             </button>
-            <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteMotor('${eq.id}', '${eq.nombre}')">
+            <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeleteMotor('${eq.id}', '${String(eq.nombre || '').replace(/'/g, "\\'")}')">
               <span class="material-icons">delete</span><span>Eliminar</span>
             </button>
           </div>

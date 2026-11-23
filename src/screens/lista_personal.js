@@ -520,7 +520,7 @@ export function initListaPersonal() {
   };
 
   window.openPersonalCard = async (id) => {
-    const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+    const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
     if (!isMobile || typeof window.openSubBottomSheet !== 'function') {
       window.navigateTo('detalle_personal', id, 'personal');
       return;
@@ -618,7 +618,7 @@ export function initListaPersonal() {
   window.toggleActionMenu = (btn) => {
     const menu = btn.nextElementSibling;
     if (!menu) return;
-    const isMobile = window.innerWidth <= 768 || window.matchMedia?.('(pointer: coarse)')?.matches;
+    const isMobile = window.innerWidth <= 1024 || window.matchMedia?.('(pointer: coarse)')?.matches;
     if (isMobile && window.openMobileMenuBottomSheet) {
       document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
       window.openMobileMenuBottomSheet(menu);
