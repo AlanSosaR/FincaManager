@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import db from '../db.js';
 import { parsePersonalGasto } from './gastos.js';
 import { showModal, closeModal } from '../modals.js';
+import { getRemovedWorkDaysSet, isWorkDayRemoved, unmarkWorkDayRemoved, dpFirstName, removeWorkerDayCompletely } from '../utils/personal_work_flags.js';
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const DAYS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
@@ -35,6 +36,41 @@ function dpEscapeHtml(s) {
 
 function dpNormText(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function dpFormatLatas(val) {
+  const n = Math.round((Number(val) || 0) * 4) / 4;
+  if (n <= 0) return '0';
+  const whole = Math.floor(n);
+  const frac = Math.round((n - whole) * 4);
+  const fracStr = frac === 1 ? '¼' : frac === 2 ? '½' : frac === 3 ? '¾' : '';
+  if (whole === 0) return fracStr || '0';
+  return fracStr ? `${whole} ${fracStr}` : String(whole);
+}
+
+function dpGetMondayIso(dateIso) {
+  const p = String(dateIso || '').slice(0, 10).split('-').map(Number);
+  if (p.length !== 3 || !p[0] || !p[1] || !p[2]) return '';
+  const d = new Date(p[0], p[1] - 1, p[2]);
+  const dow = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - dow);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function dpFormatWeekTitleFromIso(wsIso) {
+  const p = String(wsIso || '').slice(0, 10).split('-').map(Number);
+  if (p.length !== 3 || !p[0] || !p[1] || !p[2]) return '';
+  const s = new Date(p[0], p[1] - 1, p[2]);
+  const e = new Date(p[0], p[1] - 1, p[2]);
+  e.setDate(e.getDate() + 6);
+  const mS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  if (s.getFullYear() !== e.getFullYear()) {
+    return `${s.getDate()} ${mS[s.getMonth()]} ${s.getFullYear()} – ${e.getDate()} ${mS[e.getMonth()]} ${e.getFullYear()}`;
+  }
+  if (s.getMonth() !== e.getMonth()) {
+    return `${s.getDate()} ${mS[s.getMonth()]} – ${e.getDate()} ${mS[e.getMonth()]} ${e.getFullYear()}`;
+  }
+  return `${s.getDate()} – ${e.getDate()} ${mS[e.getMonth()]} ${e.getFullYear()}`;
 }
 
 function dpStripTags(s) {
@@ -120,6 +156,7 @@ async function persistAsistencia(personalId, empresaId, dateStr, wantWork) {
       }
       preferredPairIndex = idx;
       localStorage.setItem('asistencia_pair_idx', String(idx));
+      if (wantWork) unmarkWorkDayRemoved(empresaId, personalId, dateStr);
       return targetEstado;
     } catch (err) {
       lastErr = err;
@@ -182,7 +219,36 @@ async function fetchActividadesMap(personalId, empresaId, personaNombre) {
     const map = {};
 
     (apps || []).forEach(a => {
-      if (String(a.observaciones || '').startsWith('[COSECHA_JSON]')) return;
+      const obsStr = String(a.observaciones || '');
+      if (obsStr.startsWith('[COSECHA_JSON]')) {
+        const fecha = (a.fecha || '').slice(0, 10);
+        if (!fecha) return;
+        let parsed = null;
+        try { parsed = JSON.parse(obsStr.slice('[COSECHA_JSON]'.length)); } catch (_) {}
+        if (!parsed || !Array.isArray(parsed.registros)) return;
+        const matchingRegs = parsed.registros.filter(r => {
+          if ((Number(r?.latas) || 0) <= 0) return false;
+          const pidMatch = Boolean(personalId && r.personal_id && String(r.personal_id) === String(personalId));
+          const nameMatch = Boolean(normNombre && r.nombre && dpNormText(r.nombre) === normNombre);
+          return pidMatch || nameMatch;
+        });
+        if (!matchingRegs.length) return;
+        const latas = matchingRegs.reduce((s, r) => s + (Number(r.latas) || 0), 0);
+        const precioLata = Number(parsed.precio_lata) || 40;
+        const earned = Math.round(latas * precioLata);
+        if (!map[fecha]) map[fecha] = [];
+        map[fecha].push({
+          tipo: 'Cosecha de café',
+          producto: `${dpFormatLatas(latas)} ${latas === 1 ? 'lata' : 'latas'} · L ${earned.toLocaleString('es-HN')}`,
+          lote_nombre: loteMap[a.lote_id] || '',
+          lote_id: a.lote_id || '',
+          source: 'cosecha',
+          latas,
+          precio_lata: precioLata,
+          earned
+        });
+        return;
+      }
       const fecha = (a.fecha || '').slice(0, 10);
       if (!fecha) return;
       const est = String(a.estado || '');
@@ -319,6 +385,9 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId, 
   const actividadesMap = await fetchActividadesMap(personalId, empresaId, persona.nombre);
   window._currentActividadesMap = actividadesMap;
 
+  const eidForFlags = empresaId || persona?.empresa_id || '';
+  const removedDaysSet = getRemovedWorkDaysSet(eidForFlags, personalId);
+
   const asisList = Array.isArray(asistencia) ? asistencia : [];
   const asisMap = {};
   asisList.forEach(a => {
@@ -329,7 +398,7 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId, 
   const today = new Date();
   const month = today.getMonth();
   const year = today.getFullYear();
-  const initialSummaryHtml = renderSummary(asisList, persona.pago_diario, month, year, today, actividadesMap, initView, persona, gastosPersonal);
+  const initialSummaryHtml = renderSummary(asisList, persona.pago_diario, month, year, today, actividadesMap, initView, persona, gastosPersonal, removedDaysSet);
   const initialFooterAction = window._currentDpSummary?.footerAction || null;
   const initialDesktopFooterHtml = renderDesktopFooterAction(initialFooterAction);
   const initialTitle = initView === 'all'
@@ -340,10 +409,11 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId, 
   const initialCalHtml = initView === 'all'
     ? renderAllPaymentsView(window._currentDpSummary?.allPaidMovs || [], window._currentDpSummary?.totalDaysAll || 0, persona?.nombre || '')
     : initView === 'day'
-      ? renderDayView(today, asisMap, actividadesMap)
-      : renderMonthView(month, year, asisMap, actividadesMap);
+      ? renderDayView(today, asisMap, actividadesMap, removedDaysSet)
+      : renderMonthView(month, year, asisMap, actividadesMap, removedDaysSet);
   const todayStrInit = fmtDate(today);
-  const initialFooterHtml = renderDayActionsBar(asisMap[todayStrInit], false, (actividadesMap[todayStrInit] || []).length > 0, initialFooterAction);
+  const hasTodayActiveAct = (actividadesMap[todayStrInit] || []).length > 0 && !removedDaysSet.has(todayStrInit);
+  const initialFooterHtml = renderDayActionsBar(asisMap[todayStrInit], false, hasTodayActiveAct, initialFooterAction);
   window._dpPreloaded = { personalId, persona, asisData: asisList, gastosPersonal, actividadesMap };
 
   return `
@@ -352,6 +422,7 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId, 
       .dp-cal-views { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
       .dp-cal-views::-webkit-scrollbar { display: none; }
       .dp-cal-views .cal-view-btn { white-space: nowrap; flex-shrink: 0; }
+      #dp-mobile-footer-bar:empty { display: none !important; }
     </style>
     <div class="m3-pt-6 m3-pb-24 m3-p-4 m3-font-work-sans dp-screen-pad">
       <!-- embed personalId for init -->
@@ -405,6 +476,7 @@ export async function renderDetallePersonal(personalId, returnScreen, returnId, 
 
 function dpActIcon(source) {
   if (source === 'potrero') return '🐄';
+  if (source === 'cosecha') return '☕';
   if (source === 'otro') return '📋';
   return '🌱';
 }
@@ -414,7 +486,7 @@ function dpActLocationLabel(a) {
   return a.source === 'potrero' ? `Potrero: ${dpEscapeHtml(a.lote_nombre)}` : `Lote: ${dpEscapeHtml(a.lote_nombre)}`;
 }
 
-function renderMonthView(month, year, asisMap, actividadesMap = {}) {
+function renderMonthView(month, year, asisMap, actividadesMap = {}, removedDaysSet = null) {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   const startPad = firstDay.getDay();
@@ -445,8 +517,9 @@ function renderMonthView(month, year, asisMap, actividadesMap = {}) {
     const estado = asisMap[dateStr];
     const actividades = actividadesMap[dateStr] || [];
     const hasActividad = actividades.length > 0;
-    const effectiveWork = isTrabajo(estado) || hasActividad;
-    const effectiveRest = !hasActividad && isDescanso(estado);
+    const hasEffectiveAct = hasActividad && !removedDaysSet?.has(dateStr);
+    const effectiveWork = isTrabajo(estado) || hasEffectiveAct;
+    const effectiveRest = !hasEffectiveAct && isDescanso(estado);
     const isToday = dateStr === todayStr;
     let cls = 'cal-day';
     if (isToday) cls += ' cal-day-today';
@@ -458,16 +531,14 @@ function renderMonthView(month, year, asisMap, actividadesMap = {}) {
     if (diaSem === 0) cls += ' cal-day-sun';
 
     const tipHtml = hasActividad
-      ? actividades.map(a => `${dpActIcon(a.source)} ${dpEscapeHtml(a.tipo)}${a.producto ? ': <b>'+dpEscapeHtml(a.producto)+'</b>' : ''}${a.lote_nombre ? '<br><span style="font-size:11px;opacity:0.6;">'+dpActLocationLabel(a)+'</span>' : ''}`).join('<hr style="border:none;border-top:1px solid rgba(45,62,44,0.12);margin:6px 0;">')
+      ? actividades.map(a => `${dpEscapeHtml(a.tipo)}${a.producto ? ': <b>'+dpEscapeHtml(a.producto)+'</b>' : ''}${a.lote_nombre ? '<br><span style="font-size:11px;opacity:0.6;">'+dpActLocationLabel(a)+'</span>' : ''}`).join('<hr style="border:none;border-top:1px solid rgba(45,62,44,0.12);margin:6px 0;">')
       : '';
     const safeHtml = tipHtml.replace(/"/g, '&quot;');
-    const dayBadge = hasActividad ? dpActIcon(actividades[0]?.source) : '';
 
     html += `<div class="${cls}" onclick="window.__calToggleDay('${dateStr}')" ${tipHtml ? `onmouseenter="window.__calShowTip(event)" onmouseleave="window.__calHideTip()" data-tip="${safeHtml}"` : ''}>
       <span class="cal-day-num">${d}</span>
       <div class="cal-day-badges">
         ${(effectiveWork || effectiveRest) ? `<span class="cal-day-label cal-badge-asistencia">${effectiveWork ? '✔' : '✘'}</span>` : ''}
-        ${hasActividad ? `<span class="cal-day-label cal-badge-actividad">${dayBadge}</span>` : ''}
       </div>
     </div>`;
   }
@@ -476,7 +547,7 @@ function renderMonthView(month, year, asisMap, actividadesMap = {}) {
   return html;
 }
 
-function renderWeekView(weekStart, asisMap, actividadesMap = {}) {
+function renderWeekView(weekStart, asisMap, actividadesMap = {}, removedDaysSet = null) {
   const today = new Date();
   const todayStr = fmtDate(today);
   const weekDays = [];
@@ -514,8 +585,9 @@ function renderWeekView(weekStart, asisMap, actividadesMap = {}) {
     const estado = asisMap[dateStr];
     const actividades = actividadesMap[dateStr] || [];
     const hasActividad = actividades.length > 0;
-    const effectiveWork = isTrabajo(estado) || hasActividad;
-    const effectiveRest = !hasActividad && isDescanso(estado);
+    const hasEffectiveAct = hasActividad && !removedDaysSet?.has(dateStr);
+    const effectiveWork = isTrabajo(estado) || hasEffectiveAct;
+    const effectiveRest = !hasEffectiveAct && isDescanso(estado);
     const isToday = dateStr === todayStr;
     let cls = 'cal-day';
     if (isToday) cls += ' cal-day-today';
@@ -525,16 +597,14 @@ function renderWeekView(weekStart, asisMap, actividadesMap = {}) {
     if (d.getDay() === 0) cls += ' cal-day-sun';
 
     const tipHtml = hasActividad
-      ? actividades.map(a => `${dpActIcon(a.source)} ${dpEscapeHtml(a.tipo)}${a.producto ? ': <b>'+dpEscapeHtml(a.producto)+'</b>' : ''}${a.lote_nombre ? '<br><span style="font-size:11px;opacity:0.8;">'+dpActLocationLabel(a)+'</span>' : ''}`).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,0.12);margin:6px 0;">')
+      ? actividades.map(a => `${dpEscapeHtml(a.tipo)}${a.producto ? ': <b>'+dpEscapeHtml(a.producto)+'</b>' : ''}${a.lote_nombre ? '<br><span style="font-size:11px;opacity:0.8;">'+dpActLocationLabel(a)+'</span>' : ''}`).join('<hr style="border:none;border-top:1px solid rgba(255,255,255,0.12);margin:6px 0;">')
       : '';
     const safeHtml = tipHtml.replace(/"/g, '&quot;');
-    const dayBadge = hasActividad ? dpActIcon(actividades[0]?.source) : '';
 
     html += `<div class="${cls}" onclick="window.__calToggleDay('${dateStr}')" ${tipHtml ? `onmouseenter="window.__calShowTip(event)" onmouseleave="window.__calHideTip()" data-tip="${safeHtml}"` : ''}>
       <span class="cal-day-num">${d.getDate()}</span>
       <div class="cal-day-badges">
         ${(effectiveWork || effectiveRest) ? `<span class="cal-day-label cal-badge-asistencia">${effectiveWork ? '✔' : '✘'}</span>` : ''}
-        ${hasActividad ? `<span class="cal-day-label cal-badge-actividad">${dayBadge}</span>` : ''}
       </div>
     </div>`;
   });
@@ -543,8 +613,29 @@ function renderWeekView(weekStart, asisMap, actividadesMap = {}) {
   return html;
 }
 
-function buildFooterCuentasButtonHtml(footerAction, compact = false) {
+function buildFooterCuentasButtonHtml(footerAction, compact = false, singleLine = false) {
   if (!footerAction) return '';
+  if (singleLine) {
+    if (footerAction.isUpdate) {
+      return `
+        <button type="button" class="dp-footer-cuentas-btn" onclick="${footerAction.onclick}" style="width:100%; min-height:46px; padding:10px 16px; border-radius:999px; border:none; background:#b34200; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:14.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; cursor:pointer; box-sizing:border-box; box-shadow:0 3px 10px rgba(179,66,0,0.22);">
+          <span>${dpEscapeHtml(footerAction.label)} · ${dpEscapeHtml(footerAction.prevAmountText)} → ${dpEscapeHtml(footerAction.amountText)}</span>
+        </button>
+      `;
+    }
+    if (footerAction.isDelete) {
+      return `
+        <button type="button" class="dp-footer-cuentas-btn" onclick="${footerAction.onclick}" style="width:100%; min-height:46px; padding:10px 16px; border-radius:999px; border:1.5px solid #ba1a1a; background:#fee2e2; color:#ba1a1a; font-family:'Work Sans',sans-serif; font-size:14.5px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px; white-space:nowrap; cursor:pointer; box-sizing:border-box;">
+          <span>Eliminar en Cuentas · ${dpEscapeHtml(footerAction.amountText)}</span>
+        </button>
+      `;
+    }
+    return `
+      <button type="button" class="dp-footer-cuentas-btn" onclick="${footerAction.onclick}" style="width:100%; min-height:46px; padding:10px 18px; border-radius:999px; border:none; background:#16a34a; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:15px; font-weight:800; display:flex; align-items:center; justify-content:center; white-space:nowrap; cursor:pointer; box-sizing:border-box; box-shadow:0 3px 10px rgba(22,163,74,0.28);">
+        <span>Enviar a Cuentas · ${dpEscapeHtml(footerAction.amountText)}</span>
+      </button>
+    `;
+  }
   if (compact) {
     if (footerAction.isUpdate) {
       return `
@@ -611,55 +702,59 @@ function renderDayActionsBar(estado, isFuture = false, hasActividad = false, foo
   const isWork = isTrabajo(estado) || Boolean(hasActividad);
   const isRest = !hasActividad && isDescanso(estado);
 
-  if (!footerAction) {
-    if (isFuture) {
+  if (isWork) {
+    if (footerAction) {
       return `
-        <div class="dp-day-actions-bar" style="display:flex;justify-content:center;gap:12px;box-sizing:border-box;">
-          <button class="cal-view-btn" disabled style="padding:10px 24px;opacity:0.45;cursor:not-allowed;pointer-events:none;">✘ Descanso</button>
-          <button class="cal-view-btn" disabled style="padding:10px 24px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;opacity:0.45;cursor:not-allowed;pointer-events:none;">✔ Trabajó</button>
+        <div class="dp-day-actions-bar dp-footer-single-cuentas" style="display:block;width:100%;box-sizing:border-box;">
+          ${buildFooterCuentasButtonHtml(footerAction, false, true)}
         </div>
       `;
     }
-    const restStyle = hasActividad
-      ? 'padding:10px 24px;opacity:0.45;'
-      : isRest
-        ? 'padding:10px 24px;background:#dc2626;color:#ffffff;border-color:#dc2626;box-shadow:0 3px 10px rgba(220,38,38,0.25);'
-        : 'padding:10px 24px;';
-    const workStyle = isWork
-      ? 'padding:10px 24px;background:#16a34a;color:#ffffff;border-color:#16a34a;box-shadow:0 3px 10px rgba(22,163,74,0.28);'
-      : isRest
-        ? 'padding:10px 24px;background:#ffffff;color:#2d3e2c;border-color:#d5e0d4;'
-        : 'padding:10px 24px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;';
+    return '';
+  }
+
+  if (!footerAction) {
+    if (isFuture) {
+      return `
+        <div class="dp-day-actions-bar" style="display:flex;justify-content:center;gap:10px;box-sizing:border-box;">
+          <button class="cal-view-btn" disabled style="padding:10px 14px;opacity:0.45;cursor:not-allowed;pointer-events:none;">✘ Descanso este día</button>
+          <button class="cal-view-btn" disabled style="padding:10px 14px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;opacity:0.45;cursor:not-allowed;pointer-events:none;">✔ Trabajó este día</button>
+        </div>
+      `;
+    }
+    const restStyle = isRest
+      ? 'padding:10px 14px;background:#dc2626;color:#ffffff;border-color:#dc2626;box-shadow:0 3px 10px rgba(220,38,38,0.25);'
+      : 'padding:10px 14px;';
+    const workStyle = isRest
+      ? 'padding:10px 14px;background:#ffffff;color:#2d3e2c;border-color:#d5e0d4;'
+      : 'padding:10px 14px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;';
 
     return `
-      <div class="dp-day-actions-bar" style="display:flex;justify-content:center;gap:12px;box-sizing:border-box;">
-        <button class="cal-view-btn ${isRest ? 'active' : ''}" onclick="window.__calSetDayEstado('descanso')" style="${restStyle}">${isRest ? '✘ Descansó' : '✘ Descanso'}</button>
-        <button class="cal-view-btn ${isWork ? 'active' : ''}" onclick="window.__dpOpenWorkSheet()" style="${workStyle}">${isWork ? '✔ Trabajado' : '✔ Trabajó'}</button>
+      <div class="dp-day-actions-bar" style="display:flex;justify-content:center;gap:10px;box-sizing:border-box;">
+        <button class="cal-view-btn ${isRest ? 'active' : ''}" onclick="window.__calSetDayEstado('descanso')" style="${restStyle}">${isRest ? '✘ Descansó este día' : '✘ Descanso este día'}</button>
+        <button class="cal-view-btn" onclick="window.__dpOpenWorkSheet()" style="${workStyle}">✔ Trabajó este día</button>
       </div>
     `;
   }
 
-  const workBtnLabel = isWork ? '✔ Trabajado' : '✔ Trabajó';
-  const swipeWorkBg = isWork
-    ? 'background:#16a34a;color:#ffffff;border-color:#16a34a;box-shadow:0 3px 10px rgba(22,163,74,0.28);'
-    : isRest
-      ? 'background:#ffffff;color:#2d3e2c;border-color:#d5e0d4;'
-      : 'background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;';
+  const swipeWorkBg = isRest
+    ? 'background:#ffffff;color:#2d3e2c;border-color:#d5e0d4;'
+    : 'background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;';
 
   const rightSlotHtml = isFuture
-    ? `<button type="button" class="cal-view-btn" disabled style="width:100%;min-height:46px;padding:10px 12px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;opacity:0.45;cursor:not-allowed;pointer-events:none;box-sizing:border-box;">✔ Trabajó</button>`
+    ? `<button type="button" class="cal-view-btn" disabled style="width:100%;min-height:46px;padding:10px 10px;background:#2d3e2c;color:#ffffff;border-color:#2d3e2c;opacity:0.45;cursor:not-allowed;pointer-events:none;box-sizing:border-box;">✔ Trabajó este día</button>`
     : `
       <div class="dp-work-swipe-wrap" style="position:relative;overflow:hidden;border-radius:999px;min-height:46px;width:100%;box-sizing:border-box;">
-        <div class="dp-work-swipe-bg" style="position:absolute;inset:0;border-radius:999px;background:#dc2626;color:#ffffff;display:flex;align-items:center;justify-content:flex-start;padding-left:14px;font-family:'Work Sans',sans-serif;font-size:13px;font-weight:800;pointer-events:none;opacity:0;transition:opacity .12s ease;white-space:nowrap;">✘ Descanso</div>
-        <button type="button" class="cal-view-btn dp-work-swipe-btn ${isWork ? 'active' : ''}" style="${swipeWorkBg}position:relative;z-index:2;width:100%;height:100%;min-height:46px;margin:0;padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:pan-y;user-select:none;-webkit-user-select:none;will-change:transform;transition:transform .18s cubic-bezier(0.22,1,0.36,1);box-sizing:border-box;">
-          <span>${workBtnLabel}</span>
+        <div class="dp-work-swipe-bg" style="position:absolute;inset:0;border-radius:999px;background:#dc2626;color:#ffffff;display:flex;align-items:center;justify-content:flex-start;padding-left:14px;font-family:'Work Sans',sans-serif;font-size:12.5px;font-weight:800;pointer-events:none;opacity:0;transition:opacity .12s ease;white-space:nowrap;">✘ Descanso este día</div>
+        <button type="button" class="cal-view-btn dp-work-swipe-btn" style="${swipeWorkBg}position:relative;z-index:2;width:100%;height:100%;min-height:46px;margin:0;padding:10px 10px;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:pan-y;user-select:none;-webkit-user-select:none;will-change:transform;transition:transform .18s cubic-bezier(0.22,1,0.36,1);box-sizing:border-box;">
+          <span>✔ Trabajó este día</span>
           <span aria-hidden="true" style="opacity:0.6;font-size:15px;line-height:1;">›</span>
         </button>
       </div>
     `;
 
   return `
-    <div class="dp-day-actions-bar dp-footer-has-cuentas" style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:10px;width:100%;align-items:stretch;box-sizing:border-box;">
+    <div class="dp-day-actions-bar dp-footer-has-cuentas" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.08fr);gap:10px;width:100%;align-items:stretch;box-sizing:border-box;">
       ${buildFooterCuentasButtonHtml(footerAction, true)}
       ${rightSlotHtml}
     </div>
@@ -798,56 +893,76 @@ function renderAllPaymentsView(allPaidMovs = [], totalDaysAll = 0, personaNombre
   `;
 }
 
-function renderDayView(date, asisMap, actividadesMap = {}) {
+function renderDayView(date, asisMap, actividadesMap = {}, removedDaysSet = null) {
   const dateStr = fmtDate(date);
   const estado = asisMap[dateStr];
   const actividades = actividadesMap[dateStr] || [];
   const hasActividad = actividades.length > 0;
-  const hasCafe = actividades.some(a => !a.source || a.source === 'cafetal');
-  const hasPot = actividades.some(a => a.source === 'potrero');
-  const hasOtro = actividades.some(a => a.source === 'otro');
   const today = new Date();
   const todayStr = fmtDate(today);
   const isToday = dateStr === todayStr;
-
-  const actHeaderLabel = (hasCafe && !hasPot && !hasOtro)
-    ? '🌱 Actividades en cafetal'
-    : (hasPot && !hasCafe && !hasOtro)
-      ? '🐄 Actividades en potreros'
-      : '📋 Actividades del día';
-
-  const statusPillLabel = (hasCafe && hasPot)
-    ? 'Trabajó este día (Cafetal y potrero)'
-    : (hasCafe && !hasPot && !hasOtro)
-      ? 'Trabajó este día (Actividad en cafetal)'
-      : (hasPot && !hasCafe && !hasOtro)
-        ? 'Trabajó este día (Actividad en potrero)'
-        : 'Trabajó este día (Actividad registrada)';
-
-  const actividadesHtml = hasActividad ? `
-    <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--m3-outline-variant);text-align:left;">
-      <p style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--m3-on-surface-variant);letter-spacing:0.5px;margin-bottom:10px;">${actHeaderLabel}</p>
-      ${actividades.map(a => `
-        <div style="background:rgba(45,62,44,0.06);border-left:3px solid #2d3e2c;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
-          <p style="font-size:13px;font-weight:700;color:var(--m3-on-surface);margin:0 0 2px;">${dpActIcon(a.source)} ${dpEscapeHtml(a.tipo)}${a.producto ? ': ' + dpEscapeHtml(a.producto) : ''}</p>
-          ${a.lote_nombre ? `<p style="font-size:12px;color:var(--m3-on-surface-variant);margin:0;">${dpActLocationLabel(a)}</p>` : ''}
-        </div>
-      `).join('')}
-    </div>
-  ` : '';
-
   const isFuture = dateStr > todayStr;
+  const isRemovedDay = Boolean(removedDaysSet?.has(dateStr));
+  const hasEffectiveWork = isTrabajo(estado) || (hasActividad && !isRemovedDay);
+  const canSwipeRemove = !isFuture && hasEffectiveWork;
 
-  let controlsHtml = '';
-  if (hasActividad) {
-    controlsHtml = `
-      <div style="margin-top:8px;display:flex;justify-content:center;">
-        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(45,62,44,0.08);border:1.5px solid var(--m3-primary);border-radius:9999px;padding:8px 20px;color:var(--m3-primary);font-weight:700;font-size:13.5px;">
-          <span class="material-symbols-outlined" style="font-size:18px;">task_alt</span>
-          <span>${statusPillLabel}</span>
+  const wrapSwipeCard = (innerBodyHtml) => {
+    if (!canSwipeRemove) {
+      return `
+        <div style="background:rgba(45,62,44,0.06);border-left:3px solid #2d3e2c;border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+          ${innerBodyHtml}
+        </div>
+      `;
+    }
+    return `
+      <div class="dp-act-swipe-wrap" data-date="${dateStr}" style="position:relative;overflow:hidden;border-radius:10px;margin-bottom:8px;">
+        <div class="dp-act-swipe-bg" style="position:absolute;inset:0;background:#dc2626;color:#ffffff;display:flex;align-items:center;justify-content:flex-start;gap:6px;padding-left:14px;font-family:'Work Sans',sans-serif;font-size:13px;font-weight:700;opacity:0;transition:opacity .12s ease;pointer-events:none;">
+          <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
+          <span>Quitar día trabajado</span>
+        </div>
+        <div class="dp-act-swipe-card" style="position:relative;z-index:2;background:#f2f5f1;border-left:3px solid #2d3e2c;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;touch-action:pan-y;user-select:none;-webkit-user-select:none;will-change:transform;transition:transform .18s cubic-bezier(0.22,1,0.36,1);cursor:grab;">
+          <div style="min-width:0;flex:1;">
+            ${innerBodyHtml}
+          </div>
+          <span aria-hidden="true" style="color:#9aa598;font-size:18px;line-height:1;flex-shrink:0;">›</span>
         </div>
       </div>
     `;
+  };
+
+  let actividadesHtml = '';
+  if (hasActividad) {
+    actividadesHtml = `
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--m3-outline-variant);text-align:left;">
+        ${actividades.map(a => {
+          if (a.source === 'cosecha') {
+            const lTxt = `${dpFormatLatas(a.latas)} ${Number(a.latas) === 1 ? 'lata' : 'latas'}`;
+            return wrapSwipeCard(`
+              <p style="font-size:13px;font-weight:700;color:var(--m3-on-surface);margin:0 0 2px;">${dpEscapeHtml(a.tipo)}: <span style="color:#1b6e1b;font-weight:800;">${dpEscapeHtml(lTxt)}</span> · <span style="color:#b34200;font-weight:800;">L ${Number(a.earned || 0).toLocaleString('es-HN')}</span></p>
+              ${a.lote_nombre ? `<p style="font-size:12px;color:var(--m3-on-surface-variant);margin:0;">${dpActLocationLabel(a)}</p>` : ''}
+            `);
+          }
+          return wrapSwipeCard(`
+            <p style="font-size:13px;font-weight:700;color:var(--m3-on-surface);margin:0 0 2px;">${dpEscapeHtml(a.tipo)}${a.producto ? ': ' + dpEscapeHtml(a.producto) : ''}</p>
+            ${a.lote_nombre ? `<p style="font-size:12px;color:var(--m3-on-surface-variant);margin:0;">${dpActLocationLabel(a)}</p>` : ''}
+          `);
+        }).join('')}
+      </div>
+    `;
+  } else if (canSwipeRemove) {
+    actividadesHtml = `
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--m3-outline-variant);text-align:left;">
+        ${wrapSwipeCard(`
+          <p style="font-size:13px;font-weight:700;color:var(--m3-on-surface);margin:0 0 2px;">Asistencia registrada</p>
+          <p style="font-size:12px;color:var(--m3-on-surface-variant);margin:0;">Desliza a la derecha para quitar este día</p>
+        `)}
+      </div>
+    `;
+  }
+
+  let controlsHtml = '';
+  if (!isFuture && hasEffectiveWork) {
+    controlsHtml = '';
   } else if (isFuture) {
     controlsHtml = `
       <div style="margin-top:14px;display:flex;justify-content:center;">
@@ -862,14 +977,16 @@ function renderDayView(date, asisMap, actividadesMap = {}) {
   }
 
   return `
-    <div style="text-align:center; padding:10px 0 20px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 4px 16px;">
+    <div style="text-align:center; padding:4px 0 12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:2px 4px 10px;">
         <button type="button" onclick="window.__calNavigate(-1)" aria-label="Día anterior" style="width:38px; height:38px; border-radius:50%; border:1px solid #d5e2d2; background:#f2f6f1; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
           <span class="material-symbols-outlined" style="font-size:21px;">chevron_left</span>
         </button>
         <div style="text-align:center; flex:1;">
-          <div style="font-size:14.5px; font-weight:700; color:#2d3e2c;">${DAYS_FULL[date.getDay()]}</div>
-          <div style="font-size:48px; font-weight:800; line-height:1.08; margin:2px 0; color:${isToday ? '#ff7a2f' : 'var(--m3-on-surface)'};">${date.getDate()}</div>
+          <div style="font-size:14.5px; font-weight:700; color:#2d3e2c; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
+            <span>${DAYS_FULL[date.getDay()]}</span>${(!isFuture && hasEffectiveWork) ? `<span style="color:#9aa598;">·</span><span style="display:inline-flex; align-items:center; gap:3px; color:#156a2c;"><span class="material-symbols-outlined" style="font-size:16px; font-weight:700;">check</span><span>Trabajó</span></span>` : ''}
+          </div>
+          <div style="font-size:42px; font-weight:800; line-height:1.08; margin:2px 0; color:${isToday ? '#ff7a2f' : 'var(--m3-on-surface)'};">${date.getDate()}</div>
           <div style="font-size:15px; font-weight:700; color:#2d3e2c;">${MONTHS[date.getMonth()]} ${date.getFullYear()}</div>
         </div>
         <button type="button" onclick="window.__calNavigate(1)" aria-label="Día siguiente" style="width:38px; height:38px; border-radius:50%; border:1px solid #d5e2d2; background:#f2f6f1; color:#2d3e2c; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
@@ -882,7 +999,7 @@ function renderDayView(date, asisMap, actividadesMap = {}) {
   `;
 }
 
-function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividadesMap = {}, currentView = 'month', persona = {}, gastosPersonal = []) {
+function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividadesMap = {}, currentView = 'month', persona = {}, gastosPersonal = [], removedDaysSet = null) {
   const diario = Number(pagoDiario || 0);
   const trabajados = (asistencia || []).filter(a => isTrabajo(a.estado));
 
@@ -904,31 +1021,43 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
   const trabajadosFechas = new Set(
     trabajados.map(a => (a.fecha || '').slice(0, 10)).filter(Boolean)
   );
-  const actividadesFechas = Object.keys(actividadesMap || {}).map(f => f.slice(0, 10)).filter(Boolean);
+  const actividadesEntries = Object.entries(actividadesMap || {});
+  const actividadesFechas = actividadesEntries
+    .map(([f]) => f.slice(0, 10))
+    .filter(f => f && !removedDaysSet?.has(f));
+  const jornalActFechas = actividadesEntries
+    .filter(([, list]) => Array.isArray(list) && list.some(a => a.source !== 'cosecha'))
+    .map(([f]) => f.slice(0, 10))
+    .filter(f => f && !removedDaysSet?.has(f));
   const todasFechas = new Set([...trabajadosFechas, ...actividadesFechas]);
+  const jornalFechas = new Set([...trabajadosFechas, ...jornalActFechas]);
   const totalDaysAll = todasFechas.size;
 
-  const weekDates = [...todasFechas].filter(fechaStr => {
+  const inWeekRange = (fechaStr) => {
     const parts = fechaStr.split('-').map(Number);
     if (parts.length < 3 || isNaN(parts[0])) return false;
     const d = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
     return d >= weekStart && d <= weekEnd;
-  });
-
-  const monthDates = [...todasFechas].filter(fechaStr => {
+  };
+  const inMonthRange = (fechaStr) => {
     const parts = fechaStr.split('-').map(Number);
     if (parts.length < 3 || isNaN(parts[0])) return false;
     return (parts[1] - 1) === targetMonth && parts[0] === targetYear;
-  });
+  };
+
+  const weekDates = [...todasFechas].filter(inWeekRange);
+  const weekJornalDates = [...jornalFechas].filter(inWeekRange);
+  const monthDates = [...todasFechas].filter(inMonthRange);
+  const monthJornalDates = [...jornalFechas].filter(inMonthRange);
 
   const daysThisWeek = weekDates.length;
-  const weekTotal = daysThisWeek * diario;
+  const weekTotal = weekJornalDates.length * diario;
   const daysThisMonth = monthDates.length;
-  const monthTotal = daysThisMonth * diario;
+  const monthTotal = monthJornalDates.length * diario;
 
   const targetDateStr = fmtDate(targetDate);
   const isDayWorked = todasFechas.has(targetDateStr);
-  const dayTotal = isDayWorked ? diario : 0;
+  const dayTotal = jornalFechas.has(targetDateStr) ? diario : 0;
 
   let periodTitle = '';
   let periodDaysText = '';
@@ -1121,7 +1250,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
     curWe.setDate(curWs.getDate() + 6);
     const curWsStr = fmtDate(curWs);
     const curWeStr = fmtDate(curWe);
-    const curDays = [...todasFechas].filter(f => f >= curWsStr && f <= curWeStr).length;
+    const curDays = [...jornalFechas].filter(f => f >= curWsStr && f <= curWeStr).length;
     curWeekGross = curDays * diario;
     const curWeekMatches = findWeekMatches(curWs, curWe);
     curWeekMatched = curWeekMatches[0] || null;
@@ -1150,6 +1279,54 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
     pendienteMostrar = periodTotal;
   }
 
+  const weekStartIso = fmtDate(weekStart);
+  const weekEndIso = fmtDate(weekEnd);
+  const monthYmStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+  let cosechaLatasInPeriod = 0;
+  let cosechaEarnedInPeriod = 0;
+  const cosechaWeekMap = new Map();
+  actividadesEntries.forEach(([rawF, list]) => {
+    const dIso = String(rawF || '').slice(0, 10);
+    if (!dIso || !Array.isArray(list)) return;
+    const inPeriod = currentView === 'all'
+      ? true
+      : currentView === 'day'
+        ? dIso === targetDateStr
+        : currentView === 'week'
+          ? (dIso >= weekStartIso && dIso <= weekEndIso)
+          : dIso.slice(0, 7) === monthYmStr;
+    list.forEach(a => {
+      if (a?.source !== 'cosecha') return;
+      const latas = Number(a.latas) || 0;
+      const earned = Number(a.earned) || 0;
+      if (inPeriod) {
+        cosechaLatasInPeriod += latas;
+        cosechaEarnedInPeriod += earned;
+      }
+      const wsIso = dpGetMondayIso(dIso);
+      if (!wsIso) return;
+      const loteId = String(a.lote_id || '');
+      const key = `${loteId}::${wsIso}`;
+      let grp = cosechaWeekMap.get(key);
+      if (!grp) {
+        grp = {
+          loteId,
+          loteNombre: String(a.lote_nombre || ''),
+          wsIso,
+          totalLatas: 0,
+          totalEarned: 0,
+          inPeriod: false
+        };
+        cosechaWeekMap.set(key, grp);
+      }
+      grp.totalLatas += latas;
+      grp.totalEarned += earned;
+      if (!grp.loteNombre && a.lote_nombre) grp.loteNombre = String(a.lote_nombre);
+      if (inPeriod) grp.inPeriod = true;
+    });
+  });
+  cosechaEarnedInPeriod = Math.round(cosechaEarnedInPeriod);
+
   // Compute Total pagado en el período (Personal + Cosecha)
   let paidPersonal = 0;
   let paidCosecha = 0;
@@ -1160,7 +1337,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
       else paidPersonal += amt;
     }
   } else if (currentView === 'month') {
-    const ymStr = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+    const ymStr = monthYmStr;
     const mNameLow = MONTHS[targetMonth].toLowerCase();
     for (const m of allPaidMovs) {
       const amt = Number(m.monto) || 0;
@@ -1182,12 +1359,11 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
       }
     }
   } else if (currentView === 'week') {
-    const wStartStr = fmtDate(weekStart);
     paidPersonal = isMatchedNonDraft
       ? (Number(matchedGasto.monto) || 0)
       : (!matchedGasto ? weekDayPaidTotal : 0);
     for (const m of allPaidMovs) {
-      if (m._kind === 'cosecha' && m._wsIso === wStartStr) {
+      if (m._kind === 'cosecha' && m._wsIso === weekStartIso) {
         paidCosecha += Number(m.monto) || 0;
       }
     }
@@ -1203,10 +1379,64 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
         paidCosecha += Number(m.monto) || 0;
       }
     }
+    if (paidCosecha === 0 && cosechaEarnedInPeriod > 0) {
+      let weekCosPaid = 0;
+      for (const m of allPaidMovs) {
+        if (m._kind === 'cosecha' && m._wsIso === weekStartIso) {
+          weekCosPaid += Number(m.monto) || 0;
+        }
+      }
+      if (weekCosPaid > 0) {
+        paidCosecha = Math.min(cosechaEarnedInPeriod, weekCosPaid);
+      }
+    }
   }
   paidPersonal = Math.round(paidPersonal);
   paidCosecha = Math.round(paidCosecha);
   const paidInPeriod = Math.round(paidPersonal + paidCosecha);
+
+  const pidStr = String(persona?.id || '').trim();
+  const normPersonaName = dpNormText(persona?.nombre || '');
+  const cosechaGastosAll = (gastosPersonal || []).filter(g => g && String(g.categoria || '').toLowerCase() === 'cosecha');
+  const pendingCosechaGroups = [];
+  for (const grp of cosechaWeekMap.values()) {
+    if (!grp.inPeriod) continue;
+    const refTag = pidStr ? `[ref:cosecha_${grp.loteId || ''}_${pidStr}_${grp.wsIso}]` : '';
+    const matchesGroup = (x) => {
+      const desc = String(x.descripcion || '');
+      if (refTag && desc.includes(refTag)) return true;
+      const m = desc.match(/\[ref:cosecha_([^_]*)_(.+)_(\d{4}-\d{2}-\d{2})\]/);
+      if (m) {
+        const gLote = String(m[1] || '');
+        const gWorker = String(m[2] || '').trim();
+        const gWs = String(m[3] || '');
+        const sameLote = !grp.loteId || gLote === String(grp.loteId);
+        const sameWorker = (pidStr && gWorker === pidStr) || (normPersonaName && dpNormText(gWorker) === normPersonaName);
+        return sameLote && sameWorker && gWs === grp.wsIso;
+      }
+      const sameLoteCol = !grp.loteId || String(x.lote_id || '') === String(grp.loteId);
+      const sameName = normPersonaName && dpNormText(desc).includes(normPersonaName);
+      const hasWs = desc.includes(grp.wsIso);
+      return sameLoteCol && sameName && hasWs;
+    };
+    const matches = cosechaGastosAll.filter(matchesGroup);
+    const existing = matches.find(x => !String(x.descripcion || '').includes('[Por Aprobar]')) || matches[0] || null;
+    const isDraft = Boolean(existing && String(existing.descripcion || '').includes('[Por Aprobar]'));
+    const targetMonto = Math.round(grp.totalEarned);
+    const existingMonto = Math.round(Number(existing?.monto) || 0);
+    const needsSync = (!existing && targetMonto > 0)
+      || (existing && isDraft && targetMonto > 0)
+      || (existing && existingMonto !== targetMonto);
+    if (needsSync) {
+      pendingCosechaGroups.push({
+        ...grp,
+        refTag,
+        existing,
+        isDraft,
+        targetMonto
+      });
+    }
+  }
 
   // Compute Footer Action (Enviar / Actualizar / Eliminar en Cuentas)
   const dupAttr = JSON.stringify(duplicateGastoIds).replace(/"/g, '&quot;');
@@ -1290,6 +1520,27 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
     }
   }
 
+  if (!footerAction && pendingCosechaGroups.length > 0) {
+    const hasApprovedExisting = pendingCosechaGroups.some(g => g.existing && !g.isDraft);
+    const prevTotal = Math.round(pendingCosechaGroups.reduce((s, g) => s + (g.existing && !g.isDraft ? (Number(g.existing.monto) || 0) : 0), 0));
+    const newTotal = Math.round(pendingCosechaGroups.reduce((s, g) => s + g.targetMonto, 0));
+    if (hasApprovedExisting) {
+      footerAction = {
+        label: 'Actualizar en Cuentas',
+        isUpdate: true,
+        prevAmountText: `L ${prevTotal.toLocaleString('es-HN')}`,
+        amountText: `L ${newTotal.toLocaleString('es-HN')}`,
+        onclick: 'window.__enviarCosechaAGastos()'
+      };
+    } else {
+      footerAction = {
+        label: 'Enviar a Cuentas',
+        amountText: `L ${newTotal.toLocaleString('es-HN')}`,
+        onclick: 'window.__enviarCosechaAGastos()'
+      };
+    }
+  }
+
   window._currentDpSummary = {
     periodTotal,
     periodDaysText,
@@ -1303,16 +1554,21 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
     allPaidMovs,
     totalDaysAll,
     paidInPeriod,
-    pendienteMostrar
+    pendienteMostrar,
+    pendingCosechaGroups
   };
 
-  const cardLabel = currentView === 'all'
-    ? 'Total pagado · Histórico'
+  const periodSuffix = currentView === 'all'
+    ? 'Histórico'
     : currentView === 'day'
-      ? 'Total pagado · Día'
+      ? 'Día'
       : currentView === 'week'
-        ? 'Total pagado · Semana'
-        : 'Total pagado · Mes';
+        ? 'Semana'
+        : 'Mes';
+
+  const cardLabel = `Total pagado · ${periodSuffix}`;
+  const cardAmountDisplay = paidInPeriod;
+  const cardAmountColor = paidInPeriod > 0 ? '#1b6e1b' : '#111827';
 
   let bottomLineHtml = '';
   if (paidPersonal > 0 && paidCosecha > 0) {
@@ -1330,10 +1586,22 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
         <button type="button" onclick="window.closeSubBottomSheet?.(); window.navigateTo('gastos')" style="background:none; border:none; font-size:12px; font-weight:800; color:#2d3e2c; cursor:pointer; text-decoration:underline; padding:0; white-space:nowrap;">Ver en Cuentas →</button>
       </div>
     `;
+  } else if (pendingCosechaGroups.length > 0) {
+    bottomLineHtml = `<span style="font-size:12px; color:#8a4b24; font-weight:600;">Pendiente de enviar a Cuentas (${dpFormatLatas(cosechaLatasInPeriod)} ${cosechaLatasInPeriod === 1 ? 'lata' : 'latas'})</span>`;
   } else if (pendienteMostrar > 0) {
     bottomLineHtml = `<span style="font-size:12px; color:#8a4b24; font-weight:600;">Pendiente de enviar a Cuentas (${periodDaysText})</span>`;
   } else {
     bottomLineHtml = `<span style="font-size:12px; color:#5a6b58; font-weight:500;">Sin pagos registrados en este período</span>`;
+  }
+
+  if (paidInPeriod > 0 && pendingCosechaGroups.length > 0) {
+    const cosPendingAmt = Math.round(pendingCosechaGroups.reduce((s, g) => s + g.targetMonto, 0));
+    const cosActionWord = pendingCosechaGroups.some(g => g.existing && !g.isDraft) ? 'actualizar' : 'enviar';
+    bottomLineHtml += `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:6px; padding-top:6px; border-top:1px dashed rgba(0,0,0,0.08);">
+        <span style="font-size:12px; color:#8a4b24; font-weight:600;">Cosecha pendiente de ${cosActionWord} a Cuentas (${dpFormatLatas(cosechaLatasInPeriod)} ${cosechaLatasInPeriod === 1 ? 'lata' : 'latas'} · L${cosPendingAmt.toLocaleString('es-HN')})</span>
+      </div>
+    `;
   }
 
   return `
@@ -1353,7 +1621,7 @@ function renderSummary(asistencia, pagoDiario, month, year, weekDate, actividade
       <div class="m3-p-4 m3-bg-surface-container m3-rounded-2xl" style="display: flex; flex-direction: column; justify-content: space-between;">
         <div>
           <p class="m3-label-small m3-text-on-surface-variant" style="margin: 0;">${cardLabel}</p>
-          <p class="m3-title-large m3-font-bold" style="margin: 4px 0 0 0; color: ${paidInPeriod > 0 ? '#1b6e1b' : '#111827'};">L${paidInPeriod.toLocaleString('es-HN')}</p>
+          <p class="m3-title-large m3-font-bold" style="margin: 4px 0 0 0; color: ${cardAmountColor};">L${cardAmountDisplay.toLocaleString('es-HN')}</p>
         </div>
         <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.07);">
           ${bottomLineHtml}
@@ -1517,6 +1785,109 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
   }
   bindDpWorkFooterSwipe();
 
+  function bindDpActivityCardSwipe() {
+    const wraps = document.querySelectorAll('#cal-container .dp-act-swipe-wrap');
+    wraps.forEach(wrap => {
+      if (wrap.dataset.actSwipeBound === '1') return;
+      wrap.dataset.actSwipeBound = '1';
+      const card = wrap.querySelector('.dp-act-swipe-card');
+      const bg = wrap.querySelector('.dp-act-swipe-bg');
+      const dateIso = wrap.dataset.date;
+      if (!card || !bg || !dateIso) return;
+
+      let startX = 0;
+      let startY = 0;
+      let dragging = false;
+      let isSwiping = false;
+      let lastDx = 0;
+
+      const resetVisual = () => {
+        card.style.transition = 'transform .18s cubic-bezier(0.22,1,0.36,1)';
+        card.style.transform = 'translateX(0)';
+        bg.style.opacity = '0';
+      };
+
+      const startDrag = (x, y) => {
+        startX = x;
+        startY = y;
+        dragging = true;
+        isSwiping = false;
+        lastDx = 0;
+        card.style.transition = 'none';
+      };
+
+      const moveDrag = (x, y) => {
+        if (!dragging) return;
+        const dx = x - startX;
+        const dy = y - startY;
+        if (!isSwiping) {
+          if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
+            dragging = false;
+            return;
+          }
+          if (dx > 8 && dx > Math.abs(dy) * 1.1) {
+            isSwiping = true;
+          }
+        }
+        if (isSwiping) {
+          const maxPull = Math.max(120, wrap.offsetWidth * 0.65);
+          lastDx = Math.max(0, Math.min(maxPull, dx));
+          card.style.transform = `translateX(${lastDx}px)`;
+          bg.style.opacity = String(Math.min(1, lastDx / 48));
+        }
+      };
+
+      const endDrag = () => {
+        if (!dragging) return;
+        dragging = false;
+        const threshold = Math.max(72, Math.min(130, wrap.offsetWidth * 0.34));
+        const shouldRemove = isSwiping && lastDx >= threshold;
+        isSwiping = false;
+        lastDx = 0;
+        resetVisual();
+        if (shouldRemove) {
+          window.__calConfirmRemoveWorkedDay?.(dateIso);
+        }
+      };
+
+      wrap.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        e.stopPropagation();
+        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+      wrap.addEventListener('touchmove', (e) => {
+        if (!dragging || e.touches.length !== 1) return;
+        e.stopPropagation();
+        moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+      wrap.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+        endDrag();
+      }, { passive: true });
+      wrap.addEventListener('touchcancel', () => {
+        dragging = false;
+        isSwiping = false;
+        lastDx = 0;
+        resetVisual();
+      }, { passive: true });
+
+      wrap.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        startDrag(e.clientX, e.clientY);
+        const onMouseMove = (ev) => moveDrag(ev.clientX, ev.clientY);
+        const onMouseUp = () => {
+          window.removeEventListener('mousemove', onMouseMove);
+          window.removeEventListener('mouseup', onMouseUp);
+          endDrag();
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+      });
+    });
+  }
+  bindDpActivityCardSwipe();
+
   async function refreshCalendar(fromMemory = false) {
     let persona = _persona || {};
     let asisData = Array.isArray(_asisData) ? _asisData : [];
@@ -1552,9 +1923,12 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
       if (f) asisMap[f] = a.estado;
     });
 
+    const eidForFlags = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || persona?.empresa_id || '';
+    const removedDaysSet = getRemovedWorkDaysSet(eidForFlags, _personalId);
+
     const summary = document.getElementById('cal-summary');
     if (summary) {
-      summary.innerHTML = renderSummary(asisData, persona?.pago_diario, calDate.getMonth(), calDate.getFullYear(), calDate, actividadesMap, currentView, persona, _gastosPersonal);
+      summary.innerHTML = renderSummary(asisData, persona?.pago_diario, calDate.getMonth(), calDate.getFullYear(), calDate, actividadesMap, currentView, persona, _gastosPersonal, removedDaysSet);
       const subEl = document.getElementById('dp-header-subtitle');
       if (subEl && window._currentDpSummary) {
         subEl.textContent = `${window._currentDpSummary.periodDaysText} · Pago por día: L${Number(window._currentDpSummary.diario || 0).toLocaleString('es-HN')}`;
@@ -1566,12 +1940,13 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
       if (currentView === 'all') {
         calContainer.innerHTML = renderAllPaymentsView(window._currentDpSummary?.allPaidMovs || [], window._currentDpSummary?.totalDaysAll || 0, persona?.nombre || '');
       } else if (currentView === 'month') {
-        calContainer.innerHTML = renderMonthView(calDate.getMonth(), calDate.getFullYear(), asisMap, actividadesMap);
+        calContainer.innerHTML = renderMonthView(calDate.getMonth(), calDate.getFullYear(), asisMap, actividadesMap, removedDaysSet);
       } else if (currentView === 'week') {
-        calContainer.innerHTML = renderWeekView(getWeekStart(calDate), asisMap, actividadesMap);
+        calContainer.innerHTML = renderWeekView(getWeekStart(calDate), asisMap, actividadesMap, removedDaysSet);
       } else {
-        calContainer.innerHTML = renderDayView(calDate, asisMap, actividadesMap);
+        calContainer.innerHTML = renderDayView(calDate, asisMap, actividadesMap, removedDaysSet);
       }
+      bindDpActivityCardSwipe();
     }
 
     const navRow = document.querySelector('.dp-cal-nav-row');
@@ -1587,7 +1962,8 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
     if (mobileFooter) {
       const selStr = fmtDate(calDate);
       const isSelFuture = selStr > fmtDate(new Date());
-      mobileFooter.innerHTML = renderDayActionsBar(asisMap[selStr], isSelFuture, (actividadesMap[selStr] || []).length > 0, footerAct);
+      const hasActiveWorkedAct = (actividadesMap[selStr] || []).length > 0 && !removedDaysSet.has(selStr);
+      mobileFooter.innerHTML = renderDayActionsBar(asisMap[selStr], isSelFuture, hasActiveWorkedAct, footerAct);
       bindDpWorkFooterSwipe();
     }
 
@@ -1632,6 +2008,7 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
     let isHoriz = false;
     swipeEl.addEventListener('touchstart', (e) => {
       if (e.touches.length !== 1 || currentView === 'all') return;
+      if (e.target.closest?.('.dp-act-swipe-wrap')) return;
       sx = e.touches[0].clientX;
       sy = e.touches[0].clientY;
       tracking = true;
@@ -1994,16 +2371,16 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
         return;
       }
 
+      const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || _persona?.empresa_id || '';
       if (dateStr > todayStr) {
         window.Snackbar?.show('No se puede registrar asistencia en fechas futuras', { type: 'warning' });
         return;
       }
-      if (_currentActividadesMap[dateStr]?.length > 0) {
+      if (_currentActividadesMap[dateStr]?.length > 0 && !isWorkDayRemoved(empresaId, _personalId, dateStr)) {
         window.Snackbar?.show('Este día ya cuenta como trabajado por actividad registrada');
         return;
       }
 
-      const empresaId = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || '';
       const existentes = await restFetch(`/rest/v1/personal_asistencia?personal_id=eq.${encodeURIComponent(_personalId)}&fecha=eq.${dateStr}&select=*`).catch(() => []);
       const existente = (Array.isArray(existentes) ? existentes[0] : existentes) || null;
 
@@ -2104,10 +2481,11 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
       }
 
       const wantWork = isTrabajo(estado);
+      const eidCheck = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || _persona?.empresa_id || '';
       const dayActs = _currentActividadesMap[dateStr] || [];
-      const hasLinkedAreaAct = dayActs.some(a => !a.source || a.source === 'cafetal' || a.source === 'potrero');
-      if (!wantWork && hasLinkedAreaAct) {
-        window.Snackbar?.show('Este día ya cuenta como trabajado por actividad registrada en cafetal o potrero');
+      const hasLinkedAreaAct = dayActs.some(a => !a.source || a.source === 'cafetal' || a.source === 'potrero' || a.source === 'cosecha');
+      if (!wantWork && hasLinkedAreaAct && !isWorkDayRemoved(eidCheck, _personalId, dateStr)) {
+        window.Snackbar?.show('Este día ya cuenta como trabajado por actividad o cosecha registrada');
         return;
       }
       if (wantWork) {
@@ -2138,6 +2516,69 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
         window.Snackbar?.show('Error al registrar asistencia: ' + msg, { type: 'error' });
       }
     }
+  };
+
+  window.__calConfirmRemoveWorkedDay = (dateStr) => {
+    const iso = String(dateStr || '').slice(0, 10);
+    if (!iso) return;
+    const parts = iso.split('-').map(Number);
+    const dNum = parts[2] || '';
+    const mIdx = (parts[1] || 1) - 1;
+    const acts = _currentActividadesMap[iso] || [];
+    const cosechaActs = acts.filter(a => a?.source === 'cosecha');
+    const totalLatas = cosechaActs.reduce((s, a) => s + (Number(a.latas) || 0), 0);
+    const hasOtherActs = acts.some(a => !a.source || a.source === 'cafetal' || a.source === 'potrero' || a.source === 'otro');
+
+    let subText = 'Se eliminará la asistencia de este día y volverá a quedar sin registrar.';
+    if (totalLatas > 0 && hasOtherActs) {
+      const lTxt = `${dpFormatLatas(totalLatas)} ${totalLatas === 1 ? 'lata' : 'latas'}`;
+      subText = `Se eliminará la asistencia, la cosecha registrada (${lTxt}) y las actividades de este día.`;
+    } else if (totalLatas > 0) {
+      const lTxt = `${dpFormatLatas(totalLatas)} ${totalLatas === 1 ? 'lata' : 'latas'}`;
+      subText = `Se eliminará la asistencia y la cosecha registrada (${lTxt}) de este día.`;
+    } else if (hasOtherActs) {
+      subText = 'Se eliminará la asistencia y se quitará al colaborador de las actividades de este día.';
+    }
+
+    const firstName = dpFirstName(_persona?.nombre || '') || 'este colaborador';
+    const msgHtml = `<div><div style="font-weight:800;font-size:15px;color:#111827;margin-bottom:3px;">¿Quitar el día ${dNum} de ${dpEscapeHtml(firstName)}?</div><div style="font-size:13px;color:#4b5563;">${dpEscapeHtml(subText)}</div></div>`;
+    let busy = false;
+
+    window.Snackbar?.dismissAll();
+    window.Snackbar?.confirm(msgHtml, null, null, {
+      theme: 'white',
+      persist: true,
+      actions: [
+        {
+          text: 'Cancelar',
+          style: 'flex:1 1 0; background:#f5f7f3; color:#2d3e2c; border:1px solid #d0dad0; border-radius:9999px; padding:9px 14px; font-weight:700; cursor:pointer;',
+          onClick: () => {}
+        },
+        {
+          text: 'Quitar día',
+          style: 'flex:1 1 0; background:#dc2626; color:#ffffff; border:none; border-radius:9999px; padding:9px 14px; font-weight:700; cursor:pointer;',
+          onClick: async () => {
+            if (busy) return;
+            busy = true;
+            try {
+              const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || _persona?.empresa_id || '';
+              await removeWorkerDayCompletely({
+                personalId: _personalId,
+                personaNombre: _persona?.nombre || '',
+                empresaId: eid,
+                dateStr: iso
+              });
+              await refreshCalendar();
+              await window._refreshListaPersonalView?.();
+              window.Snackbar?.show(`Día ${dNum} de ${MONTHS[mIdx] || ''} eliminado`);
+            } catch (err) {
+              console.error('Error removing worked day:', err);
+              window.Snackbar?.show('Error al quitar el día: ' + (err?.message || 'Error desconocido'), { type: 'error' });
+            }
+          }
+        }
+      ]
+    });
   };
 
   window.__enviarPeriodoAGastos = async (isUpdate = false, existingGastoId = null, forcedTotal = null, duplicateIds = [], overrideView = null) => {
@@ -2379,6 +2820,94 @@ export function initDetallePersonal(personalId, returnScreen, returnId, { initia
     } catch (err) {
       console.error('Error in __enviarPeriodoAGastos:', err);
       window.Snackbar?.show('Error: ' + (err.message || 'Error desconocido'), { type: 'error' });
+    }
+  };
+
+  window.__enviarCosechaAGastos = async () => {
+    if (window._dpSendingCosecha) return;
+    const summary = window._currentDpSummary;
+    const groups = summary?.pendingCosechaGroups || [];
+    if (!groups.length) return;
+    const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || _persona?.empresa_id;
+    if (!eid) {
+      window.Snackbar?.show('Error: No se identificó la empresa.', { type: 'error' });
+      return;
+    }
+
+    window._dpSendingCosecha = true;
+    try {
+      let totalSent = 0;
+      let anyUpdate = false;
+      for (const g of groups) {
+        const weekTitle = dpFormatWeekTitleFromIso(g.wsIso);
+        const latasTxt = dpFormatLatas(g.totalLatas);
+        const unitTxt = g.totalLatas === 1 ? 'lata' : 'latas';
+        const desc = `Cosecha ${weekTitle} · ${summary.personaNombre || 'Colaborador'} (${latasTxt} ${unitTxt})${g.refTag ? ' ' + g.refTag : ''}`.trim();
+        if (g.existing?.id) {
+          if (g.targetMonto <= 0) {
+            await restFetch(`/rest/v1/gastos?id=eq.${encodeURIComponent(g.existing.id)}`, { method: 'DELETE' });
+            try { await db.table('gastos').delete(g.existing.id); } catch(e) {}
+            anyUpdate = true;
+          } else {
+            const updateBody = { monto: g.targetMonto, descripcion: desc };
+            await restFetch(`/rest/v1/gastos?id=eq.${encodeURIComponent(g.existing.id)}`, {
+              method: 'PATCH',
+              body: JSON.stringify(updateBody)
+            });
+            try { await db.table('gastos').update(g.existing.id, updateBody); } catch(e) {}
+            totalSent += g.targetMonto;
+            if (!g.isDraft) anyUpdate = true;
+          }
+        } else if (g.targetMonto > 0) {
+          const insertBody = {
+            empresa_id: eid,
+            lote_id: g.loteId || null,
+            fecha: fmtDate(new Date()),
+            categoria: 'Cosecha',
+            descripcion: desc,
+            monto: g.targetMonto
+          };
+          const insertRes = await restInsert('/rest/v1/gastos', insertBody);
+          try {
+            const newId = insertRes?.id || crypto.randomUUID();
+            await db.table('gastos').put({ id: newId, ...insertBody, created_at: new Date().toISOString() });
+          } catch(e) {}
+          totalSent += g.targetMonto;
+        }
+      }
+
+      window.clearScreenCache?.('gastos');
+      window.clearScreenCache?.('personal');
+      window.clearScreenCache?.('dashboard');
+      window.clearScreenCache?.('detalle_lote');
+      await refreshCalendar();
+
+      window.Snackbar?.dismissAll();
+      window.Snackbar?.show(
+        totalSent <= 0
+          ? '✔ Registro de cosecha eliminado en Cuentas'
+          : `✔ ${anyUpdate ? 'Actualizado' : 'Enviado'} a Cuentas: L${totalSent.toLocaleString('es-HN')}`,
+        {
+          theme: 'white',
+          actions: [
+            {
+              text: 'Ver en Cuentas →',
+              style: 'background: #2d3e2c; color: #ffffff; border-radius: 9999px; padding: 7px 16px; font-weight: 700; border: none; cursor: pointer;',
+              onClick: () => { window.closeSubBottomSheet?.(); window.navigateTo('gastos'); }
+            },
+            {
+              text: 'Cerrar',
+              style: 'background: transparent; color: #777; border: none; padding: 7px 12px; cursor: pointer;',
+              onClick: () => {}
+            }
+          ]
+        }
+      );
+    } catch (err) {
+      console.error('Error in __enviarCosechaAGastos:', err);
+      window.Snackbar?.show('Error al guardar en Cuentas: ' + (err.message || 'Error desconocido'), { type: 'error' });
+    } finally {
+      window._dpSendingCosecha = false;
     }
   };
 

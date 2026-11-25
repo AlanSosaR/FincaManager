@@ -1,5 +1,6 @@
 import { restFetch, restInsert } from '../auth.js';
 import { renderM3SearchBar, initM3FullScreenSearch } from '../components/m3_search.js';
+import { isWorkDayRemoved, unmarkWorkDayRemoved, dpFirstName, formatLatasShort, removeWorkerDayCompletely } from '../utils/personal_work_flags.js';
 
 let currentPersonalSearchQuery = '';
 let allPersonalData = [];
@@ -18,6 +19,16 @@ const LP_ESTADO_PAIRS = [
 
 function lpFmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function lpFormatLatas(val) {
+  const n = Math.round((Number(val) || 0) * 4) / 4;
+  if (n <= 0) return '0';
+  const whole = Math.floor(n);
+  const frac = Math.round((n - whole) * 4);
+  const fracStr = frac === 1 ? '¼' : frac === 2 ? '½' : frac === 3 ? '¾' : '';
+  if (whole === 0) return fracStr || '0';
+  return fracStr ? `${whole} ${fracStr}` : String(whole);
 }
 
 function lpIsTrabajo(e) {
@@ -86,6 +97,7 @@ async function lpPersistAsistencia(personalId, empresaId, dateStr, wantWork) {
         });
       }
       localStorage.setItem('asistencia_pair_idx', String(idx));
+      if (wantWork) unmarkWorkDayRemoved(empresaId, personalId, dateStr);
       return targetEstado;
     } catch (err) {
       lastErr = err;
@@ -127,6 +139,8 @@ function personalRowsHtml(list) {
               <p class="m3-body-medium m3-text-on-surface-variant" style="margin-bottom: 24px; max-width: 280px;">${currentPersonalSearchQuery ? 'Prueba con otro nombre o rol' : 'Agrega tu primer trabajador para comenzar a gestionar tu equipo'}</p>
             </div>`;
   }
+  const nowMenu = new Date();
+  const hoyCortoMenu = `${nowMenu.getDate()} ${LP_MONTHS_SHORT[nowMenu.getMonth()]}`;
   return list.map(p => {
     const info = _lpSummaryMap.get(String(p.id)) || { days: 0, pending: 0, paid: 0, diario: Number(p.pago_diario) || 0, todayEstado: null };
     let subtitleHtml = '';
@@ -163,6 +177,11 @@ function personalRowsHtml(list) {
             <button class="action-item" onclick="event.stopPropagation(); window.navigateTo('nuevo_personal', '${p.id}', 'personal')">
               <span class="material-icons">edit</span><span>Editar</span>
             </button>
+            ${lpIsTrabajo(info.todayEstado) ? `
+              <button class="action-item delete" onclick="event.stopPropagation(); window.confirmRemovePersonalToday('${p.id}', '${p.nombre.replace(/'/g, "\\'")}')">
+                <span class="material-icons">event_busy</span><span>Quitar día ${hoyCortoMenu}</span>
+              </button>
+            ` : ''}
             <button class="action-item delete" onclick="event.stopPropagation(); window.confirmDeletePersonal('${p.id}', '${p.nombre.replace(/'/g, "\\'")}')">
               <span class="material-icons">delete</span><span>Eliminar</span>
             </button>
@@ -239,10 +258,16 @@ export async function renderListaPersonal() {
 
     allPersonalData.forEach(p => {
       const pId = String(p.id);
+      const empIdForP = eid || p.empresa_id || '';
       const pAsis = asisList.filter(a => String(a.personal_id) === pId);
       const todayRec = pAsis.find(a => String(a.fecha || '').slice(0, 10) === _lpTodayStr);
+      const todayAsisWorked = Boolean(todayRec && lpIsTrabajo(todayRec.estado));
 
       let todayHasActivity = false;
+      let todayCosechaLatas = 0;
+      let todayHasNonCosechaAct = false;
+      let cosechaLatasWeek = 0;
+      let cosechaEarnedWeek = 0;
       const workedDates = new Set(
         pAsis.filter(a => lpIsTrabajo(a.estado)).map(a => String(a.fecha || '').slice(0, 10)).filter(Boolean)
       );
@@ -250,19 +275,53 @@ export async function renderListaPersonal() {
       appsList.forEach(app => {
         const f = String(app.fecha || '').slice(0, 10);
         if (!f || f < _lpWeekStartStr || f > _lpWeekEndStr) return;
-        if (String(app.observaciones || '').startsWith('[COSECHA_JSON]')) return;
+        const obsStr = String(app.observaciones || '');
+        if (obsStr.startsWith('[COSECHA_JSON]')) {
+          let parsed = null;
+          try { parsed = JSON.parse(obsStr.slice('[COSECHA_JSON]'.length)); } catch (_) {}
+          if (parsed && Array.isArray(parsed.registros)) {
+            const matchingRegs = parsed.registros.filter(r => {
+              if ((Number(r?.latas) || 0) <= 0) return false;
+              const pidMatch = Boolean(r.personal_id && String(r.personal_id) === pId);
+              const nameMatch = Boolean(pNomNorm && r.nombre && lpNormText(r.nombre) === pNomNorm);
+              return pidMatch || nameMatch;
+            });
+            if (matchingRegs.length > 0) {
+              const latas = matchingRegs.reduce((s, r) => s + (Number(r.latas) || 0), 0);
+              const pPrice = Number(parsed.precio_lata) || 40;
+              cosechaLatasWeek += latas;
+              cosechaEarnedWeek += Math.round(latas * pPrice);
+              if (f === _lpTodayStr) {
+                todayCosechaLatas += latas;
+                if (!isWorkDayRemoved(empIdForP, pId, _lpTodayStr)) {
+                  todayHasActivity = true;
+                }
+              }
+            }
+          }
+          return;
+        }
         const estado = String(app.estado || '');
         const isPerformed = estado === 'Aplicada' || estado === 'Realizada' || (f <= _lpTodayStr && estado !== 'Cancelada');
         if (!isPerformed) return;
         const pids = lpParsePersonalIds(app.personal_ids);
         const ops = lpExtractOperators(app);
         if (pids.includes(pId) || lpMatchesOperatorName(ops, pNomNorm)) {
-          workedDates.add(f);
-          if (f === _lpTodayStr) todayHasActivity = true;
+          const dayRemoved = isWorkDayRemoved(empIdForP, pId, f);
+          const hadAsisWorkOnF = pAsis.some(a => String(a.fecha || '').slice(0, 10) === f && lpIsTrabajo(a.estado));
+          if (!dayRemoved || hadAsisWorkOnF) {
+            workedDates.add(f);
+          }
+          if (f === _lpTodayStr) {
+            todayHasNonCosechaAct = true;
+            if (!dayRemoved) {
+              todayHasActivity = true;
+            }
+          }
         }
       });
 
-      const todayEstado = todayHasActivity ? 'trabajo' : (todayRec ? todayRec.estado : null);
+      const todayEstado = (todayAsisWorked || todayHasActivity) ? 'trabajo' : (todayRec ? todayRec.estado : null);
 
       const days = workedDates.size;
       const diario = Number(p.pago_diario) || 0;
@@ -287,7 +346,18 @@ export async function renderListaPersonal() {
         totalPorPagar += pending;
         colabPorPagar++;
       }
-      _lpSummaryMap.set(pId, { days, pending, paid, diario, todayEstado, todayFromActivity: todayHasActivity });
+      _lpSummaryMap.set(pId, {
+        days,
+        pending,
+        paid,
+        diario,
+        todayEstado,
+        todayFromActivity: todayHasActivity,
+        todayCosechaLatas,
+        todayHasNonCosechaAct,
+        cosechaLatas: cosechaLatasWeek,
+        cosechaEarned: cosechaEarnedWeek
+      });
     });
 
     const personal = filterPersonal();
@@ -616,6 +686,9 @@ export function initListaPersonal() {
             will-change: auto !important;
             padding-bottom: 88px !important;
           }
+          #m3-sub-action-sheet.open:has(#lp-sheet-dp-body):has(#dp-mobile-footer-bar:empty) {
+            padding-bottom: 24px !important;
+          }
           #lp-sheet-dp-body #dp-desktop-footer-bar { display: none !important; }
           #lp-sheet-dp-body .dp-screen-pad { padding: 0 0 24px 0 !important; }
           #lp-sheet-dp-body .m3-card {
@@ -665,6 +738,7 @@ export function initListaPersonal() {
           #lp-sheet-dp-body .dp-cal-views::-webkit-scrollbar { display: none; }
           #lp-sheet-dp-body .dp-cal-views .cal-view-btn { white-space: nowrap; flex-shrink: 0; }
           #lp-sheet-dp-body #dp-mobile-footer-bar { display: block !important; }
+          #lp-sheet-dp-body #dp-mobile-footer-bar:empty { display: none !important; }
           #lp-sheet-dp-body #cal-container .dp-day-actions-bar { display: none !important; }
           #lp-sheet-dp-body #dp-mobile-footer-bar .dp-day-actions-bar {
             position: fixed;
@@ -684,8 +758,9 @@ export function initListaPersonal() {
             justify-content: center;
             min-height: 46px;
             box-sizing: border-box;
-            padding: 12px 16px !important;
-            font-size: 14px !important;
+            padding: 12px 10px !important;
+            font-size: 13.5px !important;
+            white-space: nowrap;
           }
           #lp-sheet-dp-body .dp-day-actions-bar .dp-work-swipe-btn {
             padding: 10px 12px !important;
@@ -765,6 +840,82 @@ export function initListaPersonal() {
     itemSelector: '.lp-card',
     getItemTitle: (el) => el.querySelector('.m3-label-large')?.textContent?.trim() || ''
   });
+
+  window._refreshListaPersonalView = async () => {
+    const container = document.getElementById('screen-container');
+    if (!container || !container.querySelector('.lp-list')) return;
+    const freshHtml = await renderListaPersonal();
+    container.innerHTML = freshHtml;
+    initListaPersonal();
+  };
+
+  window.confirmRemovePersonalToday = (pId, nombre) => {
+    document.querySelectorAll('.action-menu.active').forEach(m => m.classList.remove('active'));
+    const escHtml = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    const info = _lpSummaryMap.get(String(pId)) || {};
+    const parts = String(_lpTodayStr || '').split('-').map(Number);
+    const dNum = parts[2] || new Date().getDate();
+    const mIdx = (parts[1] || (new Date().getMonth() + 1)) - 1;
+
+    const nLatas = Number(info.todayCosechaLatas) || 0;
+    const hasCosecha = nLatas > 0;
+    const hasOtherActs = Boolean(info.todayHasNonCosechaAct);
+
+    let subText = 'Se eliminará la asistencia de este día y volverá a quedar sin registrar.';
+    if (hasCosecha && hasOtherActs) {
+      const lTxt = `${formatLatasShort(nLatas)} ${nLatas === 1 ? 'lata' : 'latas'}`;
+      subText = `Se eliminará la asistencia, la cosecha registrada (${lTxt}) y las actividades de este día.`;
+    } else if (hasCosecha) {
+      const lTxt = `${formatLatasShort(nLatas)} ${nLatas === 1 ? 'lata' : 'latas'}`;
+      subText = `Se eliminará la asistencia y la cosecha registrada (${lTxt}) de este día.`;
+    } else if (hasOtherActs) {
+      subText = 'Se eliminará la asistencia y se quitará al colaborador de las actividades de este día.';
+    }
+
+    const firstName = dpFirstName(nombre) || 'este colaborador';
+    const msgHtml = `<div><div style="font-weight:800;font-size:15px;color:#111827;margin-bottom:3px;">¿Quitar el día ${dNum} de ${escHtml(firstName)}?</div><div style="font-size:13px;color:#4b5563;">${escHtml(subText)}</div></div>`;
+    let busy = false;
+
+    window.Snackbar?.dismissAll();
+    window.Snackbar?.confirm(msgHtml, null, null, {
+      theme: 'white',
+      persist: true,
+      actions: [
+        {
+          text: 'Cancelar',
+          style: 'flex:1 1 0; background:#f5f7f3; color:#2d3e2c; border:1px solid #d0dad0; border-radius:9999px; padding:9px 14px; font-weight:700; cursor:pointer;',
+          onClick: () => {}
+        },
+        {
+          text: 'Quitar día',
+          style: 'flex:1 1 0; background:#dc2626; color:#ffffff; border:none; border-radius:9999px; padding:9px 14px; font-weight:700; cursor:pointer;',
+          onClick: async () => {
+            if (busy) return;
+            busy = true;
+            try {
+              const p = (allPersonalData || []).find(x => String(x.id) === String(pId));
+              const eid = window._currentEmpresaId || localStorage.getItem('current_empresa_id') || p?.empresa_id || '';
+              await removeWorkerDayCompletely({
+                personalId: pId,
+                personaNombre: p?.nombre || nombre,
+                empresaId: eid,
+                dateStr: _lpTodayStr
+              });
+              await window._refreshListaPersonalView?.();
+              window.Snackbar?.show(`Día ${dNum} de ${LP_MONTHS_SHORT[mIdx] || ''} eliminado`);
+            } catch (err) {
+              console.error('Error removing today worked day:', err);
+              window.Snackbar?.show('Error al quitar el día: ' + (err?.message || 'Error desconocido'), { type: 'error' });
+            }
+          }
+        }
+      ]
+    });
+  };
 
   window.confirmDeletePersonal = (id, name) => {
     window.Snackbar.confirm(`¿Eliminar a ${name}?`, async () => {

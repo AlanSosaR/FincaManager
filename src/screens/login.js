@@ -3,7 +3,7 @@ import { login, restFetch } from '../auth.js';
 export async function renderLogin(showForm) {
   const showFormDirect = showForm === 'form';
   return `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:16px;">
+    <div class="login-page-shell">
       <div id="login-info-card" class="login-info-card" style="${showFormDirect ? 'display:none;' : ''}">
         <div class="login-decorative-blob"></div>
 

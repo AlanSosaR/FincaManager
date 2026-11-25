@@ -1175,6 +1175,17 @@ body.screen-auth #app .main-content {
 }
 
 /* ── Login Info Card ────────────────────────────────────────────────── */
+.login-page-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .login-info-card {
   position: relative;
   overflow: hidden;
@@ -1187,6 +1198,67 @@ body.screen-auth #app .main-content {
   display: flex;
   flex-direction: column;
   gap: 48px;
+}
+
+@media (max-width: 767px) {
+  .login-page-shell {
+    min-height: 100dvh;
+    justify-content: flex-start;
+    padding: 0;
+  }
+  .login-page-shell #login-form-card {
+    margin: auto 16px !important;
+    width: calc(100% - 32px) !important;
+  }
+  .login-info-card {
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    max-width: 100%;
+    min-height: 100dvh;
+    padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+    gap: 24px;
+    box-sizing: border-box;
+  }
+  .login-info-card .login-decorative-blob {
+    display: none;
+  }
+  .login-info-card .login-icon-box {
+    margin-bottom: 14px;
+  }
+  .login-info-card .login-icon-box .login-logo {
+    width: 64px;
+    height: 64px;
+  }
+  .login-info-card .login-info-content .m3-display-medium {
+    font-size: 32px;
+    line-height: 1.15;
+    margin-bottom: 10px !important;
+  }
+  .login-info-card .login-info-content .m3-body-large {
+    font-size: 14.5px;
+    line-height: 1.45;
+    margin-bottom: 0 !important;
+  }
+  .login-info-card .login-features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .login-info-card .login-feature-card {
+    aspect-ratio: auto;
+    min-height: 132px;
+    padding: 14px 10px;
+    box-sizing: border-box;
+  }
+  .login-info-card .login-feature-desc {
+    font-size: 11px;
+    line-height: 1.35;
+    margin-top: 4px;
+  }
+  .login-info-card .login-empezar-btn.mobile-btn {
+    margin-top: auto;
+    width: 100%;
+  }
 }
 
 @media (min-width: 768px) {

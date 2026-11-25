@@ -1307,17 +1307,25 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
               const isEd = editingDayIso === iso;
               const whole = Math.floor(l);
               const frac = Math.round((l - whole) * 4) / 4;
+              const rowWrapStyle = isEd
+                ? 'background:#fff7f0; border:1.5px solid #e8a472; border-radius:14px; padding:9px 10px; margin:4px 0;'
+                : `${i < 6 ? 'border-bottom:1px solid #f0f3ef;' : ''} padding:9px 2px;`;
+              const dayLblColor = isEd ? '#b34200' : '#4a5d48';
+              const dayLblWeight = isEd ? '800' : '700';
+              const barTrackBg = isEd ? '#f6dfd0' : '#e7ece5';
+              const barFillBg = isEd ? '#b34200' : '#2e7d32';
+              const latasLblColor = isEd ? '#b34200' : (l > 0 ? '#111827' : '#9ca3af');
               return `
-                <div style="${i < 6 ? 'border-bottom:1px solid #f0f3ef;' : ''} padding:9px 2px;">
+                <div style="${rowWrapStyle}">
                   <div class="cos-col-day-row" data-iso="${iso}" style="display:flex; align-items:center; gap:12px; cursor:pointer; user-select:none;">
-                    <span style="font-size:12px; font-weight:700; color:#4a5d48; width:52px; flex-shrink:0;">${DAYS_SHORT[d.getDay()]} ${d.getDate()}</span>
-                    <div style="flex:1; height:7px; background:#e7ece5; border-radius:999px; overflow:hidden;">
-                      ${pct > 0 ? `<div style="width:${pct}%; height:100%; background:#2e7d32; border-radius:999px;"></div>` : ''}
+                    <span style="font-size:12px; font-weight:${dayLblWeight}; color:${dayLblColor}; width:52px; flex-shrink:0;">${DAYS_SHORT[d.getDay()]} ${d.getDate()}</span>
+                    <div style="flex:1; height:7px; background:${barTrackBg}; border-radius:999px; overflow:hidden;">
+                      ${pct > 0 ? `<div style="width:${pct}%; height:100%; background:${barFillBg}; border-radius:999px;"></div>` : ''}
                     </div>
-                    <span style="font-size:13px; font-weight:800; color:${l > 0 ? '#111827' : '#9ca3af'}; width:70px; text-align:right; flex-shrink:0; white-space:nowrap;">${l > 0 ? `${formatLatas(l)} ${l === 1 ? 'lata' : 'latas'}` : '–'}</span>
+                    <span style="font-size:13px; font-weight:800; color:${latasLblColor}; width:70px; text-align:right; flex-shrink:0; white-space:nowrap;">${l > 0 ? `${formatLatas(l)} ${l === 1 ? 'lata' : 'latas'}` : '–'}</span>
                   </div>
                   ${isEd ? `
-                    <div style="margin-top:9px; background:#f4f7f3; border:1px solid #d5e2d2; border-radius:14px; padding:10px 12px;">
+                    <div style="margin-top:9px; background:#ffffff; border:1px solid #f0c9ad; border-radius:14px; padding:10px 12px;">
                       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
                         <span style="font-size:11.5px; font-weight:700; color:#4a5d48;">Latas completas</span>
                         <div style="display:flex; align-items:center; gap:12px;">
@@ -1502,6 +1510,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
         if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
         try {
           await persistEditedDays();
+          window.clearScreenCache?.('personal');
           closeModal();
           window.Snackbar?.show(`✔ Latas actualizadas para ${col.nombre}`);
           await loadAndRender();
@@ -1528,6 +1537,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
             weekPaidMap.delete(refTag);
           }
           window.clearScreenCache?.('gastos');
+          window.clearScreenCache?.('personal');
           closeModal();
           window.Snackbar?.show(`✔ Actualizado en Cuentas: ${col.nombre} (L ${paidMonto.toLocaleString('es-HN')} → L ${totalPay.toLocaleString('es-HN')})`);
           await loadAndRender();
@@ -1558,6 +1568,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
           const created = Array.isArray(insData) ? insData[0] : insData;
           weekPaidMap.set(refTag, { id: created?.id || '', monto: totalPay, descripcion: desc });
           window.clearScreenCache?.('gastos');
+          window.clearScreenCache?.('personal');
           closeModal();
           window.Snackbar?.show(`✔ Enviado a Cuentas: ${col.nombre} (L ${totalPay.toLocaleString('es-HN')})`);
           await loadAndRender();
@@ -1864,6 +1875,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
             if (iErr) throw iErr;
           }
         }
+        window.clearScreenCache?.('personal');
         closeModal();
         window.Snackbar?.show('✔ Día guardado correctamente');
         await loadAndRender();
@@ -1937,6 +1949,7 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
           }
 
           window.clearScreenCache?.('gastos');
+          window.clearScreenCache?.('personal');
           window.Snackbar?.show(
             isUpdateFlow
               ? `✔ Actualizado en Cuentas (L ${prevSum.toLocaleString('es-HN')} → L ${newSum.toLocaleString('es-HN')})`

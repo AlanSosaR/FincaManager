@@ -995,6 +995,82 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
   }
   const currentFoto = editApp ? (editApp.foto_url || editApp.notas || '') : '';
 
+  const escHtml = (s) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const TIPO_ITEMS = [
+    {
+      value: 'Aplicación Foliar',
+      title: 'Aplicación Foliar',
+      sub: 'Nutrición / Estimulante',
+      needsDosis: true,
+      prodLabel: 'Nutrición Foliar / Producto',
+      prodHint: 'Ej: Zinc-Boro + Aminoácidos',
+      dosisHint: 'Ej: 50 cc / bomba 20L'
+    },
+    {
+      value: 'Fertilización al Suelo',
+      title: 'Fertilización al Suelo',
+      sub: 'NPK / Abono',
+      needsDosis: true,
+      prodLabel: 'Fertilizante / Fórmula',
+      prodHint: 'Ej: 18-46-0, Urea, Caldolomita...',
+      dosisHint: 'Ej: 120 g / planta, 4 sacos...'
+    },
+    {
+      value: 'Control Fitosanitario',
+      title: 'Control Fitosanitario',
+      sub: 'Fungicida / Insecticida',
+      needsDosis: true,
+      prodLabel: 'Fungicida o Insecticida',
+      prodHint: 'Ej: Opera (Fungicida Roya), Brocap...',
+      dosisHint: 'Ej: 40 cc / bomba 20L'
+    },
+    {
+      value: 'Manejo de Tejido',
+      title: 'Manejo de Tejido',
+      sub: 'Poda / Descope',
+      needsDosis: false,
+      prodLabel: 'Tipo de Poda o Manejo',
+      prodHint: 'Ej: Poda de formación, Descope, Deschuponado...'
+    },
+    {
+      value: 'Limpieza',
+      title: 'Limpieza',
+      sub: 'Chapea / Desyerbe',
+      isLimpieza: true
+    },
+    {
+      value: 'Análisis de Suelo',
+      title: 'Análisis de Suelo',
+      sub: 'Muestreo / pH',
+      needsDosis: false,
+      prodLabel: 'Tipo de Análisis / Muestreo',
+      prodHint: 'Ej: Muestreo compuesto de suelo, pH...'
+    },
+    {
+      value: 'Otro',
+      title: 'Otra labor',
+      sub: 'Labor personalizada',
+      needsDosis: false,
+      prodLabel: 'Nombre de la Labor',
+      prodHint: 'Ej: Nombre de la labor o insumo'
+    }
+  ];
+
+  const LIMPIEZA_OPTIONS = [
+    { key: 'Machete', label: 'Machete', sub: 'Chapea manual con machete' },
+    { key: 'Motoguadaña', label: 'Motoguadaña', sub: 'Chapea mecánica con equipo' },
+    { key: 'Desyerbe manual', label: 'Desyerbe manual', sub: 'Limpia a mano / azadón' },
+    { key: 'Herbicida', label: 'Herbicida', sub: 'Control químico de malezas' },
+    { key: 'Otro', label: 'Otro', sub: 'Especificar otro tipo de limpieza' }
+  ];
+
+  const activeTipoItem = TIPO_ITEMS.find(x => x.value === currentTipo) || TIPO_ITEMS[0];
+
   const formBodyHtml = `
     <div class="cafetal-day-details-inner" style="animation: slideUp 0.2s ease-out;">
       ${useSheetModal ? `
@@ -1032,87 +1108,25 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           </div>
         `}
 
-        <!-- 3. Tipo de Labor (Custom M3 Dropdown estilo Vacuna/Tratamiento) -->
-        ${(() => {
-          const tipoItems = [
-            { value: 'Aplicación Foliar', icon: '🍃', title: 'Aplicación Foliar', sub: 'Nutrición / Estimulante' },
-            { value: 'Fertilización al Suelo', icon: '🌿', title: 'Fertilización al Suelo', sub: 'NPK / Abono' },
-            { value: 'Control Fitosanitario', icon: '🛡️', title: 'Control Fitosanitario', sub: 'Fungicida / Insecticida' },
-            { value: 'Manejo de Tejido', icon: '✂️', title: 'Manejo de Tejido', sub: 'Poda / Descope' },
-            { value: 'Limpieza', icon: '🧹', title: 'Limpieza', sub: 'Chapea / Desyerbe' },
-            { value: 'Análisis de Suelo', icon: '🧪', title: 'Análisis de Suelo', sub: 'Muestreo / pH' },
-            { value: 'Otro', icon: '📌', title: 'Otra labor', sub: 'Labor personalizada' }
-          ];
-          const activeTipo = tipoItems.find(x => x.value === currentTipo) || tipoItems[0];
-          return `
-            <div style="position:relative;" id="inline-plan-tipo-wrap">
-              <input type="hidden" name="tipo" id="inline-plan-tipo" value="${esc(activeTipo.value)}">
-              <button type="button" id="inline-plan-tipo-trigger" style="width:100%; min-height:54px; padding:12px 16px; border-radius:14px; border:1px solid #757c73; background:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; position:relative; box-sizing:border-box;">
-                <span style="position:absolute; top:-9px; left:12px; background:#ffffff; padding:0 5px; font-size:11.5px; font-weight:700; color:#4a5d48; letter-spacing:0.3px; text-transform:uppercase;">Tipo de Actividad</span>
-                <span id="inline-plan-tipo-display" style="font-size:14px; font-weight:600; color:#192b1b; display:flex; align-items:center; gap:8px;">
-                  <span>${activeTipo.icon}</span><span>${esc(activeTipo.title)}</span>
-                </span>
-                <span class="material-icons" id="inline-plan-tipo-arrow" style="font-size:20px; color:#2d3e2c; transition:transform 0.15s;">arrow_drop_down</span>
-              </button>
-              <div id="inline-plan-tipo-menu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:#f5f9f3; border:1px solid #d5e2d2; border-radius:20px; box-shadow:0 12px 32px rgba(0,0,0,0.14); z-index:100025; padding:8px 0; max-height:290px; overflow-y:auto;">
-                ${tipoItems.map(item => `
-                  <div class="inline-plan-tipo-opt" data-value="${esc(item.value)}" data-icon="${item.icon}" data-title="${esc(item.title)}" style="padding:10px 18px; cursor:pointer; background:${item.value === activeTipo.value ? '#e6efe3' : 'transparent'}; transition:background 0.12s;">
-                    <div style="font-size:15px; font-weight:600; color:#192b1b; display:flex; align-items:center; gap:8px;">
-                      <span>${item.icon}</span><span>${esc(item.title)}</span>
-                    </div>
-                    <div style="font-size:12.5px; color:#4a5d48; margin-top:2px; padding-left:26px;">${esc(item.sub)}</div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        })()}
-
-        <!-- 4. Producto / Tratamiento -->
-        <div class="m3-field" id="field-plan-producto">
-          <input type="text" name="producto" id="inline-plan-producto" value="${esc(currentProducto)}" placeholder=" " required style="font-size:13px;">
-          <label id="label-plan-producto">Producto o Fórmula recomendada</label>
-        </div>
-
-        <!-- 4b. Tipo de Limpieza (Dropdown M3 multi-select) + Motoguadañas / Equipos usados -->
-        <div id="inline-plan-limpieza-section" style="display:none; flex-direction:column; gap:12px;">
-          <div style="position:relative;" id="inline-plan-limpieza-wrap">
-            <button type="button" id="inline-plan-limpieza-trigger" style="width:100%; min-height:54px; padding:12px 16px; border-radius:14px; border:1px solid #757c73; background:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; position:relative; box-sizing:border-box;">
-              <span style="position:absolute; top:-9px; left:12px; background:#ffffff; padding:0 5px; font-size:11.5px; font-weight:700; color:#4a5d48; letter-spacing:0.3px; text-transform:uppercase;">Tipo de Limpieza</span>
-              <span id="inline-plan-limpieza-display" style="font-size:14px; font-weight:600; color:#192b1b; display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
-                <span style="color:#6b7280; font-weight:500;">Seleccionar tipo de limpieza...</span>
-              </span>
-              <span class="material-icons" id="inline-plan-limpieza-arrow" style="font-size:20px; color:#2d3e2c; transition:transform 0.15s; flex-shrink:0;">arrow_drop_down</span>
-            </button>
-            <div id="inline-plan-limpieza-menu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:#f5f9f3; border:1px solid #d5e2d2; border-radius:20px; box-shadow:0 12px 32px rgba(0,0,0,0.14); z-index:100025; padding:8px 0 0; max-height:320px; overflow-y:auto;">
-              <div id="inline-plan-limpieza-opts"></div>
-              <div style="position:sticky; bottom:0; background:#f5f9f3; border-top:1px solid #dce6da; padding:8px 14px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                <span style="font-size:11.5px; font-weight:600; color:#5a6b58;">Puedes elegir varias</span>
-                <button type="button" id="inline-plan-limpieza-done" style="border:none; background:#2d3e2c; color:#ffffff; font-family:inherit; font-size:12px; font-weight:800; padding:6px 14px; border-radius:999px; cursor:pointer;">Listo</button>
-              </div>
-            </div>
-          </div>
-          <div id="inline-plan-limpieza-otro-wrap" style="display:none;">
-            <div class="m3-field" style="margin-bottom:0;">
-              <input type="text" id="inline-plan-limpieza-otro" value="" placeholder=" " style="font-size:13px;">
-              <label for="inline-plan-limpieza-otro">Especificar otro tipo de limpieza</label>
-            </div>
-          </div>
-          <div id="inline-plan-motoguadanas-box" style="display:none; background:#f8faf8; border:1.5px solid #d4ded3; border-radius:14px; padding:14px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-              <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">✂️ Motoguadañas / Equipos usados</span>
-              <span id="inline-plan-fuel-area-pill" style="font-size:11px; font-weight:700; color:#2d3e2c; background:#eaf2e8; border:1px solid #c2d8c0; border-radius:999px; padding:3px 9px; white-space:nowrap;"></span>
-            </div>
-            <div id="inline-plan-fuel-existing-box" style="display:none; margin-bottom:10px;"></div>
-            <div id="inline-plan-motoguadanas-list" style="display:flex; flex-direction:column; gap:10px;"></div>
-            <div id="inline-plan-fuel-summary" style="display:none; margin-top:10px;"></div>
-          </div>
-        </div>
-
-        <!-- 5. Dosis (visible solo en Foliar, Suelo y Fitosanitario) -->
-        <div class="m3-field" id="field-plan-dosis">
-          <input type="text" name="dosis" id="inline-plan-dosis" value="${esc(currentDosis)}" placeholder=" " style="font-size:13px;">
-          <label>Dosis (ej: 120g/planta, 50cc/bomba 20L)</label>
+        <!-- 3. Tipo de Actividad y Complementos (Bottom Sheet unificado, sin íconos) -->
+        <div id="inline-plan-tipo-wrap">
+          <input type="hidden" name="tipo" id="inline-plan-tipo" value="${escHtml(activeTipoItem.value)}">
+          <input type="hidden" name="producto" id="inline-plan-producto" value="${escHtml(currentProducto)}">
+          <input type="hidden" name="dosis" id="inline-plan-dosis" value="${escHtml(currentDosis)}">
+          <button type="button" id="inline-plan-tipo-trigger" style="width:100%; min-height:54px; padding:12px 16px; border-radius:14px; border:1px solid #757c73; background:#ffffff; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; position:relative; box-sizing:border-box;">
+            <span style="position:absolute; top:-9px; left:12px; background:#ffffff; padding:0 5px; font-size:11.5px; font-weight:700; color:#4a5d48; letter-spacing:0.3px; text-transform:uppercase;">Tipo de Actividad</span>
+            <span id="inline-plan-tipo-display" style="font-size:14px; font-weight:600; color:#192b1b;">
+              ${escHtml(activeTipoItem.title)}
+            </span>
+            <span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c; flex-shrink:0;">expand_more</span>
+          </button>
+          <button type="button" id="inline-plan-actividad-resumen" style="width:100%; margin-top:8px; padding:11px 14px; border-radius:12px; border:1.5px solid #d4ded3; background:#f8faf8; display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; box-sizing:border-box; font-family:inherit;">
+            <div id="inline-plan-actividad-resumen-body" style="min-width:0; flex:1;"></div>
+            <span style="display:inline-flex; align-items:center; gap:2px; font-size:12px; font-weight:700; color:#2d3e2c; flex-shrink:0;">
+              <span id="inline-plan-actividad-resumen-action">Completar</span>
+              <span class="material-symbols-outlined" style="font-size:18px;">chevron_right</span>
+            </span>
+          </button>
         </div>
 
         <!-- 6. Responsables / Aplicadores (Buscador Inteligente) -->
@@ -1220,77 +1234,27 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
 
   const selectTipo = document.getElementById('inline-plan-tipo');
   const tipoTrigger = document.getElementById('inline-plan-tipo-trigger');
-  const tipoMenu = document.getElementById('inline-plan-tipo-menu');
-  const tipoArrow = document.getElementById('inline-plan-tipo-arrow');
   const tipoDisplay = document.getElementById('inline-plan-tipo-display');
-  const limpiezaTrigger = document.getElementById('inline-plan-limpieza-trigger');
-  const limpiezaDisplay = document.getElementById('inline-plan-limpieza-display');
-  const limpiezaMenu = document.getElementById('inline-plan-limpieza-menu');
-  const limpiezaArrow = document.getElementById('inline-plan-limpieza-arrow');
-  const limpiezaOptsEl = document.getElementById('inline-plan-limpieza-opts');
-  const limpiezaDoneBtn = document.getElementById('inline-plan-limpieza-done');
-
-  if (tipoTrigger && tipoMenu) {
-    tipoTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = tipoMenu.style.display === 'block';
-      if (limpiezaMenu) limpiezaMenu.style.display = 'none';
-      if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
-      tipoMenu.style.display = isOpen ? 'none' : 'block';
-      if (tipoArrow) tipoArrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
-    });
-    tipoMenu.querySelectorAll('.inline-plan-tipo-opt').forEach(opt => {
-      opt.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const val = opt.dataset.value;
-        if (selectTipo) selectTipo.value = val;
-        if (tipoDisplay) tipoDisplay.innerHTML = `<span>${opt.dataset.icon}</span><span>${opt.dataset.title}</span>`;
-        tipoMenu.querySelectorAll('.inline-plan-tipo-opt').forEach(o => { o.style.background = o === opt ? '#e6efe3' : 'transparent'; });
-        tipoMenu.style.display = 'none';
-        if (tipoArrow) tipoArrow.style.transform = 'rotate(0deg)';
-        selectTipo?.dispatchEvent(new Event('change'));
-      });
-    });
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#inline-plan-tipo-wrap')) {
-        tipoMenu.style.display = 'none';
-        if (tipoArrow) tipoArrow.style.transform = 'rotate(0deg)';
-      }
-    });
-  }
+  const actividadResumenBtn = document.getElementById('inline-plan-actividad-resumen');
+  const actividadResumenBody = document.getElementById('inline-plan-actividad-resumen-body');
+  const actividadResumenAction = document.getElementById('inline-plan-actividad-resumen-action');
   const inputProducto = document.getElementById('inline-plan-producto');
   const inputDosis = document.getElementById('inline-plan-dosis');
-  const fieldDosis = document.getElementById('field-plan-dosis');
-  const labelProducto = document.getElementById('label-plan-producto');
-  const fieldProducto = document.getElementById('field-plan-producto');
-  const limpiezaSection = document.getElementById('inline-plan-limpieza-section');
-  const limpiezaOtroWrap = document.getElementById('inline-plan-limpieza-otro-wrap');
-  const limpiezaOtroInput = document.getElementById('inline-plan-limpieza-otro');
-  const motoguadanasBox = document.getElementById('inline-plan-motoguadanas-box');
-  const fuelAreaPill = document.getElementById('inline-plan-fuel-area-pill');
-  const fuelExistingBox = document.getElementById('inline-plan-fuel-existing-box');
-  const motoguadanasListEl = document.getElementById('inline-plan-motoguadanas-list');
-  const fuelSummaryEl = document.getElementById('inline-plan-fuel-summary');
   const inputLoteEl = document.getElementById('inline-plan-lote');
 
-  const escHtml = (s) => String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
-  const LIMPIEZA_OPTIONS = [
-    { key: 'Machete', icon: '🔪', label: 'Machete', sub: 'Chapea manual con machete' },
-    { key: 'Motoguadaña', icon: '✂️', label: 'Motoguadaña', sub: 'Chapea mecánica con equipo' },
-    { key: 'Desyerbe manual', icon: '🌿', label: 'Desyerbe manual', sub: 'Limpia a mano / azadón' },
-    { key: 'Herbicida', icon: '🧪', label: 'Herbicida', sub: 'Control químico de malezas' },
-    { key: 'Otro', icon: '✏️', label: 'Otro', sub: 'Especificar otro tipo de limpieza' },
-  ];
+  const draftByTipo = {};
+  if (!activeTipoItem.isLimpieza && (currentProducto || currentDosis)) {
+    draftByTipo[activeTipoItem.value] = {
+      producto: currentProducto,
+      dosis: activeTipoItem.needsDosis ? currentDosis : ''
+    };
+  }
 
   const selectedLimpiezaTypes = new Set();
+  let limpiezaOtroText = '';
   const selectedFuelUsageMap = new Map();
 
-  if (editApp && currentTipo === 'Limpieza' && currentProducto) {
+  if (editApp && activeTipoItem.isLimpieza && currentProducto) {
     const parts = currentProducto.split(/\s*[,+]\s*/).map(s => s.trim()).filter(Boolean);
     const otherParts = [];
     parts.forEach((p) => {
@@ -1309,10 +1273,7 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
     });
     if (otherParts.length > 0) {
       selectedLimpiezaTypes.add('Otro');
-      if (limpiezaOtroInput) {
-        limpiezaOtroInput.value = otherParts.join(', ');
-        limpiezaOtroInput.closest('.m3-field')?.classList.add('has-value');
-      }
+      limpiezaOtroText = otherParts.join(', ');
     }
   }
 
@@ -1323,345 +1284,620 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
 
   const getActiveDateStr = () => document.getElementById('inline-plan-fecha')?.value || actDate;
 
-  const syncLimpiezaProductoValue = () => {
-    if (!selectTipo || selectTipo.value !== 'Limpieza' || !inputProducto) return;
+  const getActiveTipoCfg = () => TIPO_ITEMS.find(x => x.value === selectTipo?.value) || TIPO_ITEMS[0];
+
+  const getLimpiezaLabelsList = () => {
     const ordered = [];
     LIMPIEZA_OPTIONS.forEach((opt) => {
       if (!selectedLimpiezaTypes.has(opt.key)) return;
       if (opt.key === 'Otro') {
-        const custom = (limpiezaOtroInput?.value || '').trim();
+        const custom = limpiezaOtroText.trim();
         ordered.push(custom || 'Otro');
       } else {
         ordered.push(opt.key);
       }
     });
-    inputProducto.value = ordered.join(', ');
+    return ordered;
   };
 
-  const updateFuelSummaryUI = () => {
-    if (!fuelSummaryEl) return;
+  const renderActividadResumen = () => {
+    if (!actividadResumenBody) return;
+    const cfg = getActiveTipoCfg();
     const activeDate = getActiveDateStr();
-    if (!selectTipo || selectTipo.value !== 'Limpieza' || !selectedLimpiezaTypes.has('Motoguadaña') || activeDate > todayStr) {
-      fuelSummaryEl.style.display = 'none';
-      fuelSummaryEl.innerHTML = '';
+
+    if (cfg.isLimpieza) {
+      const labels = getLimpiezaLabelsList();
+      if (labels.length === 0) {
+        actividadResumenBody.innerHTML = `<div style="font-size:13px; color:#6b7280; font-weight:500;">Toca para completar detalles (tipo de limpieza y equipos)...</div>`;
+        if (actividadResumenAction) actividadResumenAction.textContent = 'Completar';
+        return;
+      }
+      let extraLine = '';
+      if (selectedLimpiezaTypes.has('Motoguadaña')) {
+        if (activeDate > todayStr) {
+          extraLine = `<div style="font-size:11.5px; color:#5a6b58; margin-top:2px;">Motoguadaña: gasolina se registra al realizar la labor</div>`;
+        } else {
+          const activeEntries = Array.from(selectedFuelUsageMap.values()).filter(e => e.liters > 0);
+          if (activeEntries.length > 0) {
+            const totalLiters = Math.round(activeEntries.reduce((s, e) => s + e.liters, 0) * 10) / 10;
+            const totalCost = Math.round(activeEntries.reduce((s, e) => s + (e.liters * (Number(e.unitPrice) || 0)), 0) * 100) / 100;
+            extraLine = `<div style="font-size:11.5px; font-weight:600; color:#1b6e1b; margin-top:2px;">${activeEntries.length} ${activeEntries.length === 1 ? 'equipo' : 'equipos'} · ${escHtml(formatLitersLabel(totalLiters))} de gasolina${totalCost > 0 ? ` · ${escHtml(formatCurrencyL(totalCost))}` : ''}</div>`;
+          } else {
+            extraLine = `<div style="font-size:11.5px; color:#b34200; font-weight:600; margin-top:2px;">Falta indicar litros de gasolina en motoguadaña</div>`;
+          }
+        }
+      }
+      actividadResumenBody.innerHTML = `
+        <div style="font-size:13px; font-weight:700; color:#192b1b; line-height:1.35;">${escHtml(labels.join(', '))}</div>
+        ${extraLine}
+      `;
+      if (actividadResumenAction) actividadResumenAction.textContent = 'Editar';
       return;
     }
-    const activeEntries = Array.from(selectedFuelUsageMap.values()).filter(e => e.liters > 0);
-    if (activeEntries.length === 0) {
-      fuelSummaryEl.style.display = 'none';
-      fuelSummaryEl.innerHTML = '';
+
+    const prod = (inputProducto?.value || '').trim();
+    const dosis = (inputDosis?.value || '').trim();
+    if (!prod && (!cfg.needsDosis || !dosis)) {
+      actividadResumenBody.innerHTML = `<div style="font-size:13px; color:#6b7280; font-weight:500;">Toca para ingresar ${escHtml(cfg.prodLabel.toLowerCase())}${cfg.needsDosis ? ' y dosis' : ''}...</div>`;
+      if (actividadResumenAction) actividadResumenAction.textContent = 'Completar';
       return;
     }
-    const totalLiters = Math.round(activeEntries.reduce((s, e) => s + e.liters, 0) * 10) / 10;
-    const totalCost = Math.round(activeEntries.reduce((s, e) => s + (e.liters * (Number(e.unitPrice) || 0)), 0) * 100) / 100;
-    fuelSummaryEl.style.display = 'block';
-    fuelSummaryEl.innerHTML = `
-      <div style="background:#eef5ec; border:1px solid #c5dcc0; border-radius:12px; padding:10px 12px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-          <span style="font-size:12.5px; font-weight:800; color:#192b18;">⛽ ${activeEntries.length} ${activeEntries.length === 1 ? 'equipo' : 'equipos'} · ${formatLitersLabel(totalLiters)} de gasolina</span>
-          ${totalCost > 0 ? `<span style="font-size:13.5px; font-weight:800; color:#1b6e1b;">${escHtml(formatCurrencyL(totalCost))}</span>` : ''}
+
+    const line1 = prod
+      ? `<div style="font-size:13px; font-weight:700; color:#192b1b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(cfg.prodLabel)}: ${escHtml(prod)}</div>`
+      : `<div style="font-size:12.5px; font-weight:600; color:#b34200;">Falta ingresar ${escHtml(cfg.prodLabel.toLowerCase())}</div>`;
+    const line2 = cfg.needsDosis
+      ? (dosis
+          ? `<div style="font-size:12px; color:#4a5d48; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Dosis: ${escHtml(dosis)}</div>`
+          : `<div style="font-size:11.5px; color:#b34200; font-weight:600; margin-top:2px;">Falta ingresar dosis</div>`)
+      : '';
+    actividadResumenBody.innerHTML = line1 + line2;
+    if (actividadResumenAction) actividadResumenAction.textContent = 'Editar';
+  };
+
+  const syncActivityStateToForm = () => {
+    const cfg = getActiveTipoCfg();
+    if (tipoDisplay) tipoDisplay.textContent = cfg.title;
+    if (cfg.isLimpieza) {
+      if (inputProducto) inputProducto.value = getLimpiezaLabelsList().join(', ');
+      if (inputDosis) inputDosis.value = '';
+    } else {
+      const d = draftByTipo[cfg.value] || { producto: '', dosis: '' };
+      if (inputProducto) inputProducto.value = d.producto || '';
+      if (inputDosis) inputDosis.value = cfg.needsDosis ? (d.dosis || '') : '';
+    }
+    renderActividadResumen();
+  };
+
+  let refreshOpenFuelSheet = null;
+
+  const openActividadBottomSheet = (initialStep = 'list', focusField = 'producto') => {
+    document.getElementById('plan-actividad-sheet-overlay')?.remove();
+    refreshOpenFuelSheet = null;
+
+    let step = initialStep === 'details' ? 'details' : 'list';
+    let currentFocusField = focusField;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'plan-actividad-sheet-overlay';
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(3px); z-index:100030; display:flex; align-items:flex-end; justify-content:center;';
+    overlay.innerHTML = `
+      <div id="plan-actividad-sheet" style="width:100%; max-width:520px; max-height:86dvh; background:#ffffff; border-radius:26px 26px 0 0; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 -10px 36px rgba(0,0,0,0.28); animation:slideUp 0.22s ease-out;">
+        <div style="padding:10px 18px 12px; border-bottom:1px solid #eef2ee; flex-shrink:0;">
+          <div style="width:38px; height:4px; border-radius:999px; background:#d0dad0; margin:0 auto 10px;"></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+              <button type="button" id="plan-act-sheet-back" aria-label="Volver a tipos" style="display:none; width:34px; height:34px; border-radius:50%; background:#eff4ed; border:none; color:#1e3e2b; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+                <span class="material-symbols-outlined" style="font-size:19px;">arrow_back</span>
+              </button>
+              <div style="min-width:0;">
+                <h3 id="plan-act-sheet-title" style="margin:0; font-size:17px; font-weight:800; color:#1e3e2b; font-family:'Work Sans',sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></h3>
+                <div id="plan-act-sheet-sub" style="font-size:12px; color:#5a6b58; margin-top:1px;"></div>
+              </div>
+            </div>
+            <button type="button" id="plan-act-sheet-close" style="width:34px; height:34px; border-radius:50%; background:#eff4ed; border:none; color:#1e3e2b; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+              <span class="material-symbols-outlined" style="font-size:19px;">close</span>
+            </button>
+          </div>
         </div>
-        <div style="font-size:11px; font-weight:600; color:#4a5d48; margin-top:3px;">Se registrará en cada equipo y en Balance de cuentas</div>
+        <div id="plan-act-sheet-body" style="flex:1 1 0%; min-height:180px; overflow-y:auto;"></div>
+        <div id="plan-act-sheet-footer" style="padding:12px 18px calc(14px + env(safe-area-inset-bottom, 0px)); border-top:1px solid #eef2ee; background:#ffffff; flex-shrink:0;">
+          <button type="button" id="plan-act-sheet-done" style="width:100%; height:44px; border-radius:999px; border:none; background:#2d3e2c; color:#ffffff; font-family:'Work Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span class="material-symbols-outlined" style="font-size:18px;">check</span>
+            <span id="plan-act-sheet-done-label">Listo</span>
+          </button>
+        </div>
       </div>
     `;
-  };
+    document.body.appendChild(overlay);
 
-  const syncSingleMotorCardUI = (motorId) => {
-    if (!motoguadanasListEl) return;
-    const idKey = String(motorId);
-    const entry = selectedFuelUsageMap.get(idKey);
-    if (!entry) return;
-    const litersTxt = formatLiters(entry.liters);
-    const cost = entry.liters > 0 && entry.unitPrice > 0
-      ? Math.round(entry.liters * entry.unitPrice * 100) / 100
-      : 0;
-    motoguadanasListEl.querySelectorAll('[data-fuel-card-liters]').forEach((el) => {
-      if (el.dataset.fuelCardLiters === idKey) el.textContent = litersTxt;
-    });
-    motoguadanasListEl.querySelectorAll('[data-fuel-card-unit]').forEach((el) => {
-      if (el.dataset.fuelCardUnit === idKey) el.textContent = litersTxt === '1' ? 'litro' : 'litros';
-    });
-    motoguadanasListEl.querySelectorAll('[data-fuel-card-cost]').forEach((el) => {
-      if (el.dataset.fuelCardCost === idKey) {
-        el.textContent = cost > 0 ? formatCurrencyL(cost) : 'L 0.00';
-        el.style.color = cost > 0 ? '#1b6e1b' : '#5a6b58';
+    const backBtn = document.getElementById('plan-act-sheet-back');
+    const titleEl = document.getElementById('plan-act-sheet-title');
+    const subEl = document.getElementById('plan-act-sheet-sub');
+    const bodyEl = document.getElementById('plan-act-sheet-body');
+    const doneLabel = document.getElementById('plan-act-sheet-done-label');
+
+    const closeSheet = () => {
+      syncActivityStateToForm();
+      refreshOpenFuelSheet = null;
+      overlay.remove();
+    };
+
+    document.getElementById('plan-act-sheet-close')?.addEventListener('click', closeSheet);
+    document.getElementById('plan-act-sheet-done')?.addEventListener('click', () => {
+      if (step === 'list') {
+        step = 'details';
+        renderSheetStep();
+      } else {
+        closeSheet();
       }
     });
-    motoguadanasListEl.querySelectorAll('[data-fuel-card-badge]').forEach((el) => {
-      if (el.dataset.fuelCardBadge === idKey) {
-        el.textContent = `${formatLitersLabel(entry.liters)}${cost > 0 ? ` · ${formatCurrencyL(cost)}` : ''}`;
-      }
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeSheet();
     });
-    updateFuelSummaryUI();
-  };
+    backBtn?.addEventListener('click', () => {
+      step = 'list';
+      renderSheetStep();
+    });
 
-  const renderMotoguadanasBox = () => {
-    if (!motoguadanasBox) return;
-    const showBox = selectTipo?.value === 'Limpieza' && selectedLimpiezaTypes.has('Motoguadaña');
-    if (!showBox) {
-      motoguadanasBox.style.display = 'none';
-      return;
-    }
-    motoguadanasBox.style.display = 'block';
+    const renderMotoguadanasInSheet = () => {
+      const box = document.getElementById('plan-act-motoguadanas-box');
+      const areaPill = document.getElementById('plan-act-fuel-area-pill');
+      const existingBox = document.getElementById('plan-act-fuel-existing-box');
+      const listEl = document.getElementById('plan-act-motoguadanas-list');
+      const summaryEl = document.getElementById('plan-act-fuel-summary');
+      if (!box) return;
 
-    const loteObj = getSelectedLoteObj();
-    const activeDate = getActiveDateStr();
-    if (fuelAreaPill) {
-      fuelAreaPill.textContent = `📍 ${loteObj?.nombre || 'Lote seleccionado'}`;
-    }
+      const cfg = getActiveTipoCfg();
+      const showBox = cfg.isLimpieza && selectedLimpiezaTypes.has('Motoguadaña');
+      if (!showBox) {
+        box.style.display = 'none';
+        return;
+      }
+      box.style.display = 'block';
 
-    if (fuelExistingBox) {
-      const existingFuel = editApp
-        ? _ifcafeEvents
-            .filter(ev => String(ev.loteId) === String(loteObj?.id) && ev.fecha === activeDate && Array.isArray(ev.linkedFuelLoads))
-            .flatMap(ev => ev.linkedFuelLoads)
-        : [];
-      if (existingFuel.length > 0) {
-        fuelExistingBox.style.display = 'block';
-        fuelExistingBox.innerHTML = `
-          <div style="background:#f3f7f2; border:1px solid #d5e2d2; border-radius:10px; padding:8px 10px; font-size:11.5px; color:#2d3e2c;">
-            <div style="font-weight:800; margin-bottom:3px;">Cargas ya registradas este día:</div>
-            ${existingFuel.map(fl => `
-              <div>${escHtml(fl.motorIcon || '✂️')} <b>${escHtml(fl.motorNombre || 'Equipo')}</b>: ${formatLitersLabel(fl.liters)} de gasolina${fl.cost > 0 ? ` · ${escHtml(formatCurrencyL(fl.cost))}` : ''}</div>
-            `).join('')}
+      const loteObj = getSelectedLoteObj();
+      const activeDate = getActiveDateStr();
+      if (areaPill) {
+        areaPill.textContent = loteObj?.nombre || 'Lote seleccionado';
+      }
+
+      if (existingBox) {
+        const existingFuel = editApp
+          ? _ifcafeEvents
+              .filter(ev => String(ev.loteId) === String(loteObj?.id) && ev.fecha === activeDate && Array.isArray(ev.linkedFuelLoads))
+              .flatMap(ev => ev.linkedFuelLoads)
+          : [];
+        if (existingFuel.length > 0) {
+          existingBox.style.display = 'block';
+          existingBox.innerHTML = `
+            <div style="background:#f3f7f2; border:1px solid #d5e2d2; border-radius:10px; padding:8px 10px; font-size:11.5px; color:#2d3e2c;">
+              <div style="font-weight:800; margin-bottom:3px;">Cargas ya registradas este día:</div>
+              ${existingFuel.map(fl => `
+                <div><b>${escHtml(fl.motorNombre || 'Equipo')}</b>: ${escHtml(formatLitersLabel(fl.liters))} de gasolina${fl.cost > 0 ? ` · ${escHtml(formatCurrencyL(fl.cost))}` : ''}</div>
+              `).join('')}
+            </div>
+          `;
+        } else {
+          existingBox.style.display = 'none';
+          existingBox.innerHTML = '';
+        }
+      }
+
+      const updateFuelSummary = () => {
+        if (!summaryEl) return;
+        if (!selectedLimpiezaTypes.has('Motoguadaña') || activeDate > todayStr) {
+          summaryEl.style.display = 'none';
+          summaryEl.innerHTML = '';
+          return;
+        }
+        const activeEntries = Array.from(selectedFuelUsageMap.values()).filter(e => e.liters > 0);
+        if (activeEntries.length === 0) {
+          summaryEl.style.display = 'none';
+          summaryEl.innerHTML = '';
+          return;
+        }
+        const totalLiters = Math.round(activeEntries.reduce((s, e) => s + e.liters, 0) * 10) / 10;
+        const totalCost = Math.round(activeEntries.reduce((s, e) => s + (e.liters * (Number(e.unitPrice) || 0)), 0) * 100) / 100;
+        summaryEl.style.display = 'block';
+        summaryEl.innerHTML = `
+          <div style="background:#eef5ec; border:1px solid #c5dcc0; border-radius:12px; padding:10px 12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:12.5px; font-weight:800; color:#192b18;">${activeEntries.length} ${activeEntries.length === 1 ? 'equipo' : 'equipos'} · ${escHtml(formatLitersLabel(totalLiters))} de gasolina</span>
+              ${totalCost > 0 ? `<span style="font-size:13.5px; font-weight:800; color:#1b6e1b;">${escHtml(formatCurrencyL(totalCost))}</span>` : ''}
+            </div>
+            <div style="font-size:11px; font-weight:600; color:#4a5d48; margin-top:3px;">Se registrará en cada equipo y en Balance de cuentas</div>
           </div>
         `;
-      } else {
-        fuelExistingBox.style.display = 'none';
-        fuelExistingBox.innerHTML = '';
+      };
+
+      const syncSingleCard = (motorId) => {
+        if (!listEl) return;
+        const idKey = String(motorId);
+        const entry = selectedFuelUsageMap.get(idKey);
+        if (!entry) return;
+        const litersTxt = formatLiters(entry.liters);
+        const cost = entry.liters > 0 && entry.unitPrice > 0
+          ? Math.round(entry.liters * entry.unitPrice * 100) / 100
+          : 0;
+        listEl.querySelectorAll('[data-fuel-card-liters]').forEach((el) => {
+          if (el.dataset.fuelCardLiters === idKey) el.textContent = litersTxt;
+        });
+        listEl.querySelectorAll('[data-fuel-card-unit]').forEach((el) => {
+          if (el.dataset.fuelCardUnit === idKey) el.textContent = litersTxt === '1' ? 'litro' : 'litros';
+        });
+        listEl.querySelectorAll('[data-fuel-card-cost]').forEach((el) => {
+          if (el.dataset.fuelCardCost === idKey) {
+            el.textContent = cost > 0 ? formatCurrencyL(cost) : 'L 0.00';
+            el.style.color = cost > 0 ? '#1b6e1b' : '#5a6b58';
+          }
+        });
+        listEl.querySelectorAll('[data-fuel-card-badge]').forEach((el) => {
+          if (el.dataset.fuelCardBadge === idKey) {
+            el.textContent = `${formatLitersLabel(entry.liters)}${cost > 0 ? ` · ${formatCurrencyL(cost)}` : ''}`;
+          }
+        });
+        updateFuelSummary();
+        renderActividadResumen();
+      };
+
+      if (!listEl) return;
+      if (activeDate > todayStr) {
+        listEl.innerHTML = `
+          <div style="font-size:12px; color:#5a6b58; background:#ffffff; border:1px solid #d4ded3; border-radius:12px; padding:10px 12px;">
+            Labor programada a futuro: la carga de gasolina se registra al realizar la actividad.
+          </div>
+        `;
+        updateFuelSummary();
+        return;
       }
-    }
 
-    if (!motoguadanasListEl) return;
-    if (activeDate > todayStr) {
-      motoguadanasListEl.innerHTML = `
-        <div style="font-size:12px; color:#5a6b58; background:#ffffff; border:1px solid #d4ded3; border-radius:12px; padding:10px 12px;">
-          📅 Labor programada a futuro: la carga de gasolina se registra al realizar la actividad.
-        </div>
-      `;
-      updateFuelSummaryUI();
-      return;
-    }
-
-    if (_fuelMotoresList.length === 0) {
-      motoguadanasListEl.innerHTML = `
-        <div style="font-size:12px; color:#5a6b58; background:#ffffff; border:1px dashed #c2d8c0; border-radius:12px; padding:12px; text-align:center;">
-          No hay motoguadañas registradas en Equipos.
-        </div>
-      `;
-      updateFuelSummaryUI();
-      return;
-    }
-
-    motoguadanasListEl.innerHTML = _fuelMotoresList.map((m) => {
-      const idKey = String(m.id);
-      const isSel = selectedFuelUsageMap.has(idKey);
-      const entry = isSel ? selectedFuelUsageMap.get(idKey) : null;
-      const entryCost = entry && entry.liters > 0 && entry.unitPrice > 0
-        ? Math.round(entry.liters * entry.unitPrice * 100) / 100
-        : 0;
-      const badgeText = isSel
-        ? `${formatLitersLabel(entry.liters)}${entryCost > 0 ? ` · ${formatCurrencyL(entryCost)}` : ''}`
-        : 'Tocar para usar';
-
-      return `
-        <div style="background:#ffffff; border:1.5px solid ${isSel ? '#2d3e2c' : '#d5e2d2'}; border-radius:14px; overflow:hidden; box-shadow:${isSel ? '0 3px 10px rgba(45,62,44,0.1)' : 'none'};">
-          <button type="button" data-fuel-motor-toggle="${escHtml(idKey)}" style="width:100%; background:${isSel ? '#f4f8f3' : '#ffffff'}; border:none; padding:11px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; font-family:inherit; text-align:left;">
-            <div style="display:flex; align-items:center; gap:9px; min-width:0; flex:1;">
-              <span style="width:20px; height:20px; border-radius:50%; border:1.5px solid ${isSel ? '#2d3e2c' : '#9eb09b'}; background:${isSel ? '#2d3e2c' : '#ffffff'}; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-                ${isSel ? '<span class="material-symbols-outlined" style="font-size:14px;">check</span>' : ''}
-              </span>
-              <span style="font-size:16px; flex-shrink:0;">${escHtml(m.icon || '✂️')}</span>
-              <span style="font-size:13.5px; font-weight:800; color:#192b18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(m.nombre || 'Equipo')}</span>
-            </div>
-            <span data-fuel-card-badge="${escHtml(idKey)}" style="font-size:11.5px; font-weight:700; color:${isSel ? '#1b6e1b' : '#5a6b58'}; background:${isSel ? '#e6efe3' : '#f4f7f3'}; border-radius:999px; padding:3px 9px; white-space:nowrap; flex-shrink:0;">${escHtml(badgeText)}</span>
-          </button>
-          ${isSel ? `
-            <div style="padding:12px; border-top:1px solid #e6ece4; display:flex; flex-direction:column; gap:10px;">
-              <div style="display:flex; align-items:center; justify-content:center; gap:18px; padding:2px 0;">
-                <button type="button" data-fuel-card-minus="${escHtml(idKey)}" aria-label="Disminuir litros" style="width:40px; height:40px; border-radius:50%; border:1.5px solid #cbd5c9; background:#ffffff; color:#192b18; font-size:21px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer;">&minus;</button>
-                <div style="display:flex; align-items:baseline; gap:5px; min-width:84px; justify-content:center;">
-                  <span data-fuel-card-liters="${escHtml(idKey)}" style="font-size:28px; font-weight:800; color:#192b18; line-height:1;">${formatLiters(entry.liters)}</span>
-                  <span data-fuel-card-unit="${escHtml(idKey)}" style="font-size:14px; font-weight:700; color:#4f5d4e;">${formatLiters(entry.liters) === '1' ? 'litro' : 'litros'}</span>
-                </div>
-                <button type="button" data-fuel-card-plus="${escHtml(idKey)}" aria-label="Aumentar litros" style="width:40px; height:40px; border-radius:50%; border:none; background:#2d3e2c; color:#ffffff; font-size:21px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(45,62,44,0.22);">+</button>
-              </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:stretch;">
-                <div class="m3-field ${entry.unitPrice > 0 ? 'has-value' : ''}" style="margin-bottom:0;">
-                  <input type="number" min="0" step="0.01" inputmode="decimal" placeholder=" " data-fuel-card-price="${escHtml(idKey)}" value="${entry.unitPrice > 0 ? entry.unitPrice : ''}" style="font-size:13px;">
-                  <label>Precio / litro (L)</label>
-                </div>
-                <div style="background:#f5f9f3; border:1px solid #d5e2d2; border-radius:12px; padding:8px 10px; display:flex; flex-direction:column; justify-content:center;">
-                  <span style="font-size:10.5px; font-weight:700; color:#5a6b58; text-transform:uppercase;">Gasto del equipo</span>
-                  <span data-fuel-card-cost="${escHtml(idKey)}" style="font-size:14px; font-weight:800; color:${entryCost > 0 ? '#1b6e1b' : '#5a6b58'}; margin-top:2px;">${entryCost > 0 ? escHtml(formatCurrencyL(entryCost)) : 'L 0.00'}</span>
-                </div>
-              </div>
-              <div style="font-size:11.5px; font-weight:600; color:#5a6b58;">
-                📍 ${escHtml(loteObj?.nombre || 'Lote actual')} · 📅 ${escHtml(activeDate)}
-              </div>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    }).join('');
-
-    motoguadanasListEl.querySelectorAll('[data-fuel-motor-toggle]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const mid = btn.dataset.fuelMotorToggle;
-        const motor = _fuelMotoresList.find(m => String(m.id) === String(mid));
-        if (!motor) return;
-        if (selectedFuelUsageMap.has(String(mid))) {
-          selectedFuelUsageMap.delete(String(mid));
-        } else {
-          selectedFuelUsageMap.set(String(mid), {
-            motor,
-            cfg: motor._cfg,
-            liters: 0,
-            unitPrice: Number(motor._resolvedPrice) || Number(motor._cfg?.precioPorLitro) || resolveSharedFuelPrice(motor, _fuelMotoresList) || 0,
-          });
-        }
-        renderMotoguadanasBox();
-      });
-    });
-
-    motoguadanasListEl.querySelectorAll('[data-fuel-card-minus]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const mid = btn.dataset.fuelCardMinus;
-        const entry = selectedFuelUsageMap.get(String(mid));
-        if (!entry) return;
-        entry.liters = Math.max(0, Math.round((entry.liters - 0.5) * 10) / 10);
-        syncSingleMotorCardUI(mid);
-      });
-    });
-
-    motoguadanasListEl.querySelectorAll('[data-fuel-card-plus]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const mid = btn.dataset.fuelCardPlus;
-        const entry = selectedFuelUsageMap.get(String(mid));
-        if (!entry) return;
-        entry.liters = Math.round((entry.liters + 0.5) * 10) / 10;
-        syncSingleMotorCardUI(mid);
-      });
-    });
-
-    motoguadanasListEl.querySelectorAll('[data-fuel-card-price]').forEach((inp) => {
-      inp.addEventListener('input', () => {
-        const mid = inp.dataset.fuelCardPrice;
-        const entry = selectedFuelUsageMap.get(String(mid));
-        if (!entry) return;
-        entry.unitPrice = Math.max(0, parseFloat(inp.value) || 0);
-        inp.closest('.m3-field')?.classList.toggle('has-value', !!inp.value);
-        syncSingleMotorCardUI(mid);
-      });
-    });
-
-    updateFuelSummaryUI();
-  };
-
-  const renderLimpiezaChips = () => {
-    if (limpiezaDisplay) {
-      const selectedList = LIMPIEZA_OPTIONS.filter(opt => selectedLimpiezaTypes.has(opt.key));
-      if (selectedList.length === 0) {
-        limpiezaDisplay.innerHTML = `<span style="color:#6b7280; font-weight:500;">Seleccionar tipo de limpieza...</span>`;
-      } else {
-        limpiezaDisplay.innerHTML = selectedList
-          .map(opt => `<span style="display:inline-flex; align-items:center; gap:5px;"><span>${opt.icon}</span><span>${escHtml(opt.label)}</span></span>`)
-          .join('<span style="color:#6b7280;">,</span> ');
+      if (_fuelMotoresList.length === 0) {
+        listEl.innerHTML = `
+          <div style="font-size:12px; color:#5a6b58; background:#ffffff; border:1px dashed #c2d8c0; border-radius:12px; padding:12px; text-align:center;">
+            No hay motoguadañas registradas en Equipos.
+          </div>
+        `;
+        updateFuelSummary();
+        return;
       }
-    }
 
-    if (limpiezaOptsEl) {
-      limpiezaOptsEl.innerHTML = LIMPIEZA_OPTIONS.map((opt) => {
-        const active = selectedLimpiezaTypes.has(opt.key);
+      listEl.innerHTML = _fuelMotoresList.map((m) => {
+        const idKey = String(m.id);
+        const isSel = selectedFuelUsageMap.has(idKey);
+        const entry = isSel ? selectedFuelUsageMap.get(idKey) : null;
+        const entryCost = entry && entry.liters > 0 && entry.unitPrice > 0
+          ? Math.round(entry.liters * entry.unitPrice * 100) / 100
+          : 0;
+        const badgeText = isSel
+          ? `${formatLitersLabel(entry.liters)}${entryCost > 0 ? ` · ${formatCurrencyL(entryCost)}` : ''}`
+          : 'Tocar para usar';
+
         return `
-          <div class="inline-plan-limpieza-opt" data-limpieza-key="${escHtml(opt.key)}" style="padding:10px 18px; cursor:pointer; background:${active ? '#e6efe3' : 'transparent'}; display:flex; align-items:center; justify-content:space-between; gap:10px; transition:background 0.12s;">
-            <div style="min-width:0; flex:1;">
-              <div style="font-size:15px; font-weight:600; color:#192b1b; display:flex; align-items:center; gap:8px;">
-                <span>${opt.icon}</span><span>${escHtml(opt.label)}</span>
+          <div style="background:#ffffff; border:1.5px solid ${isSel ? '#2d3e2c' : '#d5e2d2'}; border-radius:14px; overflow:hidden; box-shadow:${isSel ? '0 3px 10px rgba(45,62,44,0.1)' : 'none'};">
+            <button type="button" data-fuel-motor-toggle="${escHtml(idKey)}" style="width:100%; background:${isSel ? '#f4f8f3' : '#ffffff'}; border:none; padding:11px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; font-family:inherit; text-align:left;">
+              <div style="display:flex; align-items:center; gap:9px; min-width:0; flex:1;">
+                <span style="width:20px; height:20px; border-radius:50%; border:1.5px solid ${isSel ? '#2d3e2c' : '#9eb09b'}; background:${isSel ? '#2d3e2c' : '#ffffff'}; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  ${isSel ? '<span class="material-symbols-outlined" style="font-size:14px;">check</span>' : ''}
+                </span>
+                <span style="font-size:13.5px; font-weight:800; color:#192b18; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(m.nombre || 'Equipo')}</span>
               </div>
-              <div style="font-size:12.5px; color:#4a5d48; margin-top:2px; padding-left:26px;">${escHtml(opt.sub)}</div>
-            </div>
-            <span style="width:20px; height:20px; border-radius:50%; border:1.5px solid ${active ? '#2d3e2c' : '#9eb09b'}; background:${active ? '#2d3e2c' : '#ffffff'}; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
-              ${active ? '<span class="material-symbols-outlined" style="font-size:14px;">check</span>' : ''}
-            </span>
+              <span data-fuel-card-badge="${escHtml(idKey)}" style="font-size:11.5px; font-weight:700; color:${isSel ? '#1b6e1b' : '#5a6b58'}; background:${isSel ? '#e6efe3' : '#f4f7f3'}; border-radius:999px; padding:3px 9px; white-space:nowrap; flex-shrink:0;">${escHtml(badgeText)}</span>
+            </button>
+            ${isSel ? `
+              <div style="padding:12px; border-top:1px solid #e6ece4; display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; align-items:center; justify-content:center; gap:18px; padding:2px 0;">
+                  <button type="button" data-fuel-card-minus="${escHtml(idKey)}" aria-label="Disminuir litros" style="width:40px; height:40px; border-radius:50%; border:1.5px solid #cbd5c9; background:#ffffff; color:#192b18; font-size:21px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer;">&minus;</button>
+                  <div style="display:flex; align-items:baseline; gap:5px; min-width:84px; justify-content:center;">
+                    <span data-fuel-card-liters="${escHtml(idKey)}" style="font-size:28px; font-weight:800; color:#192b18; line-height:1;">${formatLiters(entry.liters)}</span>
+                    <span data-fuel-card-unit="${escHtml(idKey)}" style="font-size:14px; font-weight:700; color:#4f5d4e;">${formatLiters(entry.liters) === '1' ? 'litro' : 'litros'}</span>
+                  </div>
+                  <button type="button" data-fuel-card-plus="${escHtml(idKey)}" aria-label="Aumentar litros" style="width:40px; height:40px; border-radius:50%; border:none; background:#2d3e2c; color:#ffffff; font-size:21px; font-weight:700; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(45,62,44,0.22);">+</button>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:stretch;">
+                  <div class="m3-field ${entry.unitPrice > 0 ? 'has-value' : ''}" style="margin-bottom:0;">
+                    <input type="number" min="0" step="0.01" inputmode="decimal" placeholder=" " data-fuel-card-price="${escHtml(idKey)}" value="${entry.unitPrice > 0 ? entry.unitPrice : ''}" style="font-size:13px;">
+                    <label>Precio / litro (L)</label>
+                  </div>
+                  <div style="background:#f5f9f3; border:1px solid #d5e2d2; border-radius:12px; padding:8px 10px; display:flex; flex-direction:column; justify-content:center;">
+                    <span style="font-size:10.5px; font-weight:700; color:#5a6b58; text-transform:uppercase;">Gasto del equipo</span>
+                    <span data-fuel-card-cost="${escHtml(idKey)}" style="font-size:14px; font-weight:800; color:${entryCost > 0 ? '#1b6e1b' : '#5a6b58'}; margin-top:2px;">${entryCost > 0 ? escHtml(formatCurrencyL(entryCost)) : 'L 0.00'}</span>
+                  </div>
+                </div>
+                <div style="font-size:11.5px; font-weight:600; color:#5a6b58;">
+                  ${escHtml(loteObj?.nombre || 'Lote actual')} · ${escHtml(activeDate)}
+                </div>
+              </div>
+            ` : ''}
           </div>
         `;
       }).join('');
 
-      limpiezaOptsEl.querySelectorAll('.inline-plan-limpieza-opt').forEach((optEl) => {
-        optEl.addEventListener('click', (e) => {
+      listEl.querySelectorAll('[data-fuel-motor-toggle]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          const key = optEl.dataset.limpiezaKey;
-          if (!key) return;
-          if (selectedLimpiezaTypes.has(key)) {
-            selectedLimpiezaTypes.delete(key);
+          const mid = btn.dataset.fuelMotorToggle;
+          const motor = _fuelMotoresList.find(m => String(m.id) === String(mid));
+          if (!motor) return;
+          if (selectedFuelUsageMap.has(String(mid))) {
+            selectedFuelUsageMap.delete(String(mid));
           } else {
-            selectedLimpiezaTypes.add(key);
-            if (
-              key === 'Motoguadaña' &&
-              _fuelMotoresList.length === 1 &&
-              selectedFuelUsageMap.size === 0 &&
-              !editApp &&
-              getActiveDateStr() <= todayStr
-            ) {
-              const onlyMotor = _fuelMotoresList[0];
-              selectedFuelUsageMap.set(String(onlyMotor.id), {
-                motor: onlyMotor,
-                cfg: onlyMotor._cfg,
-                liters: 0,
-                unitPrice: Number(onlyMotor._resolvedPrice) || Number(onlyMotor._cfg?.precioPorLitro) || resolveSharedFuelPrice(onlyMotor, _fuelMotoresList) || 0,
-              });
-            }
+            selectedFuelUsageMap.set(String(mid), {
+              motor,
+              cfg: motor._cfg,
+              liters: 0,
+              unitPrice: Number(motor._resolvedPrice) || Number(motor._cfg?.precioPorLitro) || resolveSharedFuelPrice(motor, _fuelMotoresList) || 0,
+            });
           }
-          renderLimpiezaChips();
+          renderMotoguadanasInSheet();
+          renderActividadResumen();
         });
       });
+
+      listEl.querySelectorAll('[data-fuel-card-minus]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const mid = btn.dataset.fuelCardMinus;
+          const entry = selectedFuelUsageMap.get(String(mid));
+          if (!entry) return;
+          entry.liters = Math.max(0, Math.round((entry.liters - 0.5) * 10) / 10);
+          syncSingleCard(mid);
+        });
+      });
+
+      listEl.querySelectorAll('[data-fuel-card-plus]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const mid = btn.dataset.fuelCardPlus;
+          const entry = selectedFuelUsageMap.get(String(mid));
+          if (!entry) return;
+          entry.liters = Math.round((entry.liters + 0.5) * 10) / 10;
+          syncSingleCard(mid);
+        });
+      });
+
+      listEl.querySelectorAll('[data-fuel-card-price]').forEach((inp) => {
+        inp.addEventListener('input', () => {
+          const mid = inp.dataset.fuelCardPrice;
+          const entry = selectedFuelUsageMap.get(String(mid));
+          if (!entry) return;
+          entry.unitPrice = Math.max(0, parseFloat(inp.value) || 0);
+          inp.closest('.m3-field')?.classList.toggle('has-value', !!inp.value);
+          syncSingleCard(mid);
+        });
+      });
+
+      updateFuelSummary();
+    };
+
+    refreshOpenFuelSheet = renderMotoguadanasInSheet;
+
+    function renderSheetStep() {
+      const cfg = getActiveTipoCfg();
+
+      if (step === 'list') {
+        if (backBtn) backBtn.style.display = 'none';
+        if (titleEl) titleEl.textContent = 'Tipo de Actividad';
+        if (subEl) subEl.textContent = 'Selecciona una opción para completar sus detalles';
+        if (doneLabel) doneLabel.textContent = 'Continuar';
+
+        bodyEl.innerHTML = `
+          <div style="padding:6px 0;">
+            ${TIPO_ITEMS.map((item) => {
+              const isSelected = item.value === cfg.value;
+              return `
+                <div class="plan-act-sheet-tipo-opt" data-tipo-val="${escHtml(item.value)}" style="padding:13px 18px; cursor:pointer; border-bottom:1px solid #f2f5f2; background:${isSelected ? '#eef6ec' : '#ffffff'}; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                  <div style="min-width:0; flex:1;">
+                    <div style="font-size:15px; font-weight:700; color:#192b1b;">${escHtml(item.title)}</div>
+                    <div style="font-size:12.5px; color:#4a5d48; margin-top:2px;">${escHtml(item.sub)}</div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                    ${isSelected ? '<span class="material-symbols-outlined" style="font-size:20px; color:#2d3e2c;">check_circle</span>' : ''}
+                    <span class="material-symbols-outlined" style="font-size:20px; color:#5a6b58;">chevron_right</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+
+        bodyEl.querySelectorAll('.plan-act-sheet-tipo-opt').forEach((optEl) => {
+          optEl.addEventListener('click', () => {
+            const val = optEl.dataset.tipoVal;
+            if (!val) return;
+            if (selectTipo) selectTipo.value = val;
+            syncActivityStateToForm();
+            step = 'details';
+            currentFocusField = 'producto';
+            renderSheetStep();
+          });
+        });
+        return;
+      }
+
+      if (backBtn) backBtn.style.display = 'flex';
+      if (titleEl) titleEl.textContent = cfg.title;
+      if (subEl) subEl.textContent = cfg.sub;
+      if (doneLabel) doneLabel.textContent = 'Listo';
+
+      if (cfg.isLimpieza) {
+        bodyEl.innerHTML = `
+          <div style="padding:14px 18px; display:flex; flex-direction:column; gap:14px;">
+            <div>
+              <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:#4a5d48; margin-bottom:8px;">
+                Tipo de Limpieza (puedes elegir varias)
+              </div>
+              <div style="border:1px solid #dde6db; border-radius:16px; overflow:hidden;">
+                ${LIMPIEZA_OPTIONS.map((opt, idx) => {
+                  const active = selectedLimpiezaTypes.has(opt.key);
+                  return `
+                    <div class="plan-act-limpieza-opt" data-limpieza-key="${escHtml(opt.key)}" style="padding:12px 14px; cursor:pointer; background:${active ? '#e6efe3' : '#ffffff'}; display:flex; align-items:center; justify-content:space-between; gap:10px; ${idx > 0 ? 'border-top:1px solid #eef2ee;' : ''}">
+                      <div style="min-width:0; flex:1;">
+                        <div style="font-size:14.5px; font-weight:700; color:#192b1b;">${escHtml(opt.label)}</div>
+                        <div style="font-size:12px; color:#4a5d48; margin-top:2px;">${escHtml(opt.sub)}</div>
+                      </div>
+                      <span class="plan-act-limpieza-check" style="width:22px; height:22px; border-radius:50%; border:1.5px solid ${active ? '#2d3e2c' : '#9eb09b'}; background:${active ? '#2d3e2c' : '#ffffff'}; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        ${active ? '<span class="material-symbols-outlined" style="font-size:15px;">check</span>' : ''}
+                      </span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <div id="plan-act-limpieza-otro-wrap" style="display:${selectedLimpiezaTypes.has('Otro') ? 'block' : 'none'};">
+              <div class="m3-field ${limpiezaOtroText ? 'has-value' : ''}" style="margin-bottom:0;">
+                <input type="text" id="plan-act-limpieza-otro" value="${escHtml(limpiezaOtroText)}" placeholder=" " style="font-size:14px;">
+                <label for="plan-act-limpieza-otro">Especificar otro tipo de limpieza</label>
+              </div>
+            </div>
+
+            <div id="plan-act-motoguadanas-box" style="display:none; background:#f8faf8; border:1.5px solid #d4ded3; border-radius:14px; padding:14px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                <span style="font-size:11px; font-weight:800; text-transform:uppercase; color:#2d3e2c; letter-spacing:0.5px;">Motoguadañas / Equipos usados</span>
+                <span id="plan-act-fuel-area-pill" style="font-size:11px; font-weight:700; color:#2d3e2c; background:#eaf2e8; border:1px solid #c2d8c0; border-radius:999px; padding:3px 9px; white-space:nowrap;"></span>
+              </div>
+              <div id="plan-act-fuel-existing-box" style="display:none; margin-bottom:10px;"></div>
+              <div id="plan-act-motoguadanas-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+              <div id="plan-act-fuel-summary" style="display:none; margin-top:10px;"></div>
+            </div>
+          </div>
+        `;
+
+        const otroWrap = document.getElementById('plan-act-limpieza-otro-wrap');
+        const otroInp = document.getElementById('plan-act-limpieza-otro');
+
+        bodyEl.querySelectorAll('.plan-act-limpieza-opt').forEach((optEl) => {
+          optEl.addEventListener('click', () => {
+            const key = optEl.dataset.limpiezaKey;
+            if (!key) return;
+            if (selectedLimpiezaTypes.has(key)) {
+              selectedLimpiezaTypes.delete(key);
+            } else {
+              selectedLimpiezaTypes.add(key);
+              if (
+                key === 'Motoguadaña' &&
+                _fuelMotoresList.length === 1 &&
+                selectedFuelUsageMap.size === 0 &&
+                !editApp &&
+                getActiveDateStr() <= todayStr
+              ) {
+                const onlyMotor = _fuelMotoresList[0];
+                selectedFuelUsageMap.set(String(onlyMotor.id), {
+                  motor: onlyMotor,
+                  cfg: onlyMotor._cfg,
+                  liters: 0,
+                  unitPrice: Number(onlyMotor._resolvedPrice) || Number(onlyMotor._cfg?.precioPorLitro) || resolveSharedFuelPrice(onlyMotor, _fuelMotoresList) || 0,
+                });
+              }
+            }
+
+            const isNowActive = selectedLimpiezaTypes.has(key);
+            optEl.style.background = isNowActive ? '#e6efe3' : '#ffffff';
+            const checkEl = optEl.querySelector('.plan-act-limpieza-check');
+            if (checkEl) {
+              checkEl.style.borderColor = isNowActive ? '#2d3e2c' : '#9eb09b';
+              checkEl.style.background = isNowActive ? '#2d3e2c' : '#ffffff';
+              checkEl.innerHTML = isNowActive ? '<span class="material-symbols-outlined" style="font-size:15px;">check</span>' : '';
+            }
+            if (otroWrap) {
+              otroWrap.style.display = selectedLimpiezaTypes.has('Otro') ? 'block' : 'none';
+              if (selectedLimpiezaTypes.has('Otro') && key === 'Otro') {
+                setTimeout(() => otroInp?.focus(), 60);
+              }
+            }
+            syncActivityStateToForm();
+            renderMotoguadanasInSheet();
+          });
+        });
+
+        otroInp?.addEventListener('input', () => {
+          limpiezaOtroText = otroInp.value;
+          otroInp.closest('.m3-field')?.classList.toggle('has-value', !!limpiezaOtroText);
+          syncActivityStateToForm();
+        });
+
+        renderMotoguadanasInSheet();
+        return;
+      }
+
+      if (!draftByTipo[cfg.value]) {
+        draftByTipo[cfg.value] = { producto: '', dosis: '' };
+      }
+      const draft = draftByTipo[cfg.value];
+      const prodVal = draft.producto || '';
+      const dosisVal = cfg.needsDosis ? (draft.dosis || '') : '';
+
+      bodyEl.innerHTML = `
+        <div style="padding:18px 18px 20px; display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <div class="m3-field ${prodVal ? 'has-value' : ''}" style="margin-bottom:4px;">
+              <input type="text" id="plan-act-sheet-producto" value="${escHtml(prodVal)}" placeholder=" " autocomplete="off" style="font-size:14px;">
+              <label for="plan-act-sheet-producto">${escHtml(cfg.prodLabel)}</label>
+            </div>
+            <div style="font-size:11.5px; color:#5a6b58; margin:0 4px;">${escHtml(cfg.prodHint)}</div>
+          </div>
+          ${cfg.needsDosis ? `
+            <div>
+              <div class="m3-field ${dosisVal ? 'has-value' : ''}" style="margin-bottom:4px;">
+                <input type="text" id="plan-act-sheet-dosis" value="${escHtml(dosisVal)}" placeholder=" " autocomplete="off" style="font-size:14px;">
+                <label for="plan-act-sheet-dosis">Dosis</label>
+              </div>
+              <div style="font-size:11.5px; color:#5a6b58; margin:0 4px;">${escHtml(cfg.dosisHint)}</div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      const prodInp = document.getElementById('plan-act-sheet-producto');
+      const dosisInp = document.getElementById('plan-act-sheet-dosis');
+
+      prodInp?.addEventListener('input', () => {
+        draftByTipo[cfg.value].producto = prodInp.value;
+        prodInp.closest('.m3-field')?.classList.toggle('has-value', !!prodInp.value);
+        syncActivityStateToForm();
+      });
+
+      dosisInp?.addEventListener('input', () => {
+        draftByTipo[cfg.value].dosis = dosisInp.value;
+        dosisInp.closest('.m3-field')?.classList.toggle('has-value', !!dosisInp.value);
+        syncActivityStateToForm();
+      });
+
+      setTimeout(() => {
+        if (currentFocusField === 'dosis' && dosisInp) {
+          dosisInp.focus();
+        } else {
+          prodInp?.focus();
+        }
+      }, 100);
     }
 
-    if (limpiezaOtroWrap) {
-      limpiezaOtroWrap.style.display = selectedLimpiezaTypes.has('Otro') ? 'block' : 'none';
-    }
-    syncLimpiezaProductoValue();
-    renderMotoguadanasBox();
+    renderSheetStep();
   };
 
-  if (limpiezaTrigger && limpiezaMenu) {
-    limpiezaTrigger.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = limpiezaMenu.style.display === 'block';
-      if (tipoMenu) tipoMenu.style.display = 'none';
-      if (tipoArrow) tipoArrow.style.transform = 'rotate(0deg)';
-      limpiezaMenu.style.display = isOpen ? 'none' : 'block';
-      if (limpiezaArrow) limpiezaArrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
-    });
-    limpiezaDoneBtn?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      limpiezaMenu.style.display = 'none';
-      if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
-    });
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#inline-plan-limpieza-wrap')) {
-        limpiezaMenu.style.display = 'none';
-        if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
-      }
-    });
-  }
+  tipoTrigger?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openActividadBottomSheet('list');
+  });
 
-  limpiezaOtroInput?.addEventListener('input', () => {
-    limpiezaOtroInput.closest('.m3-field')?.classList.toggle('has-value', !!limpiezaOtroInput.value);
-    syncLimpiezaProductoValue();
+  actividadResumenBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openActividadBottomSheet('details');
   });
 
   if (inputLoteEl && inputLoteEl.tagName === 'SELECT') {
     inputLoteEl.addEventListener('change', () => {
-      if (selectTipo?.value === 'Limpieza' && selectedLimpiezaTypes.has('Motoguadaña')) {
-        renderMotoguadanasBox();
+      syncActivityStateToForm();
+      if (typeof refreshOpenFuelSheet === 'function') {
+        refreshOpenFuelSheet();
       }
     });
   }
+
+  syncActivityStateToForm();
 
   // Multi-operator management
   let selectedOperadores = resolvedOperador ? resolvedOperador.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -1985,8 +2221,9 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
           if (submitIcon) submitIcon.textContent = 'calendar_add_on';
         }
       }
-      if (selectTipo?.value === 'Limpieza' && selectedLimpiezaTypes.has('Motoguadaña')) {
-        renderMotoguadanasBox();
+      syncActivityStateToForm();
+      if (typeof refreshOpenFuelSheet === 'function') {
+        refreshOpenFuelSheet();
       }
     });
   }
@@ -2052,84 +2289,30 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
     });
   }
 
-  // Handle dynamic visibility and placeholders by tipo
-  const updateTipoFields = () => {
-    const t = selectTipo.value;
-    if (t === 'Limpieza') {
-      if (fieldProducto) fieldProducto.style.display = 'none';
-      if (inputProducto) inputProducto.required = false;
-      if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) inputDosis.required = false;
-      if (limpiezaSection) limpiezaSection.style.display = 'flex';
-      renderLimpiezaChips();
-      syncLimpiezaProductoValue();
-      return;
-    }
-
-    if (fieldProducto) fieldProducto.style.display = 'block';
-    if (inputProducto) inputProducto.required = true;
-    if (limpiezaSection) limpiezaSection.style.display = 'none';
-    if (limpiezaMenu) limpiezaMenu.style.display = 'none';
-    if (limpiezaArrow) limpiezaArrow.style.transform = 'rotate(0deg)';
-
-    if (t === 'Manejo de Tejido') {
-      if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; }
-      if (labelProducto) labelProducto.textContent = 'Tipo de Poda o Manejo';
-      inputProducto.placeholder = 'Ej: Poda de formación, Descope, Deschuponado...';
-    } else if (t === 'Análisis de Suelo') {
-      if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; }
-      if (labelProducto) labelProducto.textContent = 'Tipo de Análisis / Muestreo';
-      inputProducto.placeholder = 'Ej: Muestreo compuesto de suelo, pH...';
-    } else if (t === 'Control Fitosanitario') {
-      if (fieldDosis) fieldDosis.style.display = 'block';
-      if (inputDosis) inputDosis.required = true;
-      if (labelProducto) labelProducto.textContent = 'Fungicida o Insecticida';
-      inputProducto.placeholder = 'Ej: Opera (Fungicida Roya), Brocap...';
-      inputDosis.placeholder = 'Ej: 40 cc / bomba 20L';
-    } else if (t === 'Fertilización al Suelo') {
-      if (fieldDosis) fieldDosis.style.display = 'block';
-      if (inputDosis) inputDosis.required = true;
-      if (labelProducto) labelProducto.textContent = 'Fertilizante / Fórmula';
-      inputProducto.placeholder = 'Ej: 18-46-0, Urea, Caldolomita...';
-      inputDosis.placeholder = 'Ej: 120 g / planta, 4 sacos...';
-    } else if (t === 'Aplicación Foliar') {
-      if (fieldDosis) fieldDosis.style.display = 'block';
-      if (inputDosis) inputDosis.required = true;
-      if (labelProducto) labelProducto.textContent = 'Nutrición Foliar / Producto';
-      inputProducto.placeholder = 'Ej: Zinc-Boro + Aminoácidos';
-      inputDosis.placeholder = 'Ej: 50 cc / bomba 20L';
-    } else {
-      if (fieldDosis) fieldDosis.style.display = 'none';
-      if (inputDosis) { inputDosis.required = false; }
-      if (labelProducto) labelProducto.textContent = 'Nombre de la Labor';
-      inputProducto.placeholder = 'Ej: Nombre de la labor o insumo';
-    }
-  };
-
-  selectTipo.addEventListener('change', updateTipoFields);
-  updateTipoFields();
-
   // Submit handler
   const form = document.getElementById('form-plan-inline-actividad');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    syncActivityStateToForm();
+    const activeTipoCfg = getActiveTipoCfg();
     let fuelLoadsToCreate = [];
-    if (selectTipo.value === 'Limpieza') {
-      syncLimpiezaProductoValue();
-      if (!inputProducto.value.trim()) {
+
+    if (activeTipoCfg.isLimpieza) {
+      if (!inputProducto?.value.trim()) {
         window.Snackbar?.show('Selecciona al menos un tipo de limpieza', { type: 'error' });
+        openActividadBottomSheet('details');
         return;
       }
       if (selectedLimpiezaTypes.has('Motoguadaña') && getActiveDateStr() <= todayStr) {
         if (!editApp && _fuelMotoresList.length > 0 && selectedFuelUsageMap.size === 0) {
           window.Snackbar?.show('Selecciona al menos una motoguadaña usada', { type: 'error' });
+          openActividadBottomSheet('details');
           return;
         }
         for (const entry of selectedFuelUsageMap.values()) {
           if (!editApp && !(entry.liters > 0)) {
             window.Snackbar?.show(`Indica los litros de gasolina usados en ${entry.motor.nombre}`, { type: 'error' });
+            openActividadBottomSheet('details');
             return;
           }
           if (entry.liters > 0) {
@@ -2141,6 +2324,17 @@ function showInlineActividadForm(defaultDate, editAppId = null) {
             });
           }
         }
+      }
+    } else {
+      if (!inputProducto?.value.trim()) {
+        window.Snackbar?.show(`Ingresa ${activeTipoCfg.prodLabel.toLowerCase()}`, { type: 'error' });
+        openActividadBottomSheet('details', 'producto');
+        return;
+      }
+      if (activeTipoCfg.needsDosis && !inputDosis?.value.trim()) {
+        window.Snackbar?.show('Ingresa la dosis aplicada', { type: 'error' });
+        openActividadBottomSheet('details', 'dosis');
+        return;
       }
     }
 
@@ -2880,6 +3074,8 @@ export function initPlanIfcafe() {
   };
 
   window.cancelInlineActividad = function(defaultDate) {
+    document.getElementById('plan-actividad-sheet-overlay')?.remove();
+    document.getElementById('plan-responsables-sheet-overlay')?.remove();
     if (document.getElementById('modal-container')?.classList.contains('active')) {
       closeModal();
       return;
@@ -2998,6 +3194,8 @@ export function initPlanIfcafe() {
       }
 
       invalidateCache('lote_aplicaciones');
+      document.getElementById('plan-actividad-sheet-overlay')?.remove();
+      document.getElementById('plan-responsables-sheet-overlay')?.remove();
       closeModal();
       reloadCurrentView(data.lote_id);
     } catch (err) {
