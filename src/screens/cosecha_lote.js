@@ -687,29 +687,6 @@ export function createCosechaController(lote, containerId = 'dl-cosecha-wrap') {
               </div>
             </div>
           `).join('')}
-
-          <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:#4a5d48; margin:14px 0 8px;">
-            Por semana · Toca para ver
-          </div>
-          ${allWeeksHistory.map(w => `
-            <div class="cos-all-week-card" data-ws-iso="${escapeHtml(w.wsIso)}" style="background:#f5f7f3; border-radius:16px; padding:11px 14px; margin-bottom:8px; cursor:pointer; border:1px solid #e6ece4;">
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                <div style="min-width:0; flex:1;">
-                  <div style="font-size:13.5px; font-weight:700; color:#111827;">Sem. ${escapeHtml(w.weekShort)} ${escapeHtml(w.weekYear)}</div>
-                  <div style="font-size:12px; color:#5a6b58; margin-top:1px;">
-                    ${plural(w.cutDaysCount, 'día', 'días')} · ${plural(w.colsCount, 'colaborador', 'colaboradores')} · ${statusChipHtml(w.status)}
-                  </div>
-                </div>
-                <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                  <span style="display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.15;">
-                    <span style="font-size:13.5px; font-weight:800; color:#1b6e1b;">${formatLatas(w.totalLatas)} ${w.totalLatas === 1 ? 'lata' : 'latas'}</span>
-                    <span style="font-size:12px; font-weight:800; color:#b34200;">L ${Math.round(w.totalPay).toLocaleString('es-HN')}</span>
-                  </span>
-                  <span class="material-symbols-outlined" style="font-size:18px; color:#5a6b58;">chevron_right</span>
-                </div>
-              </div>
-            </div>
-          `).join('')}
         `}
       `;
 
